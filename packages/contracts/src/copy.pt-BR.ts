@@ -84,6 +84,12 @@ export const COPY = {
     semConexao: 'Sem conexão — tentando reconectar. Seus pedidos estão salvos aqui.',
   },
 
+  /** Usada enquanto uma área do produto ainda não existe (scaffold dos apps). */
+  sistema: {
+    /** Vars: {epico} */
+    emConstrucao: 'Essa área chega no Épico {epico}.',
+  },
+
   /** Erros. Nunca com emoji, nunca culpando o cliente (§2.4). */
   erros: {
     generico: 'Ops, algo queimou aqui do nosso lado. Já estamos apagando o fogo — tenta de novo em instantes.',
