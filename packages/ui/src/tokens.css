@@ -25,6 +25,10 @@
   --green-500: #12a454;
   --amber-500: #f5a623;
   --red-500: #e4404e;
+  /* Vermelho escuro para TEXTO e para o preenchimento do botão de perigo.
+     O red-500 tem só 4.08:1 com branco e 3.75:1 como texto sobre fundo claro —
+     reprova AA nos dois papéis. Mesmo padrão de purple-500/purple-700. */
+  --red-700: #c62f3b;
   --blue-500: #3d5afe;
   --pix: #32bcad;
 
@@ -41,10 +45,22 @@
   --bg: var(--surface);
   --bg-card: var(--white);
   --border: var(--line);
+  /* Borda de campo de formulário: a borda É a única pista visual de que ali se
+     digita, então precisa de 3:1 (WCAG 1.4.11). A --border (1.13:1) serve para
+     divisor decorativo, não para delimitar campo. */
+  --border-strong: var(--ink-400);
   --positive: var(--green-500);
   --caution: var(--amber-500);
   --critical: var(--red-500);
+  --critical-strong: var(--red-700);
   --info: var(--blue-500);
+
+  /* Estado desabilitado.
+     `opacity: 40%` desbota texto e fundo juntos e derruba o contraste para
+     ~1.4:1 — "desabilitado" vira "invisível". Trocado por um par de tokens que
+     lê como inativo (cinza, sem cor de marca) e continua legível: 5.8:1. */
+  --disabled-surface: var(--line);
+  --disabled-text: var(--ink-600);
 
   /* ── Status de pedido (timeline e dataviz) — §3.2 ── */
   --status-received: var(--blue-500);

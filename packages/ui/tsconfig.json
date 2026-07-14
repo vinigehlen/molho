@@ -6,5 +6,12 @@
     "types": ["vitest/globals", "@testing-library/jest-dom"],
     "noEmit": true
   },
-  "include": ["src/**/*", "tailwind-preset.ts", ".storybook/**/*", "vitest.config.ts"]
+  "include": [
+    "src/**/*",
+    "e2e/**/*",
+    "tailwind-preset.ts",
+    ".storybook/**/*",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
 }

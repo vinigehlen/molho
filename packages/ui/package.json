@@ -14,6 +14,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:contrast": "playwright test",
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build": "storybook build -o storybook-static --quiet"
@@ -29,6 +30,7 @@
     "react-dom": "^19"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@storybook/addon-a11y": "^9.0.0",
     "@storybook/addon-docs": "^9.0.0",
     "@storybook/react-vite": "^9.0.0",

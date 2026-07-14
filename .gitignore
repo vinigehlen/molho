@@ -48,3 +48,8 @@ pnpm-debug.log*
 .claude/
 .agents/
 skills-lock.json
+
+# ─── Playwright ────────────────────────────
+playwright-report
+blob-report
+.playwright

@@ -33,10 +33,20 @@ const preset = {
           DEFAULT: 'var(--bg)',
           card: 'var(--bg-card)',
         },
-        border: 'var(--border)',
+        border: {
+          DEFAULT: 'var(--border)',
+          strong: 'var(--border-strong)',
+        },
+        disabled: {
+          surface: 'var(--disabled-surface)',
+          text: 'var(--disabled-text)',
+        },
         positive: 'var(--positive)',
         caution: 'var(--caution)',
-        critical: 'var(--critical)',
+        critical: {
+          DEFAULT: 'var(--critical)',
+          strong: 'var(--critical-strong)',
+        },
         info: 'var(--info)',
         pix: 'var(--pix)',
         status: {

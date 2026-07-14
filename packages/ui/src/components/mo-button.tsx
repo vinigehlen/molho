@@ -19,7 +19,11 @@ const buttonVariants = cva(
     'transition duration-base ease-out',
     'focus-visible:outline-none focus-visible:shadow-focus',
     'active:scale-[.98]',
-    'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
+    // Desabilitado é um PAR DE TOKENS, não opacidade. `opacity: 40%` desbota
+    // texto e fundo juntos e derruba o contraste a ~1.4:1 (medido). Assim o
+    // botão lê como inativo — cinza, sem cor de marca — e continua legível.
+    'disabled:bg-disabled-surface disabled:text-disabled-text',
+    'disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:brightness-100',
   ],
   {
     variants: {
@@ -27,8 +31,11 @@ const buttonVariants = cva(
         primary: 'bg-brand text-on-brand hover:brightness-95',
         secondary: 'bg-brand-subtle text-brand-strong hover:brightness-95',
         ghost: 'bg-transparent text-brand-strong hover:bg-brand-faint',
-        danger: 'bg-critical text-white hover:brightness-95',
-        pix: 'bg-pix text-white hover:brightness-95',
+        // O red-500 do doc só alcança 4.08:1 com branco: usa-se o tom forte.
+        danger: 'bg-critical-strong text-white hover:brightness-95',
+        // A cor do PIX é do Banco Central e não se toca — o que muda é o texto.
+        // Branco sobre o teal dá 2.35:1; ink dá 7.9:1.
+        pix: 'bg-pix text-text hover:brightness-95',
       },
       size: {
         // O alvo de toque nunca cai abaixo de 44px (§6.1).

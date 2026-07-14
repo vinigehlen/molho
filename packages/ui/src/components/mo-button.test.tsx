@@ -78,15 +78,27 @@ describe('MoButton', () => {
     expect(button).toHaveClass('text-on-brand');
   });
 
+  // Contraste real medido em e2e/contrast.spec.ts. Aqui só travamos a escolha
+  // de token, que foi contraintuitiva: o teal do PIX é claro demais para texto
+  // branco (2.35:1), então o texto é ink (7.9:1). A cor do Banco Central fica.
   it.each([
-    ['danger', 'bg-critical'],
-    ['pix', 'bg-pix'],
-  ] as const)('a variante %s mantém o texto branco sobre o fundo', (variant, bg) => {
+    ['danger', 'bg-critical-strong', 'text-white'],
+    ['pix', 'bg-pix', 'text-text'],
+  ] as const)('a variante %s usa o par de tokens que passa AA', (variant, bg, fg) => {
     render(<MoButton variant={variant}>Ação</MoButton>);
 
     const button = screen.getByRole('button');
     expect(button).toHaveClass(bg);
-    expect(button).toHaveClass('text-white');
+    expect(button).toHaveClass(fg);
+  });
+
+  it('desabilitado não é opacidade: é par de tokens legível', () => {
+    render(<MoButton disabled>Loja fechada</MoButton>);
+
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('disabled:bg-disabled-surface');
+    expect(button).toHaveClass('disabled:text-disabled-text');
+    expect(button.className).not.toContain('opacity-40');
   });
 
   it('encaminha a ref para o elemento nativo', () => {

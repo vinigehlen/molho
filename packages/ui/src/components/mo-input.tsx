@@ -62,18 +62,23 @@ export const MoInput = React.forwardRef<HTMLInputElement, MoInputProps>(function
         className={cn(
           'h-[52px] w-full rounded-md px-4',
           'bg-bg-card text-body text-text placeholder:text-text-disabled',
-          'border border-border',
+          // border-strong, não border: num campo vazio a borda é a ÚNICA pista
+          // de que ali se digita, então ela precisa dos 3:1 da WCAG 1.4.11.
+          // A --border (1.13:1 sobre o fundo) serve para divisor, não para campo.
+          'border border-border-strong',
           'transition duration-base ease-out',
           'focus-visible:outline-none focus-visible:border-brand focus-visible:shadow-focus',
-          'disabled:opacity-40 disabled:cursor-not-allowed',
+          'disabled:bg-disabled-surface disabled:text-disabled-text disabled:cursor-not-allowed',
           error && 'border-critical',
           className,
         )}
         {...props}
       />
 
+      {/* critical-strong (e não critical): o red-500 dá 3.75:1 sobre fundo claro,
+          e a mensagem de erro é justamente o texto que PRECISA ser lido. */}
       {error ? (
-        <p id={errorId} role="alert" className="text-caption text-critical">
+        <p id={errorId} role="alert" className="text-caption text-critical-strong">
           {error}
         </p>
       ) : null}

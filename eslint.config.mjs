@@ -60,6 +60,18 @@ export default tseslint.config(
     },
   },
 
+  // Scripts .mjs rodam no Node (servidor estático do teste de contraste).
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+
   // Testes e stories podem usar mocks/valores literais à vontade.
   {
     files: ['**/*.test.{ts,tsx}', '**/*.stories.{ts,tsx}', '**/vitest.setup.ts'],
