@@ -68,6 +68,27 @@ describe('MoButton', () => {
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
   });
 
+  // O merge de classes já engoliu a cor do texto uma vez (ver lib/cn.test.ts):
+  // o primário ficava com ink herdado, e no tema Grafite era preto sobre preto.
+  it('o primário chega ao DOM com a cor da marca E a cor do texto sobre ela', () => {
+    render(<MoButton variant="primary">Finalizar pedido</MoButton>);
+
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('bg-brand');
+    expect(button).toHaveClass('text-on-brand');
+  });
+
+  it.each([
+    ['danger', 'bg-critical'],
+    ['pix', 'bg-pix'],
+  ] as const)('a variante %s mantém o texto branco sobre o fundo', (variant, bg) => {
+    render(<MoButton variant={variant}>Ação</MoButton>);
+
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass(bg);
+    expect(button).toHaveClass('text-white');
+  });
+
   it('encaminha a ref para o elemento nativo', () => {
     const ref = { current: null } as React.RefObject<HTMLButtonElement | null>;
     render(<MoButton ref={ref}>Salvar</MoButton>);
