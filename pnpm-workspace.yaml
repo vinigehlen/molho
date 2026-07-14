@@ -3,8 +3,8 @@ packages:
   - "packages/*"
 
 # pnpm 10+ exige aprovação explícita de scripts de postinstall.
-onlyBuiltDependencies:
-  - "@swc/core"
-  - esbuild
-  - sharp
-  - unrs-resolver
+allowBuilds:
+  esbuild: true
+  sharp: true
+  "@swc/core": true
+  unrs-resolver: true

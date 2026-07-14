@@ -1,0 +1,111 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+ * TEMPERO — design tokens do Molho
+ * Fonte da verdade: docs/04-brand-design-system.md §4
+ *
+ * Três camadas: primitivos (valor bruto) → semânticos (intenção) → componente.
+ * Componentes usam APENAS semânticos. O white-label do storefront sobrescreve
+ * o bloco --brand-* em runtime (ver themes.ts) — nada mais é customizável.
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Primitivos: cor ── */
+  --purple-950: #2d0a4e;
+  --purple-900: #4b0082;
+  --purple-700: #6d0aad;
+  --purple-500: #820ad1;
+  --purple-300: #b565f3;
+  --purple-100: #efe1fb;
+  --purple-050: #f8f1fe;
+  --ink-900: #141216;
+  --ink-600: #585666;
+  --ink-400: #8e8b9a;
+  --white: #fff;
+  --surface: #f5f5f7;
+  --line: #e9e7ee;
+  --green-500: #12a454;
+  --amber-500: #f5a623;
+  --red-500: #e4404e;
+  --blue-500: #3d5afe;
+  --pix: #32bcad;
+
+  /* ── Semânticos: cor (white-label troca só o bloco brand) ── */
+  --brand: var(--purple-500);
+  --brand-strong: var(--purple-700);
+  --brand-subtle: var(--purple-100);
+  --brand-faint: var(--purple-050);
+  --brand-accent: var(--purple-300);
+  --on-brand: var(--white);
+  --text: var(--ink-900);
+  --text-muted: var(--ink-600);
+  --text-disabled: var(--ink-400);
+  --bg: var(--surface);
+  --bg-card: var(--white);
+  --border: var(--line);
+  --positive: var(--green-500);
+  --caution: var(--amber-500);
+  --critical: var(--red-500);
+  --info: var(--blue-500);
+
+  /* ── Status de pedido (timeline e dataviz) — §3.2 ── */
+  --status-received: var(--blue-500);
+  --status-preparing: var(--amber-500);
+  --status-ready: var(--purple-300);
+  --status-in-transit: var(--purple-500);
+  --status-completed: var(--green-500);
+  --status-canceled: var(--ink-400);
+
+  /* ── Espaço (escala 4pt) ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* ── Raio ── */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* ── Elevação ── */
+  --e-1: 0 1px 2px rgb(20 18 22 / 5%);
+  --e-2: 0 4px 20px rgb(20 18 22 / 6%);
+  --e-3: 0 12px 40px rgb(20 18 22 / 12%);
+
+  /* ── Tipo ── */
+  --font: 'Inter', system-ui, sans-serif;
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 120ms;
+  --t-base: 180ms;
+  --t-slow: 240ms;
+
+  /* ── Toque/foco ── */
+  --touch-min: 44px;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+/* Números financeiros: sempre tabulares (PDV, caixa, dashboard) — §3.3 */
+.tnum {
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+/* Motion é assinatura da marca, mas nunca à força — §3.5 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
