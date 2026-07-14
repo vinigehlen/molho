@@ -21,6 +21,9 @@ const preset = {
           accent: 'var(--brand-accent)',
         },
         'on-brand': 'var(--on-brand)',
+        // Branco também vem do token: `danger` e `pix` têm texto branco fixo, que
+        // não acompanha o --on-brand do tema do lojista.
+        white: 'var(--white)',
         text: {
           DEFAULT: 'var(--text)',
           muted: 'var(--text-muted)',

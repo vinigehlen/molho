@@ -1,0 +1,91 @@
+'use client';
+
+import { type VariantProps, cva } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
+import * as React from 'react';
+import { cn } from '../lib/cn';
+
+/**
+ * MoButton — doc de marca §5.1.
+ *
+ * 52px de altura no mobile (dedo com pressa, cozinha em hora de pico), 44px no
+ * desktop. `pix` é variante própria porque a cor do PIX é do Banco Central e
+ * nunca acompanha o tema do lojista.
+ */
+const buttonVariants = cva(
+  [
+    'relative inline-flex items-center justify-center gap-2',
+    'rounded-md font-semibold',
+    'transition duration-base ease-out',
+    'focus-visible:outline-none focus-visible:shadow-focus',
+    'active:scale-[.98]',
+    'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
+  ],
+  {
+    variants: {
+      variant: {
+        primary: 'bg-brand text-on-brand hover:brightness-95',
+        secondary: 'bg-brand-subtle text-brand-strong hover:brightness-95',
+        ghost: 'bg-transparent text-brand-strong hover:bg-brand-faint',
+        danger: 'bg-critical text-white hover:brightness-95',
+        pix: 'bg-pix text-white hover:brightness-95',
+      },
+      size: {
+        // O alvo de toque nunca cai abaixo de 44px (§6.1).
+        md: 'h-[52px] sm:h-11 px-6 text-body-strong',
+        sm: 'h-11 px-4 text-body-strong',
+      },
+      fullWidth: {
+        true: 'w-full',
+        false: '',
+      },
+    },
+    defaultVariants: {
+      variant: 'primary',
+      size: 'md',
+      fullWidth: false,
+    },
+  },
+);
+
+export interface MoButtonProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'>,
+    VariantProps<typeof buttonVariants> {
+  /** Troca o conteúdo por um spinner sem mudar a largura do botão. */
+  loading?: boolean;
+  /** Ícone à esquerda (20px). */
+  icon?: React.ReactNode;
+}
+
+export const MoButton = React.forwardRef<HTMLButtonElement, MoButtonProps>(function MoButton(
+  { className, variant, size, fullWidth, loading = false, icon, children, disabled, ...props },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type={props.type ?? 'button'}
+      disabled={disabled ?? loading}
+      aria-busy={loading || undefined}
+      className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+      {...props}
+    >
+      {/* O conteúdo continua ocupando espaço enquanto carrega — o botão não encolhe
+          nem "pula" debaixo do dedo do lojista. */}
+      <span className={cn('inline-flex items-center gap-2', loading && 'invisible')}>
+        {icon ? (
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
+        {children}
+      </span>
+
+      {loading ? (
+        <span className="absolute inset-0 inline-flex items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+        </span>
+      ) : null}
+    </button>
+  );
+});
