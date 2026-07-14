@@ -19,6 +19,10 @@ export default tseslint.config(
       '**/storybook-static/**',
       '**/*.config.js',
       '**/*.config.mjs',
+      // Gerado pelo Next a cada build; o próprio arquivo diz "não edite" e
+      // exige triple-slash reference — conflita com @typescript-eslint por
+      // convenção do Next, não por erro nosso.
+      '**/next-env.d.ts',
     ],
   },
 
