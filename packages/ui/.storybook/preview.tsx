@@ -5,15 +5,27 @@ import '../src/tokens.css';
 import './preview.css';
 
 /**
- * Troca o tema do storefront ao vivo — é o mesmo mecanismo que o tenant usa em
- * produção: injetar o bloco --brand-* no elemento raiz. Nenhum CSS por tema.
+ * Aplica o tema no <html>, e não num wrapper.
+ *
+ * É o mesmo mecanismo da produção (o storefront injeta o bloco --brand-* no
+ * elemento raiz do tenant) e resolve um problema real: conteúdo em portal —
+ * MoSheet, toasts — vive fora da árvore do Storybook. Preso a um wrapper, o
+ * sheet renderizaria sempre no tema roxo e escaparia do portão de contraste.
  */
 const withTheme: Decorator = (Story, context) => {
   const key = (context.globals.theme as ThemeKey) ?? 'roxo';
-  const vars = themeToCssVars(THEMES[key]) as React.CSSProperties;
+
+  React.useLayoutEffect(() => {
+    const raiz = document.documentElement;
+    const vars = themeToCssVars(THEMES[key]);
+
+    for (const [prop, valor] of Object.entries(vars)) {
+      raiz.style.setProperty(prop, valor);
+    }
+  }, [key]);
 
   return (
-    <div style={vars} className="bg-bg text-text font-sans p-6">
+    <div className="bg-bg text-text font-sans p-6">
       <Story />
     </div>
   );

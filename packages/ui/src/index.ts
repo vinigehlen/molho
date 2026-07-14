@@ -12,7 +12,7 @@ export * from './components/mo-card';
 export * from './components/mo-chip';
 export * from './components/mo-empty-state';
 export * from './components/mo-input';
+export * from './components/mo-sheet';
 export * from './components/mo-skeleton';
 export * from './components/mo-stepper';
 export * from './components/mo-timeline';
-// TODO(épico 1): MoSheet

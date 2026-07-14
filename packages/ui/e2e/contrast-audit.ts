@@ -106,7 +106,10 @@ export function auditarContraste(limiares: LimiaresContraste): Amostra[] {
     return classe ? `${tag}.${classe}` : tag;
   };
 
-  const raiz = document.querySelector('#storybook-root');
+  // Varre o <body> inteiro, e não só o #storybook-root: MoSheet e toasts vivem
+  // em portal, fora da árvore do Storybook. Medindo só a raiz, o sheet — que é
+  // onde o cliente escolhe o prato — escaparia do portão.
+  const raiz = document.body;
   if (!raiz) return [];
 
   const amostras: Amostra[] = [];
