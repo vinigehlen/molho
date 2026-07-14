@@ -49,13 +49,15 @@ const preset = {
         },
         info: 'var(--info)',
         pix: 'var(--pix)',
+        // Cada status carrega o texto que vai sobre ele: bg-status-preparing
+        // anda junto com text-status-preparing-on. Ver tokens.css.
         status: {
-          received: 'var(--status-received)',
-          preparing: 'var(--status-preparing)',
-          ready: 'var(--status-ready)',
-          'in-transit': 'var(--status-in-transit)',
-          completed: 'var(--status-completed)',
-          canceled: 'var(--status-canceled)',
+          received: { DEFAULT: 'var(--status-received)', on: 'var(--status-received-on)' },
+          preparing: { DEFAULT: 'var(--status-preparing)', on: 'var(--status-preparing-on)' },
+          ready: { DEFAULT: 'var(--status-ready)', on: 'var(--status-ready-on)' },
+          'in-transit': { DEFAULT: 'var(--status-in-transit)', on: 'var(--status-in-transit-on)' },
+          completed: { DEFAULT: 'var(--status-completed)', on: 'var(--status-completed-on)' },
+          canceled: { DEFAULT: 'var(--status-canceled)', on: 'var(--status-canceled-on)' },
         },
       },
       borderRadius: {

@@ -62,13 +62,23 @@
   --disabled-surface: var(--line);
   --disabled-text: var(--ink-600);
 
-  /* ── Status de pedido (timeline e dataviz) — §3.2 ── */
+  /* ── Status de pedido (timeline e dataviz) — §3.2 ──
+     Cada status tem um par: a cor (fundo do selo, dot da timeline) e o texto
+     que vai SOBRE ela. O texto não é branco por padrão — medido no Chromium,
+     branco sobre o âmbar dá 2.03:1, sobre o verde 3.25:1 e sobre o lilás
+     3.43:1. Onde o branco reprova, o texto é ink. */
   --status-received: var(--blue-500);
+  --status-received-on: var(--white); /* 5.13:1 */
   --status-preparing: var(--amber-500);
+  --status-preparing-on: var(--ink-900); /* 9.19:1 */
   --status-ready: var(--purple-300);
+  --status-ready-on: var(--ink-900); /* 5.43:1 */
   --status-in-transit: var(--purple-500);
+  --status-in-transit-on: var(--white); /* 7.21:1 */
   --status-completed: var(--green-500);
+  --status-completed-on: var(--ink-900); /* 5.73:1 */
   --status-canceled: var(--ink-400);
+  --status-canceled-on: var(--ink-900); /* 5.60:1 */
 
   /* ── Espaço (escala 4pt) ── */
   --sp-1: 4px;
