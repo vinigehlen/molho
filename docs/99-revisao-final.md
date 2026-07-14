@@ -1,9 +1,9 @@
 # Molho — Revisão Final Pré-Desenvolvimento
 **3ª auditoria · Julho/2026 · Plano v2.0 (Release Candidate)**
 
-## Status: PRONTO PARA O CLAUDE CODE, com 2 decisões suas pendentes
+## Status: PRONTO PARA O CLAUDE CODE — decisões D1 e D2 fechadas em 13/07/2026
 
-Revisei os 6 documentos linha a linha, cruzando escopo × roadmap × registry × regras × prompt. Encontrei **7 inconsistências (corrigidas)**, **2 decisões abertas (suas)** e **3 pendências externas (burocráticas)**.
+Revisei os 6 documentos linha a linha, cruzando escopo × roadmap × registry × regras × prompt. Encontrei **7 inconsistências (corrigidas)**, **2 decisões abertas (agora fechadas — ver abaixo)** e **3 pendências externas (burocráticas)**.
 
 ---
 
@@ -19,11 +19,11 @@ Revisei os 6 documentos linha a linha, cruzando escopo × roadmap × registry ×
 | 6 | **Modelo de dados sem as tabelas da 2ª auditoria.** `subscriptions`, `refunds`, `audit_log`, `notification_log`, `printer_configs` e `stores.timezone` tinham sido apontadas mas nunca entraram no schema nem no prompt | Adicionadas ao modelo e ao prompt, junto com a regra **"todo valor monetário é inteiro em centavos, nunca float"** |
 | 7 | **Documento de marca desatualizado** — §6.2 ainda descrevia seletor de cor livre com validação AA em runtime, e o prompt/scaffold citava 4 apps no MVP | Marca atualizada para os 4 templates; MVP declarado com 3 apps (storefront, backoffice, api) — KDS e courier nascem nas fases 2–3 |
 
-## 🟠 2 decisões que só você pode tomar (não bloqueiam o épico 1)
+## ✅ 2 decisões do Vinicius — FECHADAS em 13/07/2026
 
-**D1 — Margem do Standard (da planilha).** O Standard a R$ 99 tem margem bruta de 62% porque o suporte custa R$ 10,50/lojista/mês. Opções: (a) subir para R$ 119; (b) **suporte do Standard só por base de conhecimento + chat assíncrono** (minha recomendação — telefone/WhatsApp de suporte a partir do Pro, que inclusive cria motivo de upgrade); (c) aceitar 62% como custo de aquisição do Pro. *Precisa estar decidido antes de publicar a página de preços — ou seja, antes do épico 13d.*
+**D1 — Margem do Standard: mantém R$ 99/mês.** Opção (c). A margem bruta de 62% (contra o padrão SaaS de >75%) é **aceita conscientemente como custo de aquisição do Pro**: o Standard é a porta de entrada que tira o lojista do WhatsApp manual, e o upgrade para o Pro é que faz a margem. Não sobe para R$ 119 e não corta o suporte do Standard. Consequência para o épico 13d: a página de preços publica **Standard R$ 99 · Pro R$ 189 · Premium R$ 299** (mensal), sem asterisco.
 
-**D2 — Nome dos planos em inglês ou português.** "Standard/Pro/Premium" está definido, mas o tom de marca é 100% pt-BR coloquial. Alternativa alinhada: **Balcão / Salão / Casa Cheia**. Cosmético, mas é o tipo de coisa cara de mudar depois que o billing existe. Se ficar Standard/Pro/Premium, está ótimo também — só decida uma vez.
+**D2 — Nomes dos planos: Standard / Pro / Premium.** Mantidos em inglês. A alternativa pt-BR (Balcão / Salão / Casa Cheia) foi descartada. Estas são as chaves canônicas do registry de módulos (`plans: ['standard','pro','premium']`), do billing e da página de preços — **não mudam mais**.
 
 ## 🟡 3 pendências externas (nenhuma trava o código, todas travam o go-live)
 
@@ -51,4 +51,6 @@ Revisei os 6 documentos linha a linha, cruzando escopo × roadmap × registry ×
 | `molho-unit-economics.xlsx` | Modelo financeiro vivo |
 
 ## Próximo passo
-Abrir o Claude Code e colar o prompt da seção 9 do plano (que agora instrui a copiar estes documentos para `docs/` e gerar o `CLAUDE.md`). Épico 1: scaffold + design system. As decisões D1 e D2 podem ser tomadas durante a semana 1 — só precisam existir antes do épico 13d (billing).
+Épico 1: scaffold do monorepo + design system Tempero. D1 e D2 estão fechadas, então o épico 13d (billing) já nasce com preço e nomenclatura definitivos.
+
+> **Correção ao prompt da §9 do plano:** ele mandava criar schema Prisma + seed "nesta primeira sessão". Isso está **desatualizado** — a tabela de épicos (§8) e o `CLAUDE.md` são a verdade: **Épico 1 = scaffold + design system apenas**; Prisma, RLS, registry de módulos, RBAC e seed são o **Épico 2**.

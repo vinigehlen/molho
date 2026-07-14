@@ -63,6 +63,8 @@
 | **Add-on NFC-e** | R$ 39,90/mês | R$ 39,90/mês | R$ 39,90/mês |
 
 **Política comercial:**
+- **Nomes dos planos travados: Standard / Pro / Premium** (decisão D2, 13/07/2026). São as chaves canônicas do registry (`plans: ['standard','pro','premium']`), do billing e da página de preços. A alternativa pt-BR (Balcão/Salão/Casa Cheia) foi descartada — não muda mais.
+- **Standard permanece em R$ 99/mês** (decisão D1, 13/07/2026), mesmo com margem bruta de 62% (o suporte come R$ 10,50 dos R$ 34,47 de custo — ver unit economics). A margem abaixo do padrão SaaS é **aceita como custo de aquisição do Pro**: o Standard é a porta de entrada, o upgrade é que faz a margem. Não subimos para R$ 119 nem cortamos o suporte do Standard.
 - **Trial de 7 dias, todas as funções, sem cartão** (padrão de mercado).
 - **Sem taxa de setup. Sem comissão por venda. Sem fidelidade contratual** — cancela quando quiser. Isso vira o principal argumento contra Anota AI/Goomer.
 - **Preço publicado no site, sem "fale com um consultor".** Transparência é posicionamento.
