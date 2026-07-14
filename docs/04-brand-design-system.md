@@ -136,9 +136,14 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 |---|---|---|
 | `success-500` | #12A454 | Pedido confirmado, caixa positivo |
 | `warning-500` | #F5A623 | Atenção, estoque baixo |
-| `danger-500` | #E4404E | Erros, cancelamentos, estornos |
+| `danger-500` | #E4404E | **Só como FUNDO de selo/borda/ícone** (3:1). Não serve para texto nem para botão |
+| `danger-700` | #C62F3B | **Texto de erro e preenchimento do botão de perigo.** É o par escuro do danger-500 |
 | `info-500` | #3D5AFE | Informativos neutros |
 | `pix` | #32BCAD | Exclusiva para elementos PIX (cor oficial do Banco Central) |
+
+> **Por que existe o `danger-700`** (medido no Chromium, não estimado): branco sobre `danger-500` dá **4,08:1** e `danger-500` como texto sobre fundo claro dá **3,75:1** — os dois reprovam o AA de 4,5:1. O `danger-700` entrega 5,4:1 nos dois papéis. É o mesmo padrão de `purple-500`/`purple-700`: **toda cor funcional tem um tom de fundo e um tom de texto, e eles não são o mesmo.**
+>
+> **Texto sobre o teal do PIX é `ink-900`, nunca branco.** Branco sobre `#32BCAD` dá **2,35:1** — ilegível. Com ink: 7,9:1. A cor do Banco Central não se altera; o que muda é o texto sobre ela.
 
 **Cores de status de pedido (dataviz e timeline)**
 `received` #3D5AFE · `preparing` #F5A623 · `ready` #B565F3 · `in_transit` #820AD1 · `completed` #12A454 · `canceled` #8E8B9A
@@ -199,7 +204,7 @@ Tokens em três camadas: **primitivos** (valores brutos) → **semânticos** (in
   --purple-500:#820AD1; --purple-300:#B565F3; --purple-100:#EFE1FB; --purple-050:#F8F1FE;
   --ink-900:#141216; --ink-600:#585666; --ink-400:#8E8B9A;
   --white:#FFF; --surface:#F5F5F7; --line:#E9E7EE;
-  --green-500:#12A454; --amber-500:#F5A623; --red-500:#E4404E;
+  --green-500:#12A454; --amber-500:#F5A623; --red-500:#E4404E; --red-700:#C62F3B;
   --blue-500:#3D5AFE; --pix:#32BCAD;
 
   /* ── Semânticos: cor (white-label troca só o bloco brand) ── */
@@ -208,7 +213,12 @@ Tokens em três camadas: **primitivos** (valores brutos) → **semânticos** (in
   --on-brand:var(--white);
   --text:var(--ink-900); --text-muted:var(--ink-600); --text-disabled:var(--ink-400);
   --bg:var(--surface); --bg-card:var(--white); --border:var(--line);
-  --positive:var(--green-500); --caution:var(--amber-500); --critical:var(--red-500);
+  --border-strong:var(--ink-400);   /* borda de CAMPO (input/select/textarea): 3:1 */
+  --positive:var(--green-500); --caution:var(--amber-500);
+  --critical:var(--red-500); --critical-strong:var(--red-700);
+
+  /* ── Estado desabilitado: par de tokens, NUNCA opacidade ── */
+  --disabled-surface:var(--line); --disabled-text:var(--ink-600);
 
   /* ── Espaço (escala 4pt) ── */
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px;
@@ -244,8 +254,8 @@ Base: shadcn/ui re-estilizado com os tokens. Nomenclatura `Mo*` para componentes
 ### 5.1 Fundamentos
 | Componente | Especificação essencial |
 |---|---|
-| **MoButton** | Variantes: `primary` (brand, on-brand, r-md, h-52px mobile/44px desktop, peso 600), `secondary` (brand-subtle + texto brand-strong), `ghost`, `danger`, `pix` (fundo --pix). Estados: hover escurece 8%, pressed scale .98, loading com spinner interno mantendo largura, disabled 40% + cursor bloqueado. Ícone opcional 20px à esquerda. |
-| **MoInput** | h-52px, r-md, borda `--border`, foco = borda brand + focus-ring. Label sempre visível acima (nunca placeholder-como-label). Erro: borda critical + mensagem caption abaixo. Máscaras BR nativas: telefone, CPF/CNPJ, CEP, R$. |
+| **MoButton** | Variantes: `primary` (brand, on-brand, r-md, h-52px mobile/44px desktop, peso 600), `secondary` (brand-subtle + texto brand-strong), `ghost`, `danger` (fundo `--critical-strong` + branco), `pix` (fundo `--pix` + texto **ink**). Estados: hover escurece 8%, pressed scale .98, loading com spinner interno mantendo largura, **disabled = `--disabled-surface` + `--disabled-text`** + cursor bloqueado. Ícone opcional 20px à esquerda. |
+| **MoInput** | h-52px, r-md, borda **`--border-strong`** (é a única pista de que ali se digita → 3:1), foco = borda brand + focus-ring. Label sempre visível acima (nunca placeholder-como-label). Erro: borda critical + mensagem caption em `--critical-strong` abaixo. Disabled = par de tokens, nunca opacidade. Máscaras BR nativas: telefone, CPF/CNPJ, CEP, R$. |
 | **MoCard** | bg-card, r-lg, e-2, padding sp-4/sp-6. Variante `interactive` com hover e-3 + translateY(-1px). |
 | **MoChip** | pill, h-36px, usado em categorias e filtros; selecionado = brand-subtle + texto brand-strong + peso 600. Scroll horizontal com fade nas bordas. |
 | **MoBadge** | pill caption; cores por status de pedido (tokens da seção 3.2); dot animado quando "ao vivo". |
@@ -282,8 +292,24 @@ Base: shadcn/ui re-estilizado com os tokens. Nomenclatura `Mo*` para componentes
 
 ## 6. Regras transversais
 
-### 6.1 Acessibilidade (bloqueante em code review)
+### 6.1 Acessibilidade (bloqueante no CI, não no olho)
 Contraste AA; toque ≥44px; foco visível com `--focus-ring` (nunca `outline:none` sem substituto); labels em todos os inputs; ordem de tab lógica; `aria-live="polite"` em mudanças de status de pedido; dataviz nunca só por cor; `prefers-reduced-motion` respeitado; textos redimensionáveis até 200%.
+
+**O contraste não é mais revisado a olho — é medido.** `packages/ui/e2e/contrast.spec.ts` renderiza cada story em cada um dos 4 temas no Chromium e lê o pixel via `getComputedStyle`, compondo alfa e `opacity` de toda a cadeia de ancestrais. Reprova o build abaixo de:
+
+| Alvo | Mínimo |
+|---|---|
+| Texto normal | 4,5:1 |
+| Texto grande (≥24px, ou ≥18,66px em negrito) | 3:1 |
+| Borda de **campo** (input/select/textarea) e ícone com significado | 3:1 |
+| Texto de componente **desabilitado** | **4,5:1** |
+
+Duas regras merecem explicação, porque contrariam o senso comum:
+
+1. **Desabilitado também tem que ser legível.** A WCAG 1.4.3 isenta componentes inativos, e quase todo design system se abriga nessa isenção. O Tempero não. Por isso o disabled é **par de tokens sólidos** (`--disabled-surface` + `--disabled-text` = 5,8:1) e **nunca `opacity`** — opacidade desbota texto E fundo juntos, e derruba o contraste a ~1,4:1: "desabilitado" vira "invisível".
+2. **A borda de 3:1 vale só para campo de formulário.** Num input vazio a borda é a única pista visual de que ali se digita, então ela carrega informação (SC 1.4.11). Borda de card e divisor é decorativa — o conteúdo já identifica o componente — e exigir 3:1 delas transformaria o produto inteiro em caixa cinza.
+
+> Este portão nasceu de um bug real: o `tailwind-merge` descartava a classe de cor do texto do botão primário, que herdava ink. Fonte correto, DOM íntegro, axe verde — e **1,00:1 no tema Grafite** (preto sobre preto). Só o pixel denuncia essa classe de erro.
 
 ### 6.2 White-label (storefront apenas) — 4 templates
 O lojista escolhe **1 entre 4 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Roxo** #820AD1 (padrão) · **Brasa** #D93025 · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre roxo Molho. Rodapé do storefront: "feito com Molho".
