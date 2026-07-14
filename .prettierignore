@@ -1,0 +1,12 @@
+node_modules
+.next
+.turbo
+dist
+build
+out
+coverage
+storybook-static
+pnpm-lock.yaml
+brand-kit
+docs
+*.md
