@@ -1,0 +1,21 @@
+{
+  "name": "@molho/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contratos do Molho: schemas zod, registry de módulos, permissões e microcopy.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./copy": "./src/copy.pt-BR.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}
