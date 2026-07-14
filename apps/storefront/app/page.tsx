@@ -1,21 +1,14 @@
-'use client';
-
 import { COPY, t } from '@molho/contracts';
-import { MoEmptyState } from '@molho/ui';
+import { HomePlaceholder } from './home-placeholder';
 
+// Server Component: @molho/contracts é resolvido aqui (SSR/RSC, via require()
+// direto), nunca no bundle do cliente. Ver o porquê em ./home-placeholder.tsx.
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <MoEmptyState
-        title="Sua loja ainda não tem cardápio"
-        description={t(COPY.sistema.emConstrucao, { epico: 5 })}
-        action={{
-          label: COPY.storefront.carrinhoVazioAcao,
-          // Sem destino real ainda — o cardápio nasce no Épico 5. O slot de
-          // ação já existe; o clique ganha função quando o menu existir.
-          onClick: () => {},
-        }}
-      />
-    </main>
+    <HomePlaceholder
+      title="Sua loja ainda não tem cardápio"
+      description={t(COPY.sistema.emConstrucao, { epico: 5 })}
+      ctaLabel={COPY.storefront.carrinhoVazioAcao}
+    />
   );
 }

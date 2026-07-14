@@ -26,6 +26,7 @@ test-results
 .cache
 .parcel-cache
 .eslintcache
+*.tsbuildinfo
 
 # ─── OS / IDE ──────────────────────────────
 .DS_Store
