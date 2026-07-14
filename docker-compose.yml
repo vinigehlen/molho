@@ -1,0 +1,36 @@
+# Ambiente local para desenvolvimento
+# Em produção usamos Neon (Postgres) e Upstash (Redis)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: molho-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: molho
+      POSTGRES_PASSWORD: molho
+      POSTGRES_DB: molho_dev
+    volumes:
+      - molho_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U molho"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: molho-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - molho_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  molho_pg_data:
+  molho_redis_data:

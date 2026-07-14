@@ -1,0 +1,50 @@
+# ─── Dependencies ──────────────────────────
+node_modules
+.pnpm-store
+
+# ─── Env & secrets ─────────────────────────
+.env
+.env.local
+.env.*.local
+.vercel
+
+# ─── Builds ────────────────────────────────
+.next
+.turbo
+dist
+build
+out
+storybook-static
+
+# ─── Testes e coverage ─────────────────────
+coverage
+.nyc_output
+playwright-report
+test-results
+
+# ─── Cache ─────────────────────────────────
+.cache
+.parcel-cache
+.eslintcache
+
+# ─── OS / IDE ──────────────────────────────
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ─── Logs ──────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ─── Prisma ────────────────────────────────
+*.db
+*.db-journal
+
+# ─── Claude Code / MCP (local per-machine) ────
+.claude/
+.agents/
+skills-lock.json
