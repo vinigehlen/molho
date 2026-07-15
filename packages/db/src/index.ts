@@ -24,3 +24,5 @@ export * from './modules/module-cache';
 export * from './modules/module-registry';
 export * from './modules/module-logger';
 export * from './modules/module-invalidation-extension';
+
+export * from './crypto/phone';
