@@ -1,0 +1,34 @@
+{
+  "name": "@molho/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Schema Prisma, migrations e client Postgres do Molho (RLS por tenant_id, PostGIS).",
+  "type": "commonjs",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" }
+  },
+  "scripts": {
+    "build": "pnpm run db:generate && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "db:generate": "DIRECT_URL=postgresql://generate:generate@localhost:5432/generate prisma generate",
+    "db:migrate:dev": "dotenv -e ../../.env.local -- prisma migrate dev",
+    "db:migrate:deploy": "dotenv -e ../../.env.local -- prisma migrate deploy",
+    "db:migrate:status": "dotenv -e ../../.env.local -- prisma migrate status",
+    "db:studio": "dotenv -e ../../.env.local -- prisma studio"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "dotenv-cli": "^11.0.0",
+    "prisma": "^7.8.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.0"
+  }
+}

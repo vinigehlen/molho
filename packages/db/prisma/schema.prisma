@@ -1,0 +1,243 @@
+// Schema Prisma do Molho — fundação (Épico 2).
+//
+// Escopo deste arquivo: só a fundação multi-tenant (tenants/stores), o
+// registry de módulos em tabela (5-B.3) e RBAC (users/user_roles) + auditoria.
+// Catálogo, pedidos, pagamentos, endereços/zonas etc. nascem nos épicos deles,
+// cada um com sua própria migration — esquema especulativo não entra aqui.
+//
+// RLS, roles do Postgres, grants e a função app_tenant_visible() NÃO são
+// representáveis neste DSL — vivem em SQL puro anexado à migration gerada
+// (ver prisma/migrations/*/migration.sql).
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Plataforma / módulos (5-B.3) ────────────────────────────────────────────
+
+model Plan {
+  id              String   @id
+  name            String
+  priceMonthCents Int      @map("price_month_cents")
+  modules         Json
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenants Tenant[]
+
+  @@map("plans")
+}
+
+model FeatureFlag {
+  key             String   @id
+  rolloutPct      Int      @default(0) @map("rollout_pct")
+  tenantAllowlist String[] @default([]) @map("tenant_allowlist") @db.Uuid
+  enabled         Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}
+
+enum EntitlementSource {
+  plan
+  addon
+  manual
+  trial
+}
+
+enum EntitlementStatus {
+  active
+  trialing
+  suspended
+}
+
+/// Direito ao módulo (super-admin/billing). module_key é TEXT sem FK/enum de
+/// propósito — a coerência é garantida pelo teste de sincronização do
+/// registry em packages/contracts, não pelo banco.
+model TenantEntitlement {
+  tenantId    String            @map("tenant_id") @db.Uuid
+  moduleKey   String            @map("module_key")
+  source      EntitlementSource
+  status      EntitlementStatus @default(active)
+  trialEndsAt DateTime?         @map("trial_ends_at")
+  limits      Json?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, moduleKey])
+  @@map("tenant_entitlements")
+}
+
+/// Configuração do lojista (liga/desliga o que já tem direito).
+model TenantSetting {
+  tenantId  String    @map("tenant_id") @db.Uuid
+  moduleKey String    @map("module_key")
+  enabled   Boolean   @default(false)
+  config    Json?
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, moduleKey])
+  @@map("tenant_settings")
+}
+
+/// Quem ligou/desligou o quê e quando — trilha do 5-B.5, append-only.
+model ModuleAudit {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  moduleKey String   @map("module_key")
+  actorId   String   @map("actor_id") @db.Uuid
+  action    String
+  at        DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  @@index([tenantId, at])
+  @@map("module_audit")
+}
+
+// ─── Tenant / loja ───────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+model Tenant {
+  id        String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  slug      String
+  name      String
+  cnpj      String?
+  planId    String?      @map("plan_id")
+  status    TenantStatus @default(active)
+  themeKey  String       @default("roxo") @map("theme_key")
+  timezone  String       @default("America/Sao_Paulo")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+
+  plan         Plan?               @relation(fields: [planId], references: [id])
+  stores       Store[]
+  entitlements TenantEntitlement[]
+  settings     TenantSetting[]
+  moduleAudits ModuleAudit[]
+  auditLogs    AuditLog[]
+
+  // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
+  // NULL criado à mão na migration (Prisma não expressa índice parcial).
+  @@map("tenants")
+}
+
+model Store {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String
+  addressText    String    @map("address_text")
+  /// geography(Point,4326) — PostGIS habilitado agora; sem uso ainda (zonas
+  /// de entrega chegam no Épico 6, mas o tipo geo já nasce certo).
+  geo            Unsupported("geography(Point, 4326)")?
+  timezone       String
+  phone          String?
+  whatsappNumber String?   @map("whatsapp_number")
+  minOrderCents  Int       @default(0) @map("min_order_cents")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("stores")
+}
+
+// ─── Identidade / RBAC (5-C) ─────────────────────────────────────────────────
+//
+// users e user_roles NÃO têm tenant_id de propósito (platform_support e
+// franchisor atuam em vários tenants; o mesmo login não pode ser "dono" de
+// um único tenant). Por isso NÃO ganham RLS — é a exceção deliberada e
+// documentada em CLAUDE.md: toda query em user_roles exige escopo explícito
+// no WHERE, nunca lê a tabela inteira.
+
+enum ScopeType {
+  platform
+  franchise
+  tenant
+  store
+}
+
+model User {
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  name            String
+  /// Telefone cifrado na aplicação (AES-256-GCM), nunca em claro — LGPD.
+  phoneCiphertext Bytes    @map("phone_ciphertext")
+  /// HMAC determinístico do telefone — é o que o login por OTP busca.
+  phoneLookupHash String   @unique @map("phone_lookup_hash")
+  /// Versão da chave de cifra usada (rotação lazy, sem migration em massa).
+  phoneKeyVersion Int      @default(1) @map("phone_key_version")
+  email           String?
+  /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
+  tokenVersion    Int      @default(0) @map("token_version")
+  version         Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  roles        UserRole[]
+  moduleAudits ModuleAudit[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+/// Uma atribuição papel+escopo. platform tem scopeId null.
+model UserRole {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// Validado contra ROLES em packages/contracts/permissions.ts na aplicação.
+  role      String
+  scopeType ScopeType @map("scope_type")
+  scopeId   String?   @map("scope_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role, scopeType, scopeId])
+  @@map("user_roles")
+}
+
+// ─── Auditoria ────────────────────────────────────────────────────────────────
+
+/// Toda ação sensível (dinheiro, permissão, módulo) grava aqui. Append-only:
+/// sem policy de UPDATE/DELETE na migration — o Postgres nega os dois por
+/// padrão. tenant_id nullable = ação de plataforma sem tenant associado.
+model AuditLog {
+  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId   String?  @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  actorRole  String   @map("actor_role")
+  action     String
+  entity     String
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  ip         String?  @db.Inet
+  at         DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  actor  User    @relation(fields: [actorId], references: [id])
+
+  @@index([tenantId, at])
+  @@map("audit_log")
+}

@@ -44,6 +44,7 @@ pnpm-debug.log*
 # ─── Prisma ────────────────────────────────
 *.db
 *.db-journal
+packages/db/prisma/generated/
 
 # ─── Claude Code / MCP (local per-machine) ────
 .claude/

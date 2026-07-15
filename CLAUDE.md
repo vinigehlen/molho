@@ -40,7 +40,7 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 
 1. **Modularidade desde o dia 1.** Toda feature é um MÓDULO em `packages/contracts/modules.ts` com `plans`, `requires`, `default`, `addon`. Backend com `@RequireModule('key')`; frontend com `<Gate module="key" fallback={<Upsell/>}>`; a navegação do backoffice é GERADA do registry, nunca hardcoded. Módulo desligado é não-destrutivo (congela dados, não apaga).
 2. **RBAC granular.** Sempre `can(user, 'permission', {scope})`, nunca `if (role === 'x')`. Papéis são conjuntos de permissões em `packages/contracts/permissions.ts`. Dupla checagem: `@RequireModule + @RequirePermission`. RLS no Postgres como última linha.
-3. **Multi-tenancy.** `user_roles(user_id, role, scope_type, scope_id)`. RLS por `tenant_id` no Postgres em toda tabela com esse campo. Escrever testes explícitos de isolamento entre tenants.
+3. **Multi-tenancy.** `user_roles(user_id, role, scope_type, scope_id)`. RLS por `tenant_id` no Postgres em toda tabela com esse campo. Escrever testes explícitos de isolamento entre tenants. **Exceção deliberada:** `users` e `user_roles` NÃO têm `tenant_id` (identidade é global — `platform_support` e franquia atuam em vários tenants) e por isso NÃO têm RLS. Toda query em `user_roles` exige escopo explícito no `WHERE` (por `scope_id`/`scope_type`) — nunca ler a tabela inteira e filtrar em memória. É a única camada sem RLS como rede de segurança; erro aqui vaza entre tenants de verdade.
 4. **Dinheiro é INTEIRO em centavos.** Nunca float. Sempre.
 5. **Pagamento no MVP** (até o épico 24): PIX ESTÁTICO com confirmação manual. O pedido nasce direto como `received` com `payment_status: 'aguardando_confirmacao'`; o lojista marca "pago" ao conferir o app do banco; estorno é manual (devolução Pix pelo lojista). Auto-cancel em 10min e estorno automático só passam a valer com o PIX online (épico 24).
 6. **WhatsApp no MVP = click-to-chat.** O sistema NUNCA envia mensagem sozinho: monta o texto e abre `https://wa.me/{fone}?text={msg}` para o lojista tocar em enviar, pelo número normal dele. NÃO usar Cloud API nem API não-oficial (Baileys/Evolution).
@@ -50,6 +50,15 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 10. **Sem dados no cliente.** Cartão nunca toca nosso servidor — tokenização no cliente (SDK do PSP). PCI-DSS SAQ-A.
 11. **LGPD.** Telefone criptografado em repouso, endpoint de exclusão do cliente, contrato de operador. Nunca logar dados pessoais crus.
 12. **Máquina de estados de pedido:** `pending_payment → received → preparing → ready → in_transit → completed` + caminhos infelizes (`expired`, `auto_canceled`, `canceled`, `delivery_failed`). Ver `docs/02-definicoes-v1.md` §5.
+
+## Convenções de schema (Postgres)
+
+- **PK = `uuid` v7** (`@default(dbgenerated("uuidv7()"))`, nativo no Postgres 18) em toda tabela. Nunca `bigserial`/serial — ID sequencial expõe ordem e volume de criação (ex.: concorrente conta pedidos por dia olhando o ID).
+- **Índice composto em tabela com `tenant_id` sempre começa por `tenant_id`.** `(tenant_id, created_at)`, nunca `(created_at)` sozinho.
+- **Soft delete:** `deleted_at` nullable em toda tabela com `tenant_id` (exceto as append-only tipo `audit_log`/`module_audit` — essas não têm UPDATE/DELETE nenhum, nem soft). Nada se apaga de verdade no MVP; `UNIQUE` que precisa ignorar registro apagado vira índice único parcial (`WHERE deleted_at IS NULL`).
+- **Optimistic locking:** `version int not null default 0` em tabelas mutáveis de negócio (`orders`, `products`, `categories`, `tenant_settings`, `users`...). Update sempre com `WHERE version = :esperado`; 0 linhas afetadas = `ConflictError`. Não precisa em tabelas append-only.
+- **Telefone (LGPD):** nunca em claro. Cifra na aplicação (AES-256-GCM, chave em `MOLHO_ENCRYPTION_KEYS`, não pgcrypto) + `phone_lookup_hash` (HMAC determinístico, único) pra busca por OTP. `phone_key_version` na linha permite rotação de chave sem migration em massa (rotaciona no próximo login).
+- **RLS:** duas roles do Postgres — `app_migrator` (dono das tabelas, roda migration, único com `CREATE EXTENSION`/DDL) e `app_runtime` (só DML, é quem a API e os workers usam, sujeito a toda policy). `REVOKE ALL ... FROM PUBLIC` explícito no schema `public` — sem isso o Postgres 15+ dá privilégio demais por herança. Toda policy usa a função `app_tenant_visible(tenant_id)`, que lê os GUCs `app.tenant_id`/`app.is_platform` setados por request — sem eles setados, nega por padrão (fail-closed).
 
 ## Design system "Tempero"
 
