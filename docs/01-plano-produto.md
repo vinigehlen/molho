@@ -546,7 +546,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | # | Épico | Fase | Entregável |
 |---|---|---|---|
 | 1 | Scaffold do monorepo + design system Tempero | 0 | Storybook com componentes Mo*; 3 apps sobem |
-| 2 | Schema Prisma + RLS + **registry de módulos** + **RBAC** + seed | 0 | Migrations, `ModuleService`, `can()`, tenant demo |
+| 2 | Schema Prisma + RLS + **registry de módulos** + **RBAC** + seed — ✅ **entregue** | 0 | Migrations, `ModuleService`, `can()`, tenant demo (Hamburgueria da Vila + Pizzaria Roma) |
 | 3 | Auth OTP (mock de envio) + sessões + revogação | 0 | Login por telefone nos dois fronts |
 | 4 | CRUD de cardápio + upload S3 + **importação por planilha** | 1 | Lojista sobe 80 produtos de um CSV |
 | 5 | Storefront: menu, carrinho, bottom sheets | 1 | Navegação mobile completa |
