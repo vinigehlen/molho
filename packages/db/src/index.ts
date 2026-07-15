@@ -17,3 +17,10 @@ export function createPrismaClient(connectionString: string): PrismaClient {
   const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({ adapter });
 }
+
+export * from './modules/module-service';
+export * from './modules/module-data-source';
+export * from './modules/module-cache';
+export * from './modules/module-registry';
+export * from './modules/module-logger';
+export * from './modules/module-invalidation-extension';
