@@ -185,15 +185,19 @@ model User {
   /// Telefone cifrado na aplicação (AES-256-GCM), nunca em claro — LGPD.
   phoneCiphertext Bytes    @map("phone_ciphertext")
   /// HMAC determinístico do telefone — é o que o login por OTP busca.
-  phoneLookupHash String   @unique @map("phone_lookup_hash")
+  /// Único só entre linhas vivas — índice único parcial criado à mão na
+  /// migration (Prisma não expressa índice parcial no DSL).
+  phoneLookupHash String    @map("phone_lookup_hash")
   /// Versão da chave de cifra usada (rotação lazy, sem migration em massa).
-  phoneKeyVersion Int      @default(1) @map("phone_key_version")
+  phoneKeyVersion Int       @default(1) @map("phone_key_version")
   email           String?
   /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
-  tokenVersion    Int      @default(0) @map("token_version")
-  version         Int      @default(0)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  tokenVersion    Int       @default(0) @map("token_version")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  /// Desligar/demitir é reversível — preserva histórico em user_roles/audit_log.
+  deletedAt       DateTime? @map("deleted_at")
 
   roles        UserRole[]
   moduleAudits ModuleAudit[]
