@@ -132,6 +132,7 @@ model Tenant {
 
   plan         Plan?               @relation(fields: [planId], references: [id])
   stores       Store[]
+  customers    Customer[]
   entitlements TenantEntitlement[]
   settings     TenantSetting[]
   moduleAudits ModuleAudit[]
@@ -162,6 +163,41 @@ model Store {
 
   @@index([tenantId])
   @@map("stores")
+}
+
+// ─── Cliente final (5-C.4) ───────────────────────────────────────────────────
+//
+// Duas semânticas de identidade, nunca misturadas (CLAUDE.md): Staff (users,
+// abaixo — global, usa user_roles/can()) e Customer (aqui — escopo por
+// tenant_id, RLS normal, SEM user_roles/can()). O mesmo telefone em dois
+// tenants é dois registros isolados de propósito (pontos de fidelidade não
+// cruzam) — por isso Customer tem único parcial em (tenant_id,
+// phone_lookup_hash), não um único global como o de User.
+//
+// Épico 3 cria só o mínimo pra identidade OTP. Endereços, pontos e histórico
+// entram nos épicos que os usam (4+).
+
+model Customer {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String
+  /// Mesmo padrão de users: cifra na aplicação, nunca em claro (LGPD).
+  phoneCiphertext Bytes     @map("phone_ciphertext")
+  /// Único só entre linhas vivas E só dentro do tenant — índice parcial
+  /// composto criado à mão na migration (Prisma não expressa índice parcial).
+  phoneLookupHash String    @map("phone_lookup_hash")
+  phoneKeyVersion Int       @default(1) @map("phone_key_version")
+  /// Corta sessões na hora, mesmo mecanismo de users.token_version.
+  tokenVersion    Int       @default(0) @map("token_version")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("customers")
 }
 
 // ─── Identidade / RBAC (5-C) ─────────────────────────────────────────────────
