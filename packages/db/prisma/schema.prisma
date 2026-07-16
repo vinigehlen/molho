@@ -10,8 +10,13 @@
 // (ver prisma/migrations/*/migration.sql).
 
 generator client {
-  provider = "prisma-client"
-  output   = "./generated/client"
+  provider     = "prisma-client"
+  output       = "./generated/client"
+  // Sem isto, o gerador produz import.meta.url no client mesmo compilado
+  // pra CommonJS (tsc não consegue transformar import.meta pra nenhum
+  // target) — quebra em runtime pra qualquer consumidor via require()
+  // (ex.: apps/api/NestJS). moduleFormat="cjs" evita a sintaxe de vez.
+  moduleFormat = "cjs"
 }
 
 datasource db {
