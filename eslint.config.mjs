@@ -69,12 +69,13 @@ export default tseslint.config(
   // com pool, cada query pode pegar conexão física diferente. Todo acesso ao
   // banco em request path precisa passar pelo client transacional do
   // RequestContextService (ver CLAUDE.md § Contexto de request). Exceção:
-  // app.module.ts (registra o provider do PrismaClient global) e o próprio
-  // request-context.service.ts.
+  // context.module.ts (registra o provider do PrismaClient global — módulo
+  // dedicado pra ser importável por quem precisa de RequestContextService
+  // sem depender do AppModule inteiro) e o próprio request-context.service.ts.
   {
     files: ['apps/api/src/**/*.ts'],
     ignores: [
-      'apps/api/src/app.module.ts',
+      'apps/api/src/context/context.module.ts',
       'apps/api/src/context/request-context.service.ts',
       // Testes legitimamente montam fakes tipados como PrismaClient/Prisma —
       // não é request path, é test double.
