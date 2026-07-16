@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { type PrismaClient, createPrismaClient } from '@molho/db';
 import { PRISMA_CLIENT } from './context/prisma.token';
 import { RequestContextService } from './context/request-context.service';
+import { OtpModule } from './auth/otp/otp.module';
 import { HealthController } from './health/health.controller';
 import { MessagingModule } from './messaging/messaging.module';
 
 @Module({
-  imports: [MessagingModule],
+  imports: [MessagingModule, OtpModule],
   controllers: [HealthController],
   providers: [
     {

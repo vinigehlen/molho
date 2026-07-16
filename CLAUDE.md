@@ -30,6 +30,8 @@ Assets em `brand-kit/`.
 
 No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção futura será `{slug}.molho.store` (a lógica de resolução de tenant deve ser configurável para trocar sem refactor).
 
+**`apps/api` não carrega `.env.local` sozinho** — NestJS não faz isso automaticamente (diferente do Next.js nos fronts). `pnpm dev` já roda via `dotenv-cli` apontando pra `.env.local`; `start` (produção) não, de propósito — em deploy real, env vars vêm da plataforma, não de um arquivo. Descoberto porque a API "subia" sem nenhuma credencial real carregada (nenhuma query tinha sido feita ainda pra denunciar) até um provider com checagem eager (`OtpModule`) travar o boot.
+
 ## Escopo do MVP (semanas 1–8, épicos 1–14)
 
 **Dentro:** cardápio (categorias, produtos, fotos, variações, esgotado manual) · importação de cardápio por CSV/XLSX · storefront (menu, carrinho, bottom sheets) · endereços com pin e zonas de entrega (polígonos) · horários e pedido mínimo · checkout com **PIX estático** (chave do lojista, confirmação manual) · gestor de pedidos realtime com push/som/fila offline · impressão ESC/POS com wizard · notificações de status via **WhatsApp click-to-chat** · página de acompanhamento · onboarding self-service em 7 passos · **4 templates de tema** (Roxo, Brasa, Folha, Grafite) · **assinatura e billing** (trial 7 dias, cobrança recorrente, dunning) · super-admin.
@@ -121,7 +123,7 @@ Ledger de itens explicitamente adiados ("não corrigido agora, fora de escopo") 
 
 ## Segurança
 
-- Rate limit no OTP (por telefone e por IP) — evita SMS pumping.
+- **Rate limit no OTP** (`OtpService`, `apps/api/src/auth/otp/`): sliding window de verdade (sorted set no Redis) — 5 pedidos/hora por telefone + cooldown de 60s entre pedidos, 20/hora por IP, 3 tentativas de verificação por (telefone + OTP ativo). Código de 6 dígitos via `crypto.randomInt` (nunca `Math.random`), TTL 10min, HMAC-SHA256 no Redis (nunca em claro), chave `MOLHO_OTP_HMAC_KEY` separada de `MOLHO_ENCRYPTION_KEYS` (rotação independente). `scope` (`staff`/`customer:{tenantSlug}`) namespacea o desafio — nunca mistura OTP de superfícies diferentes.
 - Rate limit no storefront público (evita scraping de preço).
 - Segredos apenas em variáveis de ambiente. Nunca em código.
 - 2FA na Vercel, Neon e Cloudflare — obrigatório.
