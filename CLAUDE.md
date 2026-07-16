@@ -113,6 +113,12 @@ Ver tabela completa em `docs/01-plano-produto.md` §8. Sequência do MVP:
 — **GO-LIVE do piloto** —
 15+. Fases 2–4 (ver plano)
 
+## Débito técnico resolvido
+
+Ledger de itens explicitamente adiados ("não corrigido agora, fora de escopo") e depois fechados — pra visão de PM sobre o que era risco conhecido e deixou de ser. Documentar aqui quando adiar um débito novo e mover pra "resolvido" quando fechar.
+
+- **`import.meta.url` no client do Prisma 7 sob CommonJS.** Adiado no seed do Épico 2 ("vai quebrar quando apps/api importar @molho/db de verdade"). Mordeu de fato no Épico 3, commit `MessagingProvider`, ao ligar o `MessagingModule` no `AppModule` — `pnpm dev` travava com `SyntaxError`. Resolvido com `moduleFormat = "cjs"` no `generator client` de `schema.prisma` (não é workaround, é a configuração correta do gerador). Confirmado: API sobe limpa, `/health` responde.
+
 ## Segurança
 
 - Rate limit no OTP (por telefone e por IP) — evita SMS pumping.
