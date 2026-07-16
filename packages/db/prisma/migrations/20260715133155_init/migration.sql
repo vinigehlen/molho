@@ -1,17 +1,40 @@
--- CreateEnum
-CREATE TYPE "EntitlementSource" AS ENUM ('plan', 'addon', 'manual', 'trial');
+-- Toda instrução escrita à mão nesta migration é idempotente por
+-- construção — `prisma migrate dev` faz múltiplas passadas de replay no
+-- shadow database dentro de UMA única invocação, e seu reset entre passadas
+-- só limpa o que ele reconhece do schema.prisma (tabelas, enums); função,
+-- policy etc. escritos à mão sobrevivem e colidem numa 2ª passada se não
+-- forem re-executáveis. Ver CLAUDE.md § Convenções de schema (Postgres).
 
 -- CreateEnum
-CREATE TYPE "EntitlementStatus" AS ENUM ('active', 'trialing', 'suspended');
+DO $$ BEGIN
+  CREATE TYPE "EntitlementSource" AS ENUM ('plan', 'addon', 'manual', 'trial');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "TenantStatus" AS ENUM ('active', 'suspended');
+DO $$ BEGIN
+  CREATE TYPE "EntitlementStatus" AS ENUM ('active', 'trialing', 'suspended');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
-CREATE TYPE "ScopeType" AS ENUM ('platform', 'franchise', 'tenant', 'store');
+DO $$ BEGIN
+  CREATE TYPE "TenantStatus" AS ENUM ('active', 'suspended');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- CreateEnum
+DO $$ BEGIN
+  CREATE TYPE "ScopeType" AS ENUM ('platform', 'franchise', 'tenant', 'store');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateTable
-CREATE TABLE "plans" (
+CREATE TABLE IF NOT EXISTS "plans" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "price_month_cents" INTEGER NOT NULL,
@@ -23,7 +46,7 @@ CREATE TABLE "plans" (
 );
 
 -- CreateTable
-CREATE TABLE "feature_flags" (
+CREATE TABLE IF NOT EXISTS "feature_flags" (
     "key" TEXT NOT NULL,
     "rollout_pct" INTEGER NOT NULL DEFAULT 0,
     "tenant_allowlist" UUID[] DEFAULT ARRAY[]::UUID[],
@@ -35,7 +58,7 @@ CREATE TABLE "feature_flags" (
 );
 
 -- CreateTable
-CREATE TABLE "tenant_entitlements" (
+CREATE TABLE IF NOT EXISTS "tenant_entitlements" (
     "tenant_id" UUID NOT NULL,
     "module_key" TEXT NOT NULL,
     "source" "EntitlementSource" NOT NULL,
@@ -50,7 +73,7 @@ CREATE TABLE "tenant_entitlements" (
 );
 
 -- CreateTable
-CREATE TABLE "tenant_settings" (
+CREATE TABLE IF NOT EXISTS "tenant_settings" (
     "tenant_id" UUID NOT NULL,
     "module_key" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT false,
@@ -64,7 +87,7 @@ CREATE TABLE "tenant_settings" (
 );
 
 -- CreateTable
-CREATE TABLE "module_audit" (
+CREATE TABLE IF NOT EXISTS "module_audit" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "tenant_id" UUID NOT NULL,
     "module_key" TEXT NOT NULL,
@@ -76,7 +99,7 @@ CREATE TABLE "module_audit" (
 );
 
 -- CreateTable
-CREATE TABLE "tenants" (
+CREATE TABLE IF NOT EXISTS "tenants" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "slug" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -93,7 +116,7 @@ CREATE TABLE "tenants" (
 );
 
 -- CreateTable
-CREATE TABLE "stores" (
+CREATE TABLE IF NOT EXISTS "stores" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "tenant_id" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -111,7 +134,7 @@ CREATE TABLE "stores" (
 );
 
 -- CreateTable
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "name" TEXT NOT NULL,
     "phone_ciphertext" BYTEA NOT NULL,
@@ -127,7 +150,7 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "user_roles" (
+CREATE TABLE IF NOT EXISTS "user_roles" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "user_id" UUID NOT NULL,
     "role" TEXT NOT NULL,
@@ -139,7 +162,7 @@ CREATE TABLE "user_roles" (
 );
 
 -- CreateTable
-CREATE TABLE "audit_log" (
+CREATE TABLE IF NOT EXISTS "audit_log" (
     "id" UUID NOT NULL DEFAULT uuidv7(),
     "tenant_id" UUID,
     "actor_id" UUID NOT NULL,
@@ -155,53 +178,90 @@ CREATE TABLE "audit_log" (
 );
 
 -- CreateIndex
-CREATE INDEX "module_audit_tenant_id_at_idx" ON "module_audit"("tenant_id", "at");
+CREATE INDEX IF NOT EXISTS "module_audit_tenant_id_at_idx" ON "module_audit"("tenant_id", "at");
 
 -- CreateIndex
-CREATE INDEX "stores_tenant_id_idx" ON "stores"("tenant_id");
+CREATE INDEX IF NOT EXISTS "stores_tenant_id_idx" ON "stores"("tenant_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_phone_lookup_hash_key" ON "users"("phone_lookup_hash");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_phone_lookup_hash_key" ON "users"("phone_lookup_hash");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_roles_user_id_role_scope_type_scope_id_key" ON "user_roles"("user_id", "role", "scope_type", "scope_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_roles_user_id_role_scope_type_scope_id_key" ON "user_roles"("user_id", "role", "scope_type", "scope_id");
 
 -- CreateIndex
-CREATE INDEX "audit_log_tenant_id_at_idx" ON "audit_log"("tenant_id", "at");
+CREATE INDEX IF NOT EXISTS "audit_log_tenant_id_at_idx" ON "audit_log"("tenant_id", "at");
 
 -- AddForeignKey
-ALTER TABLE "tenant_entitlements" ADD CONSTRAINT "tenant_entitlements_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tenant_entitlements" ADD CONSTRAINT "tenant_entitlements_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "tenant_settings" ADD CONSTRAINT "tenant_settings_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tenant_settings" ADD CONSTRAINT "tenant_settings_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "module_audit" ADD CONSTRAINT "module_audit_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "module_audit" ADD CONSTRAINT "module_audit_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "module_audit" ADD CONSTRAINT "module_audit_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "module_audit" ADD CONSTRAINT "module_audit_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "tenants" ADD CONSTRAINT "tenants_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tenants" ADD CONSTRAINT "tenants_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "stores" ADD CONSTRAINT "stores_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "stores" ADD CONSTRAINT "stores_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── DEFAULT de banco pra updated_at ─────────────────────────────────────────
 -- @updatedAt do Prisma só roda no Prisma Client (é comportamento de
 -- aplicação, não vira DEFAULT/trigger na migration). Sem isto, qualquer
 -- escrita fora do Prisma Client (seed em SQL cru, fix manual, este próprio
 -- teste de RLS) quebra o NOT NULL. DEFAULT no banco é rede de segurança —
--- mesmo raciocínio de "RLS como última linha de defesa".
+-- mesmo raciocínio de "RLS como última linha de defesa". SET DEFAULT já é
+-- idempotente por natureza (reafirmar o mesmo default não erra).
 ALTER TABLE "plans" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "feature_flags" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "tenant_entitlements" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
@@ -226,7 +286,7 @@ ALTER TABLE "users" ALTER COLUMN "updated_at" SET DEFAULT CURRENT_TIMESTAMP;
 
 -- ─── Índice único parcial: slug só é único entre tenants vivos ──────────────
 -- (soft delete — Prisma não expressa índice parcial no DSL)
-CREATE UNIQUE INDEX "tenants_slug_key" ON "tenants" ("slug") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "tenants_slug_key" ON "tenants" ("slug") WHERE "deleted_at" IS NULL;
 
 -- ─── Hardening: PUBLIC não herda nada; app_runtime só tem o que é dado ──────
 -- O REVOKE ALL ON SCHEMA public FROM PUBLIC e o GRANT USAGE ON SCHEMA public
@@ -235,11 +295,13 @@ CREATE UNIQUE INDEX "tenants_slug_key" ON "tenants" ("slug") WHERE "deleted_at" 
 -- `public` nem tem GRANT OPTION nele — rodar aqui seria um REVOKE/GRANT sem
 -- efeito (Postgres aceita e não erra, mas ignora silenciosamente). O que
 -- segue é grant de TABELA, que app_migrator PODE fazer por ser dono delas.
+-- GRANT é idempotente por natureza — regrantar não erra.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;
 
 -- Tabela nova criada numa migration futura (por app_migrator) já nasce com o
 -- grant certo para app_runtime — sem isto, cada migration teria que lembrar
 -- de conceder tabela por tabela, e uma esquecida fica invisível pro app.
+-- ALTER DEFAULT PRIVILEGES também é idempotente — redeclarar não erra.
 ALTER DEFAULT PRIVILEGES FOR ROLE app_migrator IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_runtime;
 
@@ -248,7 +310,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE app_migrator IN SCHEMA public
 -- então o resultado não pode ser cravado por request. STABLE ainda permite o
 -- planner cachear o valor DENTRO de uma mesma execução de query, então não
 -- vira function call por linha — ver EXPLAIN no fim desta migration.
-CREATE FUNCTION app_tenant_visible(row_tenant_id uuid) RETURNS boolean
+-- CREATE OR REPLACE: é o que sobrevive entre passadas de replay do shadow
+-- (função não é derrubada pelo reset do Prisma, só tabela/enum são).
+CREATE OR REPLACE FUNCTION app_tenant_visible(row_tenant_id uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$
   SELECT row_tenant_id = current_setting('app.tenant_id', true)::uuid
       OR current_setting('app.is_platform', true)::boolean IS TRUE
@@ -258,16 +322,19 @@ GRANT EXECUTE ON FUNCTION app_tenant_visible(uuid) TO app_runtime;
 
 -- ─── RLS: tenant-scoped, mutável (ALL commands numa policy só) ──────────────
 ALTER TABLE "stores" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "stores";
 CREATE POLICY tenant_isolation ON "stores"
   USING (app_tenant_visible("tenant_id"))
   WITH CHECK (app_tenant_visible("tenant_id"));
 
 ALTER TABLE "tenant_entitlements" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "tenant_entitlements";
 CREATE POLICY tenant_isolation ON "tenant_entitlements"
   USING (app_tenant_visible("tenant_id"))
   WITH CHECK (app_tenant_visible("tenant_id"));
 
 ALTER TABLE "tenant_settings" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "tenant_settings";
 CREATE POLICY tenant_isolation ON "tenant_settings"
   USING (app_tenant_visible("tenant_id"))
   WITH CHECK (app_tenant_visible("tenant_id"));
@@ -276,6 +343,7 @@ CREATE POLICY tenant_isolation ON "tenant_settings"
 -- Criar tenant (INSERT) exige app.is_platform=true — provisionamento é ação
 -- de plataforma, nunca de um tenant se auto-criando.
 ALTER TABLE "tenants" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "tenants";
 CREATE POLICY tenant_isolation ON "tenants"
   USING (app_tenant_visible("id"))
   WITH CHECK (app_tenant_visible("id"));
@@ -284,14 +352,18 @@ CREATE POLICY tenant_isolation ON "tenants"
 -- UPDATE/DELETE = o Postgres nega os dois por padrão; imutabilidade garantida
 -- no banco, não só por convenção de aplicação)
 ALTER TABLE "module_audit" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_select ON "module_audit";
 CREATE POLICY tenant_isolation_select ON "module_audit"
   FOR SELECT USING (app_tenant_visible("tenant_id"));
+DROP POLICY IF EXISTS tenant_isolation_insert ON "module_audit";
 CREATE POLICY tenant_isolation_insert ON "module_audit"
   FOR INSERT WITH CHECK (app_tenant_visible("tenant_id"));
 
 ALTER TABLE "audit_log" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_select ON "audit_log";
 CREATE POLICY tenant_isolation_select ON "audit_log"
   FOR SELECT USING (app_tenant_visible("tenant_id"));
+DROP POLICY IF EXISTS tenant_isolation_insert ON "audit_log";
 CREATE POLICY tenant_isolation_insert ON "audit_log"
   FOR INSERT WITH CHECK (app_tenant_visible("tenant_id"));
 
