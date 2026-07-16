@@ -64,6 +64,39 @@ export default tseslint.config(
     },
   },
 
+  // ─── apps/api: PrismaClient direto é proibido fora do contexto de request ──
+  // SET LOCAL app.tenant_id/app.is_platform só vale numa transação/conexão;
+  // com pool, cada query pode pegar conexão física diferente. Todo acesso ao
+  // banco em request path precisa passar pelo client transacional do
+  // RequestContextService (ver CLAUDE.md § Contexto de request). Exceção:
+  // app.module.ts (registra o provider do PrismaClient global) e o próprio
+  // request-context.service.ts.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/app.module.ts',
+      'apps/api/src/context/request-context.service.ts',
+      // Testes legitimamente montam fakes tipados como PrismaClient/Prisma —
+      // não é request path, é test double.
+      'apps/api/src/**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@molho/db',
+              importNames: ['PrismaClient'],
+              message:
+                'Nunca importe PrismaClient direto aqui — todo acesso ao banco em request path passa pelo client transacional do RequestContextService (ver CLAUDE.md § Contexto de request). Use RequestContextService.getClient().',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Scripts .mjs rodam no Node (servidor estático do teste de contraste).
   {
     files: ['**/*.mjs'],

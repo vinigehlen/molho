@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../prisma/generated/client/client';
 
-export { PrismaClient } from '../prisma/generated/client/client';
+export { PrismaClient, Prisma } from '../prisma/generated/client/client';
 export type * from '../prisma/generated/client/client';
 export * from '../prisma/generated/client/models';
 export * from '../prisma/generated/client/enums';
