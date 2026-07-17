@@ -215,3 +215,47 @@ describe('TokenService.rotateTokens', () => {
     );
   });
 });
+
+describe('TokenService.listSessions', () => {
+  it('lista os dispositivos ativos do user com os metadados certos', async () => {
+    const { service } = setup();
+    const { deviceId } = await service.issueTokens(USER_ID, ['owner'], SCOPES, DEVICE);
+
+    const sessions = await service.listSessions(USER_ID);
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.deviceId).toBe(deviceId);
+    expect(sessions[0]?.userAgent).toBe(DEVICE.userAgent);
+    expect(sessions[0]?.ipAtCreate).toBe(DEVICE.ip);
+  });
+
+  it('user sem sessão nenhuma: lista vazia', async () => {
+    const { service } = setup();
+    expect(await service.listSessions(USER_ID)).toEqual([]);
+  });
+});
+
+describe('TokenService.revokeOtherSessions', () => {
+  it('revoga todos MENOS o dispositivo atual', async () => {
+    const { service } = setup();
+    const a = await service.issueTokens(USER_ID, ['owner'], SCOPES, DEVICE);
+    const b = await service.issueTokens(USER_ID, ['owner'], SCOPES, DEVICE);
+    const c = await service.issueTokens(USER_ID, ['owner'], SCOPES, DEVICE);
+
+    await service.revokeOtherSessions(USER_ID, a.deviceId);
+
+    // a (atual) continua ativo — rotaciona sem problema.
+    await expect(service.rotateTokens(a.refreshToken, DEVICE)).resolves.toBeDefined();
+    // b e c foram revogados.
+    await expect(service.rotateTokens(b.refreshToken, DEVICE)).rejects.toBeInstanceOf(InvalidTokenError);
+    await expect(service.rotateTokens(c.refreshToken, DEVICE)).rejects.toBeInstanceOf(InvalidTokenError);
+  });
+
+  it('NÃO sobe token_version — o dispositivo atual não é afetado', async () => {
+    const { service, userRepository } = setup();
+    await service.issueTokens(USER_ID, ['owner'], SCOPES, DEVICE);
+    await service.revokeOtherSessions(USER_ID, 'device-atual-inexistente');
+
+    expect(await userRepository.getTokenVersion(USER_ID)).toBe(0);
+  });
+});

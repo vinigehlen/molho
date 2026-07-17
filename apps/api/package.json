@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "dotenv -e ../../.env.local -- vitest run --passWithNoTests --exclude '**/*.e2e.test.ts'",
-    "test:e2e": "dotenv -e ../../.env.local -- vitest run '**/*.e2e.test.ts'"
+    "test:e2e": "dotenv -e ../../.env.local -- vitest run '.e2e.test.ts'"
   },
   "dependencies": {
     "@molho/contracts": "workspace:*",

@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { ExpiredTokenError, InvalidTokenError, RevokedTokenError, ReusedRefreshError } from './token-errors';
 import type { RefreshLookupStore } from './refresh-lookup-store';
-import type { SessionStore } from './session-store';
+import type { SessionRecord, SessionStore } from './session-store';
 import { currentJwtKeyVersion } from './token-payload';
 import type { DeviceInfo, TokenPayload, TokenScope } from './token-payload';
 import type { UserAuthRepository } from './user-version-repository';
@@ -29,6 +29,10 @@ export interface IssuedTokens {
 export interface RotatedTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface SessionSummary extends SessionRecord {
+  deviceId: string;
 }
 
 /**
@@ -133,6 +137,30 @@ export class TokenService {
       await this.refreshLookupStore.delete(session.refreshHash);
     }
     await this.sessionStore.delete(userId, deviceId);
+  }
+
+  /** "Meus dispositivos" — pura leitura de Redis, não toca Postgres. */
+  async listSessions(userId: string): Promise<SessionSummary[]> {
+    const deviceIds = await this.sessionStore.listDeviceIds(userId);
+    const sessions = await Promise.all(
+      deviceIds.map(async (deviceId) => {
+        const record = await this.sessionStore.get(userId, deviceId);
+        return record ? { deviceId, ...record } : null;
+      }),
+    );
+    return sessions.filter((s): s is SessionSummary => s !== null);
+  }
+
+  /**
+   * Revoga todo dispositivo MENOS o atual. Não sobe token_version (isso
+   * derrubaria o próprio dispositivo atual também) — só invalida o refresh
+   * dos outros, mesmo raciocínio de revokeSession.
+   */
+  async revokeOtherSessions(userId: string, currentDeviceId: string): Promise<void> {
+    const deviceIds = await this.sessionStore.listDeviceIds(userId);
+    await Promise.all(
+      deviceIds.filter((id) => id !== currentDeviceId).map((deviceId) => this.revokeSession(userId, deviceId)),
+    );
   }
 
   async revokeAllSessions(userId: string): Promise<void> {

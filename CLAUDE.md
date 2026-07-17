@@ -94,6 +94,7 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 - **Commits pequenos, mensagens no imperativo em pt-BR** ("adiciona wizard de impressora", não "added printer wizard").
 - **Nunca commite `.env.local`** nem credenciais em código. Se aparecer, revogue no provedor e limpe o histórico.
 - **`*.e2e.test.ts` fica FORA do `pnpm test` padrão** (script `test:e2e` separado) — precisa de Redis/Postgres reais, é lento (rate limit com cooldown real chega a ~85s), e não é determinístico o bastante pra rodar em todo `pnpm build`. Roda `test:e2e` manualmente antes de commit que mexe em fluxo de auth. Cada arquivo e2e precisa limpar seu próprio rate-limit de IP no `beforeAll` (todo teste bate do mesmo localhost — rodar a suíte 2x seguidas sem isso autoderruba os testes com 429 de verdade).
+- **Filtro de arquivo do Vitest CLI (`vitest run '<filtro>'`) é substring simples, não glob.** `'**/*.e2e.test.ts'` não casa com nada ("no test files found") — o filtro certo é só o pedaço fixo do nome, `'.e2e.test.ts'`. Achado rodando `test:e2e` no Épico 3, commit 7 (sessions).
 
 ## Ordem dos épicos
 

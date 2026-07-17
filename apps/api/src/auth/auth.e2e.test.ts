@@ -223,4 +223,47 @@ describe('POST /v1/store/:slug/auth/otp (customer)', () => {
       .send({ phone: randomPhone() })
       .expect(404);
   });
+
+  it('N verifys concorrentes em tenants diferentes: contexto de tenant nunca vaza entre requests (AsyncLocalStorage por request via RequestContextService.run)', async () => {
+    const otherTenant = await migratorPrisma.tenant.create({
+      data: { slug: `${testTenantSlug}-concurrent`, name: 'E2E Test Tenant Concurrent', timezone: 'America/Sao_Paulo' },
+    });
+    extraTenantIds.push(otherTenant.id);
+
+    // Cada "raia" resolve OTP + verify pro SEU tenant, em paralelo com a
+    // outra — se o contexto de tenant vazasse entre requests concorrentes
+    // (ex.: variável compartilhada em vez de AsyncLocalStorage por run()),
+    // o customer criado apareceria no tenant errado. Busca a mensagem PELO
+    // TELEFONE (não "a última enviada") porque em concorrência de verdade
+    // outra raia pode ter mandado uma mensagem no meio do caminho.
+    function codeSentTo(phone: string): string {
+      const mock = app.get<MockMessagingProvider>(MESSAGING_PROVIDER);
+      const message = mock.getSentMessages().find((m) => m.to === phone);
+      if (!message) throw new Error(`nenhuma mensagem enviada pro telefone ${phone}`);
+      return extractCode(message.message);
+    }
+
+    async function verifyInTenant(slug: string): Promise<{ customerId: string }> {
+      const phone = randomPhone();
+      await request(app.getHttpServer()).post(`/v1/store/${slug}/auth/otp/request`).send({ phone }).expect(202);
+      const res = await request(app.getHttpServer())
+        .post(`/v1/store/${slug}/auth/otp/verify`)
+        .send({ phone, code: codeSentTo(phone) })
+        .expect(200);
+      return { customerId: res.body.user.id };
+    }
+
+    const rounds = 6;
+    const results = await Promise.all(
+      Array.from({ length: rounds }, (_, i) =>
+        verifyInTenant(i % 2 === 0 ? testTenantSlug : otherTenant.slug),
+      ),
+    );
+
+    for (const [i, result] of results.entries()) {
+      const expectedTenantId = i % 2 === 0 ? testTenantId : otherTenant.id;
+      const customer = await migratorPrisma.customer.findUniqueOrThrow({ where: { id: result.customerId } });
+      expect(customer.tenantId).toBe(expectedTenantId);
+    }
+  }, 30_000);
 });
