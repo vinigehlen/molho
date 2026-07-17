@@ -139,6 +139,70 @@ describe('a matriz da §5-C.5, ponto a ponto sensível', () => {
   });
 });
 
+describe('catálogo granular (Épico 4 — categories/products/modifiers, sem combos)', () => {
+  const CATALOG_PERMISSIONS = [
+    'catalog.category.create',
+    'catalog.category.update',
+    'catalog.category.delete',
+    'catalog.product.create',
+    'catalog.product.update',
+    'catalog.product.delete',
+    'catalog.product.mark_unavailable',
+    'catalog.import',
+  ] as const;
+
+  it('owner e manager têm as 8 permissões de catálogo', () => {
+    for (const role of ['owner', 'manager'] as const) {
+      for (const permission of CATALOG_PERMISSIONS) {
+        expect(
+          can(ator(role, 'tenant', 'tenant-1'), permission, NA_LOJA_1).allowed,
+          `${role} deveria ter "${permission}"`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('cashier tem APENAS mark_unavailable — não cria, edita nem apaga catálogo', () => {
+    expect(can(ator('cashier'), 'catalog.product.mark_unavailable', NA_LOJA_1).allowed).toBe(true);
+
+    for (const permission of CATALOG_PERMISSIONS) {
+      if (permission === 'catalog.product.mark_unavailable') continue;
+      expect(
+        can(ator('cashier'), permission, NA_LOJA_1).allowed,
+        `cashier não deveria ter "${permission}"`,
+      ).toBe(false);
+    }
+  });
+
+  it('waiter/kitchen/courier não têm NENHUMA permissão de catálogo', () => {
+    for (const role of ['waiter', 'kitchen', 'courier'] as const) {
+      for (const permission of CATALOG_PERMISSIONS) {
+        expect(
+          can(ator(role), permission, NA_LOJA_1).allowed,
+          `${role} não deveria ter "${permission}"`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('accountant/marketing não têm NENHUMA permissão de catálogo', () => {
+    for (const role of ['accountant', 'marketing'] as const) {
+      for (const permission of CATALOG_PERMISSIONS) {
+        expect(
+          can(ator(role, 'tenant', 'tenant-1'), permission, NA_LOJA_1).allowed,
+          `${role} não deveria ter "${permission}"`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('nenhuma permissão nova aponta pra "combos" — Épico 4 não inclui combos (Fase 2, Épico 15)', () => {
+    for (const permission of PERMISSIONS) {
+      expect(permission.includes('combo')).toBe(false);
+    }
+  });
+});
+
 describe('impersonation (permissões do Épico 2; fluxo é do Épico 14)', () => {
   it('platform_support tem os dois níveis; finance e engineer não têm nenhum', () => {
     const support: Actor = {
@@ -168,7 +232,7 @@ describe('impersonation (permissões do Épico 2; fluxo é do Épico 14)', () =>
       assignments: [{ role: 'platform_finance', scopeType: 'platform', scopeId: null }],
     };
     expect(can(finance, 'order.create', NA_LOJA_1).allowed).toBe(false);
-    expect(can(finance, 'catalog.edit', NA_LOJA_1).allowed).toBe(false);
+    expect(can(finance, 'catalog.product.update', NA_LOJA_1).allowed).toBe(false);
   });
 
   it('platform_support impersonando o owner: os dois conjuntos de grant valem ao mesmo tempo', () => {
@@ -188,7 +252,7 @@ describe('impersonation (permissões do Épico 2; fluxo é do Épico 14)', () =>
       true,
     );
     expect(
-      can(suporteImpersonandoOwner, 'catalog.edit', NA_LOJA_1),
+      can(suporteImpersonandoOwner, 'catalog.product.update', NA_LOJA_1),
     ).toMatchObject({ allowed: true, requiresApproval: false });
     expect(can(suporteImpersonandoOwner, 'payment.refund', NA_LOJA_1)).toMatchObject({
       allowed: true,
@@ -201,10 +265,10 @@ describe('escopo', () => {
   it('manager da loja 1 não manda na loja 2', () => {
     const manager = ator('manager', 'store', 'loja-1');
 
-    expect(can(manager, 'catalog.edit', { tenantId: 'tenant-1', storeId: 'loja-1' }).allowed).toBe(
+    expect(can(manager, 'catalog.product.update', { tenantId: 'tenant-1', storeId: 'loja-1' }).allowed).toBe(
       true,
     );
-    expect(can(manager, 'catalog.edit', { tenantId: 'tenant-1', storeId: 'loja-2' }).allowed).toBe(
+    expect(can(manager, 'catalog.product.update', { tenantId: 'tenant-1', storeId: 'loja-2' }).allowed).toBe(
       false,
     );
   });
@@ -212,13 +276,13 @@ describe('escopo', () => {
   it('atribuição de tenant cobre qualquer loja daquele tenant', () => {
     const owner = ator('owner', 'tenant', 'tenant-1');
 
-    expect(can(owner, 'catalog.edit', { tenantId: 'tenant-1', storeId: 'loja-1' }).allowed).toBe(
+    expect(can(owner, 'catalog.product.update', { tenantId: 'tenant-1', storeId: 'loja-1' }).allowed).toBe(
       true,
     );
-    expect(can(owner, 'catalog.edit', { tenantId: 'tenant-1', storeId: 'loja-99' }).allowed).toBe(
+    expect(can(owner, 'catalog.product.update', { tenantId: 'tenant-1', storeId: 'loja-99' }).allowed).toBe(
       true,
     );
-    expect(can(owner, 'catalog.edit', { tenantId: 'tenant-2', storeId: 'loja-1' }).allowed).toBe(
+    expect(can(owner, 'catalog.product.update', { tenantId: 'tenant-2', storeId: 'loja-1' }).allowed).toBe(
       false,
     );
   });
@@ -252,8 +316,8 @@ describe('escopo', () => {
   });
 
   it('sem escopo informado, atribuição de loja não vale (fail-closed)', () => {
-    expect(can(ator('manager'), 'catalog.edit').allowed).toBe(false);
-    expect(can(ator('manager'), 'catalog.edit', {}).allowed).toBe(false);
+    expect(can(ator('manager'), 'catalog.product.update').allowed).toBe(false);
+    expect(can(ator('manager'), 'catalog.product.update', {}).allowed).toBe(false);
   });
 });
 

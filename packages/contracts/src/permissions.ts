@@ -20,8 +20,15 @@ export type ScopeType = (typeof SCOPE_TYPES)[number];
 
 export const PERMISSIONS = [
   // Catálogo
-  'catalog.edit',
-  'catalog.mark_sold_out',
+  'catalog.category.create',
+  'catalog.category.update',
+  'catalog.category.delete',
+  'catalog.product.create',
+  'catalog.product.update',
+  'catalog.product.delete',
+  /** Separada de product.update: cashier marca esgotado sem poder editar preço (§5-C.5). */
+  'catalog.product.mark_unavailable',
+  'catalog.import',
   // Pedidos
   'order.create',
   'order.update_status',
@@ -130,8 +137,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
 
   // ─── Lojista ────────────────────────────────────────────────────────────────
   owner: [
-    'catalog.edit',
-    'catalog.mark_sold_out',
+    'catalog.category.create',
+    'catalog.category.update',
+    'catalog.category.delete',
+    'catalog.product.create',
+    'catalog.product.update',
+    'catalog.product.delete',
+    'catalog.product.mark_unavailable',
+    'catalog.import',
     'order.create',
     'order.update_status',
     'order.manual_discount',
@@ -152,8 +165,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'billing.manage',
   ],
   manager: [
-    'catalog.edit',
-    'catalog.mark_sold_out',
+    'catalog.category.create',
+    'catalog.category.update',
+    'catalog.category.delete',
+    'catalog.product.create',
+    'catalog.product.update',
+    'catalog.product.delete',
+    'catalog.product.mark_unavailable',
+    'catalog.import',
     'order.create',
     'order.update_status',
     'order.manual_discount',
@@ -169,7 +188,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     { permission: 'team.manage', subordinatesOnly: true },
   ],
   cashier: [
-    'catalog.mark_sold_out',
+    'catalog.product.mark_unavailable',
     'order.create',
     'order.update_status',
     { permission: 'order.manual_discount', approval: true },
@@ -179,8 +198,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'delivery.dispatch',
     'invoice.issue',
   ],
-  waiter: ['catalog.mark_sold_out', 'order.create', 'order.update_status'],
-  kitchen: ['catalog.mark_sold_out', 'order.update_status'],
+  waiter: ['order.create', 'order.update_status'],
+  kitchen: ['order.update_status'],
   // Entregador NÃO acessa o backoffice: só muda status da própria entrega.
   courier: ['delivery.update_status'],
   accountant: ['report.revenue.view', 'invoice.issue'],
