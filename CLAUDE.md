@@ -75,6 +75,8 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 
 **REGRA HARD: todo acesso ao banco em request path DEVE passar pelo client transacional do `RequestContextService`** (abre uma transação por request, roda `SET LOCAL` como primeira coisa dentro dela, guarda o client em `AsyncLocalStorage` pra duração do request). Uso direto do `PrismaClient` global injetado num service de `apps/api/src` é **lint error** (regra de lint reprova import direto de `PrismaClient` em qualquer arquivo de `apps/api/src/` exceto `context/context.module.ts` — módulo dedicado que registra o provider do client global, importável por quem precisa de `RequestContextService` sem depender do `AppModule` inteiro — e o próprio `RequestContextService`). Exceção: jobs administrativos (workers de sistema, migrations, seed) rodando via `app_migrator` podem usar o client global — mas cada um seta seu próprio contexto de tenant explícito, não herda de request nenhum.
 
+**`@typescript-eslint/consistent-type-imports` está DESLIGADA em `apps/api/src/**` (fora de teste).** NestJS resolve DI implícita (parâmetro de constructor sem `@Inject()`) e transforma `@Body()`/`@Param()` na classe do DTO (`ValidationPipe` + `class-transformer`) usando a referência de CLASSE de verdade, via reflexão (`design:paramtypes`/`emitDecoratorMetadata`). `import type` apaga essa referência em runtime — o auto-fix da regra já quebrou a injeção de `RequestContextService` e a validação de DTO na prática (achado rodando os controllers de verdade, não só no lint). É estrutural pra qualquer NestJS que use reflexão, não específico de um arquivo — por isso a regra é desligada pro pacote inteiro, não silenciada arquivo a arquivo.
+
 ## Design system "Tempero"
 
 - Roxo Molho `#820AD1` (primária). No storefront white-label, o lojista escolhe **1 de 4 templates** (Roxo, Brasa `#D93025`, Folha `#0F8A5F`, Grafite `#141216`) — constantes em `packages/ui/themes.ts`, todos AA por construção. NÃO existe seletor de cor livre.
@@ -91,6 +93,7 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 - **CI roda dois perfis:** "somente core" e "tudo ligado". Feature que quebra o perfil mínimo não passa.
 - **Commits pequenos, mensagens no imperativo em pt-BR** ("adiciona wizard de impressora", não "added printer wizard").
 - **Nunca commite `.env.local`** nem credenciais em código. Se aparecer, revogue no provedor e limpe o histórico.
+- **`*.e2e.test.ts` fica FORA do `pnpm test` padrão** (script `test:e2e` separado) — precisa de Redis/Postgres reais, é lento (rate limit com cooldown real chega a ~85s), e não é determinístico o bastante pra rodar em todo `pnpm build`. Roda `test:e2e` manualmente antes de commit que mexe em fluxo de auth. Cada arquivo e2e precisa limpar seu próprio rate-limit de IP no `beforeAll` (todo teste bate do mesmo localhost — rodar a suíte 2x seguidas sem isso autoderruba os testes com 429 de verdade).
 
 ## Ordem dos épicos
 

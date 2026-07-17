@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { COPY, t } from '@molho/contracts';
 import { AppModule } from './app.module';
@@ -11,6 +11,11 @@ async function bootstrap() {
   // tráfego ainda, o console estruturado do Nest já cobre a necessidade —
   // trocar por pino é reversível quando o Épico 9 (realtime) pedir mais.
   const app = await NestFactory.create(AppModule);
+
+  // whitelist: campo não declarado no DTO é removido silenciosamente (não
+  // erro) — forbidNonWhitelisted seria mais estrito, mas whitelist já evita
+  // um client mandar campo a mais que o controller não espera.
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // CORS liberado só para os fronts locais. Sem auth (Épico 3), então isto é
   // apenas o navegador permitindo a chamada — não é uma fronteira de segurança.

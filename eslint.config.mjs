@@ -98,6 +98,25 @@ export default tseslint.config(
     },
   },
 
+  // ─── apps/api: consistent-type-imports conflita com o Nest ─────────────────
+  // NestJS resolve DI implícita (constructor param sem @Inject) e faz
+  // @Body()/@Param() virarem instância de DTO (ValidationPipe+class-
+  // transformer) usando a referência de CLASSE de verdade, via reflexão
+  // (design:paramtypes/emitDecoratorMetadata). `import type` apaga essa
+  // referência em runtime — o auto-fix do consistent-type-imports quebrou
+  // a injeção de RequestContextService e a validação de DTO na prática
+  // (achado rodando os controllers de verdade, não só no lint). É um
+  // conflito estrutural conhecido entre a regra e qualquer código NestJS
+  // que dependa de reflexão, não específico destes dois arquivos — por
+  // isso desligada pra `apps/api/src/**` inteiro, não só aqui.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'off',
+    },
+  },
+
   // Scripts .mjs rodam no Node (servidor estático do teste de contraste).
   {
     files: ['**/*.mjs'],
