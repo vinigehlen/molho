@@ -135,13 +135,17 @@ model Tenant {
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
 
-  plan         Plan?               @relation(fields: [planId], references: [id])
-  stores       Store[]
-  customers    Customer[]
-  entitlements TenantEntitlement[]
-  settings     TenantSetting[]
-  moduleAudits ModuleAudit[]
-  auditLogs    AuditLog[]
+  plan           Plan?               @relation(fields: [planId], references: [id])
+  stores         Store[]
+  customers      Customer[]
+  entitlements   TenantEntitlement[]
+  settings       TenantSetting[]
+  moduleAudits   ModuleAudit[]
+  auditLogs      AuditLog[]
+  categories     Category[]
+  products       Product[]
+  modifierGroups ModifierGroup[]
+  modifiers      Modifier[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -261,6 +265,113 @@ model UserRole {
 
   @@unique([userId, role, scopeType, scopeId])
   @@map("user_roles")
+}
+
+// ─── Catálogo (Épico 4) ───────────────────────────────────────────────────────
+//
+// Tenant-scoped, SEM store_id: docs/01-plano-produto.md §5.1 modela o
+// cardápio por tenant (um cardápio por loja só chega com o módulo
+// multi_store, Fase 3/Premium — não é retrofit desta tabela, é override
+// futuro). Sem combos de propósito (Fase 2, já travado por teste em
+// packages/contracts/src/permissions.test.ts).
+//
+// modifier_groups e modifiers carregam tenant_id denormalizado (não só o FK
+// pro pai) porque a policy de RLS lê a coluna da PRÓPRIA linha — não
+// atravessa join. E toda FK que liga uma linha tenant-scoped a outra é
+// COMPOSTA (filho_id, tenant_id) → (pai.id, pai.tenant_id), nunca FK simples:
+// isso é o que impede fisicamente um modifier_group com tenant_id=A apontar
+// pra um product de tenant_id=B — nível de banco, sem trigger. Exige um
+// índice único (id, tenant_id) no pai só pra servir de alvo da FK composta
+// do filho (Postgres exige unique/PK na coluna referenciada).
+
+model Category {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  sortOrder Int       @default(0) @map("sort_order")
+  visible   Boolean   @default(true)
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([tenantId, sortOrder])
+  @@map("categories")
+}
+
+model Product {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  categoryId      String    @map("category_id") @db.Uuid
+  name            String
+  description     String?
+  /// Sempre inteiro em centavos, nunca float (CLAUDE.md regra 4). CHECK >= 0
+  /// à mão na migration (Prisma não expressa CHECK no DSL).
+  basePriceCents  Int       @map("base_price_cents")
+  /// Chave do objeto no R2 — nasce nula, preenchida pelo upload (commit 6).
+  imageKey        String?   @map("image_key")
+  /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
+  available       Boolean   @default(true)
+  sortOrder       Int       @default(0) @map("sort_order")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category       Category        @relation(fields: [categoryId], references: [id])
+  modifierGroups ModifierGroup[]
+
+  // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
+  // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
+  // de uma relação simples; ver migration.
+  @@index([tenantId, categoryId, sortOrder])
+  @@map("products")
+}
+
+model ModifierGroup {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  productId String    @map("product_id") @db.Uuid
+  name      String
+  /// CHECK min >= 0 AND min <= max à mão na migration.
+  min       Int       @default(0)
+  max       Int       @default(1)
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   Product    @relation(fields: [productId], references: [id])
+  modifiers Modifier[]
+
+  // FK composta (product_id, tenant_id) → products(id, tenant_id) na migration.
+  @@index([tenantId, productId])
+  @@map("modifier_groups")
+}
+
+model Modifier {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  groupId        String    @map("group_id") @db.Uuid
+  name           String
+  /// Sempre >= 0 (CHECK na migration) — complemento nunca reduz o preço base.
+  priceDeltaCents Int      @map("price_delta_cents")
+  version        Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group  ModifierGroup @relation(fields: [groupId], references: [id])
+
+  // FK composta (group_id, tenant_id) → modifier_groups(id, tenant_id) na migration.
+  @@index([tenantId, groupId])
+  @@map("modifiers")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────
