@@ -1,4 +1,4 @@
-import { type CanActivate, type ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { type Actor, type Permission, type Role, can, isRole } from '@molho/contracts';
 import { requireTenantIdHeader } from './tenant-header.util';
@@ -17,10 +17,13 @@ import { REQUIRE_PERMISSION_KEY } from './require-permission.decorator';
  * precisar — mesma limitação já documentada em TenantContextInterceptor.
  * `requiresApproval` (△ da matriz §5-C.5) não se aplica a nenhuma das 8
  * permissões de catálogo do commit 1 — fluxo de PIN fica pro Épico do PDV.
+ *
+ * @Inject(Reflector) explícito — mesmo achado de RequireModuleGuard (esbuild
+ * do Vitest não emite emitDecoratorMetadata pra DI implícita por tipo).
  */
 @Injectable()
 export class RequirePermissionGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(@Inject(Reflector) private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     const permission = this.reflector.getAllAndOverride<Permission | undefined>(REQUIRE_PERMISSION_KEY, [

@@ -4,6 +4,7 @@ import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { ModuleCheckModule } from '../modules/module-check.module';
+import { StorageModule } from '../storage/storage.module';
 import { CategoriesController } from './categories.controller';
 import { CategoryService } from './category.service';
 import { PrismaCategoryRepository } from './category.repository';
@@ -36,7 +37,7 @@ export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SER
  * CatalogModule).
  */
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorageModule],
   controllers: [CategoriesController, ProductsController, ModifierGroupsController, ModifiersController],
   providers: [
     {

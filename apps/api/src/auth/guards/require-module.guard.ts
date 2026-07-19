@@ -20,11 +20,17 @@ import { requireTenantIdHeader } from './tenant-header.util';
  * do `.run()` deste guard — nunca injetados como singleton do Nest, porque
  * `PrismaModuleDataSource` só pode usar o client transacional do request
  * (CLAUDE.md § Contexto de request), que não existe fora de um `.run()`.
+ *
+ * @Inject(Reflector) explícito (não implícito por tipo): esbuild do Vitest
+ * não emite emitDecoratorMetadata de forma confiável pra DI implícita —
+ * mesmo achado já documentado em staff-auth.controller.ts/
+ * customer-auth.controller.ts (funcionava sob `nest start`, quebrava sob
+ * `Test.createTestingModule` do Vitest com "Reflector" undefined).
  */
 @Injectable()
 export class RequireModuleGuard implements CanActivate {
   constructor(
-    private readonly reflector: Reflector,
+    @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(MODULE_CACHE) private readonly cache: ModuleCache,
     @Inject(RequestContextService) private readonly requestContext: RequestContextService,
   ) {}

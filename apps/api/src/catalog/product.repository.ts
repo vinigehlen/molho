@@ -28,6 +28,8 @@ export interface UpdateProductInput {
   description?: string | null;
   basePriceCents?: number;
   sortOrder?: number;
+  /** Confirma o upload feito via presigned PUT (StorageProvider) — nunca gerado a partir de input livre do cliente. */
+  imageKey?: string;
 }
 
 export interface ProductRepository {
