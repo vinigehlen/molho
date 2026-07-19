@@ -22,8 +22,18 @@ export interface ModuleDataSource {
   getFlag(moduleKey: string): Promise<FlagRow | null>;
 }
 
+/**
+ * Só os 3 model delegates que este adapter usa — nunca o `PrismaClient`
+ * inteiro. É o que permite passar tanto o client global quanto o
+ * `Prisma.TransactionClient` de `RequestContextService.getClient()`
+ * (obrigatório em request path, CLAUDE.md § Contexto de request): os dois
+ * têm esses delegates, mas `TransactionClient` não é atribuível a
+ * `PrismaClient` (não tem `$transaction`/`$connect`/etc.).
+ */
+type ModulePrismaDelegates = Pick<PrismaClient, 'tenantEntitlement' | 'tenantSetting' | 'featureFlag'>;
+
 export class PrismaModuleDataSource implements ModuleDataSource {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: ModulePrismaDelegates) {}
 
   async getEntitlement(tenantId: string, moduleKey: string): Promise<EntitlementRow | null> {
     // findFirst (não findUnique): precisa combinar a PK composta com

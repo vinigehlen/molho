@@ -1,29 +1,41 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
+import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
+import { ModuleCheckModule } from '../modules/module-check.module';
+import { CategoriesController } from './categories.controller';
 import { CategoryService } from './category.service';
 import { PrismaCategoryRepository } from './category.repository';
 import { ModifierService } from './modifier.service';
 import { PrismaModifierRepository } from './modifier.repository';
 import { ModifierGroupService } from './modifier-group.service';
 import { PrismaModifierGroupRepository } from './modifier-group.repository';
+import { ProductsController } from './products.controller';
 import { ProductService } from './product.service';
 import { PrismaProductRepository } from './product.repository';
+import { CATEGORY_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE, PRODUCT_SERVICE } from './catalog.tokens';
 
-export const CATEGORY_SERVICE = Symbol('CATEGORY_SERVICE');
-export const PRODUCT_SERVICE = Symbol('PRODUCT_SERVICE');
-export const MODIFIER_GROUP_SERVICE = Symbol('MODIFIER_GROUP_SERVICE');
-export const MODIFIER_SERVICE = Symbol('MODIFIER_SERVICE');
+export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE };
 
 /**
- * Só repositories + services (Épico 4, commit 3) — controllers com os
- * guards @RequireModule/@RequirePermission chegam no commit 4, primeira vez
- * que esse par de guards existe neste código (CLAUDE.md § RBAC granular,
- * regra 2). Módulo dedicado, mesmo padrão de TokenModule: importável sem
- * puxar o AppModule inteiro.
+ * Controllers de categories/products chegam no commit 4, com os guards
+ * @RequireModule/@RequirePermission (AuthModule) pela primeira vez neste
+ * código. Controllers de modifier_groups/modifiers ficam pro commit 5 —
+ * services já existem desde o commit 3, só falta a camada HTTP deles.
+ *
+ * TokenModule e ModuleCheckModule entram aqui em ADIÇÃO a AuthModule: guard
+ * referenciado por classe em @UseGuards() é resolvido no injector do módulo
+ * que declara o CONTROLLER, não no injector do módulo que o exporta — as
+ * dependências de JwtAuthGuard (TOKEN_SERVICE) e RequireModuleGuard
+ * (MODULE_CACHE) precisam estar visíveis aqui também, não só em AuthModule
+ * (achado rodando `nest start` de verdade: exportar a classe do guard não
+ * basta, sem isto o Nest não resolve `Symbol(TOKEN_SERVICE)` dentro de
+ * CatalogModule).
  */
 @Module({
-  imports: [ContextModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
+  controllers: [CategoriesController, ProductsController],
   providers: [
     {
       provide: CATEGORY_SERVICE,
