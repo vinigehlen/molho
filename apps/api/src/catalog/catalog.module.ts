@@ -7,8 +7,10 @@ import { ModuleCheckModule } from '../modules/module-check.module';
 import { CategoriesController } from './categories.controller';
 import { CategoryService } from './category.service';
 import { PrismaCategoryRepository } from './category.repository';
+import { ModifiersController } from './modifiers.controller';
 import { ModifierService } from './modifier.service';
 import { PrismaModifierRepository } from './modifier.repository';
+import { ModifierGroupsController } from './modifier-groups.controller';
 import { ModifierGroupService } from './modifier-group.service';
 import { PrismaModifierGroupRepository } from './modifier-group.repository';
 import { ProductsController } from './products.controller';
@@ -19,10 +21,10 @@ import { CATEGORY_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE, PRODUCT_SER
 export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE };
 
 /**
- * Controllers de categories/products chegam no commit 4, com os guards
+ * Controllers de categories/products chegaram no commit 4, com os guards
  * @RequireModule/@RequirePermission (AuthModule) pela primeira vez neste
- * código. Controllers de modifier_groups/modifiers ficam pro commit 5 —
- * services já existem desde o commit 3, só falta a camada HTTP deles.
+ * código. modifier-groups/modifiers chegam no commit 5, mesma infra —
+ * services já existiam desde o commit 3, só faltava a camada HTTP deles.
  *
  * TokenModule e ModuleCheckModule entram aqui em ADIÇÃO a AuthModule: guard
  * referenciado por classe em @UseGuards() é resolvido no injector do módulo
@@ -35,7 +37,7 @@ export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SER
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
-  controllers: [CategoriesController, ProductsController],
+  controllers: [CategoriesController, ProductsController, ModifierGroupsController, ModifiersController],
   providers: [
     {
       provide: CATEGORY_SERVICE,
