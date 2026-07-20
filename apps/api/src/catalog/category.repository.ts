@@ -25,6 +25,8 @@ export interface UpdateCategoryInput {
 export interface CategoryRepository {
   list(): Promise<CategoryRecord[]>;
   findById(id: string): Promise<CategoryRecord | null>;
+  /** Casamento case-insensitive — usado pela importação por planilha pra achar/criar categoria por nome. */
+  findByName(name: string): Promise<CategoryRecord | null>;
   create(input: CreateCategoryInput): Promise<CategoryRecord>;
   update(id: string, expectedVersion: number, input: UpdateCategoryInput): Promise<CategoryRecord>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
@@ -54,6 +56,13 @@ export class PrismaCategoryRepository implements CategoryRepository {
 
   async findById(id: string): Promise<CategoryRecord | null> {
     return this.requestContext.getClient().category.findFirst({ where: { id, deletedAt: null }, select: SELECT });
+  }
+
+  async findByName(name: string): Promise<CategoryRecord | null> {
+    return this.requestContext.getClient().category.findFirst({
+      where: { name: { equals: name.trim(), mode: 'insensitive' }, deletedAt: null },
+      select: SELECT,
+    });
   }
 
   async create(input: CreateCategoryInput): Promise<CategoryRecord> {

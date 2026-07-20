@@ -17,9 +17,17 @@ import { PrismaModifierGroupRepository } from './modifier-group.repository';
 import { ProductsController } from './products.controller';
 import { ProductService } from './product.service';
 import { PrismaProductRepository } from './product.repository';
-import { CATEGORY_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE, PRODUCT_SERVICE } from './catalog.tokens';
+import { CatalogImportController } from './import/catalog-import.controller';
+import { CatalogImportService } from './import/catalog-import.service';
+import {
+  CATALOG_IMPORT_SERVICE,
+  CATEGORY_SERVICE,
+  MODIFIER_GROUP_SERVICE,
+  MODIFIER_SERVICE,
+  PRODUCT_SERVICE,
+} from './catalog.tokens';
 
-export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE };
+export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE, CATALOG_IMPORT_SERVICE };
 
 /**
  * Controllers de categories/products chegaram no commit 4, com os guards
@@ -38,7 +46,13 @@ export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SER
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorageModule],
-  controllers: [CategoriesController, ProductsController, ModifierGroupsController, ModifiersController],
+  controllers: [
+    CategoriesController,
+    ProductsController,
+    ModifierGroupsController,
+    ModifiersController,
+    CatalogImportController,
+  ],
   providers: [
     {
       provide: CATEGORY_SERVICE,
@@ -64,7 +78,13 @@ export { CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SER
       useFactory: (requestContext: RequestContextService): ModifierService =>
         new ModifierService(new PrismaModifierRepository(requestContext)),
     },
+    {
+      provide: CATALOG_IMPORT_SERVICE,
+      inject: [CATEGORY_SERVICE, PRODUCT_SERVICE],
+      useFactory: (categories: CategoryService, products: ProductService): CatalogImportService =>
+        new CatalogImportService(categories, products),
+    },
   ],
-  exports: [CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE],
+  exports: [CATEGORY_SERVICE, PRODUCT_SERVICE, MODIFIER_GROUP_SERVICE, MODIFIER_SERVICE, CATALOG_IMPORT_SERVICE],
 })
 export class CatalogModule {}

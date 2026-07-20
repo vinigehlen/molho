@@ -17,6 +17,11 @@ export class CategoryService {
     return this.repo.findById(id);
   }
 
+  /** Casamento case-insensitive — usado pela importação por planilha (catalog-import.service.ts). */
+  getByName(name: string): Promise<CategoryRecord | null> {
+    return this.repo.findByName(name);
+  }
+
   // async mesmo sem await interno: assertValidName lança de forma síncrona,
   // e sem async esse throw escapa direto da chamada em vez de rejeitar a
   // Promise — quem chama com `.catch()`/`await/try` esperaria uma rejeição,

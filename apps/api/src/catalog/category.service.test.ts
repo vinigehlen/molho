@@ -15,6 +15,11 @@ class FakeCategoryRepository implements CategoryRepository {
     return this.rows.get(id) ?? null;
   }
 
+  async findByName(name: string): Promise<CategoryRecord | null> {
+    const target = name.trim().toLowerCase();
+    return [...this.rows.values()].find((r) => r.name.trim().toLowerCase() === target) ?? null;
+  }
+
   async create(input: CreateCategoryInput): Promise<CategoryRecord> {
     const record: CategoryRecord = {
       id: `cat-${this.nextId++}`,
