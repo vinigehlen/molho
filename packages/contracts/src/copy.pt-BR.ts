@@ -42,6 +42,10 @@ export const COPY = {
     saudacao: 'Oi, {nome} 👋 Bateu a fome?',
     saudacaoAnonima: 'Bateu a fome?',
 
+    /** Loja existe (link válido) mas ainda não tem categoria/produto visível. */
+    cardapioVazioTitulo: 'Essa loja ainda tá montando o cardápio',
+    cardapioVazioCorpo: 'Volta em instantes — já já tem prato novo por aqui.',
+
     carrinhoVazioTitulo: 'Seu carrinho tá vazio',
     carrinhoVazioCorpo: 'Bora resolver isso?',
     carrinhoVazioAcao: 'Ver o cardápio',
