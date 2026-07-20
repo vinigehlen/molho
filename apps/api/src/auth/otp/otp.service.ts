@@ -6,7 +6,7 @@ import type { Cooldown } from './cooldown';
 import { OtpRateLimitedError } from './otp-errors';
 import type { OtpChallengeStore } from './otp-challenge-store';
 import { ConsoleOtpLogger, type OtpLogger } from './otp-logger';
-import type { RateLimiter } from './rate-limiter';
+import type { RateLimiter } from '../../rate-limit/rate-limiter';
 
 const CODE_TTL_SECONDS = 10 * 60;
 const MAX_VERIFY_ATTEMPTS = 3;

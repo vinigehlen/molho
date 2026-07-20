@@ -6,7 +6,7 @@ import type { MessagingProvider } from '../../messaging/messaging-provider.port'
 import { InMemoryCooldown, RedisCooldown } from './cooldown';
 import { InMemoryOtpChallengeStore, RedisOtpChallengeStore } from './otp-challenge-store';
 import { OtpService } from './otp.service';
-import { InMemorySlidingWindowRateLimiter, RedisSlidingWindowRateLimiter } from './rate-limiter';
+import { InMemorySlidingWindowRateLimiter, RedisSlidingWindowRateLimiter } from '../../rate-limit/rate-limiter';
 
 export const OTP_SERVICE = Symbol('OTP_SERVICE');
 

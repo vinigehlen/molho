@@ -29,7 +29,7 @@ import { RequirePermission } from '../auth/guards/require-permission.decorator';
 import { RequirePermissionGuard } from '../auth/guards/require-permission.guard';
 import { requireTenantIdHeader } from '../auth/guards/tenant-header.util';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
-import type { RateLimiter } from '../auth/otp/rate-limiter';
+import type { RateLimiter } from '../rate-limit/rate-limiter';
 import { STORAGE_PROVIDER, UPLOAD_URL_RATE_LIMITER } from '../storage/storage.module';
 import type { StorageProvider } from '../storage/storage-provider.port';
 import { CatalogExceptionFilter } from './catalog-exception.filter';

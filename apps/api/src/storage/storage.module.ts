@@ -4,7 +4,7 @@ import {
   InMemorySlidingWindowRateLimiter,
   type RateLimiter,
   RedisSlidingWindowRateLimiter,
-} from '../auth/otp/rate-limiter';
+} from '../rate-limit/rate-limiter';
 import { MockStorageProvider } from './mock-storage.provider';
 import { R2StorageProvider } from './r2-storage.provider';
 import type { StorageProvider } from './storage-provider.port';

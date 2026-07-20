@@ -5,7 +5,7 @@ import { InMemoryCooldown } from './cooldown';
 import { InMemoryOtpChallengeStore } from './otp-challenge-store';
 import { OtpRateLimitedError } from './otp-errors';
 import { OtpService } from './otp.service';
-import { InMemorySlidingWindowRateLimiter } from './rate-limiter';
+import { InMemorySlidingWindowRateLimiter } from '../../rate-limit/rate-limiter';
 
 const PHONE_A = parsePhoneNumber('+5551999990000');
 const PHONE_B = parsePhoneNumber('+5551988880000');
