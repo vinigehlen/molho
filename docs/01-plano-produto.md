@@ -549,7 +549,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 2 | Schema Prisma + RLS + **registry de módulos** + **RBAC** + seed — ✅ **entregue** | 0 | Migrations, `ModuleService`, `can()`, tenant demo (Hamburgueria da Vila + Pizzaria Roma) |
 | 3 | Auth OTP (mock de envio) + sessões + revogação — ✅ **entregue** | 0 | Login por telefone nos dois fronts |
 | 4 | CRUD de cardápio + upload S3 + **importação por planilha** — ✅ **entregue** | 1 | Lojista sobe 80 produtos de um CSV |
-| 5 | Storefront: menu, carrinho, bottom sheets | 1 | Navegação mobile completa |
+| 5 | Storefront: menu, carrinho, bottom sheets — ✅ **entregue** | 1 | Navegação mobile completa |
 | 6 | Endereços + zonas de entrega (polígonos) + horários | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
 | 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
 | 8 | Pagamento PIX com **MockPaymentProvider** | 1 | QR, webhook simulado, idempotência, reconciliação |
