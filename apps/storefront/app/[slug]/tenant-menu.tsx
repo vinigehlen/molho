@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import type { StorefrontProduct, StorefrontCategory } from '@molho/contracts';
-import { MoCategoryChips, MoProductCard, MoProductSheet, type MoProductSheetSelection } from '@molho/ui';
+import { MoCartBar, MoCategoryChips, MoProductCard, MoProductSheet, type MoProductSheetSelection } from '@molho/ui';
 import { useCart } from '../../lib/use-cart';
 
 /**
@@ -35,6 +36,7 @@ export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenu
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
   const cart = useCart(slug);
+  const router = useRouter();
 
   // Scroll-spy: a seção mais visível vira a categoria ativa nos chips,
   // mesmo quando o cliente rola a página na mão (sem clicar em nenhum chip).
@@ -143,6 +145,12 @@ export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenu
         onAddToCart={(selecao) => {
           if (produtoSelecionado) adicionarAoCarrinho(produtoSelecionado, selecao);
         }}
+      />
+
+      <MoCartBar
+        itemCount={cart.itemCount}
+        totalCents={cart.subtotalCents}
+        onClick={() => router.push(`/${slug}/carrinho`)}
       />
     </div>
   );
