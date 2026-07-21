@@ -8,6 +8,7 @@ import {
 import { PrismaPg } from '@prisma/adapter-pg';
 import { encryptPhone, hashPhoneForLookup } from '../../src/crypto/phone';
 import { PrismaClient } from '../generated/client/client';
+import { type SeedCategoryDef, SEED_CATALOGS } from './catalog';
 import { SEED_PLANS } from './plans';
 import { type SeedTenantDef, SEED_TENANTS } from './tenants';
 
@@ -128,6 +129,87 @@ async function seedTenant(prisma: PrismaClient, def: SeedTenantDef) {
   );
 }
 
+/**
+ * Épico 4 nunca teve unique key pra categoria/produto/grupo/modificador
+ * (nome não é `@unique` — dois produtos podem ter o mesmo nome em categorias
+ * diferentes) — mesmo padrão de `seedTenant()`: findFirst+create/update, não
+ * upsert(). `sortOrder` vem da posição no array de `catalog.ts` (ordem
+ * importa pro cardápio, não é alfabética).
+ */
+async function seedCatalog(
+  prisma: PrismaClient,
+  tenantId: string,
+  categories: readonly SeedCategoryDef[],
+) {
+  for (const [categoryIndex, categoryDef] of categories.entries()) {
+    let category = await prisma.category.findFirst({
+      where: { tenantId, name: categoryDef.name, deletedAt: null },
+    });
+    const categoryData = { tenantId, name: categoryDef.name, sortOrder: categoryIndex, visible: true };
+    category = category
+      ? await prisma.category.update({ where: { id: category.id }, data: categoryData })
+      : await prisma.category.create({ data: categoryData });
+
+    for (const [productIndex, productDef] of categoryDef.products.entries()) {
+      let product = await prisma.product.findFirst({
+        where: { tenantId, categoryId: category.id, name: productDef.name, deletedAt: null },
+      });
+      const productData = {
+        tenantId,
+        categoryId: category.id,
+        name: productDef.name,
+        description: productDef.description,
+        basePriceCents: productDef.basePriceCents,
+        // Sem PEXELS_API_KEY, não há foto real pra buscar — null é o
+        // fallback determinístico (resolvePublicImageUrl degrada pro
+        // placeholder do tema), nunca uma chave inventada apontando pra um
+        // objeto que não existe no R2.
+        imageKey: null,
+        available: productDef.available,
+        sortOrder: productIndex,
+      };
+      product = product
+        ? await prisma.product.update({ where: { id: product.id }, data: productData })
+        : await prisma.product.create({ data: productData });
+
+      for (const groupDef of productDef.modifierGroups ?? []) {
+        let group = await prisma.modifierGroup.findFirst({
+          where: { tenantId, productId: product.id, name: groupDef.name, deletedAt: null },
+        });
+        const groupData = {
+          tenantId,
+          productId: product.id,
+          name: groupDef.name,
+          min: groupDef.min,
+          max: groupDef.max,
+        };
+        group = group
+          ? await prisma.modifierGroup.update({ where: { id: group.id }, data: groupData })
+          : await prisma.modifierGroup.create({ data: groupData });
+
+        for (const modifierDef of groupDef.modifiers) {
+          const existingModifier = await prisma.modifier.findFirst({
+            where: { tenantId, groupId: group.id, name: modifierDef.name, deletedAt: null },
+          });
+          const modifierData = {
+            tenantId,
+            groupId: group.id,
+            name: modifierDef.name,
+            priceDeltaCents: modifierDef.priceDeltaCents,
+          };
+          if (existingModifier) {
+            await prisma.modifier.update({ where: { id: existingModifier.id }, data: modifierData });
+          } else {
+            await prisma.modifier.create({ data: modifierData });
+          }
+        }
+      }
+    }
+
+    console.log(`  categoria "${categoryDef.name}": ${categoryDef.products.length} produtos`);
+  }
+}
+
 async function main() {
   const directUrl = process.env.DIRECT_URL;
   if (!directUrl) throw new Error('DIRECT_URL não configurada — seed roda como app_migrator');
@@ -153,6 +235,17 @@ async function main() {
     for (const def of SEED_TENANTS) {
       console.log(`\nseed: ${def.name} (${def.slug})`);
       await seedTenant(prisma, def);
+    }
+
+    console.log('\ncardápio:');
+    for (const catalogDef of SEED_CATALOGS) {
+      const tenant = await prisma.tenant.findFirst({
+        where: { slug: catalogDef.tenantSlug, deletedAt: null },
+      });
+      if (!tenant) throw new Error(`tenant "${catalogDef.tenantSlug}" não encontrado — seed de tenants rodou?`);
+
+      console.log(`  ${catalogDef.tenantSlug}:`);
+      await seedCatalog(prisma, tenant.id, catalogDef.categories);
     }
   } finally {
     await prisma.$disconnect();
