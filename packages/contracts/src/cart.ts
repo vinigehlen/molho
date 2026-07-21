@@ -17,6 +17,14 @@
  * `schemaVersion` existe pra que uma mudança futura de formato não quebre o
  * carrinho de quem já tem um salvo: quem lê descarta o que não casa, em vez de
  * estourar. Mesma ideia do `phone_key_version` — versionar em vez de migrar.
+ *
+ * ATENÇÃO — ESTE ARQUIVO TEM UMA CÓPIA: `apps/storefront/lib/cart-storage.ts`
+ * reimplementa este schema e a lógica de leitura (razão documentada lá:
+ * import.meta do CJS de `@molho/contracts` quebra o webpack do `next dev`
+ * quando importado em runtime de arquivo `'use client'`, só `import type`
+ * sobrevive). Mudar CAMPO ou `CART_SCHEMA_VERSION` aqui exige mudar os dois —
+ * `apps/storefront/lib/cart-schema-parity.test.ts` reprova o build se as
+ * versões divergirem.
  */
 
 import { z } from 'zod';

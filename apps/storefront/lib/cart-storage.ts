@@ -19,7 +19,9 @@ import type { Cart, CartItem } from '@molho/contracts';
  *
  * Se `cart.ts` mudar de forma um dia, replicar aqui também. Os testes deste
  * arquivo espelham de propósito os de `cart.test.ts` — mesmo comportamento,
- * duas fontes.
+ * duas fontes. `cart-schema-parity.test.ts` é a rede de segurança contra
+ * esquecer: compara `CART_SCHEMA_VERSION` e os campos de `cartItemSchema`
+ * dos dois arquivos e reprova se divergirem.
  */
 export const CART_SCHEMA_VERSION = 2;
 export const CART_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -33,7 +35,7 @@ const cartModifierSchema = z.object({
   priceDeltaCents: centsSchema,
 });
 
-const cartItemSchema = z.object({
+export const cartItemSchema = z.object({
   lineId: z.uuid(),
   productId: z.uuid(),
   name: z.string(),
