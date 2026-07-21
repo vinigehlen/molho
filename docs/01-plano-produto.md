@@ -578,6 +578,8 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 
 > **Nota:** os épicos 24–26 (PSP real) são os últimos, conforme decidido — mas **abra as contas sandbox e o KYC agora**: o gargalo é burocrático (2–6 semanas), não técnico.
 
+> **Backlog de UX:** melhorias de UI/UX do storefront identificadas comparando com o iFood (referência de mercado do ICP) — densidade de card, header rico, carrinho no header, sheet horizontal em desktop, modificadores em mais produtos. Não são deste épico nem do próximo; registradas em `docs/06-backlog-ux.md` pra não se perder, priorização futura.
+
 ---
 
 ## 9. Prompt para o Claude Code
