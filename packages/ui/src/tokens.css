@@ -7,7 +7,19 @@
  * o bloco --brand-* em runtime (ver themes.ts) — nada mais é customizável.
  * ══════════════════════════════════════════════════════════════════════════════ */
 
+/*
+ * Reserva o espaço da scrollbar vertical permanentemente — em vez de
+ * compensar com padding quando ela some. MoSheet trava o scroll do body
+ * (`overflow: hidden`) ao abrir; sem isto, a scrollbar desaparece, o
+ * viewport "alarga" pela largura dela, e o overlay `fixed inset-0 flex
+ * justify-center` centraliza no viewport NOVO (mais largo) — o sheet
+ * nasce deslocado pra direita em qualquer tela com scrollbar visível
+ * (desktop). Em mobile, onde a scrollbar já é overlay/sem espaço
+ * reservado, isto é virtualmente um no-op — não quebra nada lá.
+ */
 :root {
+  scrollbar-gutter: stable;
+
   /* ── Primitivos: cor ── */
   --purple-950: #2d0a4e;
   --purple-900: #4b0082;
