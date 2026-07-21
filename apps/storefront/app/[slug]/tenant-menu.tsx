@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import type { StorefrontCategory } from '@molho/contracts';
-import { MoCategoryChips, MoProductCard } from '@molho/ui';
+import type { StorefrontProduct, StorefrontCategory } from '@molho/contracts';
+import { MoCategoryChips, MoProductCard, MoProductSheet, type MoProductSheetSelection } from '@molho/ui';
+import { useCart } from '../../lib/use-cart';
 
 /**
  * Client component enxuto: só recebe DADOS já resolvidos como props, nunca
@@ -10,25 +11,30 @@ import { MoCategoryChips, MoProductCard } from '@molho/ui';
  * build — TS erasure, sem `require()` nenhum sobrando no bundle do
  * cliente). Mesmo padrão de `../home-placeholder.tsx`: o import "de
  * verdade" fica no Server Component (`page.tsx`), que passa strings/objetos
- * planos pra cá.
+ * planos pra cá. `useCart`/`cart-storage` seguem a mesma regra por dentro
+ * (ver comentário longo em `lib/cart-storage.ts`).
  *
- * Cuida só de UI de navegação (qual chip está ativo, rolar até a seção) —
- * nenhuma lógica de negócio mora aqui.
- *
- * `MoProductCard` ainda não recebe `onSelect`/`onQuickAdd`: abrir o
- * detalhe e adicionar ao carrinho chegam no Épico 5 commit 7 (estado do
- * carrinho). Até lá, os cards ficam visíveis mas não clicáveis — estado já
- * suportado pelo componente (Épico 5 commit 4), não um bug temporário.
+ * `StorefrontProduct` é estruturalmente idêntico a `MoProductSheetProduct`
+ * (mesmos campos, só `available` sobra) — passa direto pro sheet, sem
+ * adaptador.
  */
 export interface TenantMenuProps {
+  slug: string;
   storeName: string;
   greeting: string;
   categories: StorefrontCategory[];
 }
 
-export function TenantMenu({ storeName, greeting, categories }: TenantMenuProps) {
+/** Nenhum grupo obrigatório: dá pra adicionar com o "+" sem abrir o detalhe. */
+function podeAdicionarRapido(produto: StorefrontProduct): boolean {
+  return produto.modifierGroups.every((grupo) => grupo.min === 0);
+}
+
+export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
+  const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
+  const cart = useCart(slug);
 
   // Scroll-spy: a seção mais visível vira a categoria ativa nos chips,
   // mesmo quando o cliente rola a página na mão (sem clicar em nenhum chip).
@@ -56,6 +62,33 @@ export function TenantMenu({ storeName, greeting, categories }: TenantMenuProps)
   function irParaCategoria(id: string) {
     setCategoriaAtiva(id);
     secoesRef.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function adicionarAoCarrinho(produto: StorefrontProduct, selecao: MoProductSheetSelection) {
+    cart.addItem({
+      lineId: crypto.randomUUID(),
+      productId: produto.id,
+      name: produto.name,
+      imageUrl: produto.imageUrl,
+      unitBasePriceCents: produto.basePriceCents,
+      modifiers: selecao.modifiers,
+      quantity: selecao.quantity,
+      notes: selecao.notes,
+    });
+    setProdutoSelecionado(null);
+  }
+
+  function adicaoRapida(produto: StorefrontProduct) {
+    cart.addItem({
+      lineId: crypto.randomUUID(),
+      productId: produto.id,
+      name: produto.name,
+      imageUrl: produto.imageUrl,
+      unitBasePriceCents: produto.basePriceCents,
+      modifiers: [],
+      quantity: 1,
+      notes: null,
+    });
   }
 
   return (
@@ -92,12 +125,25 @@ export function TenantMenu({ storeName, greeting, categories }: TenantMenuProps)
                   priceCents={produto.basePriceCents}
                   imageUrl={produto.imageUrl}
                   available={produto.available}
+                  onSelect={() => setProdutoSelecionado(produto)}
+                  onQuickAdd={podeAdicionarRapido(produto) ? () => adicaoRapida(produto) : undefined}
                 />
               ))}
             </div>
           </section>
         ))}
       </div>
+
+      <MoProductSheet
+        open={produtoSelecionado !== null}
+        onOpenChange={(open) => {
+          if (!open) setProdutoSelecionado(null);
+        }}
+        product={produtoSelecionado}
+        onAddToCart={(selecao) => {
+          if (produtoSelecionado) adicionarAoCarrinho(produtoSelecionado, selecao);
+        }}
+      />
     </div>
   );
 }

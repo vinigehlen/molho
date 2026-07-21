@@ -37,6 +37,7 @@ export default async function TenantHomePage({ params }: TenantHomePageProps) {
 
   return (
     <TenantMenu
+      slug={slug}
       storeName={store.store.name}
       greeting={COPY.storefront.saudacaoAnonima}
       categories={store.categories}
