@@ -4,11 +4,17 @@
  * entraria como seed incremental quando as tabelas nascessem). Preço sempre
  * inteiro em centavos (CLAUDE.md regra 4).
  *
- * `imageKey` fica `null` em todo produto de propósito: sem `PEXELS_API_KEY`
- * configurada não há fotos reais pra buscar, e `resolvePublicImageUrl`
- * (apps/api/src/storage/public-url.ts) já degrada `null` pro placeholder do
- * tema — é o "fallback determinístico sem falhar", não uma chave inventada
- * que apontaria pra um objeto inexistente no R2. Fotos reais entram depois.
+ * `photoSearchTerm` é o termo (em INGLÊS — acervo da Pexels é maior) usado
+ * por `photos.ts` pra buscar uma foto real na Pexels API. Vive ao lado do
+ * produto de propósito: derivar o termo do nome em português automaticamente
+ * (ex.: "Guaraná Antarctica" → "guarana antarctica") daria resultado ruim ou
+ * vazio — quem escolhe o termo é humano, olhando o prato.
+ *
+ * Sem `PEXELS_API_KEY`/credenciais R2 configuradas, `photos.ts` nunca é
+ * chamado e `imageKey` fica `null` — `resolvePublicImageUrl`
+ * (apps/api/src/storage/public-url.ts) já degrada isso pro placeholder do
+ * tema. Esse fallback continua existindo pra qualquer ambiente sem as
+ * credenciais (CI, outro dev sem a chave).
  */
 
 export interface SeedModifierDef {
@@ -28,6 +34,8 @@ export interface SeedProductDef {
   description: string | null;
   basePriceCents: number;
   available: boolean;
+  /** Termo de busca em inglês pra foto real na Pexels — ver comentário do arquivo. */
+  photoSearchTerm: string;
   modifierGroups?: readonly SeedModifierGroupDef[];
 }
 
@@ -53,30 +61,35 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: '2 blends de 90g, cheddar, cebola caramelizada, molho da casa',
             basePriceCents: 2800,
             available: true,
+            photoSearchTerm: 'smash burger cheese closeup plate',
           },
           {
             name: 'Smash Duplo',
             description: '3 blends, dobro de queijo, bacon',
             basePriceCents: 3800,
             available: true,
+            photoSearchTerm: 'double cheeseburger',
           },
           {
             name: 'Smash Bacon',
             description: 'Bacon crocante e cheddar duplo',
             basePriceCents: 3400,
             available: true,
+            photoSearchTerm: 'bacon cheeseburger',
           },
           {
             name: 'Smash Cebola',
             description: 'Anéis de cebola e barbecue',
             basePriceCents: 3200,
             available: false,
+            photoSearchTerm: 'barbecue onion burger',
           },
           {
             name: 'Smash Frango',
             description: 'Peito de frango grelhado, cheddar, molho especial',
             basePriceCents: 3000,
             available: true,
+            photoSearchTerm: 'grilled chicken burger',
           },
         ],
       },
@@ -88,42 +101,49 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: '180g, queijo prato, alface, tomate, cebola roxa',
             basePriceCents: 3200,
             available: true,
+            photoSearchTerm: 'classic cheeseburger',
           },
           {
             name: 'Costela BBQ',
             description: '180g de costela desfiada, barbecue, cebola crispy',
             basePriceCents: 4200,
             available: true,
+            photoSearchTerm: 'pulled pork burger',
           },
           {
             name: 'Gorgonzola',
             description: '180g, gorgonzola derretido, rúcula, cebola caramelizada',
             basePriceCents: 4000,
             available: true,
+            photoSearchTerm: 'blue cheese burger',
           },
           {
             name: 'Cheddar Bacon',
             description: '180g, cheddar cremoso, bacon, picles',
             basePriceCents: 3800,
             available: true,
+            photoSearchTerm: 'bacon cheddar burger',
           },
           {
             name: 'Vegetariano',
             description: 'Hambúrguer de grão-de-bico, queijo, tomate confit',
             basePriceCents: 3000,
             available: true,
+            photoSearchTerm: 'vegetarian chickpea burger',
           },
           {
             name: 'Kids',
             description: '90g, queijo prato, batata palito',
             basePriceCents: 2200,
             available: true,
+            photoSearchTerm: 'mini cheeseburger kids',
           },
           {
             name: 'Angus Especial',
             description: '200g de angus, cheddar inglês, rúcula, cebola crispy',
             basePriceCents: 4400,
             available: true,
+            photoSearchTerm: 'angus beef burger',
           },
         ],
       },
@@ -135,6 +155,7 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: 'Monte do seu jeito',
             basePriceCents: 2600,
             available: true,
+            photoSearchTerm: 'gourmet burger ingredients',
             modifierGroups: [
               {
                 name: 'Pão',
@@ -195,42 +216,49 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: null,
             basePriceCents: 1200,
             available: true,
+            photoSearchTerm: 'french fries small portion',
           },
           {
             name: 'Batata frita M',
             description: null,
             basePriceCents: 1500,
             available: true,
+            photoSearchTerm: 'french fries',
           },
           {
             name: 'Batata frita G',
             description: null,
             basePriceCents: 2200,
             available: true,
+            photoSearchTerm: 'french fries basket',
           },
           {
             name: 'Batata cheddar bacon',
             description: null,
             basePriceCents: 2800,
             available: true,
+            photoSearchTerm: 'loaded fries cheese bacon',
           },
           {
             name: 'Onion rings',
             description: null,
             basePriceCents: 1800,
             available: true,
+            photoSearchTerm: 'onion rings',
           },
           {
             name: 'Nuggets (8un)',
             description: null,
             basePriceCents: 2000,
             available: false,
+            photoSearchTerm: 'chicken nuggets',
           },
           {
             name: 'Salada da casa',
             description: null,
             basePriceCents: 1600,
             available: true,
+            photoSearchTerm: 'fresh garden salad',
           },
         ],
       },
@@ -242,66 +270,77 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: null,
             basePriceCents: 700,
             available: true,
+            photoSearchTerm: 'cola can',
           },
           {
             name: 'Coca-Cola Zero 350ml',
             description: null,
             basePriceCents: 700,
             available: true,
+            photoSearchTerm: 'diet cola can',
           },
           {
             name: 'Coca-Cola 600ml',
             description: null,
             basePriceCents: 1200,
             available: true,
+            photoSearchTerm: 'soda bottle',
           },
           {
             name: 'Guaraná Antarctica 350ml',
             description: null,
             basePriceCents: 600,
             available: true,
+            photoSearchTerm: 'soda can',
           },
           {
             name: 'Suco de laranja natural 300ml',
             description: null,
             basePriceCents: 1000,
             available: true,
+            photoSearchTerm: 'orange juice glass',
           },
           {
             name: 'Limonada suíça 400ml',
             description: null,
             basePriceCents: 900,
             available: true,
+            photoSearchTerm: 'limeade drink glass',
           },
           {
             name: 'Água mineral 500ml',
             description: null,
             basePriceCents: 500,
             available: true,
+            photoSearchTerm: 'water bottle',
           },
           {
             name: 'Água com gás 500ml',
             description: null,
             basePriceCents: 600,
             available: true,
+            photoSearchTerm: 'sparkling water bottle',
           },
           {
             name: 'Cerveja Heineken 350ml',
             description: null,
             basePriceCents: 1200,
             available: true,
+            photoSearchTerm: 'beer bottle',
           },
           {
             name: 'Cerveja Original 600ml',
             description: null,
             basePriceCents: 1800,
             available: true,
+            photoSearchTerm: 'beer bottle large',
           },
           {
             name: 'Milkshake de Ovomaltine',
             description: null,
             basePriceCents: 1800,
             available: true,
+            photoSearchTerm: 'chocolate milkshake',
           },
         ],
       },
@@ -313,24 +352,28 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: null,
             basePriceCents: 2200,
             available: true,
+            photoSearchTerm: 'chocolate lava cake',
           },
           {
             name: 'Brownie com sorvete',
             description: null,
             basePriceCents: 1800,
             available: true,
+            photoSearchTerm: 'brownie ice cream',
           },
           {
             name: 'Torta de limão',
             description: null,
             basePriceCents: 1600,
             available: true,
+            photoSearchTerm: 'lemon pie slice',
           },
           {
             name: 'Sundae de chocolate',
             description: null,
             basePriceCents: 1400,
             available: false,
+            photoSearchTerm: 'chocolate sundae',
           },
         ],
       },
@@ -347,12 +390,14 @@ export const SEED_CATALOGS: readonly SeedCatalogDef[] = [
             description: 'Molho de tomate, mussarela, manjericão',
             basePriceCents: 4500,
             available: true,
+            photoSearchTerm: 'margherita pizza',
           },
           {
             name: 'Calabresa',
             description: 'Molho de tomate, mussarela, calabresa, cebola',
             basePriceCents: 4800,
             available: true,
+            photoSearchTerm: 'pepperoni pizza',
           },
         ],
       },

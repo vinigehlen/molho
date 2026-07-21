@@ -6,9 +6,18 @@ import {
   planGrants,
 } from '@molho/contracts';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { S3Client } from '@aws-sdk/client-s3';
 import { encryptPhone, hashPhoneForLookup } from '../../src/crypto/phone';
 import { PrismaClient } from '../generated/client/client';
 import { type SeedCategoryDef, SEED_CATALOGS } from './catalog';
+import {
+  fetchAndUploadProductPhoto,
+  loadPhotoCredits,
+  savePhotoCredits,
+  sleep,
+  type PhotoCreditRecord,
+  type PhotoUploadContext,
+} from './photos';
 import { SEED_PLANS } from './plans';
 import { type SeedTenantDef, SEED_TENANTS } from './tenants';
 
@@ -139,7 +148,10 @@ async function seedTenant(prisma: PrismaClient, def: SeedTenantDef) {
 async function seedCatalog(
   prisma: PrismaClient,
   tenantId: string,
+  tenantSlug: string,
   categories: readonly SeedCategoryDef[],
+  photoContext: PhotoUploadContext | null,
+  credits: Map<string, PhotoCreditRecord>,
 ) {
   for (const [categoryIndex, categoryDef] of categories.entries()) {
     let category = await prisma.category.findFirst({
@@ -154,17 +166,33 @@ async function seedCatalog(
       let product = await prisma.product.findFirst({
         where: { tenantId, categoryId: category.id, name: productDef.name, deletedAt: null },
       });
+
+      // Produto já tem foto? Pula — nunca rebaixa nem re-upa. Só busca pra
+      // produto novo ou pra quem ficou com `imageKey: null` (inclusive de uma
+      // tentativa anterior que falhou — vale re-tentar no próximo run).
+      let imageKey: string | null = product?.imageKey ?? null;
+      if (!imageKey && photoContext) {
+        await sleep(200); // 200 req/hora no plano gratuito da Pexels — só antes de busca real.
+        const result = await fetchAndUploadProductPhoto(photoContext, {
+          tenantId,
+          tenantSlug,
+          productName: productDef.name,
+          searchTerm: productDef.photoSearchTerm,
+        });
+        if (result) {
+          imageKey = result.imageKey;
+          credits.set(result.imageKey, result.credit);
+          console.log(`  [foto] "${productDef.name}" ← "${productDef.photoSearchTerm}"`);
+        }
+      }
+
       const productData = {
         tenantId,
         categoryId: category.id,
         name: productDef.name,
         description: productDef.description,
         basePriceCents: productDef.basePriceCents,
-        // Sem PEXELS_API_KEY, não há foto real pra buscar — null é o
-        // fallback determinístico (resolvePublicImageUrl degrada pro
-        // placeholder do tema), nunca uma chave inventada apontando pra um
-        // objeto que não existe no R2.
-        imageKey: null,
+        imageKey,
         available: productDef.available,
         sortOrder: productIndex,
       };
@@ -210,11 +238,37 @@ async function seedCatalog(
   }
 }
 
+/**
+ * `null` se faltar `PEXELS_API_KEY` OU credenciais R2 (mesmo critério de
+ * `StorageModule.STORAGE_PROVIDER` em apps/api — sem `S3_ACCESS_KEY_ID`, não
+ * tem pra onde subir a foto). Cliente S3 aqui é standalone (ver comentário em
+ * photos.ts sobre por que não reusa `R2StorageProvider`).
+ */
+function buildPhotoContext(): PhotoUploadContext | null {
+  const apiKey = process.env.PEXELS_API_KEY;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  if (!apiKey || !accessKeyId) return null;
+
+  const s3Client = new S3Client({
+    endpoint: process.env.S3_ENDPOINT ?? '',
+    region: process.env.S3_REGION ?? 'auto',
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '' },
+  });
+
+  return { apiKey, s3Client, bucket: process.env.S3_BUCKET ?? '' };
+}
+
 async function main() {
   const directUrl = process.env.DIRECT_URL;
   if (!directUrl) throw new Error('DIRECT_URL não configurada — seed roda como app_migrator');
 
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: directUrl }) });
+  const photoContext = buildPhotoContext();
+  if (!photoContext) {
+    console.log('\nPEXELS_API_KEY ou credenciais R2 ausentes — produtos novos ficam com imageKey null (placeholder do tema).');
+  }
+  const credits = loadPhotoCredits();
 
   try {
     console.log('planos:');
@@ -245,7 +299,12 @@ async function main() {
       if (!tenant) throw new Error(`tenant "${catalogDef.tenantSlug}" não encontrado — seed de tenants rodou?`);
 
       console.log(`  ${catalogDef.tenantSlug}:`);
-      await seedCatalog(prisma, tenant.id, catalogDef.categories);
+      await seedCatalog(prisma, tenant.id, catalogDef.tenantSlug, catalogDef.categories, photoContext, credits);
+    }
+
+    if (photoContext) {
+      savePhotoCredits(credits);
+      console.log(`\nfotos: ${credits.size} crédito(s) em photo-credits.json`);
     }
   } finally {
     await prisma.$disconnect();
