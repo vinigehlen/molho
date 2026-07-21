@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Cart, CartItem } from '@molho/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cartStorageKey } from '../../../lib/cart-storage';
+import { CART_SCHEMA_VERSION, cartStorageKey } from '../../../lib/cart-storage';
 import { CartView } from './cart-view';
 
 const push = vi.fn();
@@ -17,6 +17,7 @@ function item(overrides: Partial<CartItem> = {}): CartItem {
     lineId: '0193f1a0-0000-7000-8000-000000000001',
     productId: '0193f1a0-0000-7000-8000-000000000002',
     name: 'X-Burger',
+    description: null,
     imageUrl: null,
     unitBasePriceCents: 2890,
     modifiers: [],
@@ -27,7 +28,7 @@ function item(overrides: Partial<CartItem> = {}): CartItem {
 }
 
 function salvarCarrinho(items: CartItem[]) {
-  const cart: Cart = { schemaVersion: 1, slug: SLUG, items, updatedAt: new Date().toISOString() };
+  const cart: Cart = { schemaVersion: CART_SCHEMA_VERSION, slug: SLUG, items, updatedAt: new Date().toISOString() };
   localStorage.setItem(cartStorageKey(SLUG), JSON.stringify(cart));
 }
 
@@ -79,6 +80,33 @@ describe('CartView', () => {
     expect(screen.getByText('"Sem cebola"')).toBeInTheDocument();
     // (2890 + 400 + 300) * 2 = 7180 — item único: total da linha e subtotal coincidem.
     expect(screen.getAllByText('R$ 71,80')).toHaveLength(2);
+  });
+
+  it('mostra a foto e a descrição do produto quando o snapshot da linha tem os dois', async () => {
+    salvarCarrinho([
+      item({
+        name: 'X-Burger',
+        description: '180g, queijo prato, alface, tomate',
+        imageUrl: 'https://pub-example.r2.dev/products/x/foto.jpg',
+      }),
+    ]);
+
+    renderCartView();
+
+    expect(await screen.findByText('180g, queijo prato, alface, tomate')).toBeInTheDocument();
+    // alt="" (decorativa, ver comentário em MoProductCard) tira a <img> do role "img" da árvore
+    // de acessibilidade — busca no DOM direto, não por role.
+    const foto = document.querySelector('img');
+    expect(foto).toHaveAttribute('src', 'https://pub-example.r2.dev/products/x/foto.jpg');
+  });
+
+  it('sem foto, cai no placeholder do tema (sem <img> nenhuma na linha)', async () => {
+    salvarCarrinho([item({ name: 'X-Burger', imageUrl: null })]);
+
+    renderCartView();
+
+    await screen.findByText('X-Burger');
+    expect(document.querySelector('img')).not.toBeInTheDocument();
   });
 
   it('mostra o subtotal de todas as linhas', async () => {

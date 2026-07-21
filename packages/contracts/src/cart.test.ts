@@ -22,6 +22,7 @@ function item(overrides: Partial<CartItem> = {}): CartItem {
     lineId: LINE_ID,
     productId: PRODUCT_ID,
     name: 'X-Burger',
+    description: null,
     imageUrl: null,
     unitBasePriceCents: 2890,
     modifiers: [],

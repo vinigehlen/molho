@@ -21,7 +21,7 @@ import type { Cart, CartItem } from '@molho/contracts';
  * arquivo espelham de propósito os de `cart.test.ts` — mesmo comportamento,
  * duas fontes.
  */
-export const CART_SCHEMA_VERSION = 1;
+export const CART_SCHEMA_VERSION = 2;
 export const CART_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const centsSchema = z.int().nonnegative();
@@ -37,6 +37,7 @@ const cartItemSchema = z.object({
   lineId: z.uuid(),
   productId: z.uuid(),
   name: z.string(),
+  description: z.string().nullable(),
   imageUrl: z.url().nullable(),
   unitBasePriceCents: centsSchema,
   modifiers: z.array(cartModifierSchema),

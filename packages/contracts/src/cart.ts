@@ -22,7 +22,7 @@
 import { z } from 'zod';
 
 /** Formato atual. Subir isto invalida (descarta) todo carrinho salvo no formato antigo. */
-export const CART_SCHEMA_VERSION = 1;
+export const CART_SCHEMA_VERSION = 2;
 
 /**
  * Carrinho parado por mais de 7 dias é descartado na leitura. Preço de
@@ -49,6 +49,7 @@ export const cartItemSchema = z.object({
   productId: z.uuid(),
   /** Snapshots de exibição — ver aviso no topo do arquivo. */
   name: z.string(),
+  description: z.string().nullable(),
   imageUrl: z.url().nullable(),
   unitBasePriceCents: z.int().nonnegative(),
   modifiers: z.array(cartModifierSchema),

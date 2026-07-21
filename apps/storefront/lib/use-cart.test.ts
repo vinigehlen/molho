@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CartItem } from '@molho/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cartStorageKey } from './cart-storage';
+import { CART_SCHEMA_VERSION, cartStorageKey } from './cart-storage';
 import { useCart } from './use-cart';
 
 const SLUG = 'hamburgueria-da-vila';
@@ -11,6 +11,7 @@ function item(overrides: Partial<CartItem> = {}): CartItem {
     lineId: '0193f1a0-0000-7000-8000-000000000001',
     productId: '0193f1a0-0000-7000-8000-000000000002',
     name: 'X-Burger',
+    description: null,
     imageUrl: null,
     unitBasePriceCents: 2890,
     modifiers: [],
@@ -39,7 +40,7 @@ describe('useCart', () => {
     localStorage.setItem(
       cartStorageKey(SLUG),
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: CART_SCHEMA_VERSION,
         slug: SLUG,
         items: [item({ quantity: 2 })],
         updatedAt: new Date().toISOString(),
