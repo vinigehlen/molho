@@ -215,9 +215,10 @@ model Customer {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  addresses Address[]
-  orders    Order[]
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  addresses            Address[]
+  orders               Order[]
+  orderStatusHistories OrderStatusHistory[]
 
   // Alvo de FK composta (addresses.customer_id) — índice único (id,
   // tenant_id) à mão na migration (Épico 6). Fica VAZIA neste épico —
@@ -697,27 +698,41 @@ model OrderStatusHistory {
   fromStatus OrderStatus? @map("from_status")
   toStatus   OrderStatus  @map("to_status")
 
-  /// Nulo = transição do SISTEMA, não de uma pessoa — auto_canceled/expired
-  /// (mortos até o Épico 8) não têm ator humano. Sem isso seria migration
-  /// depois. actorId aponta pra User (staff), NUNCA pra Customer — cliente
-  /// final não transiciona status de pedido (só pede cancelamento, que a
-  /// LOJA aprova ou não, conforme docs/02 §5.2).
-  actorId   String? @map("actor_id") @db.Uuid
-  actorRole String? @map("actor_role")
+  /// Ator STAFF (dono/gerente/operador) — nulo quando quem transicionou não
+  /// foi um funcionário: sistema (auto_canceled/expired, mortos até o
+  /// Épico 8) OU o próprio CLIENTE (criação do pedido via checkout;
+  /// cancelamento livre antes do aceite, docs/02 §5.2). NUNCA os dois
+  /// (actorId e customerId) preenchidos ao mesmo tempo — são semânticas de
+  /// identidade diferentes (CLAUDE.md regra 3), nunca misturadas mesmo
+  /// aqui.
+  actorId    String? @map("actor_id") @db.Uuid
+  actorRole  String? @map("actor_role")
+  /// Preenchido quando quem transicionou foi o CLIENTE (criação do pedido,
+  /// ou cancelamento livre antes do aceite) — nunca junto com actorId.
+  /// Corrigido nesta mesma sessão, antes de qualquer linha real existir:
+  /// a versão original só previa ator staff, mas a CRIAÇÃO do pedido em si
+  /// já é uma transição iniciada pelo cliente, não por ninguém da equipe.
+  customerId String? @map("customer_id") @db.Uuid
   /// Obrigatório na APLICAÇÃO pra certas transições (loja cancela sempre
   /// com motivo, docs/02 §5.2) — não é CHECK de banco porque nem toda
   /// transição precisa (received→preparing não precisa de motivo).
-  reason    String?
+  reason     String?
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order  Order  @relation(fields: [orderId], references: [id])
-  actor  User?  @relation(fields: [actorId], references: [id])
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order    Order     @relation(fields: [orderId], references: [id])
+  actor    User?     @relation(fields: [actorId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
 
   // FK composta (order_id, tenant_id) → orders(id, tenant_id) na migration.
   // actor_id → users(id) é FK SIMPLES (users não tem tenant_id, mesma
-  // exceção documentada em CLAUDE.md pra user_roles).
+  // exceção documentada em CLAUDE.md pra user_roles). customer_id →
+  // customers(id) TAMBÉM é FK simples aqui, de propósito — diferente do
+  // padrão de orders.customer_id (que é composta): esta referência não é
+  // uma fronteira de posse tenant-scoped que precise do guardrail (o
+  // tenant_id da própria linha já garante isolamento via RLS), é só
+  // atribuição de autoria.
   @@index([tenantId, orderId, createdAt])
   @@map("order_status_history")
 }
