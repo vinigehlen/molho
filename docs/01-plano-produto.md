@@ -550,7 +550,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 3 | Auth OTP (mock de envio) + sessões + revogação — ✅ **entregue** | 0 | Login por telefone nos dois fronts |
 | 4 | CRUD de cardápio + upload S3 + **importação por planilha** — ✅ **entregue** | 1 | Lojista sobe 80 produtos de um CSV |
 | 5 | Storefront: menu, carrinho, bottom sheets — ✅ **entregue** | 1 | Navegação mobile completa |
-| 6 | Endereços + zonas de entrega (polígonos) + horários | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
+| 6 | Endereços + zonas de entrega (polígonos) + horários — ✅ **entregue** | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
 | 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
 | 8 | Pagamento PIX com **MockPaymentProvider** | 1 | QR, webhook simulado, idempotência, reconciliação |
 | 9 | Gestor de pedidos realtime + **push/som** + fila offline | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
