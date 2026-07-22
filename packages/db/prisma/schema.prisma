@@ -135,20 +135,24 @@ model Tenant {
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
 
-  plan           Plan?               @relation(fields: [planId], references: [id])
-  stores         Store[]
-  customers      Customer[]
-  entitlements   TenantEntitlement[]
-  settings       TenantSetting[]
-  moduleAudits   ModuleAudit[]
-  auditLogs      AuditLog[]
-  categories     Category[]
-  products       Product[]
-  modifierGroups ModifierGroup[]
-  modifiers      Modifier[]
-  addresses      Address[]
-  deliveryZones  DeliveryZone[]
-  storeHours     StoreHours[]
+  plan                 Plan?                @relation(fields: [planId], references: [id])
+  stores               Store[]
+  customers            Customer[]
+  entitlements         TenantEntitlement[]
+  settings             TenantSetting[]
+  moduleAudits         ModuleAudit[]
+  auditLogs            AuditLog[]
+  categories           Category[]
+  products             Product[]
+  modifierGroups       ModifierGroup[]
+  modifiers            Modifier[]
+  addresses            Address[]
+  deliveryZones        DeliveryZone[]
+  storeHours           StoreHours[]
+  orders               Order[]
+  orderItems           OrderItem[]
+  orderItemModifiers   OrderItemModifier[]
+  orderStatusHistories OrderStatusHistory[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -174,6 +178,7 @@ model Store {
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   deliveryZones DeliveryZone[]
   storeHours    StoreHours[]
+  orders        Order[]
 
   // Alvo de FK composta (delivery_zones.store_id, store_hours.store_id) —
   // índice único (id, tenant_id) à mão na migration (Épico 6).
@@ -212,6 +217,7 @@ model Customer {
 
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   addresses Address[]
+  orders    Order[]
 
   // Alvo de FK composta (addresses.customer_id) — índice único (id,
   // tenant_id) à mão na migration (Épico 6). Fica VAZIA neste épico —
@@ -255,9 +261,10 @@ model User {
   /// Desligar/demitir é reversível — preserva histórico em user_roles/audit_log.
   deletedAt       DateTime? @map("deleted_at")
 
-  roles        UserRole[]
-  moduleAudits ModuleAudit[]
-  auditLogs    AuditLog[]
+  roles                UserRole[]
+  moduleAudits         ModuleAudit[]
+  auditLogs            AuditLog[]
+  orderStatusHistories OrderStatusHistory[]
 
   @@map("users")
 }
@@ -335,6 +342,7 @@ model Product {
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category       Category        @relation(fields: [categoryId], references: [id])
   modifierGroups ModifierGroup[]
+  orderItems     OrderItem[]
 
   // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
   // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
@@ -377,8 +385,9 @@ model Modifier {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  group  ModifierGroup @relation(fields: [groupId], references: [id])
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group              ModifierGroup       @relation(fields: [groupId], references: [id])
+  orderItemModifiers OrderItemModifier[]
 
   // FK composta (group_id, tenant_id) → modifier_groups(id, tenant_id) na migration.
   @@index([tenantId, groupId])
@@ -424,6 +433,7 @@ model Address {
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id])
+  orders   Order[]
 
   // FK composta (customer_id, tenant_id) → customers(id, tenant_id) vive na
   // migration SQL. Índice único (id, tenant_id) também à mão — alvo futuro
@@ -504,6 +514,212 @@ model StoreHours {
   // agora" (tenant_id + store_id + day_of_week).
   @@index([tenantId, storeId, dayOfWeek])
   @@map("store_hours")
+}
+
+// ─── Pedidos (Épico 7) ────────────────────────────────────────────────────────
+//
+// DÉBITO ADIADO (registrar no CLAUDE.md ao fechar o épico): retirada no
+// balcão ("pickup") não é um tipo de pedido de verdade neste épico — a
+// cópia `foraDaArea` (Épico 6) já sinaliza a alternativa, mas é só
+// informativa (cliente contata o restaurante por fora). `order_type`
+// (delivery/pickup) com delivery_* nullable condicionado a ele é migration
+// futura, não hoje — todo pedido criado neste épico é de entrega.
+
+enum OrderStatus {
+  pending_payment
+  received
+  preparing
+  ready
+  in_transit
+  completed
+  expired
+  auto_canceled
+  canceled
+  delivery_failed
+}
+
+enum PaymentStatus {
+  aguardando_confirmacao
+  confirmado
+}
+
+/// Estorno é MANUAL no MVP (PIX estático — o lojista devolve por fora,
+/// Pix Devolução). Este campo só REGISTRA que um estorno é devido/foi
+/// feito; o sistema nunca orquestra o dinheiro em si.
+enum RefundStatus {
+  not_applicable
+  pending
+  completed
+}
+
+model Order {
+  id         String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  /// Não assume "1 loja por tenant" como outros épicos — Premium permite
+  /// multi-loja (docs/02 §4), e backfill de pedido antigo seria migration dolorosa.
+  storeId    String @map("store_id") @db.Uuid
+  /// Nunca nulo: pedido só nasce depois do OTP (CLAUDE.md regra 13).
+  customerId String @map("customer_id") @db.Uuid
+
+  status        OrderStatus   @default(received)
+  paymentStatus PaymentStatus @default(aguardando_confirmacao) @map("payment_status")
+  refundStatus  RefundStatus  @default(not_applicable) @map("refund_status")
+
+  subtotalCents    Int @map("subtotal_cents")
+  deliveryFeeCents Int @map("delivery_fee_cents")
+  /// SEMPRE "quanto foi cobrado" no momento da criação — NUNCA "quanto o
+  /// cliente pagou líquido de estorno". Estorno (parcial ou integral) é
+  /// registrado em `refundStatus` e no `audit_log`/`order_status_history`,
+  /// não recalculado aqui. CHECK `= subtotal + fee` na migration —
+  /// intencional pra este épico (MVP, estorno manual fora do sistema); se o
+  /// Épico 8 (PIX online, estorno automático) precisar de um "total líquido"
+  /// de verdade, isso é um campo NOVO, não uma mudança de semântica deste.
+  totalCents       Int @map("total_cents")
+
+  /// FK só rastreabilidade — o pedido NUNCA depende da linha em `addresses`
+  /// continuar existindo. Snapshot completo abaixo é a fonte de verdade
+  /// pra ESTE pedido, pro cliente poder editar o endereço salvo depois sem
+  /// alterar pedidos já feitos (mesmo princípio do carrinho).
+  deliveryAddressId      String?                               @map("delivery_address_id") @db.Uuid
+  deliveryLabel          String                                @map("delivery_label")
+  deliveryStreet         String                                @map("delivery_street")
+  deliveryNumber         String?                               @map("delivery_number")
+  deliveryComplement     String?                               @map("delivery_complement")
+  deliveryNeighborhood   String                                @map("delivery_neighborhood")
+  deliveryCity           String                                @map("delivery_city")
+  deliveryState          String                                @map("delivery_state")
+  deliveryPostalCode     String?                               @map("delivery_postal_code")
+  deliveryReferencePoint String?                               @map("delivery_reference_point")
+  /// geography(Point,4326) NOT NULL — checkout já exige zona validada antes
+  /// de chegar aqui, então sempre existe coordenada (ver débito adiado no
+  /// topo do arquivo sobre pickup, que mudaria isso).
+  deliveryGeo            Unsupported("geography(Point, 4326)") @map("delivery_geo")
+
+  canceledAt     DateTime? @map("canceled_at")
+  /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
+  /// papel de quem cancelou vivem no audit_log/order_status_history —
+  /// não duplicados aqui.
+  canceledReason String?   @map("canceled_reason")
+
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store           Store                @relation(fields: [storeId], references: [id])
+  customer        Customer             @relation(fields: [customerId], references: [id])
+  deliveryAddress Address?             @relation(fields: [deliveryAddressId], references: [id])
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+
+  // FKs compostas (store_id/customer_id/delivery_address_id, tenant_id) →
+  // stores/customers/addresses(id, tenant_id) na migration.
+  @@index([tenantId, customerId])
+  // Query quente do gestor de pedidos (Épico 9): pedidos ativos da loja,
+  // por status, já ordenados por criação — sem sort adicional.
+  @@index([tenantId, storeId, status, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("orders")
+}
+
+/// Append-only — mesmo tratamento de audit_log: sem version/deletedAt,
+/// item de pedido não se edita depois de criado, só existe.
+model OrderItem {
+  id        String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  orderId   String @map("order_id") @db.Uuid
+  /// Produto nunca é hard-deletado (só soft delete) — FK sempre válida.
+  productId String @map("product_id") @db.Uuid
+
+  /// Snapshot — mesmo princípio de CartItem.name.
+  name               String
+  unitBasePriceCents Int     @map("unit_base_price_cents")
+  quantity           Int
+  /// Mesmo teto de CartItem.notes.
+  notes              String?
+  /// (unitBasePriceCents + soma dos deltas dos modificadores) × quantity —
+  /// CALCULADO E CONGELADO na criação. Nunca recalcula depois, mesmo que o
+  /// preço do produto mude no catálogo.
+  lineTotalCents     Int     @map("line_total_cents")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order     Order               @relation(fields: [orderId], references: [id])
+  product   Product             @relation(fields: [productId], references: [id])
+  modifiers OrderItemModifier[]
+
+  // FKs compostas (order_id, tenant_id) → orders(id, tenant_id) e
+  // (product_id, tenant_id) → products(id, tenant_id) na migration.
+  @@index([tenantId, orderId])
+  @@map("order_items")
+}
+
+/// Append-only, mesmo tratamento de OrderItem.
+model OrderItemModifier {
+  id          String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  orderItemId String @map("order_item_id") @db.Uuid
+  /// Modifier nunca é hard-deletado — FK sempre válida.
+  modifierId  String @map("modifier_id") @db.Uuid
+
+  /// Snapshot.
+  name            String
+  priceDeltaCents Int    @map("price_delta_cents")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  modifier  Modifier  @relation(fields: [modifierId], references: [id])
+
+  // FKs compostas (order_item_id, tenant_id) → order_items(id, tenant_id) e
+  // (modifier_id, tenant_id) → modifiers(id, tenant_id) na migration —
+  // modifiers ganha índice único (id, tenant_id) novo, nunca precisou até agora.
+  @@index([tenantId, orderItemId])
+  @@map("order_item_modifiers")
+}
+
+/// Projeção rápida e específica de domínio da transição de status — NÃO
+/// substitui audit_log (regra 15, CLAUDE.md): audit_log é o rastro
+/// genérico de compliance da plataforma inteira (dinheiro, permissão,
+/// módulo), mas seu model não tem `entityId` — reconstruir "linha do tempo
+/// do pedido X" a partir dele exigiria vasculhar JSON sem índice, misturado
+/// com toda ação sensível do tenant. Esta tabela é só pra ESSA consulta
+/// (Épico 9, e disputa futura), indexada por order_id.
+model OrderStatusHistory {
+  id       String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  orderId  String @map("order_id") @db.Uuid
+
+  /// Nulo só na primeira linha (criação do pedido, sem "de onde veio").
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus  @map("to_status")
+
+  /// Nulo = transição do SISTEMA, não de uma pessoa — auto_canceled/expired
+  /// (mortos até o Épico 8) não têm ator humano. Sem isso seria migration
+  /// depois. actorId aponta pra User (staff), NUNCA pra Customer — cliente
+  /// final não transiciona status de pedido (só pede cancelamento, que a
+  /// LOJA aprova ou não, conforme docs/02 §5.2).
+  actorId   String? @map("actor_id") @db.Uuid
+  actorRole String? @map("actor_role")
+  /// Obrigatório na APLICAÇÃO pra certas transições (loja cancela sempre
+  /// com motivo, docs/02 §5.2) — não é CHECK de banco porque nem toda
+  /// transição precisa (received→preparing não precisa de motivo).
+  reason    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id])
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  // FK composta (order_id, tenant_id) → orders(id, tenant_id) na migration.
+  // actor_id → users(id) é FK SIMPLES (users não tem tenant_id, mesma
+  // exceção documentada em CLAUDE.md pra user_roles).
+  @@index([tenantId, orderId, createdAt])
+  @@map("order_status_history")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────
