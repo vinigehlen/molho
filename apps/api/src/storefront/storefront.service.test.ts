@@ -3,6 +3,7 @@ import { type StorefrontPayload, storefrontPayloadSchema } from '@molho/contract
 import { beforeEach, describe, expect, it } from 'vitest';
 import type {
   StorefrontCategoryRecord,
+  StorefrontHoursRecord,
   StorefrontRepository,
   StorefrontStoreRecord,
   StorefrontTenantRecord,
@@ -24,8 +25,11 @@ class FakeStorefrontRepository implements StorefrontRepository {
     phone: '+5511999990000',
     whatsappNumber: '+5511999990000',
     minOrderCents: 2000,
+    timezone: 'America/Sao_Paulo',
   };
   menu: StorefrontCategoryRecord[] = [];
+  /** Vazio por padrão: service precisa se virar sem nenhum turno cadastrado ainda. */
+  hours: StorefrontHoursRecord[] = [];
 
   async findTenant() {
     return this.tenant;
@@ -35,6 +39,9 @@ class FakeStorefrontRepository implements StorefrontRepository {
   }
   async listMenu() {
     return this.menu;
+  }
+  async listStoreHours() {
+    return this.hours;
   }
 }
 
@@ -141,6 +148,16 @@ describe('StorefrontService', () => {
     const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
 
     expect(payload.categories).toEqual([]);
+    expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('sem nenhum turno cadastrado: sempre fechado, sem próxima abertura (não quebra o contrato)', async () => {
+    repository.menu = [categoria()];
+    // hours já é [] por padrão no fixture.
+    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+
+    expect(payload.store.isOpenNow).toBe(false);
+    expect(payload.store.nextOpensAt).toBeNull();
     expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
   });
 

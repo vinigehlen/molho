@@ -1,4 +1,5 @@
 import type { RequestContextService } from '../context/request-context.service';
+import type { Weekday } from './store-hours';
 
 export interface StorefrontTenantRecord {
   slug: string;
@@ -12,6 +13,13 @@ export interface StorefrontStoreRecord {
   phone: string | null;
   whatsappNumber: string | null;
   minOrderCents: number;
+  timezone: string;
+}
+
+export interface StorefrontHoursRecord {
+  dayOfWeek: Weekday;
+  opensAtMinutes: number;
+  closesAtMinutes: number;
 }
 
 export interface StorefrontModifierRecord {
@@ -48,6 +56,7 @@ export interface StorefrontRepository {
   findTenant(): Promise<StorefrontTenantRecord | null>;
   findStore(): Promise<StorefrontStoreRecord | null>;
   listMenu(): Promise<StorefrontCategoryRecord[]>;
+  listStoreHours(): Promise<StorefrontHoursRecord[]>;
 }
 
 /**
@@ -81,7 +90,18 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
     return this.requestContext.getClient().store.findFirst({
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { addressText: true, phone: true, whatsappNumber: true, minOrderCents: true },
+      select: { addressText: true, phone: true, whatsappNumber: true, minOrderCents: true, timezone: true },
+    });
+  }
+
+  /**
+   * Mesma suposição de `findStore()` (uma loja por tenant no MVP) — RLS já
+   * escopa por tenant, então não precisa de `storeId` explícito.
+   */
+  async listStoreHours(): Promise<StorefrontHoursRecord[]> {
+    return this.requestContext.getClient().storeHours.findMany({
+      where: { deletedAt: null },
+      select: { dayOfWeek: true, opensAtMinutes: true, closesAtMinutes: true },
     });
   }
 
