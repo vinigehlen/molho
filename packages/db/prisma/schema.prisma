@@ -146,6 +146,9 @@ model Tenant {
   products       Product[]
   modifierGroups ModifierGroup[]
   modifiers      Modifier[]
+  addresses      Address[]
+  deliveryZones  DeliveryZone[]
+  storeHours     StoreHours[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -153,23 +156,27 @@ model Tenant {
 }
 
 model Store {
-  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
+  id             String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String                                 @map("tenant_id") @db.Uuid
   name           String
-  addressText    String    @map("address_text")
+  addressText    String                                 @map("address_text")
   /// geography(Point,4326) — PostGIS habilitado agora; sem uso ainda (zonas
   /// de entrega chegam no Épico 6, mas o tipo geo já nasce certo).
   geo            Unsupported("geography(Point, 4326)")?
   timezone       String
   phone          String?
-  whatsappNumber String?   @map("whatsapp_number")
-  minOrderCents  Int       @default(0) @map("min_order_cents")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  whatsappNumber String?                                @map("whatsapp_number")
+  minOrderCents  Int                                    @default(0) @map("min_order_cents")
+  createdAt      DateTime                               @default(now()) @map("created_at")
+  updatedAt      DateTime                               @updatedAt @map("updated_at")
+  deletedAt      DateTime?                              @map("deleted_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryZones DeliveryZone[]
+  storeHours    StoreHours[]
 
+  // Alvo de FK composta (delivery_zones.store_id, store_hours.store_id) —
+  // índice único (id, tenant_id) à mão na migration (Épico 6).
   @@index([tenantId])
   @@map("stores")
 }
@@ -203,8 +210,12 @@ model Customer {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  addresses Address[]
 
+  // Alvo de FK composta (addresses.customer_id) — índice único (id,
+  // tenant_id) à mão na migration (Épico 6). Fica VAZIA neste épico —
+  // CLAUDE.md regra 13: endereço é anônimo até o checkout (Épico 7).
   @@index([tenantId])
   @@map("customers")
 }
@@ -225,10 +236,10 @@ enum ScopeType {
 }
 
 model User {
-  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   name            String
   /// Telefone cifrado na aplicação (AES-256-GCM), nunca em claro — LGPD.
-  phoneCiphertext Bytes    @map("phone_ciphertext")
+  phoneCiphertext Bytes     @map("phone_ciphertext")
   /// HMAC determinístico do telefone — é o que o login por OTP busca.
   /// Único só entre linhas vivas — índice único parcial criado à mão na
   /// migration (Prisma não expressa índice parcial no DSL).
@@ -303,23 +314,23 @@ model Category {
 }
 
 model Product {
-  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId        String    @map("tenant_id") @db.Uuid
-  categoryId      String    @map("category_id") @db.Uuid
-  name            String
-  description     String?
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  categoryId     String    @map("category_id") @db.Uuid
+  name           String
+  description    String?
   /// Sempre inteiro em centavos, nunca float (CLAUDE.md regra 4). CHECK >= 0
   /// à mão na migration (Prisma não expressa CHECK no DSL).
-  basePriceCents  Int       @map("base_price_cents")
+  basePriceCents Int       @map("base_price_cents")
   /// Chave do objeto no R2 — nasce nula, preenchida pelo upload (commit 6).
-  imageKey        String?   @map("image_key")
+  imageKey       String?   @map("image_key")
   /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
-  available       Boolean   @default(true)
-  sortOrder       Int       @default(0) @map("sort_order")
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  available      Boolean   @default(true)
+  sortOrder      Int       @default(0) @map("sort_order")
+  version        Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category       Category        @relation(fields: [categoryId], references: [id])
@@ -355,16 +366,16 @@ model ModifierGroup {
 }
 
 model Modifier {
-  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  groupId        String    @map("group_id") @db.Uuid
-  name           String
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  groupId         String    @map("group_id") @db.Uuid
+  name            String
   /// Sempre >= 0 (CHECK na migration) — complemento nunca reduz o preço base.
-  priceDeltaCents Int      @map("price_delta_cents")
-  version        Int       @default(0)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  priceDeltaCents Int       @map("price_delta_cents")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   group  ModifierGroup @relation(fields: [groupId], references: [id])
@@ -372,6 +383,127 @@ model Modifier {
   // FK composta (group_id, tenant_id) → modifier_groups(id, tenant_id) na migration.
   @@index([tenantId, groupId])
   @@map("modifiers")
+}
+
+// ─── Endereços, zonas de entrega e horários (Épico 6) ────────────────────────
+
+/// Endereço do cliente. Tenant-scoped (mesma regra de customers: mesmo
+/// telefone em duas lojas = registros isolados, endereço não cruza).
+///
+/// CLAUDE.md regra 13: esta tabela nasce AGORA com o schema completo — o
+/// Épico 7 vai precisar dela e a decisão de shape pertence a quem cria a
+/// tabela — mas fica VAZIA até lá. Durante a navegação (Épico 6), o
+/// endereço em uso é um objeto no localStorage (packages/contracts, mesmo
+/// tratamento do Cart), nunca uma linha aqui. Só depois do OTP no checkout
+/// (Épico 7) o endereço vira linha, vinculada ao customer autenticado.
+model Address {
+  id             String                                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String                                @map("tenant_id") @db.Uuid
+  customerId     String                                @map("customer_id") @db.Uuid
+  /// String livre, não enum — mesmo racional do Store.themeKey: o cliente
+  /// sugere "Casa"/"Trabalho", mas nunca trava num valor desconhecido.
+  label          String                                @default("Endereço")
+  street         String
+  /// Aceita "s/n" como valor — endereço sem número não é dado ausente.
+  number         String?
+  complement     String?
+  neighborhood   String
+  city           String
+  state          String
+  postalCode     String?                               @map("postal_code")
+  /// "Perto da padaria" — padrão BR, útil pro motoboy. Livre, sem estrutura.
+  referencePoint String?                               @map("reference_point")
+  /// geography(Point,4326) — mesmo tipo do Store.geo. NOT NULL: esta tabela só
+  /// ganha linhas no Épico 7, quando pin/geolocalização já é pré-requisito
+  /// pra salvar (nunca existe o caso legado "endereço sem coordenada").
+  geo            Unsupported("geography(Point, 4326)")
+  version        Int                                   @default(0)
+  createdAt      DateTime                              @default(now()) @map("created_at")
+  updatedAt      DateTime                              @updatedAt @map("updated_at")
+  deletedAt      DateTime?                             @map("deleted_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  // FK composta (customer_id, tenant_id) → customers(id, tenant_id) vive na
+  // migration SQL. Índice único (id, tenant_id) também à mão — alvo futuro
+  // de orders.delivery_address_id (Épico 7).
+  @@index([tenantId, customerId])
+  @@map("addresses")
+}
+
+/// Zona de entrega da loja — polígono PostGIS, taxa fixa e ETA min/max.
+/// N zonas por loja (mesmo com 1 só no seed): "taxa e ETA POR zona" já pede
+/// suporte a múltiplas, e zona premium sobreposta a uma maior é caso real.
+model DeliveryZone {
+  id            String                                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId      String                                  @map("tenant_id") @db.Uuid
+  storeId       String                                  @map("store_id") @db.Uuid
+  /// Identificação pro lojista (ex. "Zona padrão") — sem uso no match.
+  name          String
+  /// geography(Polygon,4326). Seed gera um círculo de 10km via ST_Buffer a
+  /// partir do Store.geo.
+  polygon       Unsupported("geography(Polygon, 4326)")
+  feeCents      Int                                     @map("fee_cents")
+  etaMinMinutes Int                                     @map("eta_min_minutes")
+  etaMaxMinutes Int                                     @map("eta_max_minutes")
+  /// Zonas sobrepostas: menor valor é checado primeiro (zona premium menor
+  /// "vence" a zona grande por fora). CHECK >= 0 na migration.
+  priority      Int                                     @default(0)
+  version       Int                                     @default(0)
+  createdAt     DateTime                                @default(now()) @map("created_at")
+  updatedAt     DateTime                                @updatedAt @map("updated_at")
+  deletedAt     DateTime?                               @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  // FK composta (store_id, tenant_id) → stores(id, tenant_id) na migration.
+  // Índice GiST em `polygon` (obrigatório pra ST_Contains, Prisma não
+  // expressa) também à mão — ver migration SQL.
+  @@index([tenantId, storeId])
+  @@map("delivery_zones")
+}
+
+enum DayOfWeek {
+  sunday
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+}
+
+/// Turno de funcionamento. N turnos por dia (a Vila tem 2: almoço e
+/// jantar) — ausência de linha pro dia inteiro é o "fechado" (segunda da
+/// Vila não tem nenhuma linha, não uma linha com flag desligada).
+model StoreHours {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  storeId         String    @map("store_id") @db.Uuid
+  /// Dia em que o turno COMEÇA.
+  dayOfWeek       DayOfWeek @map("day_of_week")
+  /// Minutos desde meia-noite (0–1439) — não `TIME`, pra virada de dia ser
+  /// aritmética simples (comparação de inteiro), não fuso.
+  opensAtMinutes  Int       @map("opens_at_minutes")
+  /// `closesAtMinutes < opensAtMinutes` SIGNIFICA "fecha no dia seguinte" —
+  /// ex. bar sexta 22h–sábado 02h: dayOfWeek=friday, opens=1320, closes=120.
+  /// Sem coluna booleana extra pra isso; a semântica é a comparação em si.
+  closesAtMinutes Int       @map("closes_at_minutes")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  // FK composta (store_id, tenant_id) → stores(id, tenant_id) na migration.
+  // Índice começa por tenant_id (CLAUDE.md) e já cobre a query de "aberto
+  // agora" (tenant_id + store_id + day_of_week).
+  @@index([tenantId, storeId, dayOfWeek])
+  @@map("store_hours")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────
