@@ -1,5 +1,6 @@
 export * from './address';
 export * from './cart';
+export * from './checkout';
 export * from './copy.pt-BR';
 export * from './delivery-match';
 export * from './modules';
