@@ -18,6 +18,7 @@ export * from './components/mo-stepper';
 export * from './components/mo-timeline';
 
 // ─── Componentes de domínio (doc de marca §5.2) ──────────────────────────────
+export * from './components/mo-address-sheet';
 export * from './components/mo-cart-bar';
 export * from './components/mo-category-chips';
 export * from './components/mo-modifier-group';
