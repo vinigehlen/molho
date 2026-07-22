@@ -82,8 +82,9 @@
 ```
 pending_payment ──pago──> received ──aceito──> preparing ──> ready ──> in_transit ──> completed
       │ (expira 15min)         │ (não aceito em 10min)        │
-      └──> expired             └──> auto_canceled + estorno    └──> delivery_failed ──> returned
+      └──> expired             └──> auto_canceled + estorno    └──> delivery_failed*
 ```
+\* **`delivery_failed` é terminal no MVP** (decisão do Épico 7). O destino físico da comida depois de uma entrega falhada — volta pro restaurante, é descartada, o motoboy fica com ela — é logística operacional do restaurante, não estado que o Molho rastreia. Se um dia virar métrica de produto (ex.: perda por entrega falhada), um estado `returned` entra como decisão nova, não como schema especulativo hoje.
 
 ### 5.2 Cancelamento e estorno (v1)
 | Situação | Regra |
