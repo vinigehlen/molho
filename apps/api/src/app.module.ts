@@ -4,10 +4,11 @@ import { CatalogModule } from './catalog/catalog.module';
 import { ContextModule } from './context/context.module';
 import { HealthController } from './health/health.controller';
 import { MessagingModule } from './messaging/messaging.module';
+import { OrdersModule } from './orders/orders.module';
 import { StorefrontModule } from './storefront/storefront.module';
 
 @Module({
-  imports: [ContextModule, MessagingModule, AuthModule, CatalogModule, StorefrontModule],
+  imports: [ContextModule, MessagingModule, AuthModule, CatalogModule, StorefrontModule, OrdersModule],
   controllers: [HealthController],
 })
 export class AppModule {}

@@ -51,6 +51,10 @@ import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } f
         new DeliveryMatchService(new PrismaDeliveryMatchRepository(requestContext)),
     },
   ],
-  exports: [STOREFRONT_SERVICE, DELIVERY_MATCH_SERVICE],
+  // STOREFRONT_RATE_LIMITER exportado além dos dois serviços: o checkout
+  // (Épico 7, OrdersModule) reaproveita StorefrontRateLimitGuard na rota
+  // pública de revalidação — mesma razão de custo/scraping, chave por
+  // (slug+IP) já cobre "preço do cardápio" e "preço revalidado" igual.
+  exports: [STOREFRONT_SERVICE, DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER],
 })
 export class StorefrontModule {}

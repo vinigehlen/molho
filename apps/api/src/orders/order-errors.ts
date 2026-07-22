@@ -29,3 +29,23 @@ export class MissingCancelReasonError extends Error {
     this.name = 'MissingCancelReasonError';
   }
 }
+
+/**
+ * O `sub` do JWT (CustomerJwtAuthGuard) não corresponde a um customer visível
+ * NESTE tenant (RLS tenant-scoped, sem bypass de plataforma) — cliente de
+ * outra loja tentando finalizar pedido aqui, ou customer soft-deletado.
+ */
+export class CheckoutCustomerNotFoundError extends Error {
+  constructor() {
+    super('Cliente não encontrado.');
+    this.name = 'CheckoutCustomerNotFoundError';
+  }
+}
+
+/** Tenant sem `Store` cadastrada ainda (onboarding incompleto, Épico 13) — não há como nascer um pedido sem loja dona. */
+export class CheckoutStoreNotConfiguredError extends Error {
+  constructor() {
+    super('Loja ainda não está configurada para receber pedidos.');
+    this.name = 'CheckoutStoreNotConfiguredError';
+  }
+}
