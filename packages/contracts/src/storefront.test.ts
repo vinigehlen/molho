@@ -14,6 +14,8 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
       phone: '+5511999990000',
       whatsappNumber: '+5511999990000',
       minOrderCents: 2000,
+      isOpenNow: true,
+      nextOpensAt: null,
     },
     categories: [
       {
@@ -65,6 +67,20 @@ describe('storefrontPayloadSchema', () => {
     p.store.phone = null;
     p.store.whatsappNumber = null;
     expect(storefrontPayloadSchema.safeParse(p).success).toBe(true);
+  });
+
+  it('loja fechada: isOpenNow false com nextOpensAt com offset de timezone', () => {
+    const p = payload();
+    p.store.isOpenNow = false;
+    p.store.nextOpensAt = '2026-07-22T12:00:00-03:00';
+    expect(storefrontPayloadSchema.safeParse(p).success).toBe(true);
+  });
+
+  it('rejeita nextOpensAt sem offset — cliente nunca deveria ter que inferir o fuso da loja', () => {
+    const p = payload();
+    p.store.isOpenNow = false;
+    p.store.nextOpensAt = '2026-07-22T12:00:00';
+    expect(storefrontPayloadSchema.safeParse(p).success).toBe(false);
   });
 });
 

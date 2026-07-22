@@ -80,6 +80,21 @@ export const storefrontStoreSchema = z.object({
   whatsappNumber: z.string().nullable(),
   /** Pedido mínimo. Exibido no cardápio; só vira bloqueio no checkout (Épico 7). */
   minOrderCents: centsSchema,
+  /**
+   * Calculado no SERVIDOR, no timezone da loja (`Store.timezone`) — nunca no
+   * relógio do cliente (CLAUDE.md regra sobre store_hours, Épico 6). `false`
+   * quando não há turno cobrindo o instante atual (inclusive dia sem
+   * nenhuma linha em `store_hours` — "fechado" é ausência, não flag).
+   */
+  isOpenNow: z.boolean(),
+  /**
+   * Próximo instante em que a loja abre, ISO 8601 COM o offset do timezone
+   * da loja embutido (ex. `2026-07-22T12:00:00-03:00`) — o cliente só
+   * formata a hora pro copy `lojaFechada` (`{horario}`), nunca recalcula
+   * fuso. `null` quando `isOpenNow` é `true` (não há "próxima abertura" pra
+   * mostrar) ou quando a loja não tem NENHUM turno cadastrado ainda.
+   */
+  nextOpensAt: z.iso.datetime({ offset: true }).nullable(),
 });
 
 export const storefrontPayloadSchema = z.object({
