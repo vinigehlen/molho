@@ -42,7 +42,9 @@ let migratorPrisma: PrismaClient;
 let redis: Redis | null = null;
 
 const slug = `e2e-checkout-${Date.now()}`;
+const otherSlug = `e2e-checkout-other-${Date.now()}`;
 let tenantId: string;
+let otherTenantId: string;
 let storeId: string;
 let productId: string;
 let modifierId: string;
@@ -55,12 +57,12 @@ async function getLastSentCode(): Promise<string> {
   return extractCode(last.message);
 }
 
-async function loginCustomer(): Promise<{ customerId: string; accessToken: string }> {
+async function loginCustomer(loginSlug: string = slug): Promise<{ customerId: string; accessToken: string }> {
   const phone = randomPhone();
-  await request(app.getHttpServer()).post(`/v1/store/${slug}/auth/otp/request`).send({ phone }).expect(202);
+  await request(app.getHttpServer()).post(`/v1/store/${loginSlug}/auth/otp/request`).send({ phone }).expect(202);
   const code = await getLastSentCode();
   const res = await request(app.getHttpServer())
-    .post(`/v1/store/${slug}/auth/otp/verify`)
+    .post(`/v1/store/${loginSlug}/auth/otp/verify`)
     .send({ phone, code })
     .expect(200);
   return { customerId: res.body.user.id, accessToken: res.body.accessToken };
@@ -151,6 +153,14 @@ beforeAll(async () => {
     VALUES (${tenantId}::uuid, ${storeId}::uuid, 'Zona única', ST_Buffer((SELECT geo FROM stores WHERE id = ${storeId}::uuid), 5000), 800, 30, 50, 0)
   `;
 
+  // Tenant B: só existe pra provar isolamento — login por OTP não exige
+  // nenhum módulo (CustomerAuthController não tem @RequireModule), então
+  // nem precisa de entitlement/store/produto pra logar um customer nele.
+  const other = await migratorPrisma.tenant.create({
+    data: { slug: otherSlug, name: 'Outro Tenant E2E', timezone: 'America/Sao_Paulo' },
+  });
+  otherTenantId = other.id;
+
   if (process.env.REDIS_URL) {
     redis = new Redis(process.env.REDIS_URL);
     const keys = await redis.keys(`storefront:rl:${slug}:*`);
@@ -176,6 +186,10 @@ afterAll(async () => {
     await migratorPrisma.tenantSetting.deleteMany({ where: { tenantId } });
     await migratorPrisma.tenantEntitlement.deleteMany({ where: { tenantId } });
     await migratorPrisma.tenant.delete({ where: { id: tenantId } }).catch(() => {});
+
+    await migratorPrisma.customer.deleteMany({ where: { tenantId: otherTenantId } });
+    await migratorPrisma.tenant.delete({ where: { id: otherTenantId } }).catch(() => {});
+
     await migratorPrisma.$disconnect();
   }
   if (redis) {
@@ -260,5 +274,19 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
     const history = await migratorPrisma.orderStatusHistory.findMany({ where: { orderId: order.id } });
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ fromStatus: null, toStatus: 'received', customerId, actorId: null });
+  }, 15_000);
+
+  it('5) token de cliente de OUTRO tenant: 404 — RLS não deixa o customer aparecer neste tenant, nenhum pedido novo criado', async () => {
+    const { accessToken } = await loginCustomer(otherSlug);
+    const countAntes = await migratorPrisma.order.count({ where: { tenantId } });
+
+    await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(checkoutBody())
+      .expect(404);
+
+    const countDepois = await migratorPrisma.order.count({ where: { tenantId } });
+    expect(countDepois).toBe(countAntes);
   }, 15_000);
 });
