@@ -1,9 +1,11 @@
-import { Controller, Get, Header, Inject, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Inject, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
+import { DeliveryMatchRequestDto } from './dto/delivery-match.dto';
 import { StorefrontRateLimitGuard } from './storefront-rate-limit.guard';
-import { STOREFRONT_SERVICE } from './storefront.tokens';
+import { DELIVERY_MATCH_SERVICE, STOREFRONT_SERVICE } from './storefront.tokens';
+import type { DeliveryMatchService } from './delivery-match.service';
 import type { StorefrontService } from './storefront.service';
 
 /**
@@ -29,7 +31,10 @@ import type { StorefrontService } from './storefront.service';
 @UseInterceptors(TenantContextInterceptor)
 @RequireModule('channel.storefront')
 export class PublicStoreController {
-  constructor(@Inject(STOREFRONT_SERVICE) private readonly storefront: StorefrontService) {}
+  constructor(
+    @Inject(STOREFRONT_SERVICE) private readonly storefront: StorefrontService,
+    @Inject(DELIVERY_MATCH_SERVICE) private readonly deliveryMatchService: DeliveryMatchService,
+  ) {}
 
   /**
    * `s-maxage=30` cacheia na BORDA (CDN), não no browser do cliente — o
@@ -45,5 +50,18 @@ export class PublicStoreController {
   @Header('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
   getStorefront() {
     return this.storefront.getStorefront();
+  }
+
+  /**
+   * `POST`, não `GET` com querystring: lat/lng é dado pessoal de
+   * localização, nunca pertence numa URL (CLAUDE.md §Privacidade — nem
+   * logs de acesso deveriam carregar isso). `@HttpCode(200)`: não cria
+   * recurso nenhum, é uma pergunta ("essa área é atendida?"), o padrão 201
+   * do Nest pra POST seria semanticamente errado aqui.
+   */
+  @Post(':slug/delivery-match')
+  @HttpCode(200)
+  deliveryMatch(@Body() body: DeliveryMatchRequestDto) {
+    return this.deliveryMatchService.match(body.lat, body.lng);
   }
 }

@@ -9,10 +9,12 @@ import {
   type RateLimiter,
   RedisSlidingWindowRateLimiter,
 } from '../rate-limit/rate-limiter';
+import { DeliveryMatchService } from './delivery-match.service';
+import { PrismaDeliveryMatchRepository } from './delivery-match.repository';
 import { PublicStoreController } from './public-store.controller';
 import { PrismaStorefrontRepository } from './storefront.repository';
 import { StorefrontService } from './storefront.service';
-import { STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } from './storefront.tokens';
+import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } from './storefront.tokens';
 
 /**
  * ModuleCheckModule e AuthModule entram aqui porque `RequireModuleGuard` é
@@ -42,7 +44,13 @@ import { STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } from './storefront.tokens
         return redis ? new RedisSlidingWindowRateLimiter(redis) : new InMemorySlidingWindowRateLimiter();
       },
     },
+    {
+      provide: DELIVERY_MATCH_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): DeliveryMatchService =>
+        new DeliveryMatchService(new PrismaDeliveryMatchRepository(requestContext)),
+    },
   ],
-  exports: [STOREFRONT_SERVICE],
+  exports: [STOREFRONT_SERVICE, DELIVERY_MATCH_SERVICE],
 })
 export class StorefrontModule {}
