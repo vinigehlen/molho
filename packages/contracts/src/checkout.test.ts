@@ -21,6 +21,7 @@ function address(overrides: Partial<Record<string, unknown>> = {}) {
     referencePoint: null,
     lat: -29.6,
     lng: -51.17,
+    expectedDeliveryFeeCents: 800,
     ...overrides,
   };
 }
@@ -41,7 +42,7 @@ describe('checkoutRequestSchema', () => {
 
   it('aceita carrinho com item e endereço válidos', () => {
     const valido = {
-      items: [{ productId: UUID, modifierIds: [], quantity: 1, notes: null }],
+      items: [{ productId: UUID, unitBasePriceCents: 2890, modifiers: [], quantity: 1, notes: null }],
       address: address(),
     };
     expect(checkoutRequestSchema.safeParse(valido).success).toBe(true);

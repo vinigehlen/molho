@@ -24,9 +24,20 @@ import { z } from 'zod';
 
 const centsSchema = z.int().nonnegative();
 
+/**
+ * `unitBasePriceCents`/`modifiers[].priceDeltaCents` são o preço que o
+ * CLIENTE tem em cache (o carrinho de `@molho/contracts/cart.ts`) — não são
+ * usados pra calcular nada, só pra revalidação comparar contra o preço
+ * FRESCO do banco e decidir `revalidatedItemSchema.priceChanged`. Sem isso
+ * aqui, o servidor não teria contra o que comparar (achado escrevendo o
+ * serviço de revalidação: o schema original só tinha `modifierIds`, e
+ * "mudou desde o que o cliente mandou" não fazia sentido sem o cliente
+ * mandar o preço).
+ */
 export const checkoutItemInputSchema = z.object({
   productId: z.uuid(),
-  modifierIds: z.array(z.uuid()),
+  unitBasePriceCents: z.int().nonnegative(),
+  modifiers: z.array(z.object({ modifierId: z.uuid(), priceDeltaCents: z.int().nonnegative() })),
   quantity: z.int().positive(),
   notes: z.string().max(280).nullable(),
 });
@@ -49,6 +60,15 @@ export const checkoutAddressInputSchema = z.object({
   referencePoint: z.string().nullable(),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
+  /**
+   * Taxa que o cliente viu no `MoAddressSheet` (Épico 6) ao escolher este
+   * endereço — mesma razão de `checkoutItemInputSchema.unitBasePriceCents`:
+   * sem isso, a revalidação não tem contra o que comparar pra saber se a
+   * taxa SUBIU (regra 14). `null` no caso raro de o cliente forçar checkout
+   * sem ter visto o match de zona ainda (ex.: endereço colado direto no
+   * campo, sem passar pelo fluxo normal).
+   */
+  expectedDeliveryFeeCents: centsSchema.nullable(),
 });
 
 export const checkoutRequestSchema = z.object({
