@@ -1,10 +1,38 @@
 'use client';
 
 import * as React from 'react';
+import { MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { StorefrontProduct, StorefrontCategory } from '@molho/contracts';
-import { MoCartBar, MoCategoryChips, MoProductCard, MoProductSheet, type MoProductSheetSelection } from '@molho/ui';
+import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
+import {
+  MoAddressSheet,
+  type MoAddressSheetValue,
+  MoCartBar,
+  MoCategoryChips,
+  MoProductCard,
+  MoProductSheet,
+  type MoProductSheetSelection,
+  formatCents,
+} from '@molho/ui';
+import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
+import { fetchDeliveryMatch } from '../../lib/delivery-match-api';
+import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
+
+/**
+ * Espelhado de packages/contracts/src/copy.pt-BR.ts (COPY.storefront) — só
+ * as 2 mensagens que dependem de estado do CLIENTE (fora da zona, pedido
+ * mínimo mudam com endereço/carrinho em tempo real). "Loja fechada" não
+ * está aqui: é calculada inteira no server component (page.tsx), que
+ * importa @molho/contracts sem o risco do Fast Refresh (mesma razão de
+ * cart-storage.ts) — chega pronta via prop `closedMessage`.
+ */
+const COPY_FORA_DA_AREA = 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!';
+const COPY_PEDIDO_MINIMO = 'Faltam {valor} pra fechar o pedido mínimo da casa.';
+
+function interpolarCopy(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (bruto, chave: string) => vars[chave] ?? bruto);
+}
 
 /**
  * Client component enxuto: só recebe DADOS já resolvidos como props, nunca
@@ -24,6 +52,9 @@ export interface TenantMenuProps {
   storeName: string;
   greeting: string;
   categories: StorefrontCategory[];
+  minOrderCents: number;
+  /** Já formatada por inteiro em page.tsx — `null` quando a loja está aberta agora. */
+  closedMessage: string | null;
 }
 
 /** Nenhum grupo obrigatório: dá pra adicionar com o "+" sem abrir o detalhe. */
@@ -31,12 +62,33 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
   return produto.modifierGroups.every((grupo) => grupo.min === 0);
 }
 
-export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenuProps) {
+export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
+  const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
+  const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
   const cart = useCart(slug);
+  const { address, setAddress } = useAddress(slug);
   const router = useRouter();
+
+  // Roda de novo sempre que a coordenada mudar (endereço novo salvo, ou já
+  // veio de uma visita anterior com geolocalização) — sem isto, o cliente
+  // precisaria reabrir o formulário toda vez só pra reconfirmar cobertura.
+  React.useEffect(() => {
+    if (address?.lat == null || address?.lng == null) {
+      setDeliveryMatch(null);
+      return;
+    }
+
+    let cancelado = false;
+    fetchDeliveryMatch(slug, address.lat, address.lng).then((resultado) => {
+      if (!cancelado) setDeliveryMatch(resultado);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [slug, address?.lat, address?.lng]);
 
   // Scroll-spy: a seção mais visível vira a categoria ativa nos chips,
   // mesmo quando o cliente rola a página na mão (sem clicar em nenhum chip).
@@ -81,6 +133,16 @@ export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenu
     setProdutoSelecionado(null);
   }
 
+  function salvarEndereco(valor: MoAddressSheetValue) {
+    const novoEndereco: CustomerAddress = {
+      schemaVersion: ADDRESS_SCHEMA_VERSION,
+      ...valor,
+      updatedAt: new Date().toISOString(),
+    };
+    setAddress(novoEndereco);
+    setEnderecoSheetAberto(false);
+  }
+
   function adicaoRapida(produto: StorefrontProduct) {
     cart.addItem({
       lineId: crypto.randomUUID(),
@@ -95,12 +157,35 @@ export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenu
     });
   }
 
+  const faltamParaMinimo = minOrderCents - cart.subtotalCents;
+  const abaixoDoMinimo = cart.itemCount > 0 && faltamParaMinimo > 0;
+  const foraDaArea = deliveryMatch?.withinZone === false;
+
   return (
     <div className="pb-24">
       <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
         <h1 className="text-title-lg">{storeName}</h1>
         <p className="text-body opacity-90">{greeting}</p>
       </header>
+
+      <button
+        type="button"
+        onClick={() => setEnderecoSheetAberto(true)}
+        className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-left text-body text-text-muted transition duration-base ease-out hover:bg-bg-card"
+      >
+        <MapPin className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
+        <span className="truncate">
+          {address ? `${address.label} — ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
+        </span>
+      </button>
+
+      {closedMessage ? <div className="bg-brand-faint px-4 py-3 text-body text-text">{closedMessage}</div> : null}
+      {foraDaArea ? <div className="bg-brand-faint px-4 py-3 text-body text-text">{COPY_FORA_DA_AREA}</div> : null}
+      {abaixoDoMinimo ? (
+        <div className="bg-brand-faint px-4 py-3 text-body text-text">
+          {interpolarCopy(COPY_PEDIDO_MINIMO, { valor: formatCents(faltamParaMinimo) })}
+        </div>
+      ) : null}
 
       <MoCategoryChips
         categories={categories.map((categoria) => ({ id: categoria.id, name: categoria.name }))}
@@ -147,6 +232,13 @@ export function TenantMenu({ slug, storeName, greeting, categories }: TenantMenu
         onAddToCart={(selecao) => {
           if (produtoSelecionado) adicionarAoCarrinho(produtoSelecionado, selecao);
         }}
+      />
+
+      <MoAddressSheet
+        open={enderecoSheetAberto}
+        onOpenChange={setEnderecoSheetAberto}
+        initialValue={address}
+        onSave={salvarEndereco}
       />
 
       <MoCartBar

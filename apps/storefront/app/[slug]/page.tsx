@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { COPY } from '@molho/contracts';
+import { COPY, t } from '@molho/contracts';
 import { MoEmptyState } from '@molho/ui';
+import { formatarHorarioCurto } from '../../lib/format-horario';
 import { getStorefront } from '../../lib/storefront-api';
 import { TenantMenu } from './tenant-menu';
 
@@ -35,12 +36,24 @@ export default async function TenantHomePage({ params }: TenantHomePageProps) {
     );
   }
 
+  // Mensagem inteira montada aqui (Server Component, importa @molho/contracts
+  // sem risco) — "loja fechada" não depende de nenhum estado do cliente, só
+  // do payload que já veio pronto. TenantMenu recebe a string formatada,
+  // nunca precisa de COPY/t em runtime pra este banner específico.
+  const closedMessage = store.store.isOpenNow
+    ? null
+    : t(COPY.storefront.lojaFechada, {
+        horario: store.store.nextOpensAt ? formatarHorarioCurto(store.store.nextOpensAt) : 'em breve',
+      });
+
   return (
     <TenantMenu
       slug={slug}
       storeName={store.store.name}
       greeting={COPY.storefront.saudacaoAnonima}
       categories={store.categories}
+      minOrderCents={store.store.minOrderCents}
+      closedMessage={closedMessage}
     />
   );
 }
