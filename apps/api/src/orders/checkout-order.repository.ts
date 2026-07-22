@@ -15,6 +15,17 @@ export interface CheckoutOrderRepository {
   findCustomer(customerId: string): Promise<{ id: string } | null>;
   /** MVP assume uma loja por tenant (mesma suposição de StorefrontRepository/CheckoutRepository). */
   findStoreId(): Promise<string | null>;
+  /**
+   * `SELECT ... FOR UPDATE` nas linhas de PRODUTO do pedido — só chamado no
+   * caminho de `/checkout/orders` (criação), NUNCA em
+   * `CheckoutRevalidationService.revalidate()` (que também atende
+   * `/checkout/revalidate`, público e só-leitura). Fecha a janela de corrida
+   * entre ler preço/disponibilidade e escrever o pedido pro que tem
+   * consequência de dinheiro/consentimento do cliente — ver CLAUDE.md §
+   * Checkout pra decisão completa (zona/horário/mínimo ficam de fora,
+   * de propósito, como débito tolerável sob READ COMMITTED).
+   */
+  lockProductsForUpdate(productIds: readonly string[]): Promise<void>;
   /** Grava o endereço do localStorage como linha real, vinculada ao customer autenticado (CLAUDE.md regra 13). */
   createAddress(customerId: string, address: CheckoutAddressInput): Promise<string>;
   createOrder(params: CreateOrderParams): Promise<string>;
@@ -49,6 +60,13 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       select: { id: true },
     });
     return store?.id ?? null;
+  }
+
+  async lockProductsForUpdate(productIds: readonly string[]): Promise<void> {
+    if (productIds.length === 0) return;
+    await this.requestContext.getClient().$queryRaw`
+      SELECT "id" FROM "products" WHERE "id" = ANY(${productIds}::uuid[]) AND "deleted_at" IS NULL FOR UPDATE
+    `;
   }
 
   async createAddress(customerId: string, address: CheckoutAddressInput): Promise<string> {

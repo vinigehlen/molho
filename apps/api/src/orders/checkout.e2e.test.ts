@@ -2,13 +2,15 @@ import { randomBytes } from 'node:crypto';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@molho/db';
+import { PrismaClient, type Prisma } from '@molho/db';
 import Redis from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module';
+import type { RequestContextService } from '../context/request-context.service';
 import { MESSAGING_PROVIDER } from '../messaging/messaging.module';
 import type { MockMessagingProvider } from '../messaging/mock-messaging.provider';
+import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 
 /**
  * e2e de verdade: Postgres real (RLS, PostGIS) + Redis real (rate limit) +
@@ -46,6 +48,7 @@ const otherSlug = `e2e-checkout-other-${Date.now()}`;
 let tenantId: string;
 let otherTenantId: string;
 let storeId: string;
+let categoryId: string;
 let productId: string;
 let modifierId: string;
 
@@ -129,6 +132,7 @@ beforeAll(async () => {
   const category = await migratorPrisma.category.create({
     data: { tenantId, name: 'Hambúrgueres', sortOrder: 0, visible: true },
   });
+  categoryId = category.id;
   const product = await migratorPrisma.product.create({
     data: { tenantId, categoryId: category.id, name: 'X-Burger', basePriceCents: 2890, available: true },
   });
@@ -289,4 +293,64 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
     const countDepois = await migratorPrisma.order.count({ where: { tenantId } });
     expect(countDepois).toBe(countAntes);
   }, 15_000);
+});
+
+describe('PrismaCheckoutOrderRepository.lockProductsForUpdate — corrida real no Postgres', () => {
+  /**
+   * Constrói um repositório real preso a UM client transacional específico —
+   * não usa RequestContextService/AsyncLocalStorage de verdade (não faz
+   * sentido fora de um request HTTP), só o suficiente pra exercitar o MESMO
+   * método (`lockProductsForUpdate`) que `CheckoutOrderService.createOrder()`
+   * chama em produção, contra duas transações Postgres genuinamente
+   * concorrentes.
+   */
+  function repositoryFor(tx: Prisma.TransactionClient): PrismaCheckoutOrderRepository {
+    const fakeRequestContext = { getClient: () => tx, getTenantId: () => tenantId } as unknown as RequestContextService;
+    return new PrismaCheckoutOrderRepository(fakeRequestContext);
+  }
+
+  it('transação B fica bloqueada em FOR UPDATE até A commitar, e então enxerga preço/disponibilidade JÁ ATUALIZADOS', async () => {
+    const product = await migratorPrisma.product.create({
+      data: { tenantId, categoryId, name: 'Produto da corrida', basePriceCents: 1000, available: true },
+    });
+
+    let releaseA: () => void = () => {};
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+
+    let bUnblocked = false;
+
+    const txA = migratorPrisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
+      await repositoryFor(tx).lockProductsForUpdate([product.id]);
+      // Muda preço E disponibilidade DENTRO da transação, ainda sem commitar.
+      await tx.product.update({ where: { id: product.id }, data: { basePriceCents: 5000, available: false } });
+      await heldUntilReleased; // segura o lock até o teste mandar liberar
+    });
+
+    // Dá tempo real (round-trip Neon) pra A garantidamente já ter o lock antes de B tentar.
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const txB = migratorPrisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
+      await repositoryFor(tx).lockProductsForUpdate([product.id]); // deve BLOQUEAR aqui até A liberar
+      bUnblocked = true;
+      return tx.product.findUniqueOrThrow({ where: { id: product.id } });
+    });
+
+    // Prova que B continua bloqueado enquanto A segura o lock.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(bUnblocked).toBe(false);
+
+    releaseA();
+    await txA;
+
+    const productSeenByB = await txB;
+    expect(bUnblocked).toBe(true);
+    expect(productSeenByB.basePriceCents).toBe(5000);
+    expect(productSeenByB.available).toBe(false);
+  }, 20_000);
 });

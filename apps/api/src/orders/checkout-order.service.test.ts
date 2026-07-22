@@ -57,12 +57,16 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   storeId: string | null = 'store-1';
   createOrderCalls: CreateOrderParams[] = [];
   createOrderItemsCalls: unknown[] = [];
+  lockProductsForUpdateCalls: string[][] = [];
 
   async findCustomer() {
     return this.customer;
   }
   async findStoreId() {
     return this.storeId;
+  }
+  async lockProductsForUpdate(productIds: readonly string[]) {
+    this.lockProductsForUpdateCalls.push([...productIds]);
   }
   async createAddress() {
     return 'address-1';
@@ -118,6 +122,29 @@ describe('CheckoutOrderService.createOrder', () => {
 
     expect(result.ok).toBe(false);
     expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('6) trava as linhas de produto (ids únicos) ANTES de revalidar — fecha a janela de corrida em preço/disponibilidade', async () => {
+    const { repo, revalidationService, service } = setup();
+    const ordem: string[] = [];
+    repo.lockProductsForUpdate = async (productIds: readonly string[]) => {
+      ordem.push('lock');
+      repo.lockProductsForUpdateCalls.push([...productIds]);
+    };
+    revalidationService.revalidate.mockImplementation(async () => {
+      ordem.push('revalidate');
+      return happyRevalidation();
+    });
+
+    const requestComItemRepetido: CheckoutRequest = {
+      ...REQUEST,
+      items: [...REQUEST.items, { ...REQUEST.items[0]!, notes: 'outra linha, mesmo produto' }],
+    };
+
+    await service.createOrder('tenant-1', 'customer-1', requestComItemRepetido);
+
+    expect(ordem).toEqual(['lock', 'revalidate']);
+    expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']); // dedup — 2 linhas, 1 produto só
   });
 
   it('5) caminho feliz: cria endereço, pedido, itens e grava order_status_history', async () => {

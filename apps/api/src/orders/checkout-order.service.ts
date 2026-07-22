@@ -31,6 +31,17 @@ export class CheckoutOrderService {
     const storeId = await this.repo.findStoreId();
     if (!storeId) throw new CheckoutStoreNotConfiguredError();
 
+    // Trava as linhas de PRODUTO antes de revalidar — fecha a janela de
+    // corrida entre "ler preço/disponibilidade" e "escrever o pedido" pro
+    // que tem consequência de dinheiro/consentimento do cliente (CLAUDE.md
+    // § Checkout). Qualquer transação concorrente que tente mudar preço ou
+    // marcar esgotado um destes produtos fica bloqueada até esta transação
+    // commitar ou abortar — o que lemos abaixo fica estável até lá. Zona/
+    // horário/mínimo continuam sob READ COMMITTED normal, de propósito
+    // (débito documentado: baixa mutabilidade, consequência tolerável).
+    const productIds = [...new Set(request.items.map((item) => item.productId))];
+    await this.repo.lockProductsForUpdate(productIds);
+
     // Nunca reaproveita o resultado de /checkout/revalidate — revalida de
     // novo aqui dentro, contra o estado FRESCO do banco (regra 14).
     const revalidation = await this.revalidationService.revalidate(request);
