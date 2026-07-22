@@ -58,6 +58,32 @@ Comparação lado a lado do storefront do Molho com o iFood — referência de m
 
 ---
 
+## Robustez conhecida
+
+Diferente dos itens B1–B5 (UX/comparação de mercado), isto é uma fragilidade técnica já identificada e com causa raiz investigada — registrada aqui por falta de uma seção de robustez mais natural neste projeto ainda.
+
+### R1. P2028 no match de zona sob cold-start do Neon (prioridade: antes do go-live do piloto)
+
+**Sintoma:** `POST /v1/store/:slug/delivery-match` pode devolver 500 (`PrismaClientKnownRequestError: Unable to start a transaction in the given time`, `P2028`) quando o `useEffect` do `TenantMenu` dispara essa chamada no mount — o que acontece quase sempre a poucos milissegundos do `GET /v1/store/:slug` que o Next já fez no SSR da mesma página. As duas rotas abrem transação (`RequireModuleGuard`/`RequestContextService`), cada uma pedindo conexão nova ao pool.
+
+**Por que isto é mais provável em produção do que parece:** o piloto é um restaurante de baixo tráfego. Neon (serverless) hiberna o compute depois de um período ocioso — comum entre o movimento do almoço e o do jantar, ou de madrugada. **O primeiro cliente que abre o cardápio depois de um período parado é exatamente quem bate o cold-start** — não é um caso raro de pico de tráfego, é o caso NORMAL de uma loja pequena.
+
+**Já descartado como causa (Épico 6):**
+- Pool de conexão pequeno — `@prisma/adapter-pg` usa o default do `pg.Pool` (10), não foi configurado nada menor.
+- Processos `nest start --watch` órfãos competindo pela mesma conexão — o erro persistiu igual depois de matar os 6 órfãos encontrados, sobrando só 1 processo.
+
+**Causa provável:** o compute serverless do Neon demora pra aceitar a conexão FÍSICA nova quando estava hibernado — é o Postgres "acordando", não o Node/Prisma. Duas transações concorrentes batendo nesse momento competem pela mesma janela de timeout.
+
+**Opções a avaliar quando priorizar** (nenhuma decidida ainda):
+- **(a) Retry com backoff no `delivery-match` especificamente.** É idempotente e read-only (`ST_Covers`, sem side-effect) — retry é seguro aqui de um jeito que não seria em uma escrita.
+- **(b) Warm-up do Neon no SSR antes do `useEffect` disparar** — uma query trivial na própria página que já "acorda" o compute antes do client ter chance de competir por conexão.
+- **(c) Mover o match pro server component em vez de `useEffect` do client** — se rodar junto com o resto do payload (mesmo request, mesma transação/conexão), não há duas coisas concorrendo por conexão fria. **Parece a opção mais limpa** (menos uma race condition inteira, não só mais tolerante a ela) — mas precisa de repensar como o `lat`/`lng` (que hoje só existe no client, via `localStorage`/geolocalização) chegaria ao server component a tempo do primeiro render. Não decidido.
+- **(d) Connection pooler do Neon**, se ainda não estiver ativo no projeto — reduz a chance de qualquer conexão precisar ser física-nova.
+
+**Prioridade:** antes do go-live do piloto (Épico 14 ou o commit de preparação pra sexta-feira em produção), não antes disso — não bloqueia o Épico 7. Comportamento atual já degrada com segurança (`fetchDeliveryMatch` devolve `null`, o banner "fora da área" simplesmente não aparece nessa janela rara) — é sobre confiabilidade percebida, não sobre dado errado ou tela quebrada.
+
+---
+
 ## Referência
 
 Ver `docs/01-plano-produto.md` §8 (tabela de épicos) — nota apontando pra este arquivo, para não se perder entre sessões.
