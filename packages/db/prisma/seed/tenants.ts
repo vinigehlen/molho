@@ -13,6 +13,8 @@ export interface SeedTenantDef {
     phone: string;
     whatsappNumber: string;
     minOrderCents: number;
+    /** Store.geo (geography Point) — Épico 6. Escrito via SQL cru no seed (Unsupported no Prisma DSL). */
+    geo: { lat: number; lng: number };
   };
   owner: {
     name: string;
@@ -37,6 +39,9 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
       phone: '+5551999990000',
       whatsappNumber: '+5551999990000',
       minOrderCents: 3000,
+      // Estância Velha, RS — aproximado (centro do município), suficiente
+      // pro círculo de 10km da zona de entrega no seed.
+      geo: { lat: -29.6478, lng: -51.1728 },
     },
     owner: {
       name: 'Vinicius',
@@ -56,6 +61,8 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
       phone: '+5551988880000',
       whatsappNumber: '+5551988880000',
       minOrderCents: 0,
+      // Centro Histórico de Porto Alegre, RS — aproximado.
+      geo: { lat: -30.0346, lng: -51.2177 },
     },
     owner: {
       name: 'Ana',

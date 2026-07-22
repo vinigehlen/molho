@@ -10,6 +10,7 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { encryptPhone, hashPhoneForLookup } from '../../src/crypto/phone';
 import { PrismaClient } from '../generated/client/client';
 import { type SeedCategoryDef, SEED_CATALOGS } from './catalog';
+import { type SeedDeliveryDef, type SeedShiftDef, type SeedZoneDef, SEED_DELIVERY } from './delivery';
 import {
   fetchAndUploadProductPhoto,
   loadPhotoCredits,
@@ -43,7 +44,10 @@ function enabledByDefaultModules(plan: SeedTenantDef['plan']): ModuleKey[] {
   return defaultModulesForPlan(plan).filter((key) => !moduleDef(key).core);
 }
 
-async function seedTenant(prisma: PrismaClient, def: SeedTenantDef) {
+async function seedTenant(
+  prisma: PrismaClient,
+  def: SeedTenantDef,
+): Promise<{ tenantId: string; storeId: string }> {
   let tenant = await prisma.tenant.findFirst({ where: { slug: def.slug, deletedAt: null } });
   if (tenant) {
     tenant = await prisma.tenant.update({
@@ -76,11 +80,17 @@ async function seedTenant(prisma: PrismaClient, def: SeedTenantDef) {
     whatsappNumber: def.store.whatsappNumber,
     minOrderCents: def.store.minOrderCents,
   };
-  if (existingStore) {
-    await prisma.store.update({ where: { id: existingStore.id }, data: storeData });
-  } else {
-    await prisma.store.create({ data: storeData });
-  }
+  const store = existingStore
+    ? await prisma.store.update({ where: { id: existingStore.id }, data: storeData })
+    : await prisma.store.create({ data: storeData });
+
+  // geo é Unsupported no Prisma DSL (geography) — só dá pra escrever via SQL
+  // cru. UPDATE simples, idempotente por natureza (reescreve o mesmo ponto).
+  await prisma.$executeRaw`
+    UPDATE stores
+    SET geo = ST_SetSRID(ST_MakePoint(${def.store.geo.lng}, ${def.store.geo.lat}), 4326)::geography
+    WHERE id = ${store.id}::uuid
+  `;
 
   const phoneHash = hashPhoneForLookup(def.owner.phone);
   let owner = await prisma.user.findFirst({
@@ -136,6 +146,8 @@ async function seedTenant(prisma: PrismaClient, def: SeedTenantDef) {
   console.log(
     `  ${entitledModules(def.plan).length} entitlements, ${enabledDefaults.size} ligados por padrão`,
   );
+
+  return { tenantId: tenant.id, storeId: store.id };
 }
 
 /**
@@ -259,6 +271,94 @@ function buildPhotoContext(): PhotoUploadContext | null {
   return { apiKey, s3Client, bucket: process.env.S3_BUCKET ?? '' };
 }
 
+/**
+ * Turno não tem nome/identificador natural — a chave de idempotência é
+ * (tenantId, storeId, dayOfWeek, opensAtMinutes). Sem geo/Unsupported
+ * envolvido aqui, Prisma Client normal serve (ao contrário de zonas).
+ */
+async function seedStoreHours(
+  prisma: PrismaClient,
+  tenantId: string,
+  storeId: string,
+  shifts: readonly SeedShiftDef[],
+) {
+  for (const shift of shifts) {
+    const existing = await prisma.storeHours.findFirst({
+      where: {
+        tenantId,
+        storeId,
+        dayOfWeek: shift.dayOfWeek,
+        opensAtMinutes: shift.opensAtMinutes,
+        deletedAt: null,
+      },
+    });
+    const data = {
+      tenantId,
+      storeId,
+      dayOfWeek: shift.dayOfWeek,
+      opensAtMinutes: shift.opensAtMinutes,
+      closesAtMinutes: shift.closesAtMinutes,
+    };
+    if (existing) {
+      await prisma.storeHours.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.storeHours.create({ data });
+    }
+  }
+}
+
+/**
+ * `polygon` é Unsupported (geography) — INSERT/UPDATE só via SQL cru.
+ * ST_Buffer num geography faz buffer geodésico (metros de verdade, não
+ * plano cartesiano) a partir do Store.geo já gravado por `seedTenant()`.
+ */
+async function seedDeliveryZones(
+  prisma: PrismaClient,
+  tenantId: string,
+  storeId: string,
+  zones: readonly SeedZoneDef[],
+) {
+  for (const zone of zones) {
+    const existing = await prisma.deliveryZone.findFirst({
+      where: { tenantId, storeId, name: zone.name, deletedAt: null },
+    });
+
+    if (existing) {
+      await prisma.$executeRaw`
+        UPDATE delivery_zones
+        SET polygon = ST_Buffer((SELECT geo FROM stores WHERE id = ${storeId}::uuid), ${zone.radiusMeters}),
+            fee_cents = ${zone.feeCents},
+            eta_min_minutes = ${zone.etaMinMinutes},
+            eta_max_minutes = ${zone.etaMaxMinutes},
+            priority = ${zone.priority},
+            updated_at = now()
+        WHERE id = ${existing.id}::uuid
+      `;
+    } else {
+      await prisma.$executeRaw`
+        INSERT INTO delivery_zones
+          (tenant_id, store_id, name, polygon, fee_cents, eta_min_minutes, eta_max_minutes, priority)
+        VALUES (
+          ${tenantId}::uuid,
+          ${storeId}::uuid,
+          ${zone.name},
+          ST_Buffer((SELECT geo FROM stores WHERE id = ${storeId}::uuid), ${zone.radiusMeters}),
+          ${zone.feeCents},
+          ${zone.etaMinMinutes},
+          ${zone.etaMaxMinutes},
+          ${zone.priority}
+        )
+      `;
+    }
+  }
+}
+
+async function seedDelivery(prisma: PrismaClient, tenantId: string, storeId: string, def: SeedDeliveryDef) {
+  await seedStoreHours(prisma, tenantId, storeId, def.shifts);
+  await seedDeliveryZones(prisma, tenantId, storeId, def.zones);
+  console.log(`  ${def.shifts.length} turnos, ${def.zones.length} zona(s)`);
+}
+
 async function main() {
   const directUrl = process.env.DIRECT_URL;
   if (!directUrl) throw new Error('DIRECT_URL não configurada — seed roda como app_migrator');
@@ -305,6 +405,24 @@ async function main() {
     if (photoContext) {
       savePhotoCredits(credits);
       console.log(`\nfotos: ${credits.size} crédito(s) em photo-credits.json`);
+    }
+
+    console.log('\nzonas de entrega e horário:');
+    for (const deliveryDef of SEED_DELIVERY) {
+      const tenant = await prisma.tenant.findFirst({
+        where: { slug: deliveryDef.tenantSlug, deletedAt: null },
+      });
+      if (!tenant) throw new Error(`tenant "${deliveryDef.tenantSlug}" não encontrado — seed de tenants rodou?`);
+
+      // Mesma suposição de findStore() em apps/api: uma loja por tenant no MVP.
+      const store = await prisma.store.findFirst({
+        where: { tenantId: tenant.id, deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (!store) throw new Error(`loja do tenant "${deliveryDef.tenantSlug}" não encontrada — seed de tenants rodou?`);
+
+      console.log(`  ${deliveryDef.tenantSlug}:`);
+      await seedDelivery(prisma, tenant.id, store.id, deliveryDef);
     }
   } finally {
     await prisma.$disconnect();
