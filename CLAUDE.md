@@ -160,6 +160,20 @@ Ledger de itens explicitamente adiados ("não corrigido agora, fora de escopo") 
 - **Telefone é sempre `PhoneNumber`** (`packages/contracts/phone-number.ts`), nunca string bruta — normaliza qualquer formato BR pra E.164, valida DDD real + nono dígito. `MessagingProvider.send()` só aceita esse tipo; guard converte antes de qualquer service ver o telefone.
 - **Guardrail de custo do SMS (Zenvia):** rate limit por telefone/IP protege contra brute force, mas não contra custo — cada SMS é ~R$ 0,15. `ZenviaSmsProvider` tem teto diário (`MOLHO_MAX_SMS_PER_DAY`, 500 dev / 5000 prod) contado no Redis (`INCR` atômico). Estourou o teto: loga CRITICAL e **nega o login** com mensagem clara — **nunca cai pro `MockMessagingProvider`** em produção (mostrar código falso que ninguém recebe é pior UX que negar e escalar pro suporte).
 
+## Complexidade deliberada — não simplificar
+
+- **RLS no Postgres além do filtro de aplicação** — não confia no ORM: um `WHERE` esquecido em query nova não vaza dado de outro tenant, o banco nega por padrão.
+- **FKs compostas `(id, tenant_id)`** — guardrail do `tenant_id` denormalizado: impede fisicamente uma linha filha apontar pra um pai de OUTRO tenant, mesmo com bug de aplicação.
+- **Colunas de snapshot em `orders`** (endereço, nome/preço de item) em vez de JOIN vivo — o pedido não muda de valor se o produto ou endereço salvo forem editados depois; é o que o cliente pagou, congelado no tempo.
+- **`order_status_history` separada do `audit_log` genérico** — consulta "linha do tempo deste pedido" indexada por `order_id`, sem vasculhar JSON de compliance da plataforma inteira.
+- **`version` pra optimistic locking** — duas edições concorrentes na mesma linha não se sobrescrevem silenciosamente; a perdedora recebe 409, não dado corrompido.
+- **Portão de contraste real no Chromium via Playwright** — mede contraste renderizado de verdade, não confia em cálculo estático que pode divergir do que o navegador realmente pinta.
+- **`SELECT ... FOR UPDATE` nas linhas de produto na criação do pedido** — fecha a janela de corrida em preço/disponibilidade sob READ COMMITTED que anularia a tela de confirmação obrigatória (regra 14).
+- **Índices únicos parciais `WHERE deleted_at IS NULL`** — soft delete nunca trava um valor (slug, telefone) pra sempre; sem o parcial, o registro apagado impediria recriar o mesmo valor.
+- **Erros distinguíveis por natureza** (`RateLimited` vs `QuotaExceeded`, `CatalogNotFoundError` vs `CatalogConflictError`, etc.) — cada um vira uma resposta HTTP e uma decisão de UI diferente; colapsar em `Error` genérico obrigaria checar `.message` por substring, frágil e silenciosamente quebradiço.
+
+Um agente ou revisor operando sob YAGNI vai sinalizar estes itens como excesso. Eles são decisões conscientes de segurança e integridade — qualquer proposta de removê-los exige aprovação explícita do PM.
+
 ---
 
 Sempre que uma decisão de arquitetura tiver mais de um caminho razoável, explique-a em uma frase antes de codar, e escolha o mais simples que atende às regras acima.
