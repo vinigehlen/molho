@@ -27,8 +27,9 @@ type Step = 'phone' | 'code';
  *
  * Sem `@molho/contracts` (mesmo padrão de MoAddressSheet) — quem chama
  * decide como formatar/normalizar o telefone antes de mandar pro backend;
- * aqui só valida "tem dígitos suficientes pra ser um telefone BR" (10 ou 11
- * dígitos, DDD + número), a mesma checagem grosseira que já libera o botão.
+ * aqui só valida "tem 11 dígitos" (DDD + nono dígito + número, sempre
+ * celular — OTP é por SMS, fixo nunca recebe), a mesma checagem grosseira
+ * que já libera o botão.
  */
 export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, onVerified, className }: MoOtpSheetProps) {
   const [step, setStep] = React.useState<Step>('phone');
@@ -49,7 +50,11 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
   if (!open) return null;
 
   const digitos = phone.replace(/\D/g, '');
-  const telefoneValido = digitos.length === 10 || digitos.length === 11;
+  // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — OTP é por SMS,
+  // fixo (10 dígitos) nunca recebe. Mesma exigência de parsePhoneNumber
+  // (@molho/contracts), que rejeitaria um fixo de qualquer forma; validar
+  // aqui evita o round-trip só pra descobrir isso.
+  const telefoneValido = digitos.length === 11;
   const codigoValido = code.replace(/\D/g, '').length === 6;
 
   async function enviarTelefone() {
