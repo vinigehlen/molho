@@ -554,13 +554,13 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) — ✅ **entregue** | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
 | 8 | Pagamento PIX com **MockPaymentProvider** | 1 | QR, webhook simulado, idempotência, reconciliação |
 | 9 | Gestor de pedidos realtime + **push/som** + fila offline | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
-| 10 | **Impressão ESC/POS** + agente local + wizard de impressora | 1 | Cupom de teste sai no papel no onboarding |
 | 11 | **WhatsApp de status via click-to-chat** + `notification_log` | 1 | Um toque envia o status pelo número do próprio lojista |
 | 12 | Página de acompanhamento do pedido (timeline) | 1 | Cliente vê status em tempo real |
 | 13 | **Onboarding self-service + wizard de 7 passos** | 1 | Signup OTP → loja publicada em <30min, sem humano do Molho |
 | 13b | **Tema: 4 templates** (Roxo, Brasa, Folha, Grafite) + logo/capa | 1 | Lojista escolhe 1 dos 4; toda loja fica bonita e AA |
 | 13d | **Assinatura e billing** (trial, planos, dunning, suspensão) | 1 | Cobrança recorrente + cancelamento em 2 cliques |
 | 14 | Super-admin: provisionamento, módulos, entitlements, impersonation | 1 | Painel interno completo |
+| 10 | **Impressão ESC/POS** + agente local + wizard de impressora | 1 | Cupom de teste sai no papel no onboarding |
 | — | **🚀 GO-LIVE do piloto** | — | Sexta-feira inteira em produção |
 | 15 | Cupons + promoções + combos | 2 | — |
 | 16 | Fidelidade + avaliações | 2 | — |
@@ -581,6 +581,8 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 > **Backlog de UX:** melhorias de UI/UX do storefront identificadas comparando com o iFood (referência de mercado do ICP) — densidade de card, header rico, carrinho no header, sheet horizontal em desktop, modificadores em mais produtos. Não são deste épico nem do próximo; registradas em `docs/06-backlog-ux.md` pra não se perder, priorização futura.
 
 > **Seed do Épico 9:** o pedido de teste criado manualmente durante a validação do Épico 7 (checkout) fica no banco de propósito — apagar exigiria rodar como `app_migrator` pra furar as policies append-only de `order_items`/`order_status_history`, faxina de dev que não vale o custo. Quando o Épico 9 (gestor de pedidos) começar, o seed (`packages/db/prisma/seed/`) ganha pedidos de exemplo em estados variados (`received`, `preparing`, `ready`, `in_transit`, `completed`, `canceled`) pra que a tela do gestor tenha o que renderizar sem depender de alguém fechar pedido na mão toda vez.
+
+> **Épico 10 (impressão ESC/POS) reposicionado pro fim da Fase 1**, depois do 13d e do 14, imediatamente antes do go-live — decisão consciente, não esquecimento (o número "10" fica como identidade do épico, não como posição de execução; mesmo precedente de 13b/13d). **Consequência aceita: o piloto vai ao ar sem comanda impressa, operando 100% por tela** (gestor de pedidos do Épico 9 mostra o pedido, cozinha lê na tela em vez do papel). Se a impressão virar bloqueio de verdade numa conversa com o restaurante piloto — cozinha que só opera com papel, por hábito ou por volume — o épico é antecipado na hora; até lá, o esforço (agente local, wizard de impressora, protocolo ESC/POS) fica atrás de módulos que destravam mais lojas ao mesmo tempo (billing, super-admin).
 
 ---
 

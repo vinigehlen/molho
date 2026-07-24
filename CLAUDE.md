@@ -103,6 +103,7 @@ No dev, cada tenant é servido em rota: `molho.vercel.app/{slug}`. Em produção
 
 ## Convenções de trabalho
 
+- **Ponytail (se o plugin estiver instalado) fica em `lite`, nunca `full`/`ultra`.** O CLAUDE.md já é rigoroso o bastante sobre o que não simplificar (ver "Complexidade deliberada" acima) — `full`/`ultra` injetam texto extra por turno sem ganho marginal que compense aqui. O nível não persiste entre sessões (é estado de conversa, não config de arquivo, default do plugin é `full`) — rodar `/ponytail lite` no começo de cada sessão nova, se o plugin estiver ativo.
 - **Um épico por sessão.** Termine com `pnpm lint && pnpm test && pnpm build` verdes.
 - **Testes junto com a feature**, não depois. Cobertura mínima em módulos de negócio (pedido, pagamento, permissão).
 - **Contratos primeiro:** schema Prisma e schemas zod em `packages/contracts` antes da UI.
@@ -129,13 +130,13 @@ Ver tabela completa em `docs/01-plano-produto.md` §8. Sequência do MVP:
 7. Checkout + pedidos + máquina de estados
 8. Pagamento PIX estático + reconciliação manual
 9. Gestor de pedidos realtime + push/som + fila offline
-10. Impressão ESC/POS + agente local + wizard
 11. WhatsApp click-to-chat + `notification_log`
 12. Página de acompanhamento
 13. Onboarding self-service (wizard 7 passos)
 13b. 4 templates de tema + logo/capa
 13d. Assinatura, trial, dunning
 14. Super-admin (provisionamento, módulos, entitlements, impersonation)
+10. Impressão ESC/POS + agente local + wizard — **reposicionado pro fim da Fase 1** (depois do 13d/14, antes do go-live); piloto vai ao ar sem comanda impressa, operando por tela (docs/01 §8 tem o racional e a condição de antecipação)
 — **GO-LIVE do piloto** —
 15+. Fases 2–4 (ver plano)
 
