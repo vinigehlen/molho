@@ -26,6 +26,8 @@ export interface UseCartResult {
   addItem: (item: CartItem) => void;
   removeItem: (lineId: string) => void;
   updateQuantity: (lineId: string, quantity: number) => void;
+  /** Esvazia o carrinho — chamado depois que um pedido é criado com sucesso (Épico 7), pra não sobrar o mesmo carrinho pro cliente reenviar sem querer. */
+  clearCart: () => void;
 }
 
 export function useCart(slug: string): UseCartResult {
@@ -94,6 +96,10 @@ export function useCart(slug: string): UseCartResult {
     [cart, persistirEPropagar, removeItem],
   );
 
+  const clearCart = React.useCallback(() => {
+    persistirEPropagar(emptyCart(slug));
+  }, [slug, persistirEPropagar]);
+
   return {
     cart,
     itemCount: cartItemCount(cart),
@@ -101,5 +107,6 @@ export function useCart(slug: string): UseCartResult {
     addItem,
     removeItem,
     updateQuantity,
+    clearCart,
   };
 }

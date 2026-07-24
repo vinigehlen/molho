@@ -95,6 +95,17 @@ describe('useCart', () => {
     expect(abaB.result.current.cart.items[0]?.lineId).toBe('linha-da-aba-a');
   });
 
+  it('clearCart esvazia o carrinho e persiste (Épico 7: depois de criar o pedido)', () => {
+    const { result } = renderHook(() => useCart(SLUG));
+
+    act(() => result.current.addItem(item()));
+    act(() => result.current.clearCart());
+
+    expect(result.current.cart.items).toEqual([]);
+    const salvo = JSON.parse(localStorage.getItem(cartStorageKey(SLUG)) ?? '{}');
+    expect(salvo.items).toEqual([]);
+  });
+
   it('carrinho de OUTRA loja nunca aparece: canais e chaves são por slug', async () => {
     const lojaA = renderHook(() => useCart('hamburgueria-da-vila'));
     const lojaB = renderHook(() => useCart('pizzaria-roma'));
