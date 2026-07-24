@@ -551,7 +551,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 4 | CRUD de cardápio + upload S3 + **importação por planilha** — ✅ **entregue** | 1 | Lojista sobe 80 produtos de um CSV |
 | 5 | Storefront: menu, carrinho, bottom sheets — ✅ **entregue** | 1 | Navegação mobile completa |
 | 6 | Endereços + zonas de entrega (polígonos) + horários — ✅ **entregue** | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
-| 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
+| 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) — ✅ **entregue** | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
 | 8 | Pagamento PIX com **MockPaymentProvider** | 1 | QR, webhook simulado, idempotência, reconciliação |
 | 9 | Gestor de pedidos realtime + **push/som** + fila offline | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
 | 10 | **Impressão ESC/POS** + agente local + wizard de impressora | 1 | Cupom de teste sai no papel no onboarding |
@@ -579,6 +579,8 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 > **Nota:** os épicos 24–26 (PSP real) são os últimos, conforme decidido — mas **abra as contas sandbox e o KYC agora**: o gargalo é burocrático (2–6 semanas), não técnico.
 
 > **Backlog de UX:** melhorias de UI/UX do storefront identificadas comparando com o iFood (referência de mercado do ICP) — densidade de card, header rico, carrinho no header, sheet horizontal em desktop, modificadores em mais produtos. Não são deste épico nem do próximo; registradas em `docs/06-backlog-ux.md` pra não se perder, priorização futura.
+
+> **Seed do Épico 9:** o pedido de teste criado manualmente durante a validação do Épico 7 (checkout) fica no banco de propósito — apagar exigiria rodar como `app_migrator` pra furar as policies append-only de `order_items`/`order_status_history`, faxina de dev que não vale o custo. Quando o Épico 9 (gestor de pedidos) começar, o seed (`packages/db/prisma/seed/`) ganha pedidos de exemplo em estados variados (`received`, `preparing`, `ready`, `in_transit`, `completed`, `canceled`) pra que a tela do gestor tenha o que renderizar sem depender de alguém fechar pedido na mão toda vez.
 
 ---
 
