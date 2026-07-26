@@ -75,6 +75,15 @@ export const checkoutAddressInputSchema = z.object({
 export const paymentMethodSchema = z.enum(['pix', 'cash_on_delivery', 'card_on_delivery']);
 
 /**
+ * Ciclo de vida do pagamento (docs/02 §5.5): só 2 estados, método-agnóstico.
+ * `aguardando_confirmacao` → `confirmado`, sem terceiro estado (cancelamento
+ * vive no eixo OrderStatus + refundStatus). Espelha o enum PaymentStatus do
+ * Prisma — canônico aqui pra o gestor de pedidos (Épico 9) e o gate de
+ * pagamento consumirem sem depender do tipo gerado pelo ORM.
+ */
+export const paymentStatusSchema = z.enum(['aguardando_confirmacao', 'confirmado']);
+
+/**
  * Fonte única do mapeamento método → módulo de entitlement — usado tanto
  * pelo gate de criação de pedido (checkout, service dinâmico) quanto pelo
  * cálculo de `availablePaymentMethods` (storefront público). Duplicar isso
@@ -190,6 +199,7 @@ export const checkoutOrderResponseSchema = z.discriminatedUnion('paymentMethod',
 export type CheckoutItemInput = z.infer<typeof checkoutItemInputSchema>;
 export type CheckoutAddressInput = z.infer<typeof checkoutAddressInputSchema>;
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 export type RevalidatedItem = z.infer<typeof revalidatedItemSchema>;
 export type RevalidatedCheckout = z.infer<typeof revalidatedCheckoutSchema>;

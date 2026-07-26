@@ -1,3 +1,4 @@
+import type { PaymentMethod, PaymentStatus } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import type { OrderStatus } from './order-status-machine';
 
@@ -6,6 +7,9 @@ export interface OrderStatusRecord {
   tenantId: string;
   status: OrderStatus;
   version: number;
+  /** §5.5: o gate de pagamento em transition() lê os dois — findForTransition seleciona junto. */
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
 }
 
 export interface RecordHistoryParams {
@@ -54,7 +58,7 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
   async findForTransition(orderId: string): Promise<OrderStatusRecord | null> {
     return this.requestContext.getClient().order.findFirst({
       where: { id: orderId, deletedAt: null },
-      select: { id: true, tenantId: true, status: true, version: true },
+      select: { id: true, tenantId: true, status: true, version: true, paymentMethod: true, paymentStatus: true },
     });
   }
 

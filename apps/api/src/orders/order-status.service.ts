@@ -1,5 +1,5 @@
-import { MissingCancelReasonError, OrderConflictError, OrderNotFoundError, IllegalOrderTransitionError } from './order-errors';
-import { isLegalOrderTransition, orderTransitionRequiresReason, type OrderStatus } from './order-status-machine';
+import { MissingCancelReasonError, OrderConflictError, OrderNotFoundError, IllegalOrderTransitionError, PaymentNotConfirmedError } from './order-errors';
+import { isLegalOrderTransition, orderTransitionRequiresReason, transitionRequiresConfirmedPayment, type OrderStatus } from './order-status-machine';
 import type { OrderStatusRepository } from './order-status.repository';
 
 /**
@@ -50,6 +50,15 @@ export class OrderStatusService {
     const fromStatus = order.status;
     if (!isLegalOrderTransition(fromStatus, input.toStatus)) {
       throw new IllegalOrderTransitionError(fromStatus, input.toStatus);
+    }
+
+    // Gate de pagamento (docs/02 §5.5) — a transição já é legal, mas pré-pago
+    // (pix) não entra em `preparing` e pós-pago não chega em `completed` sem
+    // `paymentStatus = 'confirmado'`. Depois da checagem estrutural: um
+    // `received → completed` (ilegal) tem que morrer como transição ilegal,
+    // não como pagamento não confirmado.
+    if (transitionRequiresConfirmedPayment(input.toStatus, order.paymentMethod) && order.paymentStatus !== 'confirmado') {
+      throw new PaymentNotConfirmedError();
     }
 
     const applied = await this.repo.applyStatusChange(input.orderId, input.expectedVersion, input.toStatus, input.reason);

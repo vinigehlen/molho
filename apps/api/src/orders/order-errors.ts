@@ -72,6 +72,22 @@ export class PaymentMethodNotAvailableError extends Error {
   }
 }
 
+/**
+ * Gate de pagamento da máquina de estados (docs/02 §5.5): a transição exige
+ * `paymentStatus = 'confirmado'` e o pedido não está pago.
+ * - `received → preparing` com `pix`: cozinha não prepara PIX não confirmado.
+ * - `in_transit → completed` com `cash_on_delivery`/`card_on_delivery`: fecha
+ *   o "dado morto" — pós-pago não pode concluir sem alguém confirmar o
+ *   recebimento na entrega.
+ * Distinto de PaymentAlreadyConfirmedError (lá o problema é já estar pago).
+ */
+export class PaymentNotConfirmedError extends Error {
+  constructor() {
+    super('O pagamento deste pedido precisa ser confirmado antes desta etapa.');
+    this.name = 'PaymentNotConfirmedError';
+  }
+}
+
 /** `changeForCents` (troco pedido) menor que o total do pedido — pedir troco pra menos do que se deve não faz sentido (docs/02 §5.5). */
 export class InvalidChangeAmountError extends Error {
   constructor() {

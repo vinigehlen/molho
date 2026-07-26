@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IllegalOrderTransitionError, MissingCancelReasonError, OrderConflictError, OrderNotFoundError } from './order-errors';
+import { IllegalOrderTransitionError, MissingCancelReasonError, OrderConflictError, OrderNotFoundError, PaymentNotConfirmedError } from './order-errors';
 import type { OrderStatus } from './order-status-machine';
 import type {
   OrderStatusRecord,
@@ -16,8 +16,11 @@ class FakeOrderStatusRepository implements OrderStatusRepository {
   /** Simula uma escrita concorrente entre findForTransition() e applyStatusChange() no mesmo teste. */
   mutateBeforeApply: ((row: OrderStatusRecord) => void) | null = null;
 
-  seed(row: OrderStatusRecord) {
-    this.rows.set(row.id, row);
+  /** Default = PIX já pago: passa o gate de preparo (§5.5), então os testes de
+   *  máquina de estados não precisam se preocupar com pagamento. Testes de gate
+   *  passam paymentMethod/paymentStatus explícitos. */
+  seed(row: Pick<OrderStatusRecord, 'id' | 'status' | 'version'> & Partial<OrderStatusRecord>) {
+    this.rows.set(row.id, { tenantId: 'tenant-1', paymentMethod: 'pix', paymentStatus: 'confirmado', ...row });
   }
 
   async findForTransition(orderId: string) {
@@ -139,6 +142,61 @@ describe('OrderStatusService.transition', () => {
 
     expect(repo.rows.get('order-1')!.status).toBe('canceled');
     expect(repo.history[0]!.reason).toBe('Item em falta');
+  });
+});
+
+describe('OrderStatusService.transition — gate de pagamento (§5.5)', () => {
+  it('10) pix não confirmado bloqueia received → preparing (PaymentNotConfirmedError), não grava nada', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0, paymentMethod: 'pix', paymentStatus: 'aguardando_confirmacao' });
+
+    await expect(
+      service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null }),
+    ).rejects.toThrow(PaymentNotConfirmedError);
+    expect(repo.history).toHaveLength(0);
+    expect(repo.rows.get('order-1')!.status).toBe('received');
+  });
+
+  it('11) pix confirmado libera received → preparing', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0, paymentMethod: 'pix', paymentStatus: 'confirmado' });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null });
+    expect(repo.rows.get('order-1')!.status).toBe('preparing');
+  });
+
+  it('12) pós-pago (cash) NÃO bloqueia preparing mesmo sem confirmar — pagam na entrega', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0, paymentMethod: 'cash_on_delivery', paymentStatus: 'aguardando_confirmacao' });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null });
+    expect(repo.rows.get('order-1')!.status).toBe('preparing');
+  });
+
+  it('13) pós-pago (card) não confirmado bloqueia in_transit → completed (fecha o dado morto)', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'in_transit', version: 0, paymentMethod: 'card_on_delivery', paymentStatus: 'aguardando_confirmacao' });
+
+    await expect(
+      service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'completed', actor: STAFF, reason: null }),
+    ).rejects.toThrow(PaymentNotConfirmedError);
+    expect(repo.rows.get('order-1')!.status).toBe('in_transit');
+  });
+
+  it('14) pós-pago (cash) confirmado libera in_transit → completed', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'in_transit', version: 0, paymentMethod: 'cash_on_delivery', paymentStatus: 'confirmado' });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'completed', actor: STAFF, reason: null });
+    expect(repo.rows.get('order-1')!.status).toBe('completed');
+  });
+
+  it('15) pix NÃO é gateado em completed (já foi barrado antes, em preparing) — libera mesmo aguardando', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'in_transit', version: 0, paymentMethod: 'pix', paymentStatus: 'aguardando_confirmacao' });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'completed', actor: STAFF, reason: null });
+    expect(repo.rows.get('order-1')!.status).toBe('completed');
   });
 });
 
