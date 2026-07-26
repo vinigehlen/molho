@@ -17,6 +17,13 @@ export interface TokenPayload {
   tokenVersion: number;
   deviceId: string;
   jti: string;
+  /**
+   * Expiry (segundos epoch), preenchido pelo `jwt` via `expiresIn` na
+   * assinatura e devolvido pelo `verifyAccessToken`. Ausente no objeto que se
+   * ASSINA (signAccessToken usa Omit) — presente sempre DEPOIS de verificar.
+   * O stream SSE (Épico 9) lê isto pra fechar a conexão no expiry do token.
+   */
+  exp: number;
 }
 
 export interface DeviceInfo {
