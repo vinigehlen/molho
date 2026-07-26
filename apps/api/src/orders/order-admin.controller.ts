@@ -1,0 +1,74 @@
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  Patch,
+  Req,
+  UseFilters,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { JwtAuthGuard, type RequestWithUser } from '../auth/guards/jwt-auth.guard';
+import { RequireModule } from '../auth/guards/require-module.decorator';
+import { RequireModuleGuard } from '../auth/guards/require-module.guard';
+import { RequirePermission } from '../auth/guards/require-permission.decorator';
+import { RequirePermissionGuard } from '../auth/guards/require-permission.guard';
+import { requireTenantIdHeader } from '../auth/guards/tenant-header.util';
+import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
+import { TransitionOrderDto } from './dto/transition-order.dto';
+import { OrderExceptionFilter } from './order-exception.filter';
+import type { OrderStatusService } from './order-status.service';
+import { ORDER_EVENT_BUS, ORDER_STATUS_SERVICE } from './orders.tokens';
+import type { OrderEventBus } from './realtime/order-event-bus';
+
+/**
+ * Ações de staff sobre um pedido já existente — a transição de status do gestor
+ * (Épico 9). Gate no módulo `orders` (core) + permissão `order.update_status`,
+ * separado do OrderPaymentController (gate `payments.pix_static`) porque são
+ * módulos diferentes; convivem no mesmo path base (rotas distintas).
+ */
+@Controller('v1/admin/orders')
+@UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
+@UseInterceptors(TenantContextInterceptor)
+@UseFilters(OrderExceptionFilter)
+@RequireModule('orders')
+export class OrderAdminController {
+  constructor(
+    @Inject(ORDER_STATUS_SERVICE) private readonly orderStatus: OrderStatusService,
+    @Inject(ORDER_EVENT_BUS) private readonly bus: OrderEventBus,
+  ) {}
+
+  @Patch(':id/status')
+  @RequirePermission('order.update_status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async transition(@Param('id') id: string, @Body() dto: TransitionOrderDto, @Req() req: RequestWithUser): Promise<void> {
+    const tenantId = requireTenantIdHeader(req);
+    const role = resolveActorRole(req, tenantId);
+    await this.orderStatus.transition({
+      orderId: id,
+      expectedVersion: dto.version,
+      toStatus: dto.toStatus,
+      actor: { type: 'staff', userId: req.user.sub, role },
+      reason: dto.reason ?? null,
+    });
+
+    // Publish DEPOIS de transitar (lock otimista aplicou: version foi de
+    // dto.version pra dto.version+1). ponytail: cutuque best-effort — o banco
+    // é a fonte da verdade e o cliente refaz o GET REST; a janela até o commit
+    // é negativa na prática (publish→deliver→GET são vários hops). Falha de
+    // publish não desfaz a transição (o pedido JÁ mudou) — no MVP, aceitável;
+    // o próximo evento ou o refetch periódico do cliente corrige.
+    await this.bus.publish(tenantId, { orderId: id, event: 'status_changed', version: dto.version + 1 });
+  }
+}
+
+/** Mesmo critério do OrderPaymentController: escolhe QUAL papel vira actor_role no audit_log (o guard já garantiu cobertura). */
+function resolveActorRole(req: RequestWithUser, tenantId: string): string {
+  const scope = req.user.scopes.find((s) => s.scopeType === 'platform' || (s.scopeType === 'tenant' && s.scopeId === tenantId));
+  if (!scope) throw new ForbiddenException('Sem papel atribuído para este tenant.');
+  return scope.role;
+}

@@ -13,13 +13,20 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
+import { OrderAdminController } from './order-admin.controller';
 import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
 import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from './realtime/order-event-bus';
 import { OrderStreamController } from './realtime/order-stream.controller';
 import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
-import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, ORDER_EVENT_BUS, PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
+import {
+  CHECKOUT_ORDER_SERVICE,
+  CHECKOUT_REVALIDATION_SERVICE,
+  ORDER_EVENT_BUS,
+  ORDER_STATUS_SERVICE,
+  PAYMENT_CONFIRMATION_SERVICE,
+} from './orders.tokens';
 import { PrismaPaymentConfirmationRepository } from './payment-confirmation.repository';
 import { PaymentConfirmationService } from './payment-confirmation.service';
 import { PrismaPaymentMethodModuleGate } from './payment-method-module-gate';
@@ -38,9 +45,15 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule],
-  controllers: [CheckoutController, OrderPaymentController, OrderStreamController],
+  controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController],
   providers: [
     StreamCookieAuthGuard,
+    {
+      provide: ORDER_STATUS_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): OrderStatusService =>
+        new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+    },
     {
       // Singleton do processo: segura os subscribers SSE entre requests. Redis
       // pub/sub em produção (duas conexões — sub em modo subscriber não aceita
