@@ -56,6 +56,17 @@ export class RequestContextService {
     return this.requireStore().client;
   }
 
+  /**
+   * True se há uma transação de request ativa (dentro de um `run()`). Usado pra
+   * ASSERTAR que código que NÃO pode rodar dentro da transação (ex.: publish de
+   * evento no OrderPublishInterceptor, que precisa ser pós-commit) de fato está
+   * fora dela — transforma erro de ordem de interceptor em falha barulhenta na
+   * hora, não corrida silenciosa.
+   */
+  hasActiveContext(): boolean {
+    return this.als.getStore() !== undefined;
+  }
+
   getTenantId(): string {
     return this.requireStore().tenantId;
   }
