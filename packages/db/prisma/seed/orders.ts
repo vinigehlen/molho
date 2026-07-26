@@ -108,7 +108,8 @@ async function findOrCreateCustomer(prisma: PrismaClient, tenantId: string, name
   if (existing) return existing.id;
   const { ciphertext, keyVersion } = encryptPhone(phone);
   const created = await prisma.customer.create({
-    data: { tenantId, name, phoneCiphertext: ciphertext, phoneLookupHash, phoneKeyVersion: keyVersion },
+    // Prisma (Bytes) quer Uint8Array<ArrayBuffer>; Buffer é ArrayBufferLike — envolve (mesmo do owner em index.ts).
+    data: { tenantId, name, phoneCiphertext: new Uint8Array(ciphertext), phoneLookupHash, phoneKeyVersion: keyVersion },
     select: { id: true },
   });
   return created.id;
