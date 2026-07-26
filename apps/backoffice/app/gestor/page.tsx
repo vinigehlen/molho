@@ -7,6 +7,7 @@ import { getStaffSession } from '../../lib/staff-session';
 import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
+import { useWakeLock } from '../../lib/use-wake-lock';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
 
@@ -68,6 +69,9 @@ export default function GestorPage() {
     },
     onExpired: () => router.replace('/dev-login'),
   });
+
+  // Mantém a tela do tablet acesa enquanto logado (re-pede ao voltar o foco).
+  useWakeLock(tenantId !== null);
 
   if (error) {
     return (
