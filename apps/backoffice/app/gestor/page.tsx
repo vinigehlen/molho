@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
-import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, groupByColumn } from '../../lib/orders-api';
+import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
+import { applyOrderUpdate } from '../../lib/order-updates';
+import { useOrdersStream } from '../../lib/use-orders-stream';
 import { centsToBRL, isoToTime } from '../../lib/format';
 
 /**
@@ -14,18 +16,30 @@ import { centsToBRL, isoToTime } from '../../lib/format';
  */
 export default function GestorPage() {
   const router = useRouter();
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getStaffSession()) {
+    const session = getStaffSession();
+    if (!session) {
       router.replace('/dev-login');
       return;
     }
+    setTenantId(session.tenantId);
     fetchActiveOrders()
       .then(setOrders)
       .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar.'));
   }, [router]);
+
+  const streamStatus = useOrdersStream(tenantId, {
+    // Cutuque magro → refaz o GET REST (passa pela RLS) → upsert/remove no board.
+    onNudge: async ({ orderId }) => {
+      const fetched = await fetchOrder(orderId).catch(() => null);
+      setOrders((prev) => (prev ? applyOrderUpdate(prev, orderId, fetched) : prev));
+    },
+    onExpired: () => router.replace('/dev-login'),
+  });
 
   if (error) {
     return (
@@ -39,7 +53,14 @@ export default function GestorPage() {
 
   return (
     <main className="min-h-screen bg-bg p-4">
-      <h1 className="mb-4 text-xl font-semibold text-text">Pedidos</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-text">Pedidos</h1>
+        {streamStatus !== 'open' && (
+          <span className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white">
+            Sem conexão — tentando reconectar…
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {BOARD_COLUMNS.map((col) => (
           <section key={col} className="rounded-[20px] bg-surface p-3">
