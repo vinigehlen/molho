@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import Redis from 'ioredis';
 import type { ModuleCache } from '@molho/db';
 import { AuthModule } from '../auth/auth.module';
 import { TokenModule } from '../auth/token/token.module';
@@ -15,7 +16,10 @@ import { CheckoutRevalidationService } from './checkout-revalidation.service';
 import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
-import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
+import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from './realtime/order-event-bus';
+import { OrderStreamController } from './realtime/order-stream.controller';
+import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
+import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, ORDER_EVENT_BUS, PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
 import { PrismaPaymentConfirmationRepository } from './payment-confirmation.repository';
 import { PaymentConfirmationService } from './payment-confirmation.service';
 import { PrismaPaymentMethodModuleGate } from './payment-method-module-gate';
@@ -34,8 +38,19 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule],
-  controllers: [CheckoutController, OrderPaymentController],
+  controllers: [CheckoutController, OrderPaymentController, OrderStreamController],
   providers: [
+    StreamCookieAuthGuard,
+    {
+      // Singleton do processo: segura os subscribers SSE entre requests. Redis
+      // pub/sub em produção (duas conexões — sub em modo subscriber não aceita
+      // outros comandos); in-memory sem REDIS_URL (dev/test, uma instância).
+      provide: ORDER_EVENT_BUS,
+      useFactory: (): OrderEventBus =>
+        process.env.REDIS_URL
+          ? new RedisOrderEventBus(new Redis(process.env.REDIS_URL), new Redis(process.env.REDIS_URL))
+          : new InMemoryOrderEventBus(),
+    },
     {
       provide: PAYMENT_CONFIRMATION_SERVICE,
       inject: [RequestContextService],
