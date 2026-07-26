@@ -19,6 +19,7 @@ import {
   type PhotoCreditRecord,
   type PhotoUploadContext,
 } from './photos';
+import { seedOrders } from './orders';
 import { SEED_PLANS } from './plans';
 import { type SeedTenantDef, SEED_TENANTS } from './tenants';
 
@@ -426,6 +427,15 @@ async function main() {
 
       console.log(`  ${deliveryDef.tenantSlug}:`);
       await seedDelivery(prisma, tenant.id, store.id, deliveryDef);
+    }
+
+    console.log('\npedidos de exemplo (gestor):');
+    {
+      const tenant = await prisma.tenant.findFirst({ where: { slug: 'hamburgueria-da-vila', deletedAt: null } });
+      const store = tenant
+        ? await prisma.store.findFirst({ where: { tenantId: tenant.id, deletedAt: null }, orderBy: { createdAt: 'asc' } })
+        : null;
+      if (tenant && store) await seedOrders(prisma, tenant.id, store.id);
     }
   } finally {
     await prisma.$disconnect();
