@@ -121,8 +121,8 @@ Ver tabela completa em `docs/01-plano-produto.md` §8. Sequência do MVP:
 5. ✅ Storefront: menu, carrinho, bottom sheets
 6. ✅ Endereços + zonas de entrega + horários
 7. ✅ Checkout + pedidos + máquina de estados
-8. Pagamento PIX estático + reconciliação manual — **próximo**. Fecha com o cliente pagando e ficando no escuro: o lojista confirma o pagamento, mas nada avisa o cliente (WhatsApp de status é o 11, página de acompanhamento é o 12). Mesma família de decisão do Épico 10: dá pra construir fora de ordem, mas o piloto não vai ao ar sem o 11 ou o 12 fechado.
-9. Gestor de pedidos realtime + push/som + fila offline
+8. ✅ Pagamento PIX estático + método (dinheiro/cartão na entrega) + troco + reconciliação manual. Fecha com o cliente pagando e ficando no escuro: o lojista confirma o pagamento, mas nada avisa o cliente (WhatsApp de status é o 11, página de acompanhamento é o 12). Mesma família de decisão do Épico 10: dá pra construir fora de ordem, mas o piloto não vai ao ar sem o 11 ou o 12 fechado. Contrato de gate de preparo/conclusão por método e limitação de reconciliação documentados em docs/02 §5.5, pro Épico 9 consumir.
+9. Gestor de pedidos realtime + push/som + fila offline — **próximo**
 11. WhatsApp click-to-chat + `notification_log`
 12. Página de acompanhamento
 13. Onboarding self-service (wizard 7 passos)
