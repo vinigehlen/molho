@@ -26,8 +26,8 @@ import type { AdminOrderRepository } from './admin-order.repository';
 import { TransitionOrderDto } from './dto/transition-order.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import type { OrderStatusService } from './order-status.service';
-import { ADMIN_ORDER_REPOSITORY, ORDER_EVENT_BUS, ORDER_STATUS_SERVICE } from './orders.tokens';
-import type { OrderEventBus } from './realtime/order-event-bus';
+import { ADMIN_ORDER_REPOSITORY, ORDER_STATUS_SERVICE } from './orders.tokens';
+import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
  * Ações de staff sobre um pedido já existente — a transição de status do gestor
@@ -37,13 +37,15 @@ import type { OrderEventBus } from './realtime/order-event-bus';
  */
 @Controller('v1/admin/orders')
 @UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
-@UseInterceptors(TenantContextInterceptor)
+// OrderPublishInterceptor ANTES do TenantContextInterceptor de propósito: como
+// interceptor OUTER, seu flush pós-handler roda depois do commit da transação
+// (ver order-publish.interceptor.ts).
+@UseInterceptors(OrderPublishInterceptor, TenantContextInterceptor)
 @UseFilters(OrderExceptionFilter)
 @RequireModule('orders')
 export class OrderAdminController {
   constructor(
     @Inject(ORDER_STATUS_SERVICE) private readonly orderStatus: OrderStatusService,
-    @Inject(ORDER_EVENT_BUS) private readonly bus: OrderEventBus,
     @Inject(ADMIN_ORDER_REPOSITORY) private readonly orders: AdminOrderRepository,
   ) {}
 
@@ -77,13 +79,9 @@ export class OrderAdminController {
       reason: dto.reason ?? null,
     });
 
-    // Publish DEPOIS de transitar (lock otimista aplicou: version foi de
-    // dto.version pra dto.version+1). ponytail: cutuque best-effort — o banco
-    // é a fonte da verdade e o cliente refaz o GET REST; a janela até o commit
-    // é negativa na prática (publish→deliver→GET são vários hops). Falha de
-    // publish não desfaz a transição (o pedido JÁ mudou) — no MVP, aceitável;
-    // o próximo evento ou o refetch periódico do cliente corrige.
-    await this.bus.publish(tenantId, { orderId: id, event: 'status_changed', version: dto.version + 1 });
+    // Enfileira o cutuque — o flush (publish) acontece DEPOIS do commit, no
+    // OrderPublishInterceptor. version = dto.version+1 (lock otimista aplicou).
+    queueOrderPublish(req, tenantId, { orderId: id, event: 'status_changed', version: dto.version + 1 });
   }
 }
 

@@ -19,6 +19,7 @@ import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
 import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from './realtime/order-event-bus';
+import { OrderPublishInterceptor } from './realtime/order-publish.interceptor';
 import { OrderStreamController } from './realtime/order-stream.controller';
 import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
 import {
@@ -50,6 +51,7 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
   controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController],
   providers: [
     StreamCookieAuthGuard,
+    OrderPublishInterceptor,
     {
       provide: ORDER_STATUS_SERVICE,
       inject: [RequestContextService],
