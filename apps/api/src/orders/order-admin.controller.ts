@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   Patch,
   Req,
@@ -12,6 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { AdminOrder } from '@molho/contracts';
 import { JwtAuthGuard, type RequestWithUser } from '../auth/guards/jwt-auth.guard';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
@@ -19,10 +22,11 @@ import { RequirePermission } from '../auth/guards/require-permission.decorator';
 import { RequirePermissionGuard } from '../auth/guards/require-permission.guard';
 import { requireTenantIdHeader } from '../auth/guards/tenant-header.util';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
+import type { AdminOrderRepository } from './admin-order.repository';
 import { TransitionOrderDto } from './dto/transition-order.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import type { OrderStatusService } from './order-status.service';
-import { ORDER_EVENT_BUS, ORDER_STATUS_SERVICE } from './orders.tokens';
+import { ADMIN_ORDER_REPOSITORY, ORDER_EVENT_BUS, ORDER_STATUS_SERVICE } from './orders.tokens';
 import type { OrderEventBus } from './realtime/order-event-bus';
 
 /**
@@ -40,7 +44,24 @@ export class OrderAdminController {
   constructor(
     @Inject(ORDER_STATUS_SERVICE) private readonly orderStatus: OrderStatusService,
     @Inject(ORDER_EVENT_BUS) private readonly bus: OrderEventBus,
+    @Inject(ADMIN_ORDER_REPOSITORY) private readonly orders: AdminOrderRepository,
   ) {}
+
+  /** Board do gestor: pedidos ativos do tenant (load inicial + refetch na reconexão). */
+  @Get()
+  @RequirePermission('order.view')
+  listActive(): Promise<AdminOrder[]> {
+    return this.orders.listActive();
+  }
+
+  /** Um pedido — o refetch que o cliente faz ao receber um cutuque do stream (passa pela RLS). */
+  @Get(':id')
+  @RequirePermission('order.view')
+  async findOne(@Param('id') id: string): Promise<AdminOrder> {
+    const order = await this.orders.findById(id);
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    return order;
+  }
 
   @Patch(':id/status')
   @RequirePermission('order.update_status')

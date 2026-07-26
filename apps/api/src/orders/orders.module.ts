@@ -13,6 +13,7 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
+import { PrismaAdminOrderRepository } from './admin-order.repository';
 import { OrderAdminController } from './order-admin.controller';
 import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
@@ -21,6 +22,7 @@ import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from '.
 import { OrderStreamController } from './realtime/order-stream.controller';
 import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
 import {
+  ADMIN_ORDER_REPOSITORY,
   CHECKOUT_ORDER_SERVICE,
   CHECKOUT_REVALIDATION_SERVICE,
   ORDER_EVENT_BUS,
@@ -53,6 +55,11 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService): OrderStatusService =>
         new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+    },
+    {
+      provide: ADMIN_ORDER_REPOSITORY,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService) => new PrismaAdminOrderRepository(requestContext),
     },
     {
       // Singleton do processo: segura os subscribers SSE entre requests. Redis
