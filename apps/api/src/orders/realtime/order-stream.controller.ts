@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   type MessageEvent,
+  type OnApplicationShutdown,
   Post,
   Query,
   Req,
@@ -53,8 +54,24 @@ function actorFromRequest(req: RequestWithUser): Actor {
  * conexão. Escopo ausente/inválido = 403 ANTES de abrir o stream.
  */
 @Controller('v1/admin/orders/stream')
-export class OrderStreamController {
+export class OrderStreamController implements OnApplicationShutdown {
+  /** Fecha-limpo de cada stream aberto (controller é singleton — sobrevive entre requests). */
+  private readonly openStreams = new Set<() => void>();
+
   constructor(@Inject(ORDER_EVENT_BUS) private readonly bus: OrderEventBus) {}
+
+  /**
+   * SIGTERM (rolling deploy da Fly): a plataforma manda SIGTERM e ESPERA. Sem
+   * isto, os streams ficam pendurados até o timeout de TCP e os clientes
+   * demoram a migrar pra máquina que sobrou — a janela que as duas máquinas
+   * existiam pra eliminar. Fecha cada Observable ativo com um evento
+   * `server_shutdown` (o cliente reconecta na hora, na outra máquina) e
+   * completa. Depende de `enableShutdownHooks()` no main.ts.
+   */
+  onApplicationShutdown(): void {
+    for (const close of this.openStreams) close();
+    this.openStreams.clear();
+  }
 
   /**
    * Grava o cookie de stream = o próprio access token (mesmo token, validado
@@ -123,10 +140,18 @@ export class OrderStreamController {
         });
       });
 
+      // Fecha-limpo no SIGTERM (ver onApplicationShutdown).
+      const closeForShutdown = () => {
+        subscriber.next({ type: 'server_shutdown', data: '' });
+        subscriber.complete();
+      };
+      this.openStreams.add(closeForShutdown);
+
       return () => {
         clearInterval(ping);
         clearTimeout(expTimer);
         off();
+        this.openStreams.delete(closeForShutdown);
       };
     });
   }

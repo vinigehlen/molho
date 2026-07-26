@@ -28,6 +28,10 @@ async function bootstrap() {
   // origens da allowlist podem ler respostas credenciadas. Ver bootstrap/cors.
   configureCors(app);
 
+  // SIGTERM do rolling deploy (Fly) fecha os streams SSE limpo em vez de
+  // deixá-los pendurar até timeout de TCP — ver OrderStreamController.
+  app.enableShutdownHooks();
+
   const porta = process.env.PORT ? Number(process.env.PORT) : PORTA_PADRAO;
   await app.listen(porta);
 
