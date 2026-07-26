@@ -8,9 +8,10 @@ import { RequestContextService } from '../context/request-context.service';
 import { StorefrontRateLimitGuard } from '../storefront/storefront-rate-limit.guard';
 import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
-import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
+import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, ORDER_EVENT_BUS } from './orders.tokens';
 import type { CheckoutOrderService } from './checkout-order.service';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
+import type { OrderEventBus } from './realtime/order-event-bus';
 
 /**
  * Dois endpoints, MESMO body (`CheckoutRequestDto`) — ver o header de
@@ -25,6 +26,7 @@ export class CheckoutController {
     @Inject(CHECKOUT_REVALIDATION_SERVICE) private readonly revalidationService: CheckoutRevalidationService,
     @Inject(CHECKOUT_ORDER_SERVICE) private readonly orderService: CheckoutOrderService,
     @Inject(RequestContextService) private readonly requestContext: RequestContextService,
+    @Inject(ORDER_EVENT_BUS) private readonly bus: OrderEventBus,
   ) {}
 
   /**
@@ -62,6 +64,11 @@ export class CheckoutController {
       res.status(HttpStatus.CONFLICT);
       return result.revalidation;
     }
+
+    // Cutuque de "pedido novo" pro gestor (Épico 9). version 0 = pedido recém
+    // criado (Order.version default). ponytail: best-effort, mesmo racional do
+    // publish de status — o gestor refaz o GET REST (RLS) ao receber.
+    await this.bus.publish(tenantId, { orderId: result.response.orderId, event: 'new', version: 0 });
     return result.response;
   }
 }
