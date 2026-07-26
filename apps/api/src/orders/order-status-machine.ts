@@ -13,10 +13,11 @@ export type OrderStatus =
 /**
  * Máquina de estados do pedido — docs/02-definicoes-v1.md §5.1/§5.2.
  *
- * `pending_payment`/`expired`/`auto_canceled` ficam mortos até o Épico 8
- * (PIX online): nenhum código de produção HOJE produz essas transições,
- * mas já estão aqui pra não precisar de migration quando o Épico 8 plugar
- * os timers. `delivery_failed` é terminal no MVP (decisão do Épico 7 —
+ * `pending_payment`/`expired`/`auto_canceled` ficam mortos até o Épico 24
+ * (PIX online): nenhum código de produção HOJE produz essas transições
+ * (o Épico 8 é PIX ESTÁTICO — confirmação manual, sem timer nenhum), mas já
+ * estão aqui pra não precisar de migration quando o Épico 24 plugar os
+ * timers. `delivery_failed` é terminal no MVP (decisão do Épico 7 —
  * `returned`, destino físico da comida, é logística do restaurante, não
  * estado que o Molho rastreia).
  *

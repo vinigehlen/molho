@@ -16,6 +16,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
       minOrderCents: 2000,
       isOpenNow: true,
       nextOpensAt: null,
+      availablePaymentMethods: ['pix', 'cash_on_delivery', 'card_on_delivery'],
     },
     categories: [
       {
@@ -80,6 +81,19 @@ describe('storefrontPayloadSchema', () => {
     const p = payload();
     p.store.isOpenNow = false;
     p.store.nextOpensAt = '2026-07-22T12:00:00';
+    expect(storefrontPayloadSchema.safeParse(p).success).toBe(false);
+  });
+
+  it('availablePaymentMethods (Épico 8): array vazio é um estado válido — loja sem método pronto', () => {
+    const p = payload();
+    p.store.availablePaymentMethods = [];
+    expect(storefrontPayloadSchema.safeParse(p).success).toBe(true);
+  });
+
+  it('availablePaymentMethods: rejeita método desconhecido', () => {
+    const p = payload();
+    // @ts-expect-error — testando exatamente o valor que o schema tem que rejeitar
+    p.store.availablePaymentMethods = ['boleto'];
     expect(storefrontPayloadSchema.safeParse(p).success).toBe(false);
   });
 });

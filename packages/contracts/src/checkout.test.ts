@@ -34,18 +34,38 @@ describe('checkoutAddressInputSchema', () => {
   });
 });
 
+const ITEM = { productId: UUID, unitBasePriceCents: 2890, modifiers: [], quantity: 1, notes: null };
+
 describe('checkoutRequestSchema', () => {
   it('exige pelo menos 1 item — carrinho vazio não faz checkout', () => {
-    const semItens = { items: [], address: address() };
+    const semItens = { items: [], address: address(), paymentMethod: 'pix' };
     expect(checkoutRequestSchema.safeParse(semItens).success).toBe(false);
   });
 
-  it('aceita carrinho com item e endereço válidos', () => {
-    const valido = {
-      items: [{ productId: UUID, unitBasePriceCents: 2890, modifiers: [], quantity: 1, notes: null }],
-      address: address(),
-    };
+  it('aceita carrinho com item e endereço válidos, método pix (sem changeForCents)', () => {
+    const valido = { items: [ITEM], address: address(), paymentMethod: 'pix' };
     expect(checkoutRequestSchema.safeParse(valido).success).toBe(true);
+  });
+
+  it('aceita carrinho com item e endereço válidos, método card_on_delivery', () => {
+    const valido = { items: [ITEM], address: address(), paymentMethod: 'card_on_delivery' };
+    expect(checkoutRequestSchema.safeParse(valido).success).toBe(true);
+  });
+
+  it('cash_on_delivery exige changeForCents (mesmo que null) — não é campo solto opcional', () => {
+    const semCampo = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery' };
+    expect(checkoutRequestSchema.safeParse(semCampo).success).toBe(false);
+
+    const semTroco = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery', changeForCents: null };
+    expect(checkoutRequestSchema.safeParse(semTroco).success).toBe(true);
+
+    const comTroco = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery', changeForCents: 5000 };
+    expect(checkoutRequestSchema.safeParse(comTroco).success).toBe(true);
+  });
+
+  it('changeForCents em branch errado (pix/card_on_delivery) é rejeitado — campo não existe fora de cash_on_delivery', () => {
+    const pixComTroco = { items: [ITEM], address: address(), paymentMethod: 'pix', changeForCents: 5000 };
+    expect(checkoutRequestSchema.safeParse(pixComTroco).success).toBe(false);
   });
 });
 
@@ -102,14 +122,38 @@ describe('revalidatedCheckoutSchema', () => {
   });
 });
 
+const PIX_RESPONSE = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
+const RESPONSE_BASE = { orderId: UUID, status: 'received' as const, paymentStatus: 'aguardando_confirmacao' as const, totalCents: 3690 };
+
 describe('checkoutOrderResponseSchema', () => {
-  it('aceita a resposta de criação — pedido nasce direto em received/aguardando_confirmacao (PIX estático)', () => {
-    const resposta = { orderId: UUID, status: 'received', paymentStatus: 'aguardando_confirmacao', totalCents: 3690 };
+  it('pix: aceita com o campo pix (QR/copia-e-cola)', () => {
+    const resposta = { ...RESPONSE_BASE, paymentMethod: 'pix', pix: PIX_RESPONSE };
     expect(checkoutOrderResponseSchema.safeParse(resposta).success).toBe(true);
   });
 
+  it('pix: rejeita sem o campo pix — Épico 8, sempre precisa do QR pro cliente pagar', () => {
+    const semPix = { ...RESPONSE_BASE, paymentMethod: 'pix' };
+    expect(checkoutOrderResponseSchema.safeParse(semPix).success).toBe(false);
+  });
+
+  it('cash_on_delivery: aceita com changeForCents (número ou null), rejeita com pix', () => {
+    expect(checkoutOrderResponseSchema.safeParse({ ...RESPONSE_BASE, paymentMethod: 'cash_on_delivery', changeForCents: 5000 }).success).toBe(true);
+    expect(checkoutOrderResponseSchema.safeParse({ ...RESPONSE_BASE, paymentMethod: 'cash_on_delivery', changeForCents: null }).success).toBe(true);
+    expect(
+      checkoutOrderResponseSchema.safeParse({ ...RESPONSE_BASE, paymentMethod: 'cash_on_delivery', changeForCents: 5000, pix: PIX_RESPONSE })
+        .success,
+    ).toBe(false);
+  });
+
+  it('card_on_delivery: aceita só com os campos base, rejeita pix/changeForCents', () => {
+    expect(checkoutOrderResponseSchema.safeParse({ ...RESPONSE_BASE, paymentMethod: 'card_on_delivery' }).success).toBe(true);
+    expect(checkoutOrderResponseSchema.safeParse({ ...RESPONSE_BASE, paymentMethod: 'card_on_delivery', changeForCents: 100 }).success).toBe(
+      false,
+    );
+  });
+
   it('rejeita qualquer outro status na criação — só received é alcançável no MVP', () => {
-    const invalido = { orderId: UUID, status: 'pending_payment', paymentStatus: 'aguardando_confirmacao', totalCents: 3690 };
+    const invalido = { ...RESPONSE_BASE, status: 'pending_payment', paymentMethod: 'pix', pix: PIX_RESPONSE };
     expect(checkoutOrderResponseSchema.safeParse(invalido).success).toBe(false);
   });
 });

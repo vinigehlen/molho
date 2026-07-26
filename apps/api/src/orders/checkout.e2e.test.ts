@@ -71,7 +71,14 @@ async function loginCustomer(loginSlug: string = slug): Promise<{ customerId: st
   return { customerId: res.body.user.id, accessToken: res.body.accessToken };
 }
 
-function checkoutBody(overrides: { unitBasePriceCents?: number; expectedDeliveryFeeCents?: number } = {}) {
+function checkoutBody(
+  overrides: {
+    unitBasePriceCents?: number;
+    expectedDeliveryFeeCents?: number;
+    paymentMethod?: 'pix' | 'cash_on_delivery' | 'card_on_delivery';
+    changeForCents?: number | null;
+  } = {},
+) {
   return {
     items: [
       {
@@ -96,6 +103,8 @@ function checkoutBody(overrides: { unitBasePriceCents?: number; expectedDelivery
       lng: STORE_LNG,
       expectedDeliveryFeeCents: overrides.expectedDeliveryFeeCents ?? 800,
     },
+    paymentMethod: overrides.paymentMethod ?? 'pix',
+    ...(overrides.paymentMethod === 'cash_on_delivery' ? { changeForCents: overrides.changeForCents ?? null } : {}),
   };
 }
 
@@ -116,13 +125,26 @@ beforeAll(async () => {
     data: { slug, name: 'Checkout E2E', timezone: 'America/Sao_Paulo' },
   });
   tenantId = tenant.id;
-  await migratorPrisma.tenantEntitlement.create({
-    data: { tenantId, moduleKey: 'channel.storefront', source: 'plan', status: 'active' },
-  });
-  await migratorPrisma.tenantSetting.create({ data: { tenantId, moduleKey: 'channel.storefront', enabled: true } });
+  // channel.storefront (guard estático do controller) + payments.pix_static/
+  // payments.on_delivery (Épico 8, checagem DINÂMICA por paymentMethod dentro
+  // de CheckoutOrderService — sem estas duas, todo /checkout/orders vira 409
+  // PaymentMethodNotAvailableError, mesmo que o resto do pedido esteja certo).
+  for (const moduleKey of ['channel.storefront', 'payments.pix_static', 'payments.on_delivery']) {
+    await migratorPrisma.tenantEntitlement.create({ data: { tenantId, moduleKey, source: 'plan', status: 'active' } });
+    await migratorPrisma.tenantSetting.create({ data: { tenantId, moduleKey, enabled: true } });
+  }
 
   const store = await migratorPrisma.store.create({
-    data: { tenantId, name: 'Checkout E2E', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo', minOrderCents: 1000 },
+    data: {
+      tenantId,
+      name: 'Checkout E2E',
+      addressText: 'Rua X, 1',
+      timezone: 'America/Sao_Paulo',
+      minOrderCents: 1000,
+      pixKey: 'checkout-e2e@molho.test',
+      pixKeyType: 'email',
+      pixMerchantCity: 'Sao Paulo',
+    },
   });
   storeId = store.id;
   await migratorPrisma.$executeRaw`
@@ -253,7 +275,8 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
       .send(checkoutBody())
       .expect(201);
 
-    expect(res.body).toMatchObject({ status: 'received', paymentStatus: 'aguardando_confirmacao', totalCents: 7380 });
+    expect(res.body).toMatchObject({ status: 'received', paymentStatus: 'aguardando_confirmacao', paymentMethod: 'pix', totalCents: 7380 });
+    expect(res.body.pix.payload).toContain('BR.GOV.BCB.PIX');
 
     const order = await migratorPrisma.order.findUniqueOrThrow({ where: { id: res.body.orderId } });
     expect(order.customerId).toBe(customerId);
@@ -261,6 +284,8 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
     expect(order.deliveryFeeCents).toBe(800);
     expect(order.totalCents).toBe(7380);
     expect(order.status).toBe('received');
+    expect(order.paymentMethod).toBe('pix');
+    expect(order.changeForCents).toBeNull();
     expect(order.deliveryAddressId).toBeTruthy();
 
     const address = await migratorPrisma.address.findUniqueOrThrow({ where: { id: order.deliveryAddressId! } });
@@ -278,6 +303,37 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
     const history = await migratorPrisma.orderStatusHistory.findMany({ where: { orderId: order.id } });
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ fromStatus: null, toStatus: 'received', customerId, actorId: null });
+  }, 15_000);
+
+  it('4b) cash_on_delivery: cria pedido sem QR, devolve changeForCents, grava payment_method/change_for_cents no banco', async () => {
+    const { accessToken } = await loginCustomer();
+
+    const res = await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(checkoutBody({ paymentMethod: 'cash_on_delivery', changeForCents: 8000 }))
+      .expect(201);
+
+    expect(res.body).toMatchObject({ paymentMethod: 'cash_on_delivery', changeForCents: 8000, totalCents: 7380 });
+    expect(res.body.pix).toBeUndefined();
+
+    const order = await migratorPrisma.order.findUniqueOrThrow({ where: { id: res.body.orderId } });
+    expect(order.paymentMethod).toBe('cash_on_delivery');
+    expect(order.changeForCents).toBe(8000);
+  }, 15_000);
+
+  it('4c) cash_on_delivery com changeForCents menor que o total: 400, nenhum pedido criado', async () => {
+    const { accessToken } = await loginCustomer();
+    const countAntes = await migratorPrisma.order.count({ where: { tenantId } });
+
+    await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/orders`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(checkoutBody({ paymentMethod: 'cash_on_delivery', changeForCents: 100 })) // total é 7380
+      .expect(400);
+
+    const countDepois = await migratorPrisma.order.count({ where: { tenantId } });
+    expect(countDepois).toBe(countAntes);
   }, 15_000);
 
   it('5) token de cliente de OUTRO tenant: 404 — RLS não deixa o customer aparecer neste tenant, nenhum pedido novo criado', async () => {

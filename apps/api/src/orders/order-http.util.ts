@@ -3,9 +3,12 @@ import {
   CheckoutCustomerNotFoundError,
   CheckoutStoreNotConfiguredError,
   IllegalOrderTransitionError,
+  InvalidChangeAmountError,
   MissingCancelReasonError,
   OrderConflictError,
   OrderNotFoundError,
+  PaymentAlreadyConfirmedError,
+  PaymentMethodNotAvailableError,
 } from './order-errors';
 
 /**
@@ -19,5 +22,8 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof MissingCancelReasonError) return new BadRequestException(error.message);
   if (error instanceof CheckoutCustomerNotFoundError) return new NotFoundException(error.message);
   if (error instanceof CheckoutStoreNotConfiguredError) return new ConflictException(error.message);
+  if (error instanceof PaymentAlreadyConfirmedError) return new ConflictException(error.message);
+  if (error instanceof PaymentMethodNotAvailableError) return new ConflictException(error.message);
+  if (error instanceof InvalidChangeAmountError) return new BadRequestException(error.message);
   throw error;
 }

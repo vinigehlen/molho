@@ -15,6 +15,10 @@ export interface SeedTenantDef {
     minOrderCents: number;
     /** Store.geo (geography Point) — Épico 6. Escrito via SQL cru no seed (Unsupported no Prisma DSL). */
     geo: { lat: number; lng: number };
+    /** Chave PIX fictícia + cidade curta (Épico 8) — sem elas o checkout não monta QR (CheckoutStoreNotConfiguredError). */
+    pixKey: string;
+    pixKeyType: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
+    pixMerchantCity: string;
   };
   owner: {
     name: string;
@@ -42,6 +46,9 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
       // Estância Velha, RS — aproximado (centro do município), suficiente
       // pro círculo de 10km da zona de entrega no seed.
       geo: { lat: -29.6478, lng: -51.1728 },
+      pixKey: '+5551999990000',
+      pixKeyType: 'phone',
+      pixMerchantCity: 'Estancia Velha',
     },
     owner: {
       name: 'Vinicius',
@@ -63,6 +70,9 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
       minOrderCents: 0,
       // Centro Histórico de Porto Alegre, RS — aproximado.
       geo: { lat: -30.0346, lng: -51.2177 },
+      pixKey: 'pizzariaroma@exemplo.com',
+      pixKeyType: 'email',
+      pixMerchantCity: 'Porto Alegre',
     },
     owner: {
       name: 'Ana',

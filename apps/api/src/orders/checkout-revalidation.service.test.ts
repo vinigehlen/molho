@@ -47,7 +47,13 @@ class FakeDeliveryMatchRepository implements DeliveryMatchRepository {
   }
 }
 
-function baseRequest(overrides: Partial<CheckoutRequest> = {}): CheckoutRequest {
+/**
+ * revalidate() nunca lê `paymentMethod` (só `items`/`address`) — sempre 'pix'
+ * aqui só pra satisfazer o tipo (união discriminada, Épico 8). Overrides
+ * tipado só com os campos comuns a todo branch (`Pick`, não `Partial<CheckoutRequest>`
+ * inteiro — `Partial` de uma union discriminada perde o discriminante).
+ */
+function baseRequest(overrides: Partial<Pick<CheckoutRequest, 'items' | 'address'>> = {}): CheckoutRequest {
   return {
     items: [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [{ modifierId: 'mod-bacon', priceDeltaCents: 500 }], quantity: 1, notes: null }],
     address: {
@@ -64,6 +70,7 @@ function baseRequest(overrides: Partial<CheckoutRequest> = {}): CheckoutRequest 
       lng: -51.17,
       expectedDeliveryFeeCents: 800,
     },
+    paymentMethod: 'pix',
     ...overrides,
   };
 }

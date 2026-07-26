@@ -19,6 +19,7 @@
  */
 
 import { z } from 'zod';
+import { paymentMethodSchema } from './checkout';
 
 /** Dinheiro é SEMPRE inteiro em centavos (CLAUDE.md regra 4). Nunca float, nunca string. */
 const centsSchema = z.int().nonnegative();
@@ -95,6 +96,16 @@ export const storefrontStoreSchema = z.object({
    * mostrar) ou quando a loja não tem NENHUM turno cadastrado ainda.
    */
   nextOpensAt: z.iso.datetime({ offset: true }).nullable(),
+  /**
+   * Épico 8 (docs/02 §5.5) — só os métodos que a loja pode ACEITAR de
+   * verdade agora: módulo ligado E (pra `pix`) chave PIX configurada. O
+   * storefront usa isto pra decidir o que oferecer no seletor da revisão —
+   * nunca deixa o cliente escolher um método que vai estourar 409/400 no
+   * fim do funil só pra descobrir que a loja não tá pronta. Array vazio é
+   * um estado real: loja sem NENHUM método pronto bloqueia o checkout
+   * inteiro, com aviso, antes de montar carrinho nenhum.
+   */
+  availablePaymentMethods: z.array(paymentMethodSchema),
 });
 
 export const storefrontPayloadSchema = z.object({

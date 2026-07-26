@@ -14,6 +14,10 @@ export interface StorefrontStoreRecord {
   whatsappNumber: string | null;
   minOrderCents: number;
   timezone: string;
+  /** Épico 8 (docs/02 §5.5) — pré-requisito de config pra oferecer `pix` no seletor de pagamento. */
+  pixKey: string | null;
+  pixKeyType: string | null;
+  pixMerchantCity: string | null;
 }
 
 export interface StorefrontHoursRecord {
@@ -90,7 +94,16 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
     return this.requestContext.getClient().store.findFirst({
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { addressText: true, phone: true, whatsappNumber: true, minOrderCents: true, timezone: true },
+      select: {
+        addressText: true,
+        phone: true,
+        whatsappNumber: true,
+        minOrderCents: true,
+        timezone: true,
+        pixKey: true,
+        pixKeyType: true,
+        pixMerchantCity: true,
+      },
     });
   }
 

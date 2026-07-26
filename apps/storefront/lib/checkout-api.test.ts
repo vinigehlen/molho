@@ -106,7 +106,7 @@ describe('buildCheckoutRequestFromCart', () => {
 
 describe('buildCheckoutRequestFromReview', () => {
   it('monta o body a partir da revalidação — nunca do carrinho — e usa a taxa revalidada como esperada', () => {
-    const body = buildCheckoutRequestFromReview(review(), address());
+    const body = buildCheckoutRequestFromReview(review(), address(), 'pix', null);
 
     expect(body.items).toEqual([
       {
@@ -118,6 +118,8 @@ describe('buildCheckoutRequestFromReview', () => {
       },
     ]);
     expect(body.address.expectedDeliveryFeeCents).toBe(800);
+    expect(body.paymentMethod).toBe('pix');
+    expect('changeForCents' in body).toBe(false);
   });
 
   it('exclui itens indisponíveis — confirmar o pedido é confirmar SEM eles', () => {
@@ -138,10 +140,22 @@ describe('buildCheckoutRequestFromReview', () => {
       ],
     });
 
-    const body = buildCheckoutRequestFromReview(comItemEsgotado, address());
+    const body = buildCheckoutRequestFromReview(comItemEsgotado, address(), 'pix', null);
 
     expect(body.items).toHaveLength(1);
     expect(body.items[0]?.productId).toBe('0193f1a0-0000-7000-8000-000000000002');
+  });
+
+  it('cash_on_delivery: inclui changeForCents no body; pix/card_on_delivery nunca incluem', () => {
+    const comTroco = buildCheckoutRequestFromReview(review(), address(), 'cash_on_delivery', 5000);
+    expect(comTroco.paymentMethod).toBe('cash_on_delivery');
+    expect(comTroco.changeForCents).toBe(5000);
+
+    const semTroco = buildCheckoutRequestFromReview(review(), address(), 'cash_on_delivery', null);
+    expect(semTroco.changeForCents).toBeNull();
+
+    const cartao = buildCheckoutRequestFromReview(review(), address(), 'card_on_delivery', null);
+    expect('changeForCents' in cartao).toBe(false);
   });
 });
 
@@ -175,20 +189,90 @@ describe('revalidateCheckout', () => {
 });
 
 describe('createOrder', () => {
-  const body = buildCheckoutRequestFromReview(review(), address());
+  const body = buildCheckoutRequestFromReview(review(), address(), 'pix', null);
 
-  it('201: devolve status created com orderId/totalCents', async () => {
+  const pix = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' };
+
+  it('201 pix: devolve status created com orderId/totalCents/pix', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
         ok: true,
         status: 201,
-        json: async () => ({ orderId: 'order-1', status: 'received', paymentStatus: 'aguardando_confirmacao', totalCents: 7380 }),
+        json: async () => ({
+          orderId: 'order-1',
+          status: 'received',
+          paymentStatus: 'aguardando_confirmacao',
+          totalCents: 7380,
+          paymentMethod: 'pix',
+          pix,
+        }),
       })),
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380 });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, paymentMethod: 'pix', pix });
+  });
+
+  it('201 cash_on_delivery: devolve status created com changeForCents, sem pix', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          orderId: 'order-2',
+          status: 'received',
+          paymentStatus: 'aguardando_confirmacao',
+          totalCents: 7380,
+          paymentMethod: 'cash_on_delivery',
+          changeForCents: 8000,
+        }),
+      })),
+    );
+
+    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-2', totalCents: 7380, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
+  });
+
+  it('201 card_on_delivery: devolve status created sem pix nem changeForCents', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          orderId: 'order-3',
+          status: 'received',
+          paymentStatus: 'aguardando_confirmacao',
+          totalCents: 7380,
+          paymentMethod: 'card_on_delivery',
+        }),
+      })),
+    );
+
+    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-3', totalCents: 7380, paymentMethod: 'card_on_delivery' });
+  });
+
+  it('201 pix sem o campo pix no corpo: devolve status error (contrato exige QR pro cliente pagar)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          orderId: 'order-1',
+          status: 'received',
+          paymentStatus: 'aguardando_confirmacao',
+          totalCents: 7380,
+          paymentMethod: 'pix',
+        }),
+      })),
+    );
+
+    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    expect(resultado).toEqual({ status: 'error' });
   });
 
   it('401: devolve status unauthorized', async () => {

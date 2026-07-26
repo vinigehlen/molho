@@ -157,6 +157,8 @@ describe('GET /v1/store/:slug', () => {
     expect(res.body.store.slug).toBe(slugAtiva);
     expect(res.body.store.themeKey).toBe('brasa');
     expect(res.body.store.minOrderCents).toBe(2000);
+    // Nenhum módulo de pagamento entitled pro tenant — array vazio, não erro (Épico 8).
+    expect(res.body.store.availablePaymentMethods).toEqual([]);
   });
 
   it('2) manda o header de cache de borda', async () => {
@@ -187,6 +189,59 @@ describe('GET /v1/store/:slug', () => {
     const todosProdutos = res.body.categories.flatMap((c: { products: { name: string }[] }) => c.products);
     expect(todosProdutos.some((p: { name: string }) => p.name === 'Margherita')).toBe(false);
   });
+
+  it('5b) availablePaymentMethods (Épico 8): pix exige módulo ATIVO + chave configurada, não só o módulo', async () => {
+    // Tenant PRÓPRIO, nunca consultado antes neste arquivo — o cache de
+    // módulo (Redis, TTL 60s, ModuleService) guardaria "false" pra
+    // payments.on_delivery/pix_static se essa checagem já tivesse rodado
+    // pra este tenant antes de conceder o entitlement (escrita direta via
+    // Prisma não invalida cache, só o request path faz isso). Tenant novo
+    // evita a corrida por construção, sem depender de esperar TTL.
+    const slugPagamentos = `e2e-store-pay-${Date.now()}`;
+    const tenant = await migratorPrisma.tenant.create({
+      data: { slug: slugPagamentos, name: 'Loja Pagamentos E2E', timezone: 'America/Sao_Paulo' },
+    });
+    await provisionaStorefront(migratorPrisma, tenant.id, true);
+    await migratorPrisma.store.create({
+      data: { tenantId: tenant.id, name: 'Loja Pagamentos E2E', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    });
+    for (const moduleKey of ['payments.on_delivery', 'payments.pix_static']) {
+      await migratorPrisma.tenantEntitlement.create({ data: { tenantId: tenant.id, moduleKey, source: 'plan', status: 'active' } });
+      await migratorPrisma.tenantSetting.create({ data: { tenantId: tenant.id, moduleKey, enabled: true } });
+    }
+
+    try {
+      // Passo 1: módulos ligados, Store SEM pixKey — mesmo estado que hoje
+      // estoura CheckoutStoreNotConfiguredError lá no fim do funil (o bug
+      // que este ajuste existe pra evitar).
+      const semChave = await request(app.getHttpServer()).get(`/v1/store/${slugPagamentos}`).expect(200);
+      expect(semChave.body.store.availablePaymentMethods.sort()).toEqual(['card_on_delivery', 'cash_on_delivery']);
+
+      // Passo 2: configura a chave PIX na Store — agora pix entra na lista
+      // (Store é lida fresca a cada request, sem cache — só o módulo tem TTL).
+      await migratorPrisma.store.updateMany({
+        where: { tenantId: tenant.id },
+        data: { pixKey: '+5511999990000', pixKeyType: 'phone', pixMerchantCity: 'Sao Paulo' },
+      });
+
+      const comChave = await request(app.getHttpServer()).get(`/v1/store/${slugPagamentos}`).expect(200);
+      expect(comChave.body.store.availablePaymentMethods.sort()).toEqual(['card_on_delivery', 'cash_on_delivery', 'pix']);
+
+      // A chave PIX de verdade está no banco (setUp acima) — a resposta HTTP
+      // não pode conter o valor cru, só o `availablePaymentMethods` derivado
+      // dele. JSON.stringify pra pegar tanto chave quanto valor em qualquer
+      // posição do payload, não só as chaves de 1 nível.
+      const bruto = JSON.stringify(comChave.body);
+      expect(bruto).not.toContain('+5511999990000'); // o valor da chave PIX
+      expect(bruto.toLowerCase()).not.toContain('pixkey');
+      expect(bruto.toLowerCase()).not.toContain('pixmerchantcity');
+    } finally {
+      await migratorPrisma.store.deleteMany({ where: { tenantId: tenant.id } });
+      await migratorPrisma.tenantSetting.deleteMany({ where: { tenantId: tenant.id } });
+      await migratorPrisma.tenantEntitlement.deleteMany({ where: { tenantId: tenant.id } });
+      await migratorPrisma.tenant.delete({ where: { id: tenant.id } });
+    }
+  }, 15_000);
 
   it('6) módulo channel.storefront desligado → 403 (público não pula o gate de módulo)', async () => {
     await request(app.getHttpServer()).get(`/v1/store/${slugDesligada}`).expect(403);

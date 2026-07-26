@@ -159,6 +159,17 @@ model Tenant {
   @@map("tenants")
 }
 
+/// Tipo da chave PIX cadastrada pelo lojista — só pra validar formato no
+/// cadastro; o payload EMV (Épico 8) usa sempre o VALOR da chave, o tipo não
+/// entra no BR Code em si.
+enum PixKeyType {
+  cpf
+  cnpj
+  email
+  phone
+  random
+}
+
 model Store {
   id             String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId       String                                 @map("tenant_id") @db.Uuid
@@ -171,6 +182,18 @@ model Store {
   phone          String?
   whatsappNumber String?                                @map("whatsapp_number")
   minOrderCents  Int                                    @default(0) @map("min_order_cents")
+  /// Chave PIX do LOJISTA (Épico 8) — o dinheiro cai direto na conta dele,
+  /// nunca passa pelo Molho (docs/01 §5-D.1, modelo A). Nula até o lojista
+  /// configurar; sem ela o checkout não tem como montar o QR e a loja não
+  /// está pronta pra vender (mesmo erro de "loja não configurada" da falta
+  /// de Store em si — CheckoutStoreNotConfiguredError).
+  pixKey          String?     @map("pix_key")
+  pixKeyType      PixKeyType? @map("pix_key_type")
+  /// Campo 60 do BR Code (cidade do lojista) — curto e sem acento por
+  /// exigência do padrão EMV (≤15 chars), por isso não deriva de
+  /// `addressText` (texto livre, formato não previsível). Preenchido junto
+  /// com a chave PIX.
+  pixMerchantCity String?     @map("pix_merchant_city")
   createdAt      DateTime                               @default(now()) @map("created_at")
   updatedAt      DateTime                               @updatedAt @map("updated_at")
   deletedAt      DateTime?                              @map("deleted_at")
@@ -544,6 +567,16 @@ enum PaymentStatus {
   confirmado
 }
 
+/// Granular de propósito (cash ≠ card) — docs/02-definicoes-v1.md §5.5:
+/// dinheiro e cartão na maquininha são operações diferentes na ponta
+/// (troco vs nada) pro Épico 9, mesmo os dois dependendo do mesmo módulo
+/// `payments.on_delivery`.
+enum PaymentMethod {
+  pix
+  cash_on_delivery
+  card_on_delivery
+}
+
 /// Estorno é MANUAL no MVP (PIX estático — o lojista devolve por fora,
 /// Pix Devolução). Este campo só REGISTRA que um estorno é devido/foi
 /// feito; o sistema nunca orquestra o dinheiro em si.
@@ -563,8 +596,13 @@ model Order {
   customerId String @map("customer_id") @db.Uuid
 
   status        OrderStatus   @default(received)
+  /// Sem @default — o cliente escolhe no checkout, nunca "cai" num método sem querer.
+  paymentMethod PaymentMethod @map("payment_method")
   paymentStatus PaymentStatus @default(aguardando_confirmacao) @map("payment_status")
   refundStatus  RefundStatus  @default(not_applicable) @map("refund_status")
+  /// Só quando paymentMethod = cash_on_delivery — "troco pra quanto" (o valor
+  /// que o cliente vai entregar, não o troco em si). docs/02 §5.5.
+  changeForCents Int? @map("change_for_cents")
 
   subtotalCents    Int @map("subtotal_cents")
   deliveryFeeCents Int @map("delivery_fee_cents")

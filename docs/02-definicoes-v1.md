@@ -113,6 +113,31 @@ pending_payment ──pago──> received ──aceito──> preparing ──>
 ### 5.4 Estoque
 **Manual na v1** (toggle "esgotado"), como Goomer e Anota AI no plano de entrada. Auto-desligamento e contador diário ficam para a v2.
 
+### 5.5 Pagamento: método, troco e ciclo de vida do `paymentStatus` (Épico 8 → contrato pro Épico 9)
+
+**Método de pagamento** (`paymentMethod`, Épico 8): `pix` | `cash_on_delivery` | `card_on_delivery`. Granular de propósito, mesmo os dois últimos dependendo do mesmo módulo `payments.on_delivery` — dinheiro e cartão na maquininha são operações diferentes na ponta (troco vs nada), o gestor de pedidos (Épico 9) precisa saber qual pra separar troco ou levar a maquininha.
+
+**Estados de `paymentStatus`**: só 2, método-agnóstico — `aguardando_confirmacao` → `confirmado`. Nunca um terceiro estado "cancelado": cancelamento já vive no eixo `status` (OrderStatus) + `refundStatus` (§5.2). Se o pedido morre (cancelado, `delivery_failed`) antes de confirmar pagamento, `paymentStatus` só congela em `aguardando_confirmacao` — não ganha transição própria.
+
+**Default na criação**: `aguardando_confirmacao`, pros 3 métodos — inclusive pagamento na entrega, que só é coletado na hora da entrega, nunca na criação do pedido.
+
+**Troco (`cash_on_delivery`)**: `changeForCents` (nullable) é "troco pra quanto" — o valor da nota/quantia que o cliente vai entregar (ex.: pedido de R$ 47, cliente paga com R$ 50 → `changeForCents: 5000`). Não é o troco em si: o valor a devolver (`changeForCents − totalCents`) é calculado na hora de exibir (cozinha/entregador), não persistido separado. `null` = cliente não precisa de troco. O campo existe estruturalmente só no branch `cash_on_delivery` da union discriminada de request/resposta — `pix`/`card_on_delivery` nunca têm o campo, nem em branco.
+Validação de negócio na criação do pedido (não é checagem de schema — só depois da revalidação o `totalCents` real existe): `changeForCents`, se informado, tem que ser `>= totalCents`. Pedir troco pra menos que o total é request inválido (`InvalidChangeAmountError`).
+
+**Gate de preparo (`received → preparing`) — contrato pro Épico 9.** Só bloqueia pra método PRÉ-pago:
+
+| `paymentMethod` | bloqueia `preparing` até `confirmado`? | por quê |
+|---|:--:|---|
+| `pix` | **sim** | pago antes da cozinha começar — cozinha não prepara pedido PIX não pago |
+| `cash_on_delivery` | não | pago só na entrega, DEPOIS do preparo — bloquear travaria o pedido pra sempre |
+| `card_on_delivery` | não | mesma razão |
+
+Quando o Épico 9 ligar `preparing` a um consumidor real: `OrderStatusRepository.findForTransition()` passa a selecionar `paymentMethod`/`paymentStatus` junto; `OrderStatusService.transition()` rejeita com `PaymentNotConfirmedError` quando `toStatus === 'preparing'` e o método exige confirmação prévia e `paymentStatus !== 'confirmado'`.
+
+**Gate de conclusão (`in_transit → completed`) — contrato pro Épico 9, fecha o buraco do dado morto.** Sem isso, pedido em dinheiro/cartão-na-entrega fica pra sempre em `aguardando_confirmacao` se ninguém tocar em nada — não é lembrete de UI, é regra: `in_transit → completed` EXIGE `paymentStatus === 'confirmado'` pros métodos pós-pagos (`cash_on_delivery`/`card_on_delivery`). Reusa o MESMO endpoint `payment.confirm` do Épico 8 (já é método-agnóstico) — quem entrega confirma "recebi o dinheiro"/"a maquininha aprovou" no mesmo fluxo que marca a entrega como concluída (UI do Épico 9 pode combinar as duas ações numa tela só, mas continuam sendo duas chamadas: `payment.confirm` primeiro, `transition(completed)` depois). `pix` fica de fora deste segundo gate — já foi bloqueado antes, na entrada de `preparing`; se chegou em `in_transit`, já está pago.
+
+**Limitação de reconciliação do PIX estático (não é bug, é característica do modelo).** O payload embute um `txid` (campo 62/05 do BR Code, referência do pedido) mas isso é *best-effort*, não garantia: é chave PIX ESTÁTICA, não PIX dinâmico via API do BACEN com txid rastreado do lado do PSP — muitos apps de banco não mostram esse campo pro humano no extrato de uma chave estática, só valor + nome do pagador + horário. A reconciliação real, e a única em que o lojista pode confiar, é **valor + horário + nome do cliente** — o que significa que dois pedidos do MESMO valor, na MESMA janela curta, são indistinguíveis pro lojista olhando o extrato. A tela de confirmação de pagamento do Épico 9 precisa mostrar os três (valor, horário do pedido, nome do cliente) lado a lado — é o que torna a reconciliação manual operável, não o txid.
+
 ---
 
 ## 6. Impressão (decidido)

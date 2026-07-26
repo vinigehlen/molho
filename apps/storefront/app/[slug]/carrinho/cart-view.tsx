@@ -13,19 +13,52 @@ import {
   MoCheckoutReviewSheet,
   MoEmptyState,
   MoOtpSheet,
+  MoPixPayment,
   MoStepper,
   MoToast,
 } from '@molho/ui';
 import { ADDRESS_SCHEMA_VERSION } from '../../../lib/address-storage';
 import { lineTotalCents } from '../../../lib/cart-storage';
-import type { CheckoutReview } from '../../../lib/checkout-api';
+import type { CheckoutPaymentMethod, CheckoutReview } from '../../../lib/checkout-api';
 import { useAddress } from '../../../lib/use-address';
 import { useCart } from '../../../lib/use-cart';
-import { useCheckout } from '../../../lib/use-checkout';
+import { useCheckout, type CheckoutStep } from '../../../lib/use-checkout';
+
+/**
+ * Um branch por `paymentMethod` (Épico 8) — `pix` mostra o QR de verdade;
+ * dinheiro/cartão na entrega não têm nada pra o cliente pagar AGORA (o
+ * pagamento acontece na porta), então a confirmação é só informativa.
+ */
+function SuccessPaymentInfo({ step }: { step: Extract<CheckoutStep, { kind: 'success' }> }) {
+  if (step.paymentMethod === 'pix') {
+    return (
+      <>
+        <p className="text-body text-text-muted">Falta só o pagamento — a loja começa o preparo assim que confirmar.</p>
+        <MoPixPayment payload={step.pix.payload} totalCents={step.totalCents} className="w-full max-w-sm" />
+      </>
+    );
+  }
+  if (step.paymentMethod === 'cash_on_delivery') {
+    // changeForCents === totalCents é pagamento EXATO (troco zero) — nunca
+    // "leve troco pra R$ X" nesse caso, mesma coisa que não pedir troco
+    // nenhum pro cliente que for ler a mensagem (validado: sempre
+    // changeForCents >= totalCents, InvalidChangeAmountError barra o resto).
+    const trocoDeVerdade = step.changeForCents !== null && step.changeForCents > step.totalCents;
+    return (
+      <p className="text-body text-text-muted">
+        Pagamento em dinheiro na entrega — {formatCents(step.totalCents)}
+        {trocoDeVerdade ? ` (leve troco pra ${formatCents(step.changeForCents as number)})` : ' (sem troco)'}.
+      </p>
+    );
+  }
+  return <p className="text-body text-text-muted">Pagamento no cartão, na entrega — {formatCents(step.totalCents)}. Tenha a maquininha à mão.</p>;
+}
 
 export interface CartViewProps {
   slug: string;
   storeName: string;
+  /** `GET /v1/store/:slug` (Épico 8, docs/02 §5.5) — array vazio é um estado real: loja sem nenhum método pronto. */
+  availablePaymentMethods: CheckoutPaymentMethod[];
   emptyTitle: string;
   emptyBody: string;
   emptyActionLabel: string;
@@ -38,7 +71,7 @@ export interface CartViewProps {
  * concentra toda a orquestração (revalidação → revisão → OTP → criação) —
  * esta view só liga estado a componente visual.
  */
-export function CartView({ slug, storeName, emptyTitle, emptyBody, emptyActionLabel }: CartViewProps) {
+export function CartView({ slug, storeName, availablePaymentMethods, emptyTitle, emptyBody, emptyActionLabel }: CartViewProps) {
   const cart = useCart(slug);
   const { address, setAddress } = useAddress(slug);
   const checkout = useCheckout(slug, cart.cart, address);
@@ -70,7 +103,36 @@ export function CartView({ slug, storeName, emptyTitle, emptyBody, emptyActionLa
     if (review.items.some((item) => item.priceChanged)) setToastAberto(true);
   }, [checkout.step]);
 
-  if (cart.cart.items.length === 0 && checkout.step.kind !== 'success') {
+  if (checkout.step.kind === 'success') {
+    return (
+      <main className="flex min-h-screen flex-col items-center gap-6 p-6 text-center">
+        <h1 className="text-title-lg text-text">Pedido feito! 🎉</h1>
+        <SuccessPaymentInfo step={checkout.step} />
+        <MoButton variant="ghost" onClick={() => router.push(`/${slug}`)}>
+          Voltar pro cardápio
+        </MoButton>
+      </main>
+    );
+  }
+
+  // Loja sem NENHUM método de pagamento pronto (Épico 8, docs/02 §5.5) —
+  // bloqueia ANTES de deixar montar carrinho nenhum, com mensagem clara.
+  // Nunca deixa chegar num botão "Fazer pedido" morto no fim do funil: sem
+  // isso o cliente monta o pedido inteiro só pra descobrir, na revisão, que
+  // não tem como pagar.
+  if (availablePaymentMethods.length === 0) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+        <MoEmptyState
+          title="Essa loja não está recebendo pedidos agora"
+          description="A forma de pagamento ainda não foi configurada. Volta mais tarde ou fala direto com a loja."
+          action={{ label: 'Voltar pro cardápio', onClick: () => router.push(`/${slug}`) }}
+        />
+      </main>
+    );
+  }
+
+  if (cart.cart.items.length === 0) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
         <MoEmptyState
@@ -78,18 +140,6 @@ export function CartView({ slug, storeName, emptyTitle, emptyBody, emptyActionLa
           description={emptyBody}
           action={{ label: emptyActionLabel, onClick: () => router.push(`/${slug}`) }}
         />
-      </main>
-    );
-  }
-
-  if (checkout.step.kind === 'success') {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <h1 className="text-title-lg text-text">Pedido feito! 🎉</h1>
-        <p className="text-body text-text-muted">
-          Total de {formatCents(checkout.step.totalCents)}. A loja vai confirmar o pagamento e já começar o preparo.
-        </p>
-        <MoButton onClick={() => router.push(`/${slug}`)}>Voltar pro cardápio</MoButton>
       </main>
     );
   }
@@ -212,6 +262,11 @@ export function CartView({ slug, storeName, emptyTitle, emptyBody, emptyActionLa
         errorMessage={checkout.step.kind === 'review' ? checkout.step.errorMessage : null}
         confirmLoading={checkout.step.kind === 'review' && checkout.step.submitting}
         onConfirm={checkout.confirmReview}
+        availablePaymentMethods={availablePaymentMethods}
+        paymentMethod={checkout.paymentMethod}
+        onPaymentMethodChange={checkout.setPaymentMethod}
+        changeForCents={checkout.changeForCents}
+        onChangeForCentsChange={checkout.setChangeForCents}
       />
 
       <MoOtpSheet

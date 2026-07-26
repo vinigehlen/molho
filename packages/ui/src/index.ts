@@ -25,5 +25,6 @@ export * from './components/mo-category-chips';
 export * from './components/mo-checkout-review-sheet';
 export * from './components/mo-modifier-group';
 export * from './components/mo-otp-sheet';
+export * from './components/mo-pix-payment';
 export * from './components/mo-product-card';
 export * from './components/mo-product-sheet';

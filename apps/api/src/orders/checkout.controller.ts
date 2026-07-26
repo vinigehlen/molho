@@ -6,7 +6,7 @@ import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
 import { RequestContextService } from '../context/request-context.service';
 import { StorefrontRateLimitGuard } from '../storefront/storefront-rate-limit.guard';
-import { CheckoutRequestDto } from './dto/checkout-request.dto';
+import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
 import type { CheckoutOrderService } from './checkout-order.service';
@@ -37,7 +37,7 @@ export class CheckoutController {
   @UseGuards(StorefrontRateLimitGuard, RequireModuleGuard)
   @HttpCode(HttpStatus.OK)
   revalidate(@Body() dto: CheckoutRequestDto) {
-    return this.revalidationService.revalidate(dto);
+    return this.revalidationService.revalidate(toCheckoutRequest(dto));
   }
 
   /**
@@ -57,7 +57,7 @@ export class CheckoutController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const tenantId = this.requestContext.getTenantId();
-    const result = await this.orderService.createOrder(tenantId, req.user.sub, dto);
+    const result = await this.orderService.createOrder(tenantId, req.user.sub, toCheckoutRequest(dto));
     if (!result.ok) {
       res.status(HttpStatus.CONFLICT);
       return result.revalidation;

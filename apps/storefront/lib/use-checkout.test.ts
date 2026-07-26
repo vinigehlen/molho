@@ -138,8 +138,10 @@ describe('useCheckout', () => {
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('5) verifyOtpCode ok: guarda o token, cria o pedido, vai pro sucesso', async () => {
-    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690 });
+  const PIX = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
+
+  it('5) verifyOtpCode ok: guarda o token, cria o pedido, vai pro sucesso (com pix)', async () => {
+    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
     const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
@@ -149,7 +151,42 @@ describe('useCheckout', () => {
     });
 
     expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), 'token-x');
-    expect(result.current.step).toEqual({ kind: 'success', orderId: 'order-1', totalCents: 3690 });
+    expect(result.current.step).toEqual({ kind: 'success', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
+  });
+
+  it('5b) setPaymentMethod/setChangeForCents (Épico 8): body enviado carrega o método escolhido, step de sucesso reflete cash_on_delivery', async () => {
+    createOrder.mockResolvedValue({
+      status: 'created',
+      orderId: 'order-cash',
+      totalCents: 3690,
+      paymentMethod: 'cash_on_delivery',
+      changeForCents: 5000,
+    });
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    await act(async () => result.current.startCheckout());
+
+    act(() => {
+      result.current.setPaymentMethod('cash_on_delivery');
+      result.current.setChangeForCents(5000);
+    });
+    act(() => result.current.confirmReview());
+
+    await act(async () => {
+      await result.current.verifyOtpCode('51999990000', '123456');
+    });
+
+    expect(createOrder).toHaveBeenCalledWith(
+      SLUG,
+      expect.objectContaining({ paymentMethod: 'cash_on_delivery', changeForCents: 5000 }),
+      'token-x',
+    );
+    expect(result.current.step).toEqual({
+      kind: 'success',
+      orderId: 'order-cash',
+      totalCents: 3690,
+      paymentMethod: 'cash_on_delivery',
+      changeForCents: 5000,
+    });
   });
 
   it('6) verifyOtpCode falha (código errado): não cria pedido, devolve o erro pro sheet', async () => {
@@ -229,7 +266,7 @@ describe('useCheckout', () => {
   });
 
   it('12) sessão já persistida (token salvo de antes): confirmReview cria o pedido direto, sem abrir OTP', async () => {
-    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-2', totalCents: 3690 });
+    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-2', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
 
     // Primeira montagem: loga e guarda o token.
     const primeira = renderHook(() => useCheckout(SLUG, cart(), address()));

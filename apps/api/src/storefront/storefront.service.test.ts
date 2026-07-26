@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
-import { type StorefrontPayload, storefrontPayloadSchema } from '@molho/contracts';
+import { type PaymentMethod, type StorefrontPayload, storefrontPayloadSchema } from '@molho/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { AvailablePaymentMethodsResolver, StoreForPaymentMethods } from './available-payment-methods';
 import type {
   StorefrontCategoryRecord,
   StorefrontHoursRecord,
@@ -26,6 +27,9 @@ class FakeStorefrontRepository implements StorefrontRepository {
     whatsappNumber: '+5511999990000',
     minOrderCents: 2000,
     timezone: 'America/Sao_Paulo',
+    pixKey: '+5511999990000',
+    pixKeyType: 'phone',
+    pixMerchantCity: 'Sao Paulo',
   };
   menu: StorefrontCategoryRecord[] = [];
   /** Vazio por padrão: service precisa se virar sem nenhum turno cadastrado ainda. */
@@ -43,6 +47,25 @@ class FakeStorefrontRepository implements StorefrontRepository {
   async listStoreHours() {
     return this.hours;
   }
+}
+
+/** Por padrão devolve os 3 métodos (caminho feliz) — testes de disponibilidade sobrescrevem `methods`. */
+class FakeAvailablePaymentMethodsResolver implements AvailablePaymentMethodsResolver {
+  methods: PaymentMethod[] = ['pix', 'cash_on_delivery', 'card_on_delivery'];
+  lastStoreSeen: StoreForPaymentMethods | null | undefined = undefined;
+
+  async list(store: StoreForPaymentMethods | null) {
+    this.lastStoreSeen = store;
+    return this.methods;
+  }
+}
+
+/** Sempre PUBLIC_URL e resolver-3-métodos — o teste de `S3_PUBLIC_URL` ausente usa `new StorefrontService()` direto (ver abaixo, `undefined` explícito não passa por um default param). */
+function buildService(
+  repository: StorefrontRepository,
+  resolver: AvailablePaymentMethodsResolver = new FakeAvailablePaymentMethodsResolver(),
+): StorefrontService {
+  return new StorefrontService(repository, PUBLIC_URL, resolver);
 }
 
 function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): StorefrontCategoryRecord {
@@ -93,21 +116,24 @@ describe('StorefrontService', () => {
 
   it('monta um payload que satisfaz o contrato público', async () => {
     repository.menu = [categoria()];
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
   });
 
   it('resolve imageKey em URL pública', async () => {
     repository.menu = [categoria()];
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(primeiroProduto(payload).imageUrl).toBe('https://pub-abc.r2.dev/produtos/x-burger.jpg');
   });
 
   it('devolve imageUrl null quando S3_PUBLIC_URL não está configurada, sem quebrar o contrato', async () => {
     repository.menu = [categoria()];
-    const payload = await new StorefrontService(repository, undefined).getStorefront();
+    // new StorefrontService() direto, não buildService(): default param de publicUrl
+    // dispara em cima de `undefined` explícito também — não dá pra "passar undefined
+    // de propósito" por uma função com default nesse parâmetro.
+    const payload = await new StorefrontService(repository, undefined, new FakeAvailablePaymentMethodsResolver()).getStorefront();
 
     expect(primeiroProduto(payload).imageUrl).toBeNull();
     expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
@@ -118,7 +144,7 @@ describe('StorefrontService', () => {
     primeiro(c.products, 'produto').available = false;
     repository.menu = [c];
 
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(primeiro(payload.categories, 'categoria').products).toHaveLength(1);
     expect(primeiroProduto(payload).available).toBe(false);
@@ -126,7 +152,7 @@ describe('StorefrontService', () => {
 
   it('responde 404 quando o tenant sumiu entre a resolução do slug e a leitura', async () => {
     repository.tenant = null;
-    await expect(new StorefrontService(repository, PUBLIC_URL).getStorefront()).rejects.toBeInstanceOf(
+    await expect(buildService(repository).getStorefront()).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
@@ -135,7 +161,7 @@ describe('StorefrontService', () => {
     repository.store = null;
     repository.menu = [categoria()];
 
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(payload.store.addressText).toBeNull();
     expect(payload.store.phone).toBeNull();
@@ -145,7 +171,7 @@ describe('StorefrontService', () => {
 
   it('responde loja sem cardápio nenhum sem quebrar (lojista que ainda não cadastrou nada)', async () => {
     repository.menu = [];
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(payload.categories).toEqual([]);
     expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
@@ -154,7 +180,7 @@ describe('StorefrontService', () => {
   it('sem nenhum turno cadastrado: sempre fechado, sem próxima abertura (não quebra o contrato)', async () => {
     repository.menu = [categoria()];
     // hours já é [] por padrão no fixture.
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     expect(payload.store.isOpenNow).toBe(false);
     expect(payload.store.nextOpensAt).toBeNull();
@@ -163,12 +189,69 @@ describe('StorefrontService', () => {
 
   it('não vaza campos internos do banco no payload público', async () => {
     repository.menu = [categoria()];
-    const payload = await new StorefrontService(repository, PUBLIC_URL).getStorefront();
+    const payload = await buildService(repository).getStorefront();
 
     const produto = primeiroProduto(payload) as unknown as Record<string, unknown>;
     expect(produto.imageKey).toBeUndefined();
     expect(produto.tenantId).toBeUndefined();
     expect(produto.version).toBeUndefined();
     expect(produto.deletedAt).toBeUndefined();
+  });
+
+  it('não vaza a chave PIX (nem tipo/cidade) no payload público — só availablePaymentMethods sai (Épico 8)', async () => {
+    // Fixture já tem pixKey/pixKeyType/pixMerchantCity preenchidos (repository.store
+    // default) — exatamente o dado sensível que não pode aparecer cru na resposta.
+    repository.menu = [categoria()];
+    const payload = await buildService(repository).getStorefront();
+
+    const store = payload.store as unknown as Record<string, unknown>;
+    expect(store.pixKey).toBeUndefined();
+    expect(store.pixKeyType).toBeUndefined();
+    expect(store.pixMerchantCity).toBeUndefined();
+    expect(Object.keys(store).some((key) => key.toLowerCase().includes('pix') && key !== 'availablePaymentMethods')).toBe(false);
+    expect(payload.store.availablePaymentMethods).toEqual(['pix', 'cash_on_delivery', 'card_on_delivery']);
+  });
+
+  describe('availablePaymentMethods (Épico 8)', () => {
+    it('repassa a lista que o resolver devolveu', async () => {
+      const resolver = new FakeAvailablePaymentMethodsResolver();
+      resolver.methods = ['pix'];
+      repository.menu = [categoria()];
+
+      const payload = await buildService(repository, resolver).getStorefront();
+
+      expect(payload.store.availablePaymentMethods).toEqual(['pix']);
+    });
+
+    it('array vazio (loja sem nenhum método pronto) continua satisfazendo o contrato', async () => {
+      const resolver = new FakeAvailablePaymentMethodsResolver();
+      resolver.methods = [];
+      repository.menu = [categoria()];
+
+      const payload = await buildService(repository, resolver).getStorefront();
+
+      expect(payload.store.availablePaymentMethods).toEqual([]);
+      expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
+    });
+
+    it('passa a Store (não null) pro resolver quando a loja existe — é o que decide se pix entra na conta', async () => {
+      const resolver = new FakeAvailablePaymentMethodsResolver();
+      repository.menu = [categoria()];
+
+      await buildService(repository, resolver).getStorefront();
+
+      expect(resolver.lastStoreSeen).toMatchObject({ pixKey: '+5511999990000' });
+    });
+
+    it('loja ainda não cadastrada: resolver recebe null, nunca quebra o contrato', async () => {
+      const resolver = new FakeAvailablePaymentMethodsResolver();
+      repository.store = null;
+      repository.menu = [categoria()];
+
+      const payload = await buildService(repository, resolver).getStorefront();
+
+      expect(resolver.lastStoreSeen).toBeNull();
+      expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
+    });
   });
 });

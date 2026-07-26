@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Cart, CartItem } from '@molho/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,11 +95,12 @@ function salvarCarrinho(items: CartItem[]) {
   localStorage.setItem(cartStorageKey(SLUG), JSON.stringify(cart));
 }
 
-function renderCartView() {
+function renderCartView(overrides: { availablePaymentMethods?: ('pix' | 'cash_on_delivery' | 'card_on_delivery')[] } = {}) {
   return render(
     <CartView
       slug={SLUG}
       storeName="Hamburgueria da Vila"
+      availablePaymentMethods={overrides.availablePaymentMethods ?? ['pix', 'cash_on_delivery', 'card_on_delivery']}
       emptyTitle="Seu carrinho tá vazio"
       emptyBody="Bora resolver isso?"
       emptyActionLabel="Ver o cardápio"
@@ -264,7 +265,13 @@ describe('CartView — checkout (Épico 7)', () => {
   });
 
   it('fluxo completo: revisão → OTP → pedido criado → tela de sucesso, carrinho esvaziado', async () => {
-    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690 });
+    createOrder.mockResolvedValue({
+      status: 'created',
+      orderId: 'order-1',
+      totalCents: 3690,
+      paymentMethod: 'pix',
+      pix: { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' },
+    });
     const user = userEvent.setup();
     salvarCarrinho([item()]);
     salvarEndereco();
@@ -287,6 +294,48 @@ describe('CartView — checkout (Épico 7)', () => {
 
     const salvo = JSON.parse(localStorage.getItem(cartStorageKey(SLUG)) ?? '{}');
     expect(salvo.items).toEqual([]);
+  });
+
+  it('fluxo completo com dinheiro na entrega (Épico 8): escolhe o chip, informa troco, body vai com paymentMethod/changeForCents', async () => {
+    createOrder.mockResolvedValue({
+      status: 'created',
+      orderId: 'order-cash',
+      totalCents: 3690,
+      paymentMethod: 'cash_on_delivery',
+      changeForCents: 5000,
+    });
+    const user = userEvent.setup();
+    salvarCarrinho([item()]);
+    salvarEndereco();
+    renderCartView();
+
+    await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
+    await screen.findByText('Revisa seu pedido');
+
+    await user.click(screen.getByRole('button', { name: 'Dinheiro na entrega' }));
+    await user.click(screen.getByLabelText('Não preciso de troco')); // desmarca, abre o campo
+    // fireEvent.change (não user.type char a char) — mesma razão de sempre
+    // com máscara + cursor em jsdom: digitar caractere a caractere reseta o
+    // cursor a cada re-mascaramento e embaralha a ordem dos dígitos. Aqui
+    // testamos "o handler recebe o valor mascarado certo", não a mecânica de
+    // digitação em si (essa já tem cobertura própria em mo-input.test.tsx).
+    fireEvent.change(screen.getByLabelText('Troco pra quanto?'), { target: { value: '5000' } });
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
+    await screen.findByText('Confirma seu telefone');
+    await user.type(screen.getByLabelText('Telefone'), '51999990000');
+    await user.click(screen.getByRole('button', { name: 'Enviar código' }));
+    await screen.findByText('Digite o código');
+    await user.type(screen.getByLabelText('Código'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
+
+    expect(await screen.findByText(/Pagamento em dinheiro na entrega/)).toBeInTheDocument();
+    expect(await screen.findByText(/leve troco pra R\$ 50,00/)).toBeInTheDocument();
+    expect(createOrder).toHaveBeenCalledWith(
+      SLUG,
+      expect.objectContaining({ paymentMethod: 'cash_on_delivery', changeForCents: 5000 }),
+      'token-x',
+    );
   });
 
   it('divergência ainda desfavorável na criação (409): volta pra revisão com os dados frescos, sem tela de sucesso', async () => {
@@ -328,5 +377,46 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
 
     expect(await screen.findByText(/Boa notícia/)).toBeInTheDocument();
+  });
+
+  it('changeForCents === totalCents (pago exato): tela de sucesso diz "sem troco", nunca "leve troco pra"', async () => {
+    createOrder.mockResolvedValue({
+      status: 'created',
+      orderId: 'order-exato',
+      totalCents: 3690,
+      paymentMethod: 'cash_on_delivery',
+      changeForCents: 3690, // exatamente o total — pagamento exato, troco zero
+    });
+    const user = userEvent.setup();
+    salvarCarrinho([item()]);
+    salvarEndereco();
+    renderCartView();
+
+    await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
+    await screen.findByText('Revisa seu pedido');
+    await user.click(screen.getByRole('button', { name: 'Dinheiro na entrega' }));
+    await user.click(screen.getByLabelText('Não preciso de troco')); // desmarca, abre o campo
+    fireEvent.change(screen.getByLabelText('Troco pra quanto?'), { target: { value: '3690' } });
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
+    await screen.findByText('Confirma seu telefone');
+    await user.type(screen.getByLabelText('Telefone'), '51999990000');
+    await user.click(screen.getByRole('button', { name: 'Enviar código' }));
+    await screen.findByText('Digite o código');
+    await user.type(screen.getByLabelText('Código'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
+
+    expect(await screen.findByText(/sem troco/)).toBeInTheDocument();
+    expect(screen.queryByText(/leve troco pra/)).not.toBeInTheDocument();
+  });
+});
+
+describe('CartView — disponibilidade de pagamento (Ajuste 1)', () => {
+  it('loja sem NENHUM método disponível: bloqueia antes de montar carrinho, mesmo com itens salvos', async () => {
+    salvarCarrinho([item()]);
+    renderCartView({ availablePaymentMethods: [] });
+
+    expect(await screen.findByText('Essa loja não está recebendo pedidos agora')).toBeInTheDocument();
+    expect(screen.queryByText('Seu carrinho tá vazio')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fazer pedido' })).not.toBeInTheDocument();
   });
 });

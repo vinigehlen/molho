@@ -1,8 +1,37 @@
-import type { CheckoutOrderResponse, CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
+import { buildPixBrCode } from '@molho/contracts';
+import type { CheckoutOrderPix, CheckoutOrderResponse, CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
-import { CheckoutCustomerNotFoundError, CheckoutStoreNotConfiguredError } from './order-errors';
-import type { CheckoutOrderRepository } from './checkout-order.repository';
+import { CheckoutCustomerNotFoundError, CheckoutStoreNotConfiguredError, InvalidChangeAmountError } from './order-errors';
+import type { CheckoutOrderRepository, StoreForOrder } from './checkout-order.repository';
 import type { OrderStatusService } from './order-status.service';
+import type { PaymentMethodModuleGate } from './payment-method-module-gate';
+
+function isPixKeyType(value: string | null): value is CheckoutOrderPix['keyType'] {
+  return value === 'cpf' || value === 'cnpj' || value === 'email' || value === 'phone' || value === 'random';
+}
+
+/**
+ * Monta o BR Code da loja pra ESTE pedido (Épico 8) — `txid` é o próprio
+ * `orderId` sem hífens (uuid v7 tem 32 chars alfanuméricos, cabe nos 25 do
+ * campo sem truncar de um jeito que ainda identifique o pedido: os 25
+ * primeiros já bastam pra achar no extrato/log, não precisa ser único
+ * globalmente pro BR Code em si). Lança CheckoutStoreNotConfiguredError se
+ * a loja não tem chave/cidade — mesma natureza de "loja não pronta pra
+ * vender" da falta de Store (ver order-errors.ts).
+ */
+function buildOrderPix(store: StoreForOrder, orderId: string, totalCents: number): CheckoutOrderPix {
+  if (!store.pixKey || !isPixKeyType(store.pixKeyType) || !store.pixMerchantCity) {
+    throw new CheckoutStoreNotConfiguredError();
+  }
+  const payload = buildPixBrCode({
+    pixKey: store.pixKey,
+    merchantName: store.name,
+    merchantCity: store.pixMerchantCity,
+    amountCents: totalCents,
+    txid: orderId.replace(/-/g, ''),
+  });
+  return { payload, key: store.pixKey, keyType: store.pixKeyType };
+}
 
 /**
  * `ok: false` NÃO é uma exceção: ainda existe divergência desfavorável (ou
@@ -22,14 +51,20 @@ export class CheckoutOrderService {
     private readonly repo: CheckoutOrderRepository,
     private readonly revalidationService: CheckoutRevalidationService,
     private readonly orderStatusService: OrderStatusService,
+    private readonly moduleGate: PaymentMethodModuleGate,
   ) {}
 
   async createOrder(tenantId: string, customerId: string, request: CheckoutRequest): Promise<CreateOrderResult> {
     const customer = await this.repo.findCustomer(customerId);
     if (!customer) throw new CheckoutCustomerNotFoundError();
 
-    const storeId = await this.repo.findStoreId();
-    if (!storeId) throw new CheckoutStoreNotConfiguredError();
+    const store = await this.repo.findStore();
+    if (!store) throw new CheckoutStoreNotConfiguredError();
+
+    // Depende do BODY (paymentMethod), não dá pra checar por @RequireModule
+    // estático — ver payment-method-module-gate.ts. Cedo, antes de travar
+    // produto/revalidar: sem módulo, não vale gastar o resto do trabalho.
+    await this.moduleGate.assertAvailable(tenantId, request.paymentMethod);
 
     // Trava as linhas de PRODUTO antes de revalidar — fecha a janela de
     // corrida entre "ler preço/disponibilidade" e "escrever o pedido" pro
@@ -49,26 +84,48 @@ export class CheckoutOrderService {
       return { ok: false, revalidation };
     }
 
+    // canSubmit true garante withinZone true garante totalCents não-nulo (ver revalidatedCheckoutSchema).
+    const totalCents = revalidation.totalCents as number;
+
+    // Só dá pra validar DEPOIS da revalidação — antes disso não existe
+    // totalCents real (docs/02 §5.5: pedir troco pra menos que o total é
+    // request inválido).
+    const changeForCents = request.paymentMethod === 'cash_on_delivery' ? request.changeForCents : null;
+    if (changeForCents !== null && changeForCents < totalCents) {
+      throw new InvalidChangeAmountError();
+    }
+
     const deliveryAddressId = await this.repo.createAddress(customerId, request.address);
     const orderId = await this.repo.createOrder({
-      storeId,
+      storeId: store.id,
       customerId,
       deliveryAddressId,
       address: request.address,
       revalidated: revalidation,
+      paymentMethod: request.paymentMethod,
+      changeForCents,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
 
-    return {
-      ok: true,
-      response: {
-        orderId,
-        status: 'received',
-        paymentStatus: 'aguardando_confirmacao',
-        // canSubmit true garante withinZone true garante totalCents não-nulo (ver revalidatedCheckoutSchema).
-        totalCents: revalidation.totalCents as number,
-      },
-    };
+    return { ok: true, response: this.buildResponse(request, store, orderId, totalCents, changeForCents) };
+  }
+
+  /** Espelha a union de `checkoutOrderResponseSchema` — cada branch monta só os campos que existem nela (nunca `pix` fora de `pix`, nunca `changeForCents` fora de `cash_on_delivery`). */
+  private buildResponse(
+    request: CheckoutRequest,
+    store: StoreForOrder,
+    orderId: string,
+    totalCents: number,
+    changeForCents: number | null,
+  ): CheckoutOrderResponse {
+    const base = { orderId, status: 'received' as const, paymentStatus: 'aguardando_confirmacao' as const, totalCents };
+    if (request.paymentMethod === 'pix') {
+      return { ...base, paymentMethod: 'pix', pix: buildOrderPix(store, orderId, totalCents) };
+    }
+    if (request.paymentMethod === 'cash_on_delivery') {
+      return { ...base, paymentMethod: 'cash_on_delivery', changeForCents };
+    }
+    return { ...base, paymentMethod: 'card_on_delivery' };
   }
 }

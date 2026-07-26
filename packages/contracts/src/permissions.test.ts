@@ -70,6 +70,18 @@ describe('a matriz da §5-C.5, ponto a ponto sensível', () => {
     expect(can(ator('cashier'), 'payment.refund', NA_LOJA_1).allowed).toBe(false);
   });
 
+  it('payment.confirm (Épico 8): owner, manager e cashier sem aprovação — dinheiro entrando, não saindo', () => {
+    for (const role of ['owner', 'manager', 'cashier'] as const) {
+      expect(can(ator(role), 'payment.confirm', NA_LOJA_1)).toMatchObject({
+        allowed: true,
+        requiresApproval: false,
+      });
+    }
+    for (const role of ['waiter', 'kitchen', 'courier'] as const) {
+      expect(can(ator(role), 'payment.confirm', NA_LOJA_1).allowed).toBe(false);
+    }
+  });
+
   it('cashier abre e fecha SÓ o próprio caixa (selfOnly)', () => {
     expect(can(ator('cashier'), 'cash.open_close', NA_LOJA_1)).toMatchObject({
       allowed: true,

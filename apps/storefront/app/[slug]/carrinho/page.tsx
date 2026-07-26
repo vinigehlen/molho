@@ -22,6 +22,7 @@ export default async function CarrinhoPage({ params }: CarrinhoPageProps) {
     <CartView
       slug={slug}
       storeName={store.store.name}
+      availablePaymentMethods={store.store.availablePaymentMethods}
       emptyTitle={COPY.storefront.carrinhoVazioTitulo}
       emptyBody={COPY.storefront.carrinhoVazioCorpo}
       emptyActionLabel={COPY.storefront.carrinhoVazioAcao}

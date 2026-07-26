@@ -79,6 +79,9 @@ async function seedTenant(
     phone: def.store.phone,
     whatsappNumber: def.store.whatsappNumber,
     minOrderCents: def.store.minOrderCents,
+    pixKey: def.store.pixKey,
+    pixKeyType: def.store.pixKeyType,
+    pixMerchantCity: def.store.pixMerchantCity,
   };
   const store = existingStore
     ? await prisma.store.update({ where: { id: existingStore.id }, data: storeData })

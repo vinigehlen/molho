@@ -1,5 +1,5 @@
 /**
- * Contrato do checkout (Épico 7).
+ * Contrato do checkout (Épico 7) + método de pagamento (Épico 8, docs/02 §5.5).
  *
  * Dois endpoints, mesmo par de schemas de entrada/saída:
  *
@@ -21,6 +21,7 @@
  */
 
 import { z } from 'zod';
+import type { ModuleKey } from './modules';
 
 const centsSchema = z.int().nonnegative();
 
@@ -71,10 +72,50 @@ export const checkoutAddressInputSchema = z.object({
   expectedDeliveryFeeCents: centsSchema.nullable(),
 });
 
-export const checkoutRequestSchema = z.object({
+export const paymentMethodSchema = z.enum(['pix', 'cash_on_delivery', 'card_on_delivery']);
+
+/**
+ * Fonte única do mapeamento método → módulo de entitlement — usado tanto
+ * pelo gate de criação de pedido (checkout, service dinâmico) quanto pelo
+ * cálculo de `availablePaymentMethods` (storefront público). Duplicar isso
+ * nos dois lugares é exatamente o tipo de coisa que diverge silenciosamente
+ * depois de um módulo novo. Ver docs/02-definicoes-v1.md §5.5.
+ */
+export const PAYMENT_METHOD_MODULE: Record<z.infer<typeof paymentMethodSchema>, ModuleKey> = {
+  pix: 'payments.pix_static',
+  cash_on_delivery: 'payments.on_delivery',
+  card_on_delivery: 'payments.on_delivery',
+};
+
+const checkoutRequestBase = z.object({
   items: z.array(checkoutItemInputSchema).min(1),
   address: checkoutAddressInputSchema,
 });
+
+/**
+ * Union discriminada por `paymentMethod` (Épico 8), não campo solto — o
+ * mesmo racional de `checkoutOrderResponseSchema.pix` abaixo: `changeForCents`
+ * só EXISTE estruturalmente no branch `cash_on_delivery`, nunca aparece
+ * (nem `null`) em `pix`/`card_on_delivery`. Granular (dinheiro ≠ cartão na
+ * maquininha) porque são operações diferentes na ponta pro Épico 9 (troco
+ * vs nada) — ambos dependem do mesmo módulo `payments.on_delivery`, mas
+ * isso é detalhe de entitlement, não de contrato de request. Ver
+ * docs/02-definicoes-v1.md §5.5.
+ */
+// .strict() em cada branch: changeForCents mandado com paymentMethod !== 'cash_on_delivery'
+// é request malformado, rejeitado — não silenciosamente descartado (comportamento
+// "strip" default do zod pra chave desconhecida).
+export const checkoutRequestSchema = z.discriminatedUnion('paymentMethod', [
+  checkoutRequestBase.extend({ paymentMethod: z.literal('pix') }).strict(),
+  checkoutRequestBase
+    .extend({
+      paymentMethod: z.literal('cash_on_delivery'),
+      /** "Troco pra quanto" — o valor que o cliente vai entregar (ex.: paga R$47 com uma nota de R$50 → 5000), NÃO o troco em si (isso é `changeForCents - totalCents`, calculado na hora de exibir). `null` = não precisa de troco. */
+      changeForCents: centsSchema.nullable(),
+    })
+    .strict(),
+  checkoutRequestBase.extend({ paymentMethod: z.literal('card_on_delivery') }).strict(),
+]);
 
 export const revalidatedItemSchema = z.object({
   productId: z.uuid(),
@@ -116,16 +157,41 @@ export const revalidatedCheckoutSchema = z.object({
   canSubmit: z.boolean(),
 });
 
-export const checkoutOrderResponseSchema = z.object({
+/**
+ * Pagamento (Épico 8) — PIX estático, chave do lojista, sem PSP. `payload` é
+ * o BR Code completo (`@molho/contracts/pix.ts`): o storefront renderiza o
+ * QR a partir dele E mostra como copia-e-cola, mesmo string pras duas
+ * coisas. `key`/`keyType` só pra exibição humana ("chave: fulano@banco.com,
+ * tipo e-mail") — o payload já embute a chave, isto aqui não é usado pra
+ * montar nada.
+ */
+export const checkoutOrderPixSchema = z.object({
+  payload: z.string(),
+  key: z.string(),
+  keyType: z.enum(['cpf', 'cnpj', 'email', 'phone', 'random']),
+});
+
+const checkoutOrderResponseBase = z.object({
   orderId: z.uuid(),
   status: z.literal('received'),
   paymentStatus: z.literal('aguardando_confirmacao'),
   totalCents: centsSchema,
 });
 
+/** Mesma union de `checkoutRequestSchema`, mesmo racional — `pix` só existe no branch `pix`, `changeForCents` só no branch `cash_on_delivery`. */
+export const checkoutOrderResponseSchema = z.discriminatedUnion('paymentMethod', [
+  checkoutOrderResponseBase.extend({ paymentMethod: z.literal('pix'), pix: checkoutOrderPixSchema }).strict(),
+  checkoutOrderResponseBase
+    .extend({ paymentMethod: z.literal('cash_on_delivery'), changeForCents: centsSchema.nullable() })
+    .strict(),
+  checkoutOrderResponseBase.extend({ paymentMethod: z.literal('card_on_delivery') }).strict(),
+]);
+
 export type CheckoutItemInput = z.infer<typeof checkoutItemInputSchema>;
 export type CheckoutAddressInput = z.infer<typeof checkoutAddressInputSchema>;
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 export type RevalidatedItem = z.infer<typeof revalidatedItemSchema>;
 export type RevalidatedCheckout = z.infer<typeof revalidatedCheckoutSchema>;
+export type CheckoutOrderPix = z.infer<typeof checkoutOrderPixSchema>;
 export type CheckoutOrderResponse = z.infer<typeof checkoutOrderResponseSchema>;

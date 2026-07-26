@@ -6,4 +6,5 @@ export * from './delivery-match';
 export * from './modules';
 export * from './permissions';
 export * from './phone-number';
+export * from './pix';
 export * from './storefront';

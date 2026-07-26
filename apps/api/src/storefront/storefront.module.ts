@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
+import type { ModuleCache } from '@molho/db';
 import Redis from 'ioredis';
 import { AuthModule } from '../auth/auth.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
-import { ModuleCheckModule } from '../modules/module-check.module';
+import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
 import {
   InMemorySlidingWindowRateLimiter,
   type RateLimiter,
   RedisSlidingWindowRateLimiter,
 } from '../rate-limit/rate-limiter';
+import { PrismaAvailablePaymentMethodsResolver } from './available-payment-methods';
 import { DeliveryMatchService } from './delivery-match.service';
 import { PrismaDeliveryMatchRepository } from './delivery-match.repository';
 import { PublicStoreController } from './public-store.controller';
@@ -30,9 +32,13 @@ import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } f
   providers: [
     {
       provide: STOREFRONT_SERVICE,
-      inject: [RequestContextService],
-      useFactory: (requestContext: RequestContextService): StorefrontService =>
-        new StorefrontService(new PrismaStorefrontRepository(requestContext), process.env.S3_PUBLIC_URL),
+      inject: [RequestContextService, MODULE_CACHE],
+      useFactory: (requestContext: RequestContextService, moduleCache: ModuleCache): StorefrontService =>
+        new StorefrontService(
+          new PrismaStorefrontRepository(requestContext),
+          process.env.S3_PUBLIC_URL,
+          new PrismaAvailablePaymentMethodsResolver(requestContext, moduleCache),
+        ),
     },
     {
       // Sem REDIS_URL cai no limitador em memória: em dev de uma instância só

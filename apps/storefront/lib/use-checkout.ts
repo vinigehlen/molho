@@ -7,16 +7,21 @@ import {
   buildCheckoutRequestFromReview,
   createOrder,
   revalidateCheckout,
+  type CheckoutOrderPix,
+  type CheckoutPaymentMethod,
   type CheckoutReview,
 } from './checkout-api';
 import { requestOtp, verifyOtp } from './customer-auth-api';
 import { useCustomerToken } from './use-customer-token';
 
+/** Espelha o branch `status: 'created'` de `CreateOrderResult` (Épico 8) — mesma união por paymentMethod. */
 export type CheckoutStep =
   | { kind: 'idle' }
   | { kind: 'review'; review: CheckoutReview | null; errorMessage: string | null; submitting: boolean }
   | { kind: 'otp' }
-  | { kind: 'success'; orderId: string; totalCents: number };
+  | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'pix'; pix: CheckoutOrderPix }
+  | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
+  | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'card_on_delivery' };
 
 export interface UseCheckoutResult {
   step: CheckoutStep;
@@ -30,6 +35,12 @@ export interface UseCheckoutResult {
   closeCheckout: () => void;
   /** Fecha o sheet de OTP SEM abandonar o checkout — volta pra revisão, que o cliente já viu. */
   cancelOtp: () => void;
+  /** Seletor de forma de pagamento da tela de revisão (Épico 8, docs/02 §5.5). */
+  paymentMethod: CheckoutPaymentMethod;
+  setPaymentMethod: (method: CheckoutPaymentMethod) => void;
+  /** Só relevante quando paymentMethod === 'cash_on_delivery'. */
+  changeForCents: number | null;
+  setChangeForCents: (cents: number | null) => void;
 }
 
 const ERRO_REVALIDACAO = 'Não deu pra conferir seu pedido agora. Tenta de novo.';
@@ -50,16 +61,19 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
   const [step, setStep] = React.useState<CheckoutStep>({ kind: 'idle' });
   const { token, setToken, clearToken } = useCustomerToken(slug);
   const lastReviewRef = React.useRef<CheckoutReview | null>(null);
+  const [paymentMethod, setPaymentMethod] = React.useState<CheckoutPaymentMethod>('pix');
+  const [changeForCents, setChangeForCents] = React.useState<number | null>(null);
 
   const submitOrder = React.useCallback(
     async (accessToken: string) => {
       if (!address || !lastReviewRef.current) return;
 
-      const body = buildCheckoutRequestFromReview(lastReviewRef.current, address);
+      const body = buildCheckoutRequestFromReview(lastReviewRef.current, address, paymentMethod, changeForCents);
       const result = await createOrder(slug, body, accessToken);
 
       if (result.status === 'created') {
-        setStep({ kind: 'success', orderId: result.orderId, totalCents: result.totalCents });
+        const { status: _status, ...success } = result;
+        setStep({ kind: 'success', ...success });
         return;
       }
       if (result.status === 'divergent') {
@@ -74,7 +88,7 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
       }
       setStep({ kind: 'review', review: lastReviewRef.current, errorMessage: ERRO_CRIACAO, submitting: false });
     },
-    [address, clearToken, slug],
+    [address, changeForCents, clearToken, paymentMethod, slug],
   );
 
   const startCheckout = React.useCallback(async () => {
@@ -133,5 +147,17 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
     );
   }, []);
 
-  return { step, startCheckout, confirmReview, requestOtpCode, verifyOtpCode, closeCheckout, cancelOtp };
+  return {
+    step,
+    startCheckout,
+    confirmReview,
+    requestOtpCode,
+    verifyOtpCode,
+    closeCheckout,
+    cancelOtp,
+    paymentMethod,
+    setPaymentMethod,
+    changeForCents,
+    setChangeForCents,
+  };
 }

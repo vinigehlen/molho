@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import type { StorefrontPayload } from '@molho/contracts';
 import { resolvePublicImageUrl } from '../storage/public-url';
+import type { AvailablePaymentMethodsResolver } from './available-payment-methods';
 import type { StorefrontRepository } from './storefront.repository';
 import { computeStoreOpenState } from './store-hours';
 
@@ -17,6 +18,7 @@ export class StorefrontService {
     private readonly repository: StorefrontRepository,
     /** `S3_PUBLIC_URL`. Vazia = bucket sem leitura pública; toda foto vira `null`. */
     private readonly publicImageBaseUrl: string | undefined,
+    private readonly paymentMethods: AvailablePaymentMethodsResolver,
   ) {}
 
   async getStorefront(): Promise<StorefrontPayload> {
@@ -26,6 +28,7 @@ export class StorefrontService {
       this.repository.listMenu(),
       this.repository.listStoreHours(),
     ]);
+    const availablePaymentMethods = await this.paymentMethods.list(store);
 
     // O slug já resolveu pra um tenant no interceptor, então não achar o
     // tenant aqui significa que ele foi soft-deletado entre uma coisa e
@@ -53,6 +56,7 @@ export class StorefrontService {
         minOrderCents: store?.minOrderCents ?? 0,
         isOpenNow,
         nextOpensAt,
+        availablePaymentMethods,
       },
       categories: categories.map((category) => ({
         id: category.id,

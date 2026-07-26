@@ -35,6 +35,8 @@ export const PERMISSIONS = [
   'order.manual_discount',
   'order.cancel_paid',
   // Pagamentos
+  /** PIX estático confirmado manualmente (Épico 8) — dinheiro ENTRANDO, por isso sem approval (§5-C.5 não lista esta ação; ver ROLE_PERMISSIONS pro racional). */
+  'payment.confirm',
   'payment.refund',
   // Caixa
   'cash.open_close',
@@ -149,6 +151,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'order.update_status',
     'order.manual_discount',
     'order.cancel_paid',
+    'payment.confirm',
     'payment.refund',
     'cash.open_close',
     'cash.withdraw',
@@ -177,6 +180,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'order.update_status',
     'order.manual_discount',
     'order.cancel_paid',
+    'payment.confirm',
     { permission: 'payment.refund', approval: true },
     'cash.open_close',
     'cash.withdraw',
@@ -191,6 +195,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'catalog.product.mark_unavailable',
     'order.create',
     'order.update_status',
+    'payment.confirm',
     { permission: 'order.manual_discount', approval: true },
     { permission: 'order.cancel_paid', approval: true },
     { permission: 'cash.open_close', selfOnly: true },

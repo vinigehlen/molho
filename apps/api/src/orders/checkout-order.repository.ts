@@ -1,4 +1,4 @@
-import type { CheckoutAddressInput, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import type { CheckoutAddressInput, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 
 export interface CreateOrderParams {
@@ -8,13 +8,25 @@ export interface CreateOrderParams {
   address: CheckoutAddressInput;
   /** Já garantido `withinZone && canSubmit` por quem chama — deliveryFeeCents/totalCents nunca nulos aqui. */
   revalidated: RevalidatedCheckout;
+  paymentMethod: PaymentMethod;
+  /** Só relevante quando paymentMethod === 'cash_on_delivery' — null nos outros dois (CLAUDE.md regra 4 não se aplica aqui, é ausência de troco, não zero). */
+  changeForCents: number | null;
+}
+
+/** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
+export interface StoreForOrder {
+  id: string;
+  pixKey: string | null;
+  pixKeyType: string | null;
+  pixMerchantCity: string | null;
+  name: string;
 }
 
 export interface CheckoutOrderRepository {
   /** RLS tenant-scoped normal (sem bypass de plataforma) — null tanto pra "não existe" quanto pra "é de outro tenant", de propósito (mesma ambiguidade de CatalogNotFoundError). */
   findCustomer(customerId: string): Promise<{ id: string } | null>;
   /** MVP assume uma loja por tenant (mesma suposição de StorefrontRepository/CheckoutRepository). */
-  findStoreId(): Promise<string | null>;
+  findStore(): Promise<StoreForOrder | null>;
   /**
    * `SELECT ... FOR UPDATE` nas linhas de PRODUTO do pedido — só chamado no
    * caminho de `/checkout/orders` (criação), NUNCA em
@@ -53,13 +65,12 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     });
   }
 
-  async findStoreId(): Promise<string | null> {
-    const store = await this.requestContext.getClient().store.findFirst({
+  async findStore(): Promise<StoreForOrder | null> {
+    return this.requestContext.getClient().store.findFirst({
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { id: true },
+      select: { id: true, pixKey: true, pixKeyType: true, pixMerchantCity: true, name: true },
     });
-    return store?.id ?? null;
   }
 
   async lockProductsForUpdate(productIds: readonly string[]): Promise<void> {
@@ -89,16 +100,18 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
 
   async createOrder(params: CreateOrderParams): Promise<string> {
     const tenantId = this.requestContext.getTenantId();
-    const { storeId, customerId, deliveryAddressId, address, revalidated } = params;
+    const { storeId, customerId, deliveryAddressId, address, revalidated, paymentMethod, changeForCents } = params;
     const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
       INSERT INTO "orders" (
-        "tenant_id", "store_id", "customer_id", "status", "payment_status", "refund_status",
+        "tenant_id", "store_id", "customer_id", "status", "payment_method", "payment_status", "refund_status",
+        "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
         "delivery_geo"
       ) VALUES (
-        ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', 'aguardando_confirmacao', 'not_applicable',
+        ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
+        ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
         ${deliveryAddressId}::uuid, ${address.label}, ${address.street}, ${address.number}, ${address.complement},
         ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},

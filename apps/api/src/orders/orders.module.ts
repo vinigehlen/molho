@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import type { ModuleCache } from '@molho/db';
 import { AuthModule } from '../auth/auth.module';
 import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
-import { ModuleCheckModule } from '../modules/module-check.module';
+import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { PrismaDeliveryMatchRepository } from '../storefront/delivery-match.repository';
 import { CheckoutController } from './checkout.controller';
@@ -11,11 +12,15 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
+import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
-import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
+import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
+import { PrismaPaymentConfirmationRepository } from './payment-confirmation.repository';
+import { PaymentConfirmationService } from './payment-confirmation.service';
+import { PrismaPaymentMethodModuleGate } from './payment-method-module-gate';
 
-export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE };
+export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMATION_SERVICE };
 
 /**
  * TokenModule e StorefrontModule entram aqui em ADIÇÃO a AuthModule pelo
@@ -29,8 +34,14 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE };
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule],
-  controllers: [CheckoutController],
+  controllers: [CheckoutController, OrderPaymentController],
   providers: [
+    {
+      provide: PAYMENT_CONFIRMATION_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): PaymentConfirmationService =>
+        new PaymentConfirmationService(new PrismaPaymentConfirmationRepository(requestContext)),
+    },
     {
       provide: CHECKOUT_REVALIDATION_SERVICE,
       inject: [RequestContextService],
@@ -42,18 +53,20 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE };
     },
     {
       provide: CHECKOUT_ORDER_SERVICE,
-      inject: [RequestContextService, CHECKOUT_REVALIDATION_SERVICE],
+      inject: [RequestContextService, CHECKOUT_REVALIDATION_SERVICE, MODULE_CACHE],
       useFactory: (
         requestContext: RequestContextService,
         revalidationService: CheckoutRevalidationService,
+        moduleCache: ModuleCache,
       ): CheckoutOrderService =>
         new CheckoutOrderService(
           new PrismaCheckoutOrderRepository(requestContext),
           revalidationService,
           new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+          new PrismaPaymentMethodModuleGate(requestContext, moduleCache),
         ),
     },
   ],
-  exports: [CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE],
+  exports: [CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMATION_SERVICE],
 })
 export class OrdersModule {}
