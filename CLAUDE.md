@@ -136,12 +136,15 @@ Ver tabela completa em `docs/01-plano-produto.md` §8. Sequência do MVP:
 6. ✅ Endereços + zonas de entrega + horários
 7. ✅ Checkout + pedidos + máquina de estados
 8. ✅ Pagamento PIX estático + método (dinheiro/cartão na entrega) + troco + reconciliação manual. Fecha com o cliente pagando e ficando no escuro: o lojista confirma o pagamento, mas nada avisa o cliente (WhatsApp de status é o 11, página de acompanhamento é o 12). Mesma família de decisão do Épico 10: dá pra construir fora de ordem, mas o piloto não vai ao ar sem o 11 ou o 12 fechado. Contrato de gate de preparo/conclusão por método e limitação de reconciliação documentados em docs/02 §5.5, pro Épico 9 consumir.
-9. Gestor de pedidos realtime + push/som + fila offline — **próximo**
-11. WhatsApp click-to-chat + `notification_log`
+9. Gestor de pedidos realtime + push/som + fila offline — **em andamento** (backend fechado; UI contra stub de auth só-dev)
+9b. **Auth-do-backoffice (login diário de staff) — BURACO DE ROADMAP, bloqueante de go-live.** Descoberto no Épico 9: o backend de staff-auth existe (`/v1/auth/otp` request/verify, sessões, revogação — Épico 3), mas **não existe frontend de login de staff no backoffice** (é scaffold puro). Não é feature opcional — é como o lojista abre o sistema toda manhã, e não estava em nenhum épico (13 é onboarding do cadastro, 14 é super-admin). Escopo: tela de login OTP de staff, storage do token, client autenticado com header `X-Tenant-Id`, seletor de tenant pra staff multi-tenant, wiring do `arm`/`disarm` do stream (incluindo `disarm` ANTES de descartar o JWT, docs/07). **Posição sugerida:** antes do 13 (onboarding cria o owner, que precisa logar) e do 14; na prática é fundação de todo backoffice autenticado. O Épico 9 usa um stub só-dev que obtém JWT REAL pelo `/v1/auth/otp` (atalho pro token, nunca contorno da validação) até este épico entrar. Não implementado — só escopo e posição.
+11. WhatsApp click-to-chat + `notification_log` (nenhum dos dois existe hoje — a porta `ClickToChatProvider` é citada no comentário de `messaging-provider.port.ts` mas NÃO está definida, e a tabela `notification_log` não está no schema; ambos são escopo DESTE épico, não buraco)
+12. Página de acompanhamento (realtime do cliente NÃO reusa o SSE do gestor, que é staff-only — polling cobre o MVP; se "tracking ao vivo" virar requisito, é canal novo)
+13. Onboarding self-service (wizard 7 passos) — **depende do 9b** (owner criado precisa logar)
 12. Página de acompanhamento
 13. Onboarding self-service (wizard 7 passos)
 13b. 4 templates de tema + logo/capa
-13d. Assinatura, trial, dunning
+13d. Assinatura, trial, dunning — **atenção: pré-requisito de PSP recorrente não existe.** O pagamento do MVP é PIX estático MANUAL (mock/sem PSP, Épico 8). Cobrança recorrente de assinatura (cartão recorrente ou PIX assinatura) precisa de um adapter de PSP REAL — não é swap trivial de mock. É a segunda maior dependência não-construída depois do 9b; dimensionar o adapter (qual PSP, tokenização recorrente) antes de agendar o 13d.
 14. Super-admin (provisionamento, módulos, entitlements, impersonation)
 10. Impressão ESC/POS + agente local + wizard — **reposicionado pro fim da Fase 1** (depois do 13d/14, antes do go-live); piloto vai ao ar sem comanda impressa, operando por tela (docs/01 §8 tem o racional e a condição de antecipação)
 — **GO-LIVE do piloto** —
