@@ -22,6 +22,28 @@ Itens que NÃO podem ir pro ar sem estar fechados. Diferente da seção "resolvi
   4. Removido inteiro quando o 9b entrar — a UI troca o stub pelo login real sem mexer no resto (arm/disarm/consumo do stream não mudam).
 - **Upload de logo/capa (Épico 13b) DEVE reusar a allowlist de imagem sem SVG.** Registrado agora pra não depender de memória de sessão futura: a foto de produto (Épico 4) já recusa SVG (allowlist `image/jpeg|png|webp` em `storage-provider.port.ts`, content-type assinado no presigned PUT — R2 rejeita mismatch). Quando o 13b construir upload de logo/capa, **reusa a MESMA allowlist** — logo de loja não precisa ser SVG, e SVG servido same-site seria origem executável. Não inventar um caminho de upload novo que aceite SVG.
 
+## PSP recorrente (levantamento pro 13d — dependência externa com lead time)
+
+Levantamento pra o PM decidir (NÃO implementado). Contexto: o 13d (assinatura) precisa de PSP real com **cartão recorrente E PIX assinatura**, e abrir conta é lead time de calendário (CNPJ, KYC, sandbox→produção) que não comprime com código — iniciar em paralelo com 9–12, não no 13 (ver `CLAUDE.md` → Ordem dos épicos).
+
+**Duas modalidades de recorrência (queremos as duas):**
+- **PIX Automático** — recorrência regulamentada pelo Bacen (Resolução BCB 384/2024, em produção desde jun/2025). Débito automático programado da conta-corrente, autorizado uma vez pelo cliente. Custo baixo/zero e **taxa de falha estrutural menor (2–5%)** que cartão (8–14%). Todos os PSPs relevantes devem expor o endpoint em 2026.
+- **Cartão recorrente** — tokenização Mastercard/Visa + dunning automático pra falha de cobrança. Cobre quem não usa PIX recorrente.
+
+**Players (todos participam do PIX Automático):**
+| PSP | Perfil | Recorrência | Nota |
+|---|---|---|---|
+| **Vindi** | Especialista em assinatura | Cartão + PIX recorrente; planos/assinaturas nativos | Integra com Pagar.me e outros gateways (taxa de plataforma + gateway separadas) |
+| **Iugu** | Recorrência p/ SaaS/serviços | Boleto, cartão, PIX, link, carnê; API de assinaturas madura (dev.iugu.com) | Onboarding fintech (mais leve que adquirente pura) |
+| **Asaas** | Fintech p/ PME | Boleto, PIX, cartão recorrente com **dunning embutido** | ~R$ 0,49/cobrança cartão + 1,99% |
+| **Pagar.me** | Grupo Stone | Cartão recorrente + dunning automático; PIX Automático nativo | Adquirente completa |
+
+**Abertura de conta (o lead time):** todos exigem CNPJ, contrato social, KYC dos sócios, conta bancária PJ, underwriting e aprovação sandbox→produção. Os de perfil fintech (Asaas, Iugu) tendem a onboarding mais rápido pra PME que adquirente pura. **Requisitos exatos por PSP só se confirmam no cadastro/contato — e iniciar esse cadastro É a ação de lead time.**
+
+**Direção (PM decide):** um especialista em assinatura com cartão + PIX Automático + dunning embutido encaixa no 13d — Vindi, Iugu ou Asaas são os focados em recorrência; Pagar.me se já quisermos a adquirente do grupo Stone. **Alternativa que tira o PSP do caminho crítico do go-live:** cobrar o piloto (poucos restaurantes) manualmente por PIX/boleto na mão, e fazer o 13d self-service só com volume.
+
+Fontes: [Iugu recorrência](https://www.iugu.com/iugu-recorrencia) · [Vindi PIX](https://vindi.com.br/formas-de-pagamentos/pix/) · [Asaas preços](https://www.asaas.com/precos-e-taxas) · [PIX Automático (BCB 384/2024)](https://www.socialhub.pro/blog/pix-automatico-recorrencia-e-commerce/).
+
 ## Débito técnico resolvido
 
 Itens explicitamente adiados ("não corrigido agora, fora de escopo") e depois fechados — visão de PM sobre o que era risco conhecido e deixou de ser. Documentar aqui quando adiar um débito novo e mover pra "resolvido" quando fechar.
