@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
+import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
 
 /**
@@ -19,6 +20,33 @@ export default function GestorPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  const beeperRef = useRef<Beeper | null>(null);
+  const seenIdsRef = useRef<Set<string> | null>(null); // null = load inicial ainda não semeado
+
+  // Som por diff de ids: id nunca visto → beep. O 1º load só SEMEIA o conjunto
+  // (não toca — senão o board inteiro apitaria ao abrir). Depois, todo id novo
+  // (incluindo os que chegaram na janela offline, pegos no refetch da
+  // reconexão) toca. Ver lib/order-sound.ts.
+  useEffect(() => {
+    if (!orders) return;
+    const ids = orders.map((o) => o.id);
+    if (seenIdsRef.current === null) {
+      seenIdsRef.current = new Set(ids);
+      return;
+    }
+    const novos = diffNewIds(seenIdsRef.current, ids);
+    if (novos.length > 0) {
+      beeperRef.current?.beep();
+      for (const id of novos) seenIdsRef.current.add(id);
+    }
+  }, [orders]);
+
+  function ativarSom() {
+    beeperRef.current ??= new Beeper();
+    beeperRef.current.unlock();
+    setSoundOn(true);
+  }
 
   useEffect(() => {
     const session = getStaffSession();
@@ -55,11 +83,21 @@ export default function GestorPage() {
     <main className="min-h-screen bg-bg p-4">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">Pedidos</h1>
-        {streamStatus !== 'open' && (
-          <span className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white">
-            Sem conexão — tentando reconectar…
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {streamStatus !== 'open' && (
+            <span className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white">
+              Sem conexão — tentando reconectar…
+            </span>
+          )}
+          {!soundOn && (
+            <button
+              className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text"
+              onClick={ativarSom}
+            >
+              🔔 Ativar som
+            </button>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {BOARD_COLUMNS.map((col) => (
