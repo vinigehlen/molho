@@ -2,26 +2,41 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DEV_SEED_OWNER, devRequestOtp, devVerifyOtp } from '../../lib/dev-only-auth';
 
 /**
  * Login SÓ-DEV do backoffice (débito docs/07, sai com o Épico 9b). Dirige o OTP
  * REAL do Épico 3: pede o código (o MockMessagingProvider LOGA no console da
- * API), você digita, e a sessão de staff é gravada com o JWT real. Depois
- * `arm → EventSource → StreamCookieAuthGuard` roda de verdade localmente.
+ * API), você digita, e a sessão de staff é gravada com o JWT real.
+ *
+ * `dev-only-auth` é importado DINAMICAMENTE atrás de `NODE_ENV === 'development'`
+ * — `NODE_ENV` é substituído estático no build, então o branch vira código morto
+ * em produção e o webpack ELIMINA o módulo do bundle (o caminho que obtém OTP
+ * nem existe em prod, não só falha em runtime). A página em si early-returna em
+ * prod.
  */
+const DEV_SEED_PHONE = '+5551999990000'; // owner do seed (hardcoded pra não importar o módulo dev-only no topo)
+
 export default function DevLoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState<string>(DEV_SEED_OWNER.phone);
+  const [phone, setPhone] = useState(DEV_SEED_PHONE);
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  if (process.env.NODE_ENV !== 'development') return null;
+
+  // O `if (NODE_ENV !== 'development') return` NO INÍCIO de cada handler é o que
+  // faz o webpack ELIMINAR o import dinâmico: NODE_ENV é estático no build, o
+  // return vira incondicional em prod, e todo o resto (incluindo o import) vira
+  // código morto removido. Guard só no topo do componente NÃO basta (o import
+  // ficaria alcançável e seria empacotado).
   async function pedirCodigo() {
+    if (process.env.NODE_ENV !== 'development') return;
     setBusy(true);
     setError(null);
     try {
+      const { devRequestOtp } = await import('../../lib/dev-only-auth');
       await devRequestOtp(phone);
       setStep('code');
     } catch (e) {
@@ -32,9 +47,11 @@ export default function DevLoginPage() {
   }
 
   async function entrar() {
+    if (process.env.NODE_ENV !== 'development') return;
     setBusy(true);
     setError(null);
     try {
+      const { devVerifyOtp } = await import('../../lib/dev-only-auth');
       await devVerifyOtp(phone, code);
       router.push('/gestor');
     } catch (e) {
