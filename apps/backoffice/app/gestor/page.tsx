@@ -7,6 +7,7 @@ import { getStaffSession } from '../../lib/staff-session';
 import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
+import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
@@ -73,6 +74,10 @@ export default function GestorPage() {
   // Mantém a tela do tablet acesa enquanto logado (re-pede ao voltar o foco).
   useWakeLock(tenantId !== null);
 
+  // Alcançabilidade da API — DIFERENTE do stream. "sem conexão" só quando o
+  // REST em si falha; stream caído com API alcançável é só "sem tempo real".
+  const online = useReachability();
+
   if (error) {
     return (
       <main className="min-h-screen bg-bg p-6">
@@ -88,10 +93,16 @@ export default function GestorPage() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-text">Pedidos</h1>
         <div className="flex items-center gap-2">
-          {streamStatus !== 'open' && (
+          {!online ? (
             <span className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white">
-              Sem conexão — tentando reconectar…
+              Sem conexão — pedidos podem estar desatualizados
             </span>
+          ) : (
+            streamStatus !== 'open' && (
+              <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-white">
+                Sem tempo real — reconectando…
+              </span>
+            )
           )}
           {!soundOn && (
             <button

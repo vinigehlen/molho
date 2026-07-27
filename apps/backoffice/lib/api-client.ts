@@ -1,3 +1,4 @@
+import { markReachable, markUnreachable } from './reachability';
 import { getStaffSession, type StaffSession } from './staff-session';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
@@ -23,11 +24,18 @@ export function authHeaders(session: StaffSession | null, base?: HeadersInit): H
  * por HEADER (Bearer); o cookie é SÓ pro stream SSE (ver desenho do Épico 9).
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: authHeaders(getStaffSession(), init?.headers),
-    credentials: 'include',
-  });
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: authHeaders(getStaffSession(), init?.headers),
+      credentials: 'include',
+    });
+    markReachable(); // respondeu (mesmo 4xx/5xx) = API alcançável
+    return res;
+  } catch (err) {
+    markUnreachable(); // fetch LANÇOU = falha de rede real
+    throw err;
+  }
 }
 
 /** URL do stream SSE (o EventSource é aberto pelo consumidor realtime, não por apiFetch). */
