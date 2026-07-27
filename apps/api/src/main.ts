@@ -3,6 +3,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { COPY, t } from '@molho/contracts';
 import { AppModule } from './app.module';
+import { configureCors } from './bootstrap/cors';
 import { configureTrustProxy } from './bootstrap/trust-proxy';
 
 const PORTA_PADRAO = 3333;
@@ -22,11 +23,14 @@ async function bootstrap() {
   // um client mandar campo a mais que o controller não espera.
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // CORS liberado só para os fronts locais. Sem auth (Épico 3), então isto é
-  // apenas o navegador permitindo a chamada — não é uma fronteira de segurança.
-  app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-  });
+  // CORS com credenciais + allowlist de origens exatas (Épico 9). Com o stream
+  // SSE autenticado por cookie, CORS PASSA a ser fronteira de segurança: só as
+  // origens da allowlist podem ler respostas credenciadas. Ver bootstrap/cors.
+  configureCors(app);
+
+  // SIGTERM do rolling deploy (Fly) fecha os streams SSE limpo em vez de
+  // deixá-los pendurar até timeout de TCP — ver OrderStreamController.
+  app.enableShutdownHooks();
 
   const porta = process.env.PORT ? Number(process.env.PORT) : PORTA_PADRAO;
   await app.listen(porta);

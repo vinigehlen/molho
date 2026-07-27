@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import Redis from 'ioredis';
 import type { ModuleCache } from '@molho/db';
 import { AuthModule } from '../auth/auth.module';
 import { TokenModule } from '../auth/token/token.module';
@@ -12,10 +13,23 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
+import { PrismaAdminOrderRepository } from './admin-order.repository';
+import { OrderAdminController } from './order-admin.controller';
 import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
-import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE, PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
+import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from './realtime/order-event-bus';
+import { OrderPublishInterceptor } from './realtime/order-publish.interceptor';
+import { OrderStreamController } from './realtime/order-stream.controller';
+import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
+import {
+  ADMIN_ORDER_REPOSITORY,
+  CHECKOUT_ORDER_SERVICE,
+  CHECKOUT_REVALIDATION_SERVICE,
+  ORDER_EVENT_BUS,
+  ORDER_STATUS_SERVICE,
+  PAYMENT_CONFIRMATION_SERVICE,
+} from './orders.tokens';
 import { PrismaPaymentConfirmationRepository } from './payment-confirmation.repository';
 import { PaymentConfirmationService } from './payment-confirmation.service';
 import { PrismaPaymentMethodModuleGate } from './payment-method-module-gate';
@@ -34,8 +48,31 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule],
-  controllers: [CheckoutController, OrderPaymentController],
+  controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController],
   providers: [
+    StreamCookieAuthGuard,
+    OrderPublishInterceptor,
+    {
+      provide: ORDER_STATUS_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): OrderStatusService =>
+        new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+    },
+    {
+      provide: ADMIN_ORDER_REPOSITORY,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService) => new PrismaAdminOrderRepository(requestContext),
+    },
+    {
+      // Singleton do processo: segura os subscribers SSE entre requests. Redis
+      // pub/sub em produção (duas conexões — sub em modo subscriber não aceita
+      // outros comandos); in-memory sem REDIS_URL (dev/test, uma instância).
+      provide: ORDER_EVENT_BUS,
+      useFactory: (): OrderEventBus =>
+        process.env.REDIS_URL
+          ? new RedisOrderEventBus(new Redis(process.env.REDIS_URL), new Redis(process.env.REDIS_URL))
+          : new InMemoryOrderEventBus(),
+    },
     {
       provide: PAYMENT_CONFIRMATION_SERVICE,
       inject: [RequestContextService],

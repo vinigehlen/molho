@@ -11,7 +11,7 @@ const ROTAS_RESERVADAS = new Set<string>([]);
 /**
  * Resolve o tenant a partir da URL. É a ÚNICA função que sabe COMO uma
  * requisição vira slug hoje — path (`molho.vercel.app/{slug}`, CLAUDE.md
- * "infra ativa"). Trocar pra subdomínio (`{slug}.molho.store`, produção
+ * "infra ativa"). Trocar pra subdomínio (`{slug}.molho.live`, produção
  * futura) é editar só esta função; nenhum layout muda ("a lógica de
  * resolução de tenant deve ser configurável para trocar sem refactor").
  */

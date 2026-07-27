@@ -11,13 +11,16 @@ import { OrderExceptionFilter } from './order-exception.filter';
 import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
 import type { CheckoutOrderService } from './checkout-order.service';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
+import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
  * Dois endpoints, MESMO body (`CheckoutRequestDto`) — ver o header de
  * `@molho/contracts/checkout.ts` pro racional completo dos dois papéis.
  */
 @Controller('v1/store/:slug/checkout')
-@UseInterceptors(TenantContextInterceptor)
+// OrderPublishInterceptor OUTER do TenantContextInterceptor: flush do cutuque
+// 'new' só depois do commit da criação (ver order-publish.interceptor.ts).
+@UseInterceptors(OrderPublishInterceptor, TenantContextInterceptor)
 @UseFilters(OrderExceptionFilter)
 @RequireModule('channel.storefront')
 export class CheckoutController {
@@ -62,6 +65,10 @@ export class CheckoutController {
       res.status(HttpStatus.CONFLICT);
       return result.revalidation;
     }
+
+    // Enfileira o cutuque de "pedido novo" — flush após o commit da criação
+    // (OrderPublishInterceptor). version 0 = pedido recém-nascido.
+    queueOrderPublish(req, tenantId, { orderId: result.response.orderId, event: 'new', version: 0 });
     return result.response;
   }
 }

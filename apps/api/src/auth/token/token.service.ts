@@ -205,7 +205,7 @@ export class TokenService {
     return payload;
   }
 
-  private signAccessToken(payload: TokenPayload): string {
+  private signAccessToken(payload: Omit<TokenPayload, 'exp'>): string {
     const version = currentJwtKeyVersion(this.jwtSecrets);
     const secret = this.jwtSecrets[version];
     if (!secret) throw new Error(`sem chave JWT pra versão "${version}"`);

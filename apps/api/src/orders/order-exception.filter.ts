@@ -10,6 +10,7 @@ import {
   OrderNotFoundError,
   PaymentAlreadyConfirmedError,
   PaymentMethodNotAvailableError,
+  PaymentNotConfirmedError,
 } from './order-errors';
 import { toOrderHttpException } from './order-http.util';
 
@@ -22,6 +23,7 @@ type OrderDomainError =
   | CheckoutStoreNotConfiguredError
   | PaymentAlreadyConfirmedError
   | PaymentMethodNotAvailableError
+  | PaymentNotConfirmedError
   | InvalidChangeAmountError;
 
 /** Traduz os erros de domínio de pedidos/checkout pra HTTP — mesmo padrão de CatalogExceptionFilter. */
@@ -34,6 +36,7 @@ type OrderDomainError =
   CheckoutStoreNotConfiguredError,
   PaymentAlreadyConfirmedError,
   PaymentMethodNotAvailableError,
+  PaymentNotConfirmedError,
   InvalidChangeAmountError,
 )
 export class OrderExceptionFilter implements ExceptionFilter {

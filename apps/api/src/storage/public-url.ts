@@ -3,7 +3,9 @@
  * front renderiza.
  *
  * Mora no servidor de propósito: o front NUNCA monta URL de bucket. Assim,
- * trocar "R2 público direto" por domínio próprio (`cdn.molho.store`, Fase 2)
+ * trocar "R2 público direto" por domínio próprio (Fase 2 — registrable domain
+ * SEPARADO tipo `molhousercontent.com`, nunca subdomínio de `molho.live`:
+ * conteúdo de usuário não pode ser same-site com a API, ver Épico 9)
  * ou por um Worker de resize é mudança de `S3_PUBLIC_URL`, sem deploy de
  * front e sem migration — o `imageKey` gravado no banco continua o mesmo.
  *

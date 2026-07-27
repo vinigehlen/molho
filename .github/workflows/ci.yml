@@ -1,3 +1,8 @@
+# CI é quality-only: lint + typecheck + test + build + contraste. NÃO faz deploy.
+# Deploy da apps/api é passo separado, fora daqui: Fly.io região GRU (São Paulo),
+# máquina sempre ligada — processo Node de vida longa que o SSE do gestor de
+# pedidos exige (Épico 9). Deploy dos fronts é a Vercel. Ver CLAUDE.md →
+# "Infra de produção". Quando o deploy da API entrar no CI, é um job à parte.
 name: CI
 on:
   push:

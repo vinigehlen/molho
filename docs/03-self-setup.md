@@ -41,9 +41,11 @@ Landing → "Criar minha loja grátis"
 
 ## 4. Domínio (simplificado — decisão travada)
 
-**Sempre e apenas `{slug}.molho.app`.** Sem domínio próprio, sem CNAME, sem verificação de DNS, sem TLS on-demand.
+**Sempre e apenas `{slug}.molho.live`.** Sem domínio próprio, sem CNAME, sem verificação de DNS, sem TLS on-demand.
 
-**O que isso elimina:** um épico inteiro (13c), o suporte de "meu DNS não propaga", a emissão de certificados e um vetor de falha em produção. **O que se ganha:** wildcard TLS único (`*.molho.app`), loja no ar em 1 segundo, e cada loja carregando o nome Molho — vira canal de aquisição.
+**O que isso elimina:** um épico inteiro (13c), o suporte de "meu DNS não propaga", a emissão de certificados e um vetor de falha em produção. **O que se ganha:** wildcard TLS único (`*.molho.live`), loja no ar em 1 segundo, e cada loja carregando o nome Molho — vira canal de aquisição.
+
+> **Nota (Épico 9):** o registrable domain `molho.live` é compartilhado com o backoffice (`app.molho.live`) e a API (`api.molho.live`) — os storefronts `{slug}.molho.live` ficam **same-site** com a API. Isso é pré-requisito do cookie de stream do gestor realtime (SSE), e traz uma superfície de segurança same-site analisada no desenho do Épico 9. Ver `CLAUDE.md` → "Infra de produção".
 
 - Slug validado em tempo real no cadastro (a–z, 0–9, hífen; 3–30 chars; blocklist de reservados e palavrões).
 - Trocar o slug depois: permitido 1×, com redirect 301 do antigo por 90 dias.
@@ -94,4 +96,6 @@ Substitui e amplia o antigo épico 13:
 > Estes três são **parte do MVP** — sem eles não existe produto vendável, só demo.
 
 ## 8. Unit economics
-Feita — ver `molho-unit-economics.xlsx`. Conclusão: o modelo fecha, mas **o Standard a R$ 99 tem margem bruta de 62%**, abaixo do padrão SaaS (>75%), porque o **suporte** come R$ 10,50 dos R$ 34,47 de custo. Break-even em **~24 lojas**.
+Feita — ver `05-unit-economics.xlsx`. Conclusão: o modelo fecha, mas **o Standard a R$ 99 tem margem bruta de 62%**, abaixo do padrão SaaS (>75%), porque o **suporte** come R$ 10,50 dos R$ 34,47 de custo. Break-even em **~24 lojas**.
+
+> **Custo fixo de infra que faltava na conta (Épico 9).** A `apps/api` na Fly.io (região GRU) é **custo fixo mensal que nunca entrou na planilha** — ela assumia só Vercel/Neon/Upstash (todos com tier free ou usage-based). São **DUAS máquinas sempre ligadas** (não uma) — exigência do rolling deploy: máquina única mata todos os streams SSE juntos a cada deploy (ver `CLAUDE.md` → "Infra de produção"). Custo: `shared-cpu-1x` 512MB always-on em GRU ≈ $4/mês cada (base $3,32 × surcharge 1,22 de São Paulo) → **~$8/mês pelas duas**; num par de 1GB ≈ $16–20/mês. É **custo de plataforma amortizado por todas as lojas** (não por loja), dilui rápido no break-even de ~24 lojas. Vale o dinheiro só por eliminar a janela de indisponibilidade no pico do jantar. **Ação pendente: lançar essa linha de custo fixo de infra na `05-unit-economics.xlsx`** (planilha binária, não editável por aqui — o número acima é o que entra).

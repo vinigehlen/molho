@@ -48,7 +48,9 @@ export const storefrontProductSchema = z.object({
   /**
    * URL pública já resolvida pela API a partir de `Product.imageKey` — o front
    * nunca monta URL de bucket. Assim, trocar R2 público por domínio próprio
-   * (`cdn.molho.store`, Fase 2) é mudança de env var no servidor, sem deploy
+   * (Fase 2 — registrable domain SEPARADO, tipo `molhousercontent.com`, NUNCA
+   * subdomínio de `molho.live`: conteúdo de usuário same-site com a API é o
+   * anti-padrão que o desenho do Épico 9 barra) é mudança de env var no servidor, sem deploy
    * de front. `null` = produto sem foto (ou leitura pública ainda não
    * configurada), e o card cai no placeholder do tema.
    */

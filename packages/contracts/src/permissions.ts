@@ -30,6 +30,10 @@ export const PERMISSIONS = [
   'catalog.product.mark_unavailable',
   'catalog.import',
   // Pedidos
+  /** Ler o gestor de pedidos e o stream realtime (Épico 9) — gate de LEITURA
+   *  separado dos de escrita: deixa a porta aberta pra um papel view-only ou
+   *  "só entrega" sem retrabalho. Todo papel que hoje muda status também vê. */
+  'order.view',
   'order.create',
   'order.update_status',
   'order.manual_discount',
@@ -147,6 +151,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'catalog.product.delete',
     'catalog.product.mark_unavailable',
     'catalog.import',
+    'order.view',
     'order.create',
     'order.update_status',
     'order.manual_discount',
@@ -176,6 +181,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'catalog.product.delete',
     'catalog.product.mark_unavailable',
     'catalog.import',
+    'order.view',
     'order.create',
     'order.update_status',
     'order.manual_discount',
@@ -193,6 +199,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
   ],
   cashier: [
     'catalog.product.mark_unavailable',
+    'order.view',
     'order.create',
     'order.update_status',
     'payment.confirm',
@@ -203,8 +210,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'delivery.dispatch',
     'invoice.issue',
   ],
-  waiter: ['order.create', 'order.update_status'],
-  kitchen: ['order.update_status'],
+  waiter: ['order.view', 'order.create', 'order.update_status'],
+  kitchen: ['order.view', 'order.update_status'],
   // Entregador NÃO acessa o backoffice: só muda status da própria entrega.
   courier: ['delivery.update_status'],
   accountant: ['report.revenue.view', 'invoice.issue'],

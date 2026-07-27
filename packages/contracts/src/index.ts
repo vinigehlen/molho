@@ -1,4 +1,5 @@
 export * from './address';
+export * from './admin-order';
 export * from './cart';
 export * from './checkout';
 export * from './copy.pt-BR';
