@@ -114,7 +114,7 @@ export default function GestorPage() {
   if (error) {
     return (
       <main className="min-h-screen bg-bg p-6">
-        <p className="text-danger">{error}</p>
+        <p className="text-critical">{error}</p>
       </main>
     );
   }
@@ -127,7 +127,7 @@ export default function GestorPage() {
         <h1 className="text-xl font-semibold text-text">Pedidos</h1>
         <div className="flex items-center gap-2">
           {!online ? (
-            <span className="rounded-full bg-danger px-3 py-1 text-xs font-medium text-white">
+            <span className="rounded-full bg-critical px-3 py-1 text-xs font-medium text-white">
               Sem conexão — pedidos podem estar desatualizados
             </span>
           ) : (
@@ -149,7 +149,7 @@ export default function GestorPage() {
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {BOARD_COLUMNS.map((col) => (
-          <section key={col} className="rounded-[20px] bg-surface p-3">
+          <section key={col} className="rounded-[20px] bg-bg-card p-3">
             <h2 className="mb-3 px-1 text-sm font-semibold text-text-muted">
               {COLUMN_LABEL[col]} {groups && <span className="tabular-nums">({groups[col].length})</span>}
             </h2>
@@ -176,8 +176,8 @@ export default function GestorPage() {
       </div>
 
       {conflicts.length > 0 && (
-        <section className="mt-6 rounded-[20px] border border-danger bg-surface p-4">
-          <h2 className="mb-2 text-sm font-semibold text-danger">
+        <section className="mt-6 rounded-[20px] border border-critical bg-bg-card p-4">
+          <h2 className="mb-2 text-sm font-semibold text-critical">
             Ações não aplicadas — precisam da sua decisão ({conflicts.length})
           </h2>
           <ul className="space-y-2">
@@ -188,7 +188,7 @@ export default function GestorPage() {
                 </span>
                 <span className="flex shrink-0 gap-2">
                   <button
-                    className="rounded-[10px] bg-primary px-2 py-1 text-xs font-medium text-primary-fg"
+                    className="rounded-[10px] bg-brand px-2 py-1 text-xs font-medium text-on-brand"
                     onClick={() => void resolveConflict(c.intent.idempotencyKey, 'reapply')}
                   >
                     Reaplicar
@@ -207,7 +207,7 @@ export default function GestorPage() {
       )}
 
       {autoApplied.length > 0 && (
-        <section className="mt-4 rounded-[20px] bg-surface p-4">
+        <section className="mt-4 rounded-[20px] bg-bg-card p-4">
           <h2 className="mb-2 text-sm font-semibold text-text-muted">Reaplicadas automaticamente na reconexão ({autoApplied.length})</h2>
           <ul className="space-y-1 text-xs text-text-muted">
             {autoApplied.map((a) => (
@@ -265,7 +265,7 @@ function OrderCard({
         )}
         {next && (
           <button
-            className="rounded-[10px] bg-primary px-3 py-1 text-xs font-medium text-primary-fg"
+            className="rounded-[10px] bg-brand px-3 py-1 text-xs font-medium text-on-brand"
             onClick={() => onAdvance(next.to)}
           >
             {next.label}
