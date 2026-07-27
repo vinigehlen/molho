@@ -28,6 +28,12 @@ jobs:
       # `build` gera o storybook-static, que é o alvo do teste de contraste.
       - run: pnpm build
 
+      # Regride em silêncio (config de build): falha se o atalho de auth só-dev
+      # (dev-only-auth.ts) vazar pro bundle de produção do backoffice. Roda DEPOIS
+      # do build — depende do .next/static. Ver docs/07.
+      - name: Stub só-dev fora do bundle de produção
+        run: ./scripts/check-dev-stub-excluded.sh
+
       - name: Cache dos browsers do Playwright
         uses: actions/cache@v4
         id: playwright-cache
