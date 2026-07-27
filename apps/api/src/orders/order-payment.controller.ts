@@ -10,6 +10,7 @@ import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { PAYMENT_CONFIRMATION_SERVICE } from './orders.tokens';
 import type { PaymentConfirmationService } from './payment-confirmation.service';
+import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
  * Reconciliação manual do PIX estático (Épico 8) — o lojista confere o app
@@ -20,7 +21,9 @@ import type { PaymentConfirmationService } from './payment-confirmation.service'
  */
 @Controller('v1/admin/orders')
 @UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
-@UseInterceptors(TenantContextInterceptor)
+// OrderPublishInterceptor ANTES do TenantContextInterceptor (outer): o flush do
+// cutuque roda depois do commit da transação. Mesmo motivo do OrderAdminController.
+@UseInterceptors(OrderPublishInterceptor, TenantContextInterceptor)
 @UseFilters(OrderExceptionFilter)
 @RequireModule('payments.pix_static')
 export class OrderPaymentController {
@@ -39,6 +42,13 @@ export class OrderPaymentController {
       expectedVersion: dto.version,
       actor: { userId: req.user.sub, role },
     });
+
+    // Cutuque pós-commit (flush no OrderPublishInterceptor): sem isto, o segundo
+    // tablet da cozinha segue mostrando "aguardando pagamento" e o gate de
+    // preparo (§5.5) barra num board desatualizado. Evento PRÓPRIO (não
+    // status_changed) — paymentStatus é eixo ortogonal. version = dto.version+1
+    // (o lock otimista da confirmação bumpa a versão).
+    queueOrderPublish(req, tenantId, { orderId: id, event: 'payment_confirmed', version: dto.version + 1 });
   }
 }
 

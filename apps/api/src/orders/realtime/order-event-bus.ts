@@ -9,7 +9,13 @@ import type Redis from 'ioredis';
  */
 export interface OrderEvent {
   orderId: string;
-  event: 'new' | 'status_changed';
+  // `payment_confirmed` é EIXO SEPARADO de `status_changed` de propósito:
+  // paymentStatus é ortogonal a OrderStatus (docs/02 §5.5). Confirmar pagamento
+  // NÃO move o status do pedido — reusar `status_changed` mentiria sobre qual
+  // eixo mudou pra qualquer consumidor que ramifique por tipo (ex.: o
+  // acompanhamento do cliente, Épico 12). O cutuque continua magro: o cliente
+  // refaz o GET REST de qualquer forma.
+  event: 'new' | 'status_changed' | 'payment_confirmed';
   version: number;
 }
 

@@ -6,7 +6,7 @@ export type StreamStatus = 'connecting' | 'open' | 'reconnecting';
 
 interface Nudge {
   orderId: string;
-  event: 'new' | 'status_changed';
+  event: 'new' | 'status_changed' | 'payment_confirmed';
   version: number;
 }
 
@@ -75,6 +75,9 @@ export function useOrdersStream(tenantId: string | null, handlers: Handlers): St
       };
       source.addEventListener('order_new', onNudge);
       source.addEventListener('order_status', onNudge);
+      // Confirmação de pagamento (eixo ortogonal ao status) — refetch idêntico:
+      // o AdminOrder devolvido já traz o paymentStatus fresco pro board/painel.
+      source.addEventListener('order_payment', onNudge);
       source.addEventListener('server_shutdown', () => {
         source.close();
         scheduleReconnect(true);

@@ -26,6 +26,13 @@ import { STREAM_COOKIE_NAME, StreamCookieAuthGuard } from './stream-cookie-auth.
 const PING_INTERVAL_MS = 25_000;
 const BEARER_PREFIX = 'Bearer ';
 
+/** Mapa evento-do-bus → nome do evento SSE (o front escuta por nome). */
+const SSE_EVENT_TYPE: Record<OrderEvent['event'], string> = {
+  new: 'order_new',
+  status_changed: 'order_status',
+  payment_confirmed: 'order_payment',
+};
+
 /** Reconstrói o Actor do JWT (mesmo critério do RequirePermissionGuard) — filtra papel desconhecido em vez de castar (fail-closed). */
 function actorFromRequest(req: RequestWithUser): Actor {
   return {
@@ -134,7 +141,7 @@ export class OrderStreamController implements OnApplicationShutdown {
       // pro Last-Event-ID (protocolo; sem replay — gap coberto por diff de ids).
       const off = this.bus.subscribe(frozenTenantId, (event: OrderEvent) => {
         subscriber.next({
-          type: event.event === 'new' ? 'order_new' : 'order_status',
+          type: SSE_EVENT_TYPE[event.event],
           data: JSON.stringify(event),
           id: String(event.version),
         });
