@@ -117,6 +117,7 @@ A `apps/api` (NestJS) é um **processo Node de vida longa** — não roda server
 
 - **Ponytail (se instalado) fica em `lite`, nunca `full`/`ultra`** — este CLAUDE.md já é rigoroso sobre o que não simplificar (ver "Complexidade deliberada"). Nível não persiste entre sessões — rodar `/ponytail lite` no começo de cada sessão nova.
 - **Um épico por sessão.** Termine com `pnpm lint && pnpm test && pnpm build` verdes.
+- **NENHUM resultado de gate é reportado sem `pnpm build` completo ter rodado.** Não basta `pnpm lint`/`typecheck` isolado: eles rodam a partir da RAIZ, mas o `next build` roda o próprio ESLint/typecheck com **cwd em `apps/<app>`** — caminho relativo de config resolve diferente, e um checador pode passar na raiz e explodir no build (ou o contrário). Aconteceu DUAS vezes: Épico 8 ("typecheck cobre a compilação" → o build provou que não) e Épico 9 ("0 falso positivo no `pnpm lint`" → o build expôs FP em massa do guarda de token). Mesma causa: **ferramenta rodando com cwd diferente da raiz.** Regra: só declare verde depois do `pnpm build`, e prefira caminho ABSOLUTO (`import.meta.dirname`) em qualquer config que uma ferramenta possa carregar de outro cwd.
 - **Testes junto com a feature**, não depois. Cobertura mínima em módulos de negócio.
 - **Contratos primeiro:** schema Prisma e schemas zod em `packages/contracts` antes da UI.
 - **CI roda dois perfis:** "somente core" e "tudo ligado". Feature que quebra o perfil mínimo não passa.
