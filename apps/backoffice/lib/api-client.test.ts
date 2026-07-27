@@ -3,7 +3,7 @@ import { authHeaders } from './api-client';
 
 describe('authHeaders', () => {
   it('com sessão: seta Bearer + X-Tenant-Id', () => {
-    const h = authHeaders({ accessToken: 'tok', tenantId: 'tenant-1' });
+    const h = authHeaders({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
     expect(h.get('authorization')).toBe('Bearer tok');
     expect(h.get('x-tenant-id')).toBe('tenant-1');
   });
@@ -15,7 +15,7 @@ describe('authHeaders', () => {
   });
 
   it('preserva headers base (ex.: content-type)', () => {
-    const h = authHeaders({ accessToken: 't', tenantId: 'x' }, { 'content-type': 'application/json' });
+    const h = authHeaders({ accessToken: 't', tenantId: 'x', userId: 'u1' }, { 'content-type': 'application/json' });
     expect(h.get('content-type')).toBe('application/json');
     expect(h.get('authorization')).toBe('Bearer t');
   });

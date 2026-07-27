@@ -1,4 +1,4 @@
-import { firstTenantScopeId } from './jwt-tenant';
+import { firstTenantScopeId, subFromToken } from './jwt-tenant';
 import { setStaffSession } from './staff-session';
 
 /**
@@ -47,7 +47,9 @@ export async function devVerifyOtp(phone: string, code: string): Promise<{ name:
 
   const tenantId = firstTenantScopeId(body.accessToken);
   if (!tenantId) throw new Error('Token sem escopo de tenant — o owner do seed tem user_role? Rode o seed.');
+  const userId = subFromToken(body.accessToken);
+  if (!userId) throw new Error('Token sem sub.');
 
-  setStaffSession({ accessToken: body.accessToken, tenantId });
+  setStaffSession({ accessToken: body.accessToken, tenantId, userId });
   return { name: body.user.name };
 }

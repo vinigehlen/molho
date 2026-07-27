@@ -9,8 +9,17 @@ import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
+import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
+
+/** Próxima ação do fluxo por status (o botão "Avançar" do card). */
+const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status']; label: string }>> = {
+  received: { to: 'preparing', label: 'Preparar' },
+  preparing: { to: 'ready', label: 'Pronto' },
+  ready: { to: 'in_transit', label: 'Saiu p/ entrega' },
+  in_transit: { to: 'completed', label: 'Concluir' },
+};
 
 /**
  * Board do gestor de pedidos (Épico 9). Load inicial via GET /v1/admin/orders;
@@ -20,6 +29,7 @@ import { centsToBRL, isoToTime } from '../../lib/format';
 export default function GestorPage() {
   const router = useRouter();
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
@@ -57,6 +67,7 @@ export default function GestorPage() {
       return;
     }
     setTenantId(session.tenantId);
+    setUserId(session.userId);
     fetchActiveOrders()
       .then(setOrders)
       .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar.'));
@@ -77,6 +88,10 @@ export default function GestorPage() {
   // Alcançabilidade da API — DIFERENTE do stream. "sem conexão" só quando o
   // REST em si falha; stream caído com API alcançável é só "sem tempo real".
   const online = useReachability();
+
+  // Fila offline: submit (online aplica / offline enfileira), sync na volta, conflitos.
+  const { pending, conflicts, autoApplied, submit, resolveConflict } = useOrderQueue(tenantId, userId, online);
+  const pendingIds = new Set(pending.map((i) => i.orderId));
 
   if (error) {
     return (
@@ -122,7 +137,14 @@ export default function GestorPage() {
             </h2>
             <div className="space-y-3">
               {groups
-                ? groups[col].map((order) => <OrderCard key={order.id} order={order} />)
+                ? groups[col].map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      pending={pendingIds.has(order.id)}
+                      onAdvance={(to) => void submit(order, to)}
+                    />
+                  ))
                 : // skeletons no load
                   Array.from({ length: 2 }).map((_, i) => (
                     <div key={i} className="h-24 animate-pulse rounded-[14px] bg-bg" />
@@ -131,11 +153,64 @@ export default function GestorPage() {
           </section>
         ))}
       </div>
+
+      {conflicts.length > 0 && (
+        <section className="mt-6 rounded-[20px] border border-danger bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold text-danger">
+            Ações não aplicadas — precisam da sua decisão ({conflicts.length})
+          </h2>
+          <ul className="space-y-2">
+            {conflicts.map((c) => (
+              <li key={c.intent.idempotencyKey} className="flex items-center justify-between gap-3 rounded-[14px] bg-bg p-3 text-sm">
+                <span className="text-text">
+                  {c.order?.customerName ?? 'Pedido'} → <strong>{c.intent.toStatus}</strong>: {c.reason}
+                </span>
+                <span className="flex shrink-0 gap-2">
+                  <button
+                    className="rounded-[10px] bg-primary px-2 py-1 text-xs font-medium text-primary-fg"
+                    onClick={() => void resolveConflict(c.intent.idempotencyKey, 'reapply')}
+                  >
+                    Reaplicar
+                  </button>
+                  <button
+                    className="rounded-[10px] border border-border px-2 py-1 text-xs text-text"
+                    onClick={() => void resolveConflict(c.intent.idempotencyKey, 'discard')}
+                  >
+                    Descartar
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {autoApplied.length > 0 && (
+        <section className="mt-4 rounded-[20px] bg-surface p-4">
+          <h2 className="mb-2 text-sm font-semibold text-text-muted">Reaplicadas automaticamente na reconexão ({autoApplied.length})</h2>
+          <ul className="space-y-1 text-xs text-text-muted">
+            {autoApplied.map((a) => (
+              <li key={a.intent.idempotencyKey} className="tabular-nums">
+                {isoToTime(new Date(a.at).toISOString())} — pedido {a.intent.orderId.slice(0, 8)} → {a.intent.toStatus}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }
 
-function OrderCard({ order }: { order: AdminOrder }) {
+function OrderCard({
+  order,
+  pending,
+  onAdvance,
+}: {
+  order: AdminOrder;
+  pending: boolean;
+  onAdvance: (to: AdminOrder['status']) => void;
+}) {
+  const next = NEXT_ACTION[order.status];
   return (
     <article className="rounded-[14px] border border-border bg-bg p-3">
       <div className="flex items-baseline justify-between">
@@ -150,6 +225,21 @@ function OrderCard({ order }: { order: AdminOrder }) {
           </li>
         ))}
       </ul>
+      <div className="mt-3 flex items-center justify-between">
+        {pending ? (
+          <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
+        ) : (
+          <span />
+        )}
+        {next && (
+          <button
+            className="rounded-[10px] bg-primary px-3 py-1 text-xs font-medium text-primary-fg"
+            onClick={() => onAdvance(next.to)}
+          >
+            {next.label}
+          </button>
+        )}
+      </div>
     </article>
   );
 }

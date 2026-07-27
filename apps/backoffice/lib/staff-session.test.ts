@@ -5,8 +5,8 @@ beforeEach(() => window.sessionStorage.clear());
 
 describe('staff-session', () => {
   it('set → get devolve a sessão', () => {
-    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1' });
-    expect(getStaffSession()).toEqual({ accessToken: 'tok', tenantId: 'tenant-1' });
+    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
+    expect(getStaffSession()).toEqual({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
   });
 
   it('sem nada gravado: null', () => {
@@ -14,7 +14,7 @@ describe('staff-session', () => {
   });
 
   it('clear remove', () => {
-    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1' });
+    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
     clearStaffSession();
     expect(getStaffSession()).toBeNull();
   });

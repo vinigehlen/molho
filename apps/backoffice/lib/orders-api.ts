@@ -36,12 +36,15 @@ export async function transitionOrder(
   id: string,
   toStatus: AdminOrder['status'],
   version: number,
-  reason?: string,
+  reason: string | null,
+  idempotencyKey?: string,
 ): Promise<Response> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
   return apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ toStatus, version, reason }),
+    headers,
+    body: JSON.stringify({ toStatus, version, reason: reason ?? undefined }),
   });
 }
 

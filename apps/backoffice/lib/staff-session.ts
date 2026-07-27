@@ -9,6 +9,8 @@ export interface StaffSession {
   accessToken: string;
   /** UUID do tenant ativo — vira o header X-Tenant-Id. Staff multi-tenant escolhe qual (no dev, o único do owner do seed). */
   tenantId: string;
+  /** userId (sub do JWT) — marca autoria dos intents da fila offline (tablet compartilhado). */
+  userId: string;
 }
 
 const KEY = 'molho.staff-session';
@@ -19,8 +21,8 @@ export function getStaffSession(): StaffSession | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<StaffSession>;
-    if (typeof parsed.accessToken === 'string' && typeof parsed.tenantId === 'string') {
-      return { accessToken: parsed.accessToken, tenantId: parsed.tenantId };
+    if (typeof parsed.accessToken === 'string' && typeof parsed.tenantId === 'string' && typeof parsed.userId === 'string') {
+      return { accessToken: parsed.accessToken, tenantId: parsed.tenantId, userId: parsed.userId };
     }
   } catch {
     // storage corrompido — trata como sem sessão

@@ -6,13 +6,25 @@
  * pela mesma leitura.
  */
 export function firstTenantScopeId(accessToken: string): string | null {
+  return decodePayload(accessToken)?.scopes?.find((s) => s.scopeType === 'tenant' && typeof s.scopeId === 'string')?.scopeId ?? null;
+}
+
+/** `sub` do JWT (userId do staff) — pra marcar autoria dos intents da fila offline. Mesma decodificação-sem-verificar (o servidor revalida). */
+export function subFromToken(accessToken: string): string | null {
+  const sub = decodePayload(accessToken)?.sub;
+  return typeof sub === 'string' ? sub : null;
+}
+
+interface JwtPayload {
+  sub?: string;
+  scopes?: { scopeType?: string; scopeId?: string | null }[];
+}
+
+function decodePayload(accessToken: string): JwtPayload | null {
   const part = accessToken.split('.')[1];
   if (!part) return null;
   try {
-    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
-    const payload = JSON.parse(json) as { scopes?: { scopeType?: string; scopeId?: string | null }[] };
-    const tenantScope = payload.scopes?.find((s) => s.scopeType === 'tenant' && typeof s.scopeId === 'string');
-    return tenantScope?.scopeId ?? null;
+    return JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as JwtPayload;
   } catch {
     return null;
   }
