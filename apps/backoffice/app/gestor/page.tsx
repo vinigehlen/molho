@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
-import { BOARD_COLUMNS, COLUMN_LABEL, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
+import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
@@ -93,6 +93,24 @@ export default function GestorPage() {
   const { pending, conflicts, autoApplied, submit, resolveConflict } = useOrderQueue(tenantId, userId, online);
   const pendingIds = new Set(pending.map((i) => i.orderId));
 
+  // Confirmação de pagamento (item 6). Refetch pós-confirm atualiza board+painel;
+  // o cutuque `payment_confirmed` faz o mesmo nos OUTROS tablets. NÃO passa pela
+  // fila offline: é gateada por alcançabilidade (só habilita online), então nunca
+  // é disparada offline pra precisar enfileirar.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  async function markPaid(order: AdminOrder) {
+    setConfirmingId(order.id);
+    try {
+      // ok OU 409 (já confirmado / conflito de version): o fetch fresco reconcilia.
+      // Só erro de rede/500 fica sem tratar aqui — some no próximo cutuque/refetch.
+      await confirmPayment(order.id, order.version).catch(() => null);
+      const fresh = await fetchOrder(order.id).catch(() => null);
+      setOrders((prev) => (prev ? applyOrderUpdate(prev, order.id, fresh) : prev));
+    } finally {
+      setConfirmingId(null);
+    }
+  }
+
   if (error) {
     return (
       <main className="min-h-screen bg-bg p-6">
@@ -142,7 +160,10 @@ export default function GestorPage() {
                       key={order.id}
                       order={order}
                       pending={pendingIds.has(order.id)}
+                      online={online}
+                      confirming={confirmingId === order.id}
                       onAdvance={(to) => void submit(order, to)}
+                      onMarkPaid={() => void markPaid(order)}
                     />
                   ))
                 : // skeletons no load
@@ -204,15 +225,23 @@ export default function GestorPage() {
 function OrderCard({
   order,
   pending,
+  online,
+  confirming,
   onAdvance,
+  onMarkPaid,
 }: {
   order: AdminOrder;
   pending: boolean;
+  online: boolean;
+  confirming: boolean;
   onAdvance: (to: AdminOrder['status']) => void;
+  onMarkPaid: () => void;
 }) {
   const next = NEXT_ACTION[order.status];
   return (
     <article className="rounded-[14px] border border-border bg-bg p-3">
+      {/* Nome + horário + valor: a TRÍADE de reconciliação do PIX estático (§5.5) —
+          é o que o lojista casa com o extrato do banco (o txid não é confiável). */}
       <div className="flex items-baseline justify-between">
         <span className="font-medium text-text">{order.customerName}</span>
         <span className="text-xs tabular-nums text-text-muted">{isoToTime(order.createdAt)}</span>
@@ -225,6 +254,9 @@ function OrderCard({
           </li>
         ))}
       </ul>
+
+      <PaymentPanel order={order} online={online} confirming={confirming} onMarkPaid={onMarkPaid} />
+
       <div className="mt-3 flex items-center justify-between">
         {pending ? (
           <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
@@ -241,5 +273,50 @@ function OrderCard({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * Painel de reconciliação de pagamento (item 6). "Marcar pago" gateado por
+ * ALCANÇABILIDADE DA API (`online`), NUNCA por streamStatus: sem tempo real o
+ * REST ainda confirma; sem rede, não. Motivo do disable fica VISÍVEL. PIX é
+ * pré-pago (bloqueia preparo, §5.5); pós-pago (dinheiro/cartão na entrega) só é
+ * confirmado na entrega, então lá a confirmação vale a partir do "Saiu".
+ */
+function PaymentPanel({
+  order,
+  online,
+  confirming,
+  onMarkPaid,
+}: {
+  order: AdminOrder;
+  online: boolean;
+  confirming: boolean;
+  onMarkPaid: () => void;
+}) {
+  if (order.paymentStatus === 'confirmado') {
+    return <div className="mt-2 text-xs font-medium text-positive">✓ Pago</div>;
+  }
+  // Pós-pago só faz sentido confirmar a partir da saída pra entrega (recebe na
+  // ponta). PIX pode ser confirmado assim que o dinheiro cai, ainda em Recebidos.
+  const confirmavel = order.paymentMethod === 'pix' || order.status === 'in_transit';
+  return (
+    <div className="mt-2 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">Aguardando pagamento</span>
+        {confirmavel && (
+          <button
+            className="rounded-[10px] bg-positive px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            disabled={!online || confirming}
+            onClick={onMarkPaid}
+          >
+            {confirming ? 'Confirmando…' : 'Marcar pago'}
+          </button>
+        )}
+      </div>
+      {confirmavel && !online && (
+        <span className="text-[11px] text-text-muted">Sem conexão com o sistema — reconecte pra confirmar o pagamento.</span>
+      )}
+    </div>
   );
 }

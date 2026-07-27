@@ -48,6 +48,22 @@ export async function transitionOrder(
   });
 }
 
+/**
+ * Reconciliação manual do PIX estático (item 6, Épico 8→9): o lojista confere o
+ * valor/horário/nome no extrato e marca pago. Endpoint método-agnóstico (§5.5)
+ * — serve tanto o gate de preparo do PIX quanto o gate de conclusão dos
+ * pós-pagos. 409 (PaymentAlreadyConfirmedError OU conflito de version) é BENIGNO
+ * aqui: quem chama refaz o fetch e o paymentStatus fresco conta a verdade — não
+ * é falha de UI (o outro tablet pode ter confirmado no meio, via cutuque).
+ */
+export async function confirmPayment(id: string, version: number): Promise<Response> {
+  return apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/payment/confirm`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version }),
+  });
+}
+
 /** Agrupa pedidos por coluna do board, preservando a ordem de chegada (FIFO). Puro, testável. */
 export function groupByColumn(orders: AdminOrder[]): Record<BoardColumn, AdminOrder[]> {
   const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [] };
