@@ -27,6 +27,10 @@ class FakeOrderStatusRepository implements OrderStatusRepository {
     return this.rows.get(orderId) ?? null;
   }
 
+  async wasIdempotencyKeyApplied(orderId: string, idempotencyKey: string) {
+    return this.history.some((h) => h.orderId === orderId && h.idempotencyKey === idempotencyKey);
+  }
+
   async applyStatusChange(orderId: string, expectedVersion: number, toStatus: OrderStatus) {
     const row = this.rows.get(orderId);
     if (!row) return false;
@@ -197,6 +201,53 @@ describe('OrderStatusService.transition — gate de pagamento (§5.5)', () => {
 
     await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'completed', actor: STAFF, reason: null });
     expect(repo.rows.get('order-1')!.status).toBe('completed');
+  });
+});
+
+describe('OrderStatusService.transition — idempotência da fila offline (§9)', () => {
+  it('16) replay com a MESMA chave já aplicada devolve sucesso SEM re-aplicar (não muda version, não dobra history)', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'k1' });
+    expect(repo.rows.get('order-1')!.status).toBe('preparing');
+    expect(repo.rows.get('order-1')!.version).toBe(1);
+    expect(repo.history).toHaveLength(1);
+
+    // Retry (resposta perdida) com a MESMA chave — o pedido já está em preparing.
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'k1' });
+    expect(repo.rows.get('order-1')!.version).toBe(1); // NÃO re-aplicou
+    expect(repo.history).toHaveLength(1); // NÃO dobrou o history
+  });
+
+  it('17) sem o pré-check, o retry morreria como transição ilegal — prova de que a chave é o que evita o 409 fantasma', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0 });
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'k1' });
+
+    // Mesma chave, mas o status já é 'preparing' → received→preparing seria ILEGAL agora.
+    // Com o pré-check, resolve como sucesso idempotente em vez de IllegalOrderTransitionError.
+    await expect(
+      service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'k1' }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('18) chave NOVA (outro intent) não é deduplicada — segue o fluxo normal', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0 });
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'k1' });
+
+    // chave diferente, transição legal (preparing→ready) → aplica normalmente
+    await service.transition({ orderId: 'order-1', expectedVersion: 1, toStatus: 'ready', actor: STAFF, reason: null, idempotencyKey: 'k2' });
+    expect(repo.rows.get('order-1')!.status).toBe('ready');
+    expect(repo.history).toHaveLength(2);
+  });
+
+  it('19) a chave é gravada na linha de history', async () => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', status: 'received', version: 0 });
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'abc' });
+    expect(repo.history[0]!.idempotencyKey).toBe('abc');
   });
 });
 

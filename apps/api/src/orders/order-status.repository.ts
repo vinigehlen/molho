@@ -21,6 +21,8 @@ export interface RecordHistoryParams {
   actorRole: string | null;
   customerId: string | null;
   reason: string | null;
+  /** Chave da fila offline (Épico 9) — nula em ação online direta. */
+  idempotencyKey?: string | null;
 }
 
 export interface RecordAuditLogParams {
@@ -33,6 +35,8 @@ export interface RecordAuditLogParams {
 
 export interface OrderStatusRepository {
   findForTransition(orderId: string): Promise<OrderStatusRecord | null>;
+  /** True se já existe linha de history com esta (orderId, idempotencyKey) — o intent já foi aplicado (replay). */
+  wasIdempotencyKeyApplied(orderId: string, idempotencyKey: string): Promise<boolean>;
   /** UPDATE com WHERE version = expected — devolve false se 0 linhas mudaram (conflito OU não existe mais, ver assertOptimisticUpdate). */
   applyStatusChange(
     orderId: string,
@@ -60,6 +64,14 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
       where: { id: orderId, deletedAt: null },
       select: { id: true, tenantId: true, status: true, version: true, paymentMethod: true, paymentStatus: true },
     });
+  }
+
+  async wasIdempotencyKeyApplied(orderId: string, idempotencyKey: string): Promise<boolean> {
+    const existing = await this.requestContext.getClient().orderStatusHistory.findFirst({
+      where: { orderId, idempotencyKey },
+      select: { id: true },
+    });
+    return existing !== null;
   }
 
   async applyStatusChange(
@@ -91,6 +103,7 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
         actorRole: params.actorRole,
         customerId: params.customerId,
         reason: params.reason,
+        idempotencyKey: params.idempotencyKey ?? null,
       },
     });
   }

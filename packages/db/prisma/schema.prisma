@@ -756,6 +756,15 @@ model OrderStatusHistory {
   /// transição precisa (received→preparing não precisa de motivo).
   reason     String?
 
+  /// Chave de idempotência da fila offline (Épico 9): gerada no cliente por
+  /// intent enfileirado, a MESMA em todo retry. Um retry cuja resposta se
+  /// perdeu na volta carrega esta chave → o INSERT desta linha colide no
+  /// índice único parcial (order_id, idempotency_key) e o service devolve
+  /// "já aplicado" (204) em vez de 409 fantasma. Nulo pra transições que não
+  /// vêm da fila (ação online direta). Índice único parcial é SQL à mão na
+  /// migration (WHERE idempotency_key IS NOT NULL — nunca do schema.prisma).
+  idempotencyKey String? @map("idempotency_key")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)

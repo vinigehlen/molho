@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Inject,
@@ -68,7 +69,12 @@ export class OrderAdminController {
   @Patch(':id/status')
   @RequirePermission('order.update_status')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async transition(@Param('id') id: string, @Body() dto: TransitionOrderDto, @Req() req: RequestWithUser): Promise<void> {
+  async transition(
+    @Param('id') id: string,
+    @Body() dto: TransitionOrderDto,
+    @Req() req: RequestWithUser,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ): Promise<void> {
     const tenantId = requireTenantIdHeader(req);
     const role = resolveActorRole(req, tenantId);
     await this.orderStatus.transition({
@@ -77,6 +83,8 @@ export class OrderAdminController {
       toStatus: dto.toStatus,
       actor: { type: 'staff', userId: req.user.sub, role },
       reason: dto.reason ?? null,
+      // Fila offline (Épico 9): retry com a mesma chave não re-aplica. Ausente numa ação online direta.
+      idempotencyKey: idempotencyKey ?? null,
     });
 
     // Enfileira o cutuque — o flush (publish) acontece DEPOIS do commit, no
