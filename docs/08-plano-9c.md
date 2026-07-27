@@ -20,6 +20,13 @@ secrets da Fly pra ele, subir o primeiro tenant pelo onboarding. (Se o PM prefer
 projeto Neon com limpeza de seed antes do go-live, é a alternativa — mas a decisão default
 aqui é staging separado.)
 
+**Consequência da decisão (não deixar implícito):** a validação de fronteira do passo 7 roda
+contra **staging** (`staging-app`/`staging-api`), mas o piloto será um **provisionamento
+diferente** — projeto Neon novo, secrets novos, certs novos, domínios de produção. **O DESENHO
+transfere (mesmo código, mesmo fluxo de cookie/CORS/pub-sub); o PROVISIONAMENTO não.** Passar em
+staging prova o desenho, não a config de produção. Por isso o go-live exige um **passe de fumaça
+de produção** (§7b) — o subset do checklist que depende de CONFIG, não de desenho.
+
 ### ZENVIA_API_KEY é secret OBRIGATÓRIO em produção
 Corrigido antes do 9c (commit `fix(auth): nega boot em produção sem provider de SMS real`):
 sem `ZENVIA_API_KEY` e `NODE_ENV=production`, a API **recusa subir** — não cai mais pro
@@ -82,6 +89,29 @@ Só verificável contra os domínios reais na Fly. Ordem:
 6. Preview Vercel (`*.vercel.app`) → SSE não autentica (cross-site) e o front **degrada pra polling**.
 7. **★ pub/sub Redis cross-instância** — o ÚNICO mecanismo do Épico 9 que **ninguém nunca viu rodar**: publicar numa máquina, confirmar que a aba conectada na OUTRA máquina recebe o cutuque. Só existe com duas máquinas + Upstash real. **Priorizar.** (Em dev validou-se só single-instance in-memory: 2 abas, 1 API.)
 8. `disarm` no logout apaga o cookie em `api.molho.live` (wiring depende do 9b; o endpoint já existe).
+
+### 7b. Passe de fumaça de PRODUÇÃO (condição de go-live)
+O passo 7 roda contra staging e prova o DESENHO. Como o piloto é provisionamento diferente
+(Neon/secrets/certs/domínios novos — ver decisão de escopo), o go-live exige re-verificar o
+que depende de **config de produção**, não de desenho. Subset curto e obrigatório, contra
+`app.molho.live`/`api.molho.live` reais:
+
+1. **Cookie `__Host-` no domínio de produção** — inspecionar no DevTools de prod que o
+   `__Host-molho_stream` chega com `HttpOnly; Secure; SameSite=Strict; Path=/` e **sem `Domain`**
+   (host-only em `api.molho.live`). É config de cookie/TLS/domínio, não código — pode passar em
+   staging e falhar em prod se um cert, um domínio ou um proxy estiver diferente.
+2. **CORS à origem exata de produção** — `Access-Control-Allow-Origin: https://app.molho.live`
+   **exato** + `Allow-Credentials: true`; e uma origem fora da allowlist bloqueada. A allowlist
+   é config por ambiente (staging aponta pra `staging-app`); a de prod precisa ser verificada
+   contra o domínio de prod, não presumida do staging.
+3. **pub/sub Redis cross-instância entre as DUAS máquinas de produção** — publicar numa máquina,
+   confirmar que a aba conectada na OUTRA recebe o cutuque. Depende do `REDIS_URL` de prod e de
+   haver de fato duas máquinas no `gru` de prod — config, não desenho (o desenho é o §7.7 do
+   staging). É o item de maior risco: nunca rodou em lugar nenhum até o staging, e o Upstash de
+   prod pode ser instância/região diferente da de staging.
+
+Os outros 5 itens do §7 (fluxo de token, degradação de preview, disarm) são majoritariamente
+DESENHO e ficam cobertos pelo staging — só re-verificar em prod se algum tocar config nova.
 
 ## Pré-requisitos do PM (caminho crítico)
 - **Região do Upstash** → passo 0, `REDIS_URL` (passo 4), validação cross-instância (7.7).
