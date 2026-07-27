@@ -286,28 +286,22 @@ async function seedStoreHours(
   storeId: string,
   shifts: readonly SeedShiftDef[],
 ) {
+  // Limpa e recria (não upsert linha-a-linha): o dia fechado é RELATIVO ao dia
+  // do seed (ver delivery.ts), então re-rodar em outro dia da semana muda QUAL
+  // dia é fechado. Upsert sem prune deixaria linhas do dia que virou fechado —
+  // loja aberta quando deveria estar fechada. Hard delete é ok: seed roda como
+  // app_migrator, e store_hours é dado de seed regenerável.
+  await prisma.storeHours.deleteMany({ where: { tenantId, storeId } });
   for (const shift of shifts) {
-    const existing = await prisma.storeHours.findFirst({
-      where: {
+    await prisma.storeHours.create({
+      data: {
         tenantId,
         storeId,
         dayOfWeek: shift.dayOfWeek,
         opensAtMinutes: shift.opensAtMinutes,
-        deletedAt: null,
+        closesAtMinutes: shift.closesAtMinutes,
       },
     });
-    const data = {
-      tenantId,
-      storeId,
-      dayOfWeek: shift.dayOfWeek,
-      opensAtMinutes: shift.opensAtMinutes,
-      closesAtMinutes: shift.closesAtMinutes,
-    };
-    if (existing) {
-      await prisma.storeHours.update({ where: { id: existing.id }, data });
-    } else {
-      await prisma.storeHours.create({ data });
-    }
   }
 }
 
