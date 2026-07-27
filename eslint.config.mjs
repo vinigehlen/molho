@@ -1,6 +1,15 @@
+import path from 'node:path';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import tailwindcss from 'eslint-plugin-tailwindcss';
+
+// ABSOLUTO de propósito: o `next build` roda o próprio ESLint com cwd em
+// apps/<app>, onde um caminho RELATIVO pro config do Tailwind não resolve — o
+// plugin cai no tema default e marca TODO token semântico do Tempero como
+// "custom" (falso positivo em massa que só aparece no build, não no lint da
+// raiz). Absoluto resolve igual de qualquer cwd.
+const TAILWIND_CONFIG = path.resolve(import.meta.dirname, 'apps/backoffice/tailwind.config.ts');
 
 /**
  * ESLint flat config único do monorepo.
@@ -61,6 +70,26 @@ export default tseslint.config(
             'Cor hex hardcoded é proibida em apps/. Use um token semântico do Tempero (ex.: bg-brand, text-muted) — ver docs/04-brand-design-system.md §4.',
         },
       ],
+    },
+  },
+
+  // ─── Design system: classe Tailwind fora do preset Tempero é erro ─────────
+  // Classe utilitária desconhecida vira no-op SILENCIOSO no Tailwind (nem CSS,
+  // nem erro) — foi assim que o board do gestor renderizou sem estilo os itens
+  // 1–5 inteiros sem nada acusar (docs/07). `no-custom-classname` resolve o
+  // preset (via config do backoffice, que carrega packages/ui/tailwind-preset)
+  // e barra qualquer classe que não exista nele. Barulhento no `pnpm lint` (já
+  // no CI), no momento da escrita, custo zero de runtime.
+  {
+    files: ['apps/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}', '**/*.stories.{ts,tsx}'],
+    plugins: { tailwindcss },
+    settings: { tailwindcss: { config: TAILWIND_CONFIG } },
+    rules: {
+      // whitelist: `tnum` é utility custom do design system (tokens.css:
+      // font-variant-numeric pra números financeiros, §3.3), não gerada pelo
+      // Tailwind — o plugin não a conhece. É a ÚNICA classe custom em tokens.css.
+      'tailwindcss/no-custom-classname': ['error', { whitelist: ['tnum'] }],
     },
   },
 
