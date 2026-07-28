@@ -99,3 +99,18 @@ Substitui e amplia o antigo épico 13:
 Feita — ver `05-unit-economics.xlsx`. Conclusão: o modelo fecha, mas **o Standard a R$ 99 tem margem bruta de 62%**, abaixo do padrão SaaS (>75%), porque o **suporte** come R$ 10,50 dos R$ 34,47 de custo. Break-even em **~24 lojas**.
 
 > **Custo fixo de infra que faltava na conta (Épico 9).** A `apps/api` na Fly.io (região GRU) é **custo fixo mensal que nunca entrou na planilha** — ela assumia só Vercel/Neon/Upstash (todos com tier free ou usage-based). São **DUAS máquinas sempre ligadas** (não uma) — exigência do rolling deploy: máquina única mata todos os streams SSE juntos a cada deploy (ver `CLAUDE.md` → "Infra de produção"). Custo: `shared-cpu-1x` 512MB always-on em GRU ≈ $4/mês cada (base $3,32 × surcharge 1,22 de São Paulo) → **~$8/mês pelas duas**; num par de 1GB ≈ $16–20/mês. É **custo de plataforma amortizado por todas as lojas** (não por loja), dilui rápido no break-even de ~24 lojas. Vale o dinheiro só por eliminar a janela de indisponibilidade no pico do jantar. **Ação pendente: lançar essa linha de custo fixo de infra na `05-unit-economics.xlsx`** (planilha binária, não editável por aqui — o número acima é o que entra).
+
+## 9. Provisionamento do banco (Neon): mapeamento de role — NUNCA `neondb_owner` no runtime
+
+Passo de infra que **some da memória** — mesmo caso do `bootstrap.sql`. Todo projeto Neon novo (staging, produção, e o **do piloto**) precisa deste remapeamento **antes de qualquer migration**.
+
+**A armadilha:** as connection strings que o console do Neon entrega vêm com o role **`neondb_owner`** (admin/dono). Usá-lo como runtime quebra o design em dois pontos:
+1. **Migração falha** — as migrations rodam como `app_migrator` (elas fazem `ALTER DEFAULT PRIVILEGES FOR ROLE app_migrator`); `neondb_owner` toma `permission denied`.
+2. **RLS fica BYPASSADA** — dono de tabela ignora policy. Um teste "fail-closed" passa **falsamente**, sem RLS nenhuma ativa. (Achado no Épico 9c ao subir o staging com as strings default.)
+
+**O mapeamento obrigatório** (o `bootstrap.sql` cria os dois roles; depois seta senha e monta as strings):
+- **`DATABASE_URL` → `app_runtime`** — runtime da app. Não-dono, **sujeito a RLS**. É o que torna o fail-closed real.
+- **`DIRECT_URL` → `app_migrator`** — migrations e seed. Dono do schema, roda DDL. As tabelas nascem de propriedade dele (não de `neondb_owner`), o que mantém `app_runtime` fora da propriedade e RLS ativa.
+- `neondb_owner` só pra rodar o `bootstrap.sql` uma vez (criar roles, instalar postgis, grants de schema) — nunca como runtime nem migração.
+
+**Como verificar que um projeto está certo:** as tabelas de `public` devem ter dono `app_migrator` (não `neondb_owner`), e uma query como `app_runtime` sem o GUC `app.tenant_id` tem que retornar 0 linhas (fail-closed). Ver `docs/08-plano-9c.md` §1 pro passo operacional.

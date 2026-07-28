@@ -45,9 +45,12 @@ a conta de latência da validação cross-instância (passo 7.7).
 ### 1. Neon `aws-sa-east-1` (projeto NOVO)
 Neon não muda região de projeto existente → criar projeto novo em São Paulo. Custo-neutro
 (pricing uniforme entre regiões) e barato agora (só schema/migrations/seed, sem dado de prod).
-1. `CREATE EXTENSION postgis;` no branch (migrations usam `geography(Point,4326)` — sem isso a `init` falha).
-2. Rodar **`packages/db/prisma/bootstrap.sql`** uma vez (cria `app_migrator`/`app_runtime` + ACLs de schema). O `prisma migrate` NÃO faz isso; sem ele a RLS não tem os dois papéis. É o passo que some da memória.
-3. Guardar as DUAS connection strings: **pooled** (`-pooler`, PgBouncer transaction) pro runtime, **direta** pras migrations.
+1. `CREATE EXTENSION postgis;` no branch (migrations usam `geography(Point,4326)` — sem isso a `init` falha). (O `bootstrap.sql` do passo 2 já faz isso; explícito aqui por garantia.)
+2. Rodar **`packages/db/prisma/bootstrap.sql`** uma vez, conectado como `neondb_owner` (cria `app_migrator`/`app_runtime` + postgis + ACLs de schema). O `prisma migrate` NÃO faz isso; sem ele a RLS não tem os dois papéis. É o passo que some da memória.
+3. **REMAPEAR OS ROLES antes de qualquer migration — passo obrigatório, não opcional (ver `docs/03` §9).** As strings que o console do Neon entrega vêm com **`neondb_owner`**, que **NÃO serve**: migration falha (`permission denied to change default privileges` — a migration roda como `app_migrator`) e RLS fica bypassada (dono ignora policy → fail-closed passa FALSO). Setar senha nos dois roles (`ALTER ROLE app_migrator/app_runtime PASSWORD ...`) e montar as strings finais:
+   - **`DATABASE_URL` → `app_runtime`** na string **pooled** (`-pooler`, PgBouncer transaction, `pgbouncer=true`) — runtime sujeito a RLS.
+   - **`DIRECT_URL` → `app_migrator`** na string **direta** — migrations/seed, dono do schema.
+   - `neondb_owner` some das duas strings (só rodou o bootstrap). Verificar: tabelas de `public` com dono `app_migrator`, e query como `app_runtime` sem GUC retorna 0 (fail-closed). **Isto vale pro projeto do PILOTO também** — todo projeto Neon novo nasce com neondb_owner e precisa deste remapeamento.
 
 ### 2. Migração + seed
 - `DIRECT_URL` (endpoint direto, session mode) → `prisma migrate deploy` (nunca `migrate dev` liso — trava no SQL à mão, docs/07). Depois `prisma generate`.
