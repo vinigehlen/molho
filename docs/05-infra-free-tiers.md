@@ -1,4 +1,4 @@
-# 05 (anexo) — Free tiers de infra: teto, consumo e gatilho de upgrade
+# 05 (anexo) — Infra: tetos de free tier, consumo e CUSTO FIXO mensal
 
 Companheiro de `docs/05-unit-economics.xlsx` (a planilha é binária; esta conta em
 prosa fica versionável no git). Registrado no Épico 9c ao confirmar o Upstash.
@@ -32,25 +32,39 @@ Comandos/mês (ordem de grandeza):
 - Publishes: 6 × 7.500 ≈ **45 mil**
 - **Total ≈ 760 mil/mês** — **já ESTOURA os 500 mil** a ~7.500 pedidos.
 
-### Gatilho de upgrade (em pedidos/mês, como pedido — mas leia a ressalva)
-Com o modelo acima, o teto de 500 mil comandos é cruzado por volta de
-**~4.000–5.000 pedidos/mês**. **Gatilho conservador: 3.000 pedidos/mês** — abaixo
-disso, folga; ao cruzar, subir pro plano pago (Pay-as-you-go).
+### O free tier NÃO é gatilho de upgrade — é custo fixo desde o dia 1
+Reenquadre (não tratar como contingência): o **ICP fatura R$ 40–150 mil/mês**; com
+ticket ~R$ 50 isso é **800 a 3.000 pedidos/mês POR restaurante**. Ao ~100 comandos/pedido
+efetivos do modelo acima, **um ÚNICO restaurante ativo** já gera ~80 mil–300 mil comandos/mês
+— e o **segundo** estoura os 500 mil. O free tier não sobrevive ao primeiro par de clientes
+reais. Logo: o Upstash entra como **plano pago fixo desde o go-live** (~US$ 10/mês,
+Pay-as-you-go/fixed), não "quando o dashboard acender". O dashboard de comandos vira
+monitoramento de custo variável, não gatilho binário.
+(Incertezas que só PIORAM a conta, confirmar nos docs do Upstash: (a) comando dentro de
+`MULTI` conta separado? (b) entrega pub/sub por subscriber conta? — empurram o custo pra cima,
+nunca pra baixo.)
 
-**Ressalva honesta:** "pedidos/mês" é um PROXY — o driver real é volume de
-REQUESTS (navegação de cliente + refetch de staff), com fator de amplificação
-grande e sensível à razão navegação/pedido. **O sinal de verdade é o dashboard de
-comandos do Upstash:** subir de plano ao chegar em **400 mil/mês (80% do teto)**,
-independente de pedidos. Duas incertezas que podem PIORAR a conta (confirmar nos
-docs do Upstash): (a) cada comando dentro de um `MULTI` conta separado? (b) entrega
-de mensagem pub/sub por subscriber conta como comando? Se sim, o rate-limit e o
-fan-out multiplicam.
+### Custo fixo mensal de infra e break-even (entrada de unit economics)
+Câmbio assumido ~R$ 5,40/US$. Números a confirmar no faturamento real de cada serviço.
 
-**Mitigações baratas antes de pagar (se quiser esticar o free tier):** (1) o
-rate-limit do storefront é o maior termo — trocar por janela FIXA (1–2 comandos) ou
-só limitar sob volume suspeito corta o dominante; (2) um L1 em processo (TTL curto)
-no `UserVersionCache` reduz os GETs por request. Nenhuma é urgente pro piloto —
-registrar pra quando o dashboard acender.
+| Serviço | Config | US$/mês | ~R$/mês |
+|---|---|--:|--:|
+| **Fly.io** | 2× `shared-cpu-1x` 512MB, GRU, sempre ligadas | ~8 | ~43 |
+| **Neon** | projeto de prod (Launch — free tier NÃO serve: API sempre-ligada mantém o compute ativo, estoura as compute-hours do free) | ~19 | ~103 |
+| **Upstash** | plano pago desde o dia 1 (ver acima) | ~10 | ~54 |
+| **Núcleo (os 3)** | | **~37** | **~200** |
+| Vercel (à parte) | Pro exigido p/ uso comercial (Hobby proíbe) | ~20 | ~108 |
+
+**Break-even do núcleo (~R$ 200/mês) no plano Standard (R$ 99/tenant/mês):**
+**~2–3 tenants pagantes cobrem TODA a infra de núcleo** (2 tenants = R$ 198 ≈ empata;
+3 = R$ 297 folga). Somando a Vercel Pro (~R$ 308/mês total), são **~4 tenants Standard**.
+Ou seja: a partir de ~3–4 restaurantes no Standard, a infra é ruído no P&L — o risco de
+custo do piloto não está na infra, está no CAC/suporte.
+
+**Mitigações (otimização FUTURA — NÃO implementar agora, o custo não justifica):** (1) o
+rate-limit do storefront é o maior termo de comandos — janela FIXA (1–2 comandos) ou só sob
+volume suspeito cortaria o dominante; (2) L1 em processo (TTL curto) no `UserVersionCache`
+reduz os GETs por request. Registrado pra quando o volume/custo justificar, não antes.
 
 ### Conexões concorrentes (teto a CONFIRMAR no console)
 A API abre ~5 conexões persistentes por instância (cada módulo faz seu `new Redis`:
