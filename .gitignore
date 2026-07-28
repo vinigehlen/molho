@@ -3,9 +3,11 @@ node_modules
 .pnpm-store
 
 # ─── Env & secrets ─────────────────────────
-.env
-.env.local
-.env.*.local
+# `.env*` cobre TUDO derivado (.env.local, .env.local.bak, .env.production, .envrc…)
+# — padrões exatos deixavam backups/variantes commitáveis (ex.: .env.local.bak
+# com credencial viva). `!.env.example` mantém só o template (placeholders).
+.env*
+!.env.example
 .vercel
 
 # ─── Builds ────────────────────────────────
