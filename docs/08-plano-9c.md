@@ -20,6 +20,17 @@ secrets da Fly pra ele, subir o primeiro tenant pelo onboarding. (Se o PM prefer
 projeto Neon com limpeza de seed antes do go-live, é a alternativa — mas a decisão default
 aqui é staging separado.)
 
+**Decisão (Épico 9c): o staging São Paulo VIRA o dev-local; o `molho` (US East) é aposentado ao fechar o 9c.**
+O staging (`wild-pine-22057676`, sa-east-1) é co-locado, mesmo schema, mesmo seed, e é contra ele
+que validamos — então passa a ser o **dev-local** (a `.env.local` já aponta pra ele, com o mapeamento
+`app_runtime`/`app_migrator`). O projeto antigo `molho` (`floral-dream-56687978`, us-east-1) fica
+**intocado como rede de segurança até o 9c fechar, e então é APOSENTADO** — os dois projetos dividem
+a cota do Free plan do Neon, então manter o US East vivo custa. **Não** reconstituir o `.env.local` do
+US East (rotacionar senha + montar arquivo é trabalho pra um ambiente que já tem data de aposentadoria);
+se algum dia precisar dele antes de aposentar, as roles `app_runtime`/`app_migrator` ainda existem lá
+(senhas não salvas → rotacionar via `ALTER ROLE` e remontar). O piloto continua ganhando projeto Neon
+próprio e limpo (decisão acima), independente disso.
+
 **Consequência da decisão (não deixar implícito):** a validação de fronteira do passo 7 roda
 contra **staging** (`staging-app`/`staging-api`), mas o piloto será um **provisionamento
 diferente** — projeto Neon novo, secrets novos, certs novos, domínios de produção. **O DESENHO
