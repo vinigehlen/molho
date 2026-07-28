@@ -2,7 +2,9 @@
 # API do Molho: processo Node de vida longa (SSE + Redis pub/sub), São Paulo,
 # DUAS máquinas sempre ligadas com rolling deploy. NUNCA scale-to-zero.
 
-app = "molho-api"            # TODO(9c): confirmar nome do app na Fly
+app = "molho-api-staging"    # staging (dev-local, descartável). `molho-api` fica reservado pro piloto.
+                             # Nomes de app na Fly são GLOBAIS — se estiver tomado, avisar antes de improvisar.
+                             # DNS correspondente: staging-api.molho.live (par com staging-app.molho.live).
 primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
 
 [build]

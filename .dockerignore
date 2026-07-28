@@ -1,0 +1,16 @@
+# Contexto do build da imagem da apps/api. Sem isto, `COPY . .` manda o repo
+# inteiro (node_modules, .next, .git) pro daemon — build inviável.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/build
+**/coverage
+**/storybook-static
+.git
+**/.env*
+!**/.env.example
+**/*.log
+.pnpm-store
+**/playwright-report
+**/.DS_Store

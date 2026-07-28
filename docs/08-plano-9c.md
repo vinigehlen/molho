@@ -38,11 +38,40 @@ transfere (mesmo código, mesmo fluxo de cookie/CORS/pub-sub); o PROVISIONAMENTO
 staging prova o desenho, não a config de produção. Por isso o go-live exige um **passe de fumaça
 de produção** (§7b) — o subset do checklist que depende de CONFIG, não de desenho.
 
-### ZENVIA_API_KEY é secret OBRIGATÓRIO em produção
+### ZENVIA_API_KEY é DEPENDÊNCIA DURA do 9c inteiro (não só do boot)
 Corrigido antes do 9c (commit `fix(auth): nega boot em produção sem provider de SMS real`):
 sem `ZENVIA_API_KEY` e `NODE_ENV=production`, a API **recusa subir** — não cai mais pro
-Mock (que loga o código OTP = bypass de auth). Consequência pro passo 4: `ZENVIA_API_KEY`
-é secret obrigatório; sem ele o boot na Fly falha barulhento, de propósito.
+Mock (que loga o código OTP = bypass de auth).
+
+**Mas a dependência é maior que o boot — ela trava TODA a validação de fronteira (§7).**
+Cadeia: validar a fronteira exige um `EventSource` conectado → o cookie de stream vem do
+`POST /stream/arm` → `arm` exige **JWT de staff** → o JWT vem do **OTP** → o OTP precisa de
+**SMS**. E o stub `dev-login` é **eliminado do bundle de produção por desenho** (docs/07 + a
+checagem de CI). Logo, **sem chave ZENVIA não há como obter sessão de staff no ambiente
+deployado, e NENHUM item do checklist de fronteira roda** — nem cookie `__Host-`, nem CORS,
+nem o pub/sub cross-instância (que precisa de um stream conectado pra ser observado). É
+pré-requisito de tudo em 6–7, não um detalhe do passo 4.
+
+**Opção (b) — `NODE_ENV=staging` pra liberar o Mock — está VETADA.** Além do OTP burlável num
+`api.` público (bypass de login), `staging` **não é valor padrão do Node**: bibliotecas tratam
+qualquer coisa `!== 'production'` como desenvolvimento. Seria pôr o **stack inteiro em modo dev
+num host público**, não só liberar o mock. Só (a): chave ZENVIA real (mesmo de teste/sandbox).
+
+**Levantamento (Épico 9c) — o sandbox Zenvia NÃO tem lead time (não é classe PSP):**
+- **Sandbox Zenvia: self-service, grátis, sem contrato, sem CNPJ pra criar a conta** — valida só
+  email + telefone, aprovação **instantânea**. O Access Token do sandbox fica em **Developers →
+  Tokens and Webhooks**. Limite **200 msgs/dia** (sobra pro staging).
+- **Requisito operacional:** número que RECEBE precisa de **opt-in** (registrar como contato +
+  enviar uma keyword pro contato Zenvia). Ou seja, os telefones de staff usados no login de staging
+  precisam ser cadastrados no sandbox. Poucos números — tranquilo.
+- **Conclusão: dá pra ter a chave HOJE.** Sai do caminho crítico de calendário (≠ PSP recorrente
+  do 13d, que tem CNPJ/contrato/underwriting). A chave de sandbox destrava toda a validação 6–7.
+- **Alternativas (Twilio, AWS SNS):** mais fricção pra SMS no Brasil (registro de sender/long code,
+  aprovação regulatória) que o sandbox Zenvia — e trocariam o provider no código (NÃO fazer). O
+  sandbox Zenvia é o caminho mais rápido E já está no código (`ZenviaSmsProvider`).
+- **Produção (pós-piloto):** a conta PAGA da Zenvia (SMS real, sem opt-in por número) é o que vale
+  pro go-live — essa pode ter etapas de conta empresarial; iniciar em paralelo se necessário. O
+  sandbox cobre o 9c inteiro.
 
 ## Ordem de execução
 
