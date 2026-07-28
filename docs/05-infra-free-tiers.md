@@ -3,6 +3,39 @@
 Companheiro de `docs/05-unit-economics.xlsx` (a planilha é binária; esta conta em
 prosa fica versionável no git). Registrado no Épico 9c ao confirmar o Upstash.
 
+## OTP de cliente por SMS — FURO de unit economics (não é custo de piloto)
+
+**Separar os dois usos de OTP** — têm volume e resposta opostos:
+- **OTP de STAFF** (login no backoffice): poucos números, poucos logins/dia. Custo desprezível.
+  Candidato a **e-mail via Resend** (já na stack, custo marginal zero) — tira SMS do caminho.
+- **OTP de CLIENTE** (checkout no storefront): é o VOLUME real, e o problema é abaixo.
+
+**A conta (1 SMS por pedido — regra 13, OTP no "Fazer pedido"):**
+- Tenant do ICP: **800–3.000 pedidos/mês**. SMS a **~R$ 0,10–0,15**.
+- **Custo de OTP: R$ 80 a R$ 450 por mês, POR TENANT.**
+- Plano **Standard = R$ 99/mês**. Ou seja: no piso (800 × R$0,10 = R$80) o OTP come **~80% da
+  mensalidade**; no teto (3.000 × R$0,15 = R$450) é **4,5× a mensalidade → margem NEGATIVA**.
+- Pior: o SMS sai no *request* (anti-enumeração — o OTP é enviado antes de saber se o pedido
+  fecha), então a contagem de SMS **≥** pedidos concluídos (retry, carrinho abandonado no OTP).
+- O Standard já tem R$ 34,47 de custo / 62% de margem (docs/03) — somar R$ 80–450 de SMS a
+  **estoura pra negativo** no plano de entrada.
+
+**Conclusão: OTP de cliente por SMS não é custo de piloto, é FURO de unit economics** — resolver
+ANTES de vender o primeiro contrato. Trocar de provedor de SMS **não** resolve (o furo é o custo
+POR mensagem, não o mínimo mensal). As saídas, por custo:
+- **(a) Não verificar o cliente no piloto** (pedido só com nome+telefone; lojista liga se houver
+  trote) — **custo zero, fecha o furo.** É o que a maioria dos cardápios digitais BR faz.
+- **(b) OTP por WhatsApp** (canal do Épico 11) — mais barato por mensagem que SMS, MAS exige
+  **Cloud API + aprovação de template** (Meta), que o MVP DEFERE pra Fase 2 (CLAUDE.md regra 6:
+  MVP é click-to-chat, Cloud API/Baileys vetados). Reabre a verificação na Fase 2, sem custo agora.
+- **(c) SMS pré-pago sem mínimo (SMSDev)** — tira o mínimo mensal (~R$100), **mas NÃO o custo por
+  mensagem** → o furo persiste (R$80–450/tenant). Só ajuda se a decisão for manter SMS.
+
+**Recomendação: (a) no piloto** — desligar OTP de cliente, criar o customer por nome+telefone não
+verificado, lojista confirma trote por ligação. Revisitar verificação por WhatsApp na Fase 2 (quando
+o Cloud API já estiver na mesa). O custo por tenant deve entrar na `05-unit-economics.xlsx` ANTES de
+precificar qualquer plano.
+
 ## Upstash Redis — Free Tier
 
 **Limites (plano atual, `great-worm-158188`, `aws-sa-east-1`, Global):** 500 mil
