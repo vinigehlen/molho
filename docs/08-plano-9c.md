@@ -79,6 +79,33 @@ Rascunhos em `apps/api/Dockerfile` e `apps/api/fly.toml` (marcados como DRAFT �
   - CORS de produção na `apps/api` (`main.ts`): allowlist **exata** `https://app.molho.live` + `Allow-Credentials: true`, nunca curinga nem eco do `Origin`. Hoje o CORS é de dev (localhost).
   - **`X-Content-Type-Options: nosniff`** — o docs/07 dizia que entraria no Épico 9, mas **NÃO entrou** (confirmado: nenhum `headers()` em nenhum `next.config.ts`, nenhum nosniff no código). **Entra aqui**, risco zero. (CSP completa segue sendo item PM separado, pré-go-live — não neste passo.)
 
+#### Armadilha da Cloudflare: proxy (nuvem laranja) NA FRENTE do SSE — CONFIRMADA
+O `molho.live` está registrado e o DNS é gerido na Cloudflare. **`api.molho.live` NUNCA pode
+ficar com o proxy da Cloudflare ligado (nuvem LARANJA) — tem que ser DNS-only (nuvem CINZA).**
+Três motivos, todos fatais pro Épico 9:
+1. **Buffer de streaming:** o proxy da Cloudflare BUFFERIZA a resposta — o SSE deixa de ser
+   incremental, os cutuques não chegam em tempo real (ou chegam em lote).
+2. **Timeout de conexão longa:** o proxy corta conexão ociosa (~100s), brigando com o keepalive
+   de 25s do stream e a natureza de vida longa do SSE.
+3. **TLS terminado na Cloudflare, não na Fly:** move a fronteira que o desenho depende — o cookie
+   `__Host-`/same-site foi desenhado pra TLS terminando na Fly (`api.molho.live` host-only, HTTP/2
+   ALPN `h2`). Proxy laranja re-termina o TLS e pode reescrever/mexer no fluxo.
+   → `api.` **DNS-only**: A/AAAA (ou CNAME) apontando direto pra Fly; a Fly termina o TLS.
+Para `app.` e `*.` (Vercel): também **DNS-only** — Vercel gerencia o próprio edge/TLS, e proxy da
+Cloudflare na frente do Vercel é fonte conhecida de loop de redirect / handshake TLS duplo.
+
+#### O que precisa de você no painel de DNS da Cloudflare
+**Pode fazer AGORA (Vercel — não depende da Fly):**
+- `app.molho.live` → adicionar o domínio no projeto Vercel do **backoffice**; criar o registro que a
+  Vercel indicar (CNAME `cname.vercel-dns.com` ou A/AAAA), **nuvem CINZA (DNS-only)**.
+- `*.molho.live` → adicionar domínio wildcard no projeto Vercel do **storefront** (Vercel emite TLS
+  wildcard); registro CNAME wildcard que a Vercel indicar, **DNS-only**.
+- (opcional) raiz `molho.live` → redirect pro `app.` ou landing — decidir depois, não bloqueia.
+
+**ESPERA o app da Fly existir (passo 3/5):**
+- `api.molho.live` → só depois do app na Fly (pra ter os IPs/target). Aí: registro A/AAAA (ou CNAME)
+  pro app da Fly, **nuvem CINZA (DNS-only)**, e `fly certs add api.molho.live` pra TLS na Fly.
+
 ### 7. Checklist de validação de fronteira (condição de go-live — docs/07 §ABERTO)
 Só verificável contra os domínios reais na Fly. Ordem:
 1. `EventSource` de `app.molho.live` → `api.molho.live/.../stream` **conecta** com `withCredentials` (cookie `__Host-molho_stream` cross-origin same-site).
