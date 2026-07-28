@@ -75,8 +75,12 @@ num host público**, não só liberar o mock. Só (a): chave ZENVIA real (mesmo 
   **boleto** no 5º dia útil do mês seguinte ao uso), e escolha de plano em
   `zenvia.com/produtos/messaging/sms`. É **mais leve que o PSP** do 13d (sem KYC/underwriting), mas
   **não é instantâneo** como o sandbox — validação de CNPJ + contrato têm calendário. Mesma classe de
-  ação do PSP: abrir já, em paralelo com os épicos, não no go-live. (OTP transacional é uso legítimo —
-  o opt-in obrigatório é regra de SMS **marketing**, não de OTP; confirmar no cadastro do plano.)
+  ação do PSP: abrir já, em paralelo com os épicos, não no go-live.
+  - **⚠️ NÃO CONFIRMADO (hipótese, não fato):** que o opt-in por número seja regra só de SMS
+    **marketing** e que **OTP transacional** seja exceção. **Confirmar no cadastro do plano pago
+    ANTES de assumir.** Se estiver ERRADO (opt-in exigido também pra OTP), muda o onboarding de TODO
+    lojista — cada cliente final teria que dar opt-in antes de receber o código, o que quebra o
+    fluxo de checkout. É premissa de produto, não detalhe de infra.
 
 ### Pré-requisito da validação de fronteira: owner do seed com telefone REAL (opt-in do sandbox)
 O opt-in do sandbox Zenvia (o número que RECEBE precisa se cadastrar + enviar keyword) tem
@@ -93,9 +97,13 @@ Duas formas:
   cria `user` + `user_role('owner')` pro número. Contra: mais peça móvel, DUPLICA a lógica que o
   onboarding (Épico 13) já tem, e vira segunda fonte de verdade pra "quem é staff".
 
-**Recomendação: (a).** Menor superfície, secret fora do repo, fallback determinístico. O PM põe o
-próprio número em `MOLHO_SEED_STAFF_PHONE` no `.env.local` do staging e faz opt-in dele no sandbox.
-(Implementação pendente de OK — ~10 linhas no seed + doc no `.env.example`.)
+**Recomendação: (a) — IMPLEMENTADA.** O seed lê `MOLHO_SEED_STAFF_PHONE` e sobrescreve o `owner.phone`
+do 1º tenant (hamburgueria-da-vila) se a env existir; ausente = fictício. Passa pela MESMA cifragem
+dos demais (`encryptPhone`/`hashPhoneForLookup`, sem formato divergente). Valida E.164 BR (`+55…`) e
+**RECUSA rodar com `NODE_ENV=production`** (falha barulhenta — o seed sobrescreveria contato de lojista
+real; piloto nasce por onboarding, não por seed). Doc no `.env.example`.
+**PRÉ-REQUISITO OPERACIONAL de 6–7:** fazer **opt-in desse número no sandbox Zenvia ANTES do 1º login**
+de staff no staging — senão o SMS do OTP não chega e a cadeia inteira (JWT→arm→cookie→stream) não sobe.
 
 ## Ordem de execução
 

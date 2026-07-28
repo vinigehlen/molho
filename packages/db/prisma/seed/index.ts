@@ -358,6 +358,29 @@ async function seedDelivery(prisma: PrismaClient, tenantId: string, storeId: str
 }
 
 async function main() {
+  // GUARDA DE PRODUÇÃO (mesma classe do fix do ZENVIA): o seed RECUSA rodar em
+  // produção. O piloto é provisionado por onboarding, NUNCA por seed — e o seed
+  // sobrescreve dados (ex.: telefone de owner via MOLHO_SEED_STAFF_PHONE), o que
+  // sobrescreveria o contato de um lojista real se escapasse pra prod. Caminho
+  // perigoso morre no boot, não degrada.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Seed RECUSADO em produção (NODE_ENV=production). O piloto nasce por onboarding, não por seed. Rodar só em dev/staging.',
+    );
+  }
+
+  // Telefone de staff do staging via env (opt-in do sandbox Zenvia): sobrescreve
+  // o owner FICTÍCIO do 1º tenant por um número REAL que o operador controle.
+  // Fallback pro fictício quando ausente (CI/dev determinísticos). O número NÃO
+  // vai hardcoded no repo — vive só no .env.local. Passa pela MESMA cifragem dos
+  // demais (encryptPhone/hashPhoneForLookup), sem formato divergente.
+  const staffPhone = process.env.MOLHO_SEED_STAFF_PHONE;
+  if (staffPhone && !/^\+55\d{10,11}$/.test(staffPhone)) {
+    throw new Error(
+      `MOLHO_SEED_STAFF_PHONE inválido (${staffPhone}) — precisa ser E.164 BR: +55 + DDD + número (ex.: +5551999990000).`,
+    );
+  }
+
   const directUrl = process.env.DIRECT_URL;
   if (!directUrl) throw new Error('DIRECT_URL não configurada — seed roda como app_migrator');
 
@@ -385,8 +408,15 @@ async function main() {
     }
 
     for (const def of SEED_TENANTS) {
-      console.log(`\nseed: ${def.name} (${def.slug})`);
-      await seedTenant(prisma, def);
+      // Override do owner do 1º tenant (hamburgueria-da-vila) pelo número real de
+      // staging, sem mutar o array importado. Os outros tenants ficam fictícios.
+      const effectiveDef =
+        staffPhone && def.slug === 'hamburgueria-da-vila'
+          ? { ...def, owner: { ...def.owner, phone: staffPhone } }
+          : def;
+      if (effectiveDef !== def) console.log(`  (owner de ${def.slug} sobrescrito por MOLHO_SEED_STAFF_PHONE)`);
+      console.log(`\nseed: ${effectiveDef.name} (${effectiveDef.slug})`);
+      await seedTenant(prisma, effectiveDef);
     }
 
     console.log('\ncardápio:');
