@@ -69,9 +69,33 @@ num host público**, não só liberar o mock. Só (a): chave ZENVIA real (mesmo 
 - **Alternativas (Twilio, AWS SNS):** mais fricção pra SMS no Brasil (registro de sender/long code,
   aprovação regulatória) que o sandbox Zenvia — e trocariam o provider no código (NÃO fazer). O
   sandbox Zenvia é o caminho mais rápido E já está no código (`ZenviaSmsProvider`).
-- **Produção (pós-piloto):** a conta PAGA da Zenvia (SMS real, sem opt-in por número) é o que vale
-  pro go-live — essa pode ter etapas de conta empresarial; iniciar em paralelo se necessário. O
-  sandbox cobre o 9c inteiro.
+- **Produção (conta PAGA) — DEPENDÊNCIA DE CALENDÁRIO DO GO-LIVE, iniciar EM PARALELO (não quando
+  chegar lá).** O sandbox cobre o 9c inteiro, mas o go-live precisa de SMS real (sem opt-in por
+  número). A conta paga exige: **validação de CNPJ**, **contrato** (prazo indeterminado, cobrança por
+  **boleto** no 5º dia útil do mês seguinte ao uso), e escolha de plano em
+  `zenvia.com/produtos/messaging/sms`. É **mais leve que o PSP** do 13d (sem KYC/underwriting), mas
+  **não é instantâneo** como o sandbox — validação de CNPJ + contrato têm calendário. Mesma classe de
+  ação do PSP: abrir já, em paralelo com os épicos, não no go-live. (OTP transacional é uso legítimo —
+  o opt-in obrigatório é regra de SMS **marketing**, não de OTP; confirmar no cadastro do plano.)
+
+### Pré-requisito da validação de fronteira: owner do seed com telefone REAL (opt-in do sandbox)
+O opt-in do sandbox Zenvia (o número que RECEBE precisa se cadastrar + enviar keyword) tem
+consequência no seed: o owner usa `+5551999990000` (fictício), que **nunca recebe o SMS** → sem OTP
+→ sem JWT de staff → **nenhum item de 6–7 roda**. O staging precisa de um owner com um número **REAL
+que o PM controle e faça opt-in no sandbox** — mas esse número **não pode ir hardcoded no repo**.
+
+Duas formas:
+- **(a) env var `MOLHO_SEED_STAFF_PHONE` lida pelo seed, fallback pro fictício.** O seed sobrescreve o
+  `owner.phone` do 1º tenant com a env se ela existir. **Trade-off:** mínimo (o seed já lê env —
+  encryption keys etc.); o número real vive só no `.env.local` do staging (gitignored, fora do repo);
+  o fallback mantém CI/dev determinístico. Contra: o seed passa a depender de 1 env opcional.
+- **(b) script separado que promove um número a staff no staging.** **Trade-off:** roda depois do seed,
+  cria `user` + `user_role('owner')` pro número. Contra: mais peça móvel, DUPLICA a lógica que o
+  onboarding (Épico 13) já tem, e vira segunda fonte de verdade pra "quem é staff".
+
+**Recomendação: (a).** Menor superfície, secret fora do repo, fallback determinístico. O PM põe o
+próprio número em `MOLHO_SEED_STAFF_PHONE` no `.env.local` do staging e faz opt-in dele no sandbox.
+(Implementação pendente de OK — ~10 linhas no seed + doc no `.env.example`.)
 
 ## Ordem de execução
 
@@ -98,8 +122,9 @@ Neon não muda região de projeto existente → criar projeto novo em São Paulo
 - Runtime usa a string **pooled** com `?pgbouncer=true` (desliga prepared statements; o `SET LOCAL app.tenant_id` sobrevive sob transaction pooling porque é escopado à transação). Nunca apontar `DATABASE_URL` de runtime pro endpoint direto.
 
 ### 3. Dockerfile + `fly.toml` da `apps/api`
-Rascunhos em `apps/api/Dockerfile` e `apps/api/fly.toml` (marcados como DRAFT — não validados contra deploy real).
+`apps/api/Dockerfile` e `apps/api/fly.toml` — **build e boot validados localmente** (imagem sobe, Prisma carrega, guard do ZENVIA dispara). Dois erros pegos e corrigidos antes de qualquer `fly deploy`: `pnpm deploy` precisa de `--legacy` (pnpm v10+), e Prisma precisa de `openssl`/`ca-certificates` no builder E runner (senão "Defaulting to openssl-1.1.x" no slim).
 - Imagem roda **`node dist/main`** (script `start`, que NÃO carrega `.env.local` — env vem dos secrets da Fly, de propósito).
+- **Tamanho:** multi-stage já certo — runner só tem `dist` (2,4MB) + node_modules de prod (402MB, dominado por NestJS+Prisma) + engines Prisma (22MB); sem toolchain. Base `node:22-slim` (~150MB, node binário 120MB). **Imagem amd64 ≈ 175MB comprimida (pull) / ~550MB descomprimida.** (Os 883MB do 1º build foram artefato do buildx local no Mac arm64 com multi-arch+attestations — a Fly builda amd64 nativo, sem esse inchaço; pra reproduzir o tamanho real localmente: `--platform linux/amd64 --provenance=false --sbom=false`.) **Não vale trocar pra alpine/musl** — arriscaria o engine do Prisma validado por um ganho de base; a redução segura já está feita.
 - `fly.toml`: região `gru`, `min_machines_running = 2`, **sem scale-to-zero**, `strategy = "rolling"`, concorrência dimensionada pra **conexão longa** (SSE não é request curta), `kill_timeout` folgado pro drain do SIGTERM.
 - Graceful shutdown **já no código** (`enableShutdownHooks()` + `OrderStreamController.onApplicationShutdown()` fecha os streams com `server_shutdown`). **Validar que o SIGTERM da Fly chega e a janela de drain basta.**
 - **Mudança de CÓDIGO do 9c:** `max` do pool do adapter `PrismaPg` EXPLÍCITO por instância, dimensionado pra `2 × max` caber no limite de conexão do compute Neon (hoje herda o default 10). Não é config de infra.
