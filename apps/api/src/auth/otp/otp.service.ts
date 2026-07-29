@@ -1,11 +1,10 @@
 import { createHmac, randomInt } from 'node:crypto';
-import { type PhoneNumber, phoneNumberToE164 } from '@molho/contracts';
 import { SmsQuotaExceededError } from '../../messaging/messaging-provider.port';
-import type { MessagingProvider } from '../../messaging/messaging-provider.port';
 import type { Cooldown } from './cooldown';
 import { OtpRateLimitedError } from './otp-errors';
 import type { OtpChallengeStore } from './otp-challenge-store';
 import { ConsoleOtpLogger, type OtpLogger } from './otp-logger';
+import type { OtpRecipient } from './otp-recipient';
 import type { RateLimiter } from '../../rate-limit/rate-limiter';
 
 const CODE_TTL_SECONDS = 10 * 60;
@@ -17,7 +16,6 @@ const IP_LIMIT_WINDOW_SECONDS = 60 * 60;
 const COOLDOWN_SECONDS = 60;
 
 export interface OtpServiceDeps {
-  messaging: MessagingProvider;
   challengeStore: OtpChallengeStore;
   phoneRateLimiter: RateLimiter;
   ipRateLimiter: RateLimiter;
@@ -33,8 +31,9 @@ export interface OtpServiceDeps {
  * decorators do Nest (mesmo padrão de ModuleService/ZenviaSmsProvider):
  * testável sem framework, sem Redis real.
  *
- * NÃO conhece Zenvia nem WhatsApp — só MessagingProvider (porta). Trocar o
- * provider é zero mudança aqui. TAMBÉM não conhece users/customers: cria
+ * NÃO conhece canal (SMS/e-mail) nem provider — só o `OtpRecipient` (identifier
+ * pra keying + deliver). Trocar/adicionar canal é zero mudança aqui: quem chama
+ * monta o recipiente. TAMBÉM não conhece users/customers: cria
  * ou busca a conta é responsabilidade de quem chama verifyOtp() depois que
  * ele devolver true (Épico 3, commit dos controllers) — este serviço só
  * sabe "esse código bate com esse telefone", nada de identidade.
@@ -45,7 +44,6 @@ export interface OtpServiceDeps {
  * ou não.
  */
 export class OtpService {
-  private readonly messaging: MessagingProvider;
   private readonly challengeStore: OtpChallengeStore;
   private readonly phoneRateLimiter: RateLimiter;
   private readonly ipRateLimiter: RateLimiter;
@@ -55,7 +53,6 @@ export class OtpService {
   private readonly buildMessage: (code: string) => string;
 
   constructor(deps: OtpServiceDeps) {
-    this.messaging = deps.messaging;
     this.challengeStore = deps.challengeStore;
     this.phoneRateLimiter = deps.phoneRateLimiter;
     this.ipRateLimiter = deps.ipRateLimiter;
@@ -70,8 +67,11 @@ export class OtpService {
    * um OTP de login do backoffice nunca ser confundível com o de um cliente
    * de outra loja. O tipo de scope não importa aqui, é opaco de propósito.
    */
-  async requestOtp(scope: string, phone: PhoneNumber, ip: string): Promise<void> {
-    const phoneHash = this.hashPhone(phone);
+  async requestOtp(scope: string, recipient: OtpRecipient, ip: string): Promise<void> {
+    // idHash = hmac(identifier). Pra telefone, identifier = E.164 → hash IDÊNTICO
+    // ao antigo hashPhone (chave de desafio e rate limit inalteradas). As chaves
+    // Redis mantêm o prefixo `otp_rl:phone:`/`otp_cooldown:` (namespace histórico).
+    const idHash = this.hmac(recipient.identifier);
 
     const ipOk = await this.ipRateLimiter.checkAndRecord(
       `otp_rl:ip:${ip}`,
@@ -79,59 +79,59 @@ export class OtpService {
       IP_LIMIT_WINDOW_SECONDS,
     );
     if (!ipOk) {
-      this.log('otp_request', phoneHash, ip, 'rate_limited');
+      this.log('otp_request', idHash, ip, 'rate_limited');
       throw new OtpRateLimitedError('ip');
     }
 
-    const cooldownOk = await this.cooldown.tryAcquire(`otp_cooldown:${scope}:${phoneHash}`, COOLDOWN_SECONDS);
+    const cooldownOk = await this.cooldown.tryAcquire(`otp_cooldown:${scope}:${idHash}`, COOLDOWN_SECONDS);
     if (!cooldownOk) {
-      this.log('otp_request', phoneHash, ip, 'rate_limited');
+      this.log('otp_request', idHash, ip, 'rate_limited');
       throw new OtpRateLimitedError('cooldown');
     }
 
     const phoneOk = await this.phoneRateLimiter.checkAndRecord(
-      `otp_rl:phone:${scope}:${phoneHash}`,
+      `otp_rl:phone:${scope}:${idHash}`,
       PHONE_LIMIT_PER_HOUR,
       PHONE_LIMIT_WINDOW_SECONDS,
     );
     if (!phoneOk) {
-      this.log('otp_request', phoneHash, ip, 'rate_limited');
+      this.log('otp_request', idHash, ip, 'rate_limited');
       throw new OtpRateLimitedError('phone');
     }
 
     const code = this.generateCode();
-    await this.challengeStore.create(scope, phoneHash, this.hmac(code), CODE_TTL_SECONDS);
+    await this.challengeStore.create(scope, idHash, this.hmac(code), CODE_TTL_SECONDS);
 
     try {
-      await this.messaging.send(phone, this.buildMessage(code));
+      await recipient.deliver(this.buildMessage(code));
     } catch (error) {
       if (error instanceof SmsQuotaExceededError) {
-        this.log('otp_request', phoneHash, ip, 'quota_exceeded');
+        this.log('otp_request', idHash, ip, 'quota_exceeded');
       }
       throw error;
     }
 
-    this.log('otp_request', phoneHash, ip, 'success');
+    this.log('otp_request', idHash, ip, 'success');
   }
 
   /** true = código certo, desafio consumido (uso único). false = qualquer outro caso. */
-  async verifyOtp(scope: string, phone: PhoneNumber, code: string, ip: string): Promise<boolean> {
-    const phoneHash = this.hashPhone(phone);
-    const challenge = await this.challengeStore.get(scope, phoneHash);
+  async verifyOtp(scope: string, recipient: OtpRecipient, code: string, ip: string): Promise<boolean> {
+    const idHash = this.hmac(recipient.identifier);
+    const challenge = await this.challengeStore.get(scope, idHash);
 
     if (!challenge || challenge.attempts >= MAX_VERIFY_ATTEMPTS) {
-      this.log('otp_verify', phoneHash, ip, 'invalid_code');
+      this.log('otp_verify', idHash, ip, 'invalid_code');
       return false;
     }
 
     if (this.hmac(code) !== challenge.codeHmac) {
-      await this.challengeStore.incrementAttempts(scope, phoneHash);
-      this.log('otp_verify', phoneHash, ip, 'invalid_code');
+      await this.challengeStore.incrementAttempts(scope, idHash);
+      this.log('otp_verify', idHash, ip, 'invalid_code');
       return false;
     }
 
-    await this.challengeStore.delete(scope, phoneHash);
-    this.log('otp_verify', phoneHash, ip, 'success');
+    await this.challengeStore.delete(scope, idHash);
+    this.log('otp_verify', idHash, ip, 'success');
     return true;
   }
 
@@ -143,11 +143,7 @@ export class OtpService {
     return createHmac('sha256', this.hmacKey).update(value).digest('hex');
   }
 
-  private hashPhone(phone: PhoneNumber): string {
-    return this.hmac(phoneNumberToE164(phone));
-  }
-
-  private log(action: 'otp_request' | 'otp_verify', phoneHash: string, ip: string, result: Parameters<OtpLogger['log']>[0]['result']): void {
-    this.logger.log({ action, phoneHash, ip, result });
+  private log(action: 'otp_request' | 'otp_verify', idHash: string, ip: string, result: Parameters<OtpLogger['log']>[0]['result']): void {
+    this.logger.log({ action, phoneHash: idHash, ip, result });
   }
 }

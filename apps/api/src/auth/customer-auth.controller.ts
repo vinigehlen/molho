@@ -16,6 +16,9 @@ import type { Response } from 'express';
 import type { Request } from 'express';
 import { RequestContextService } from '../context/request-context.service';
 import { PLATFORM_CONTEXT_TENANT_ID } from '../context/tenant-context.constants';
+import { MESSAGING_PROVIDER } from '../messaging/messaging.module';
+import type { MessagingProvider } from '../messaging/messaging-provider.port';
+import { phoneRecipient } from './otp/otp-recipient';
 import { OTP_SERVICE } from './otp/otp.module';
 import type { OtpService } from './otp/otp.service';
 import { CUSTOMER_TOKEN_SERVICE } from './token/token.module';
@@ -46,6 +49,9 @@ export class CustomerAuthController {
     // Vitest não emite emitDecoratorMetadata de forma confiável pra DI
     // implícita por tipo).
     @Inject(RequestContextService) private readonly requestContext: RequestContextService,
+    // Canal de entrega do OTP — hoje SMS via phoneRecipient; o canal por escopo
+    // (e-mail no piloto) entra no passo 3. O OtpService não conhece o canal.
+    @Inject(MESSAGING_PROVIDER) private readonly messaging: MessagingProvider,
   ) {
     this.tenantLookup = new TenantLookupRepository(requestContext);
     this.customerIdentity = new CustomerIdentityRepository(requestContext);
@@ -72,7 +78,7 @@ export class CustomerAuthController {
 
     try {
       const phone = parsePhoneNumber(dto.phone);
-      await this.otpService.requestOtp(`customer:${slug}`, phone, req.ip ?? '0.0.0.0');
+      await this.otpService.requestOtp(`customer:${slug}`, phoneRecipient(phone, this.messaging), req.ip ?? '0.0.0.0');
     } catch (error) {
       if (error instanceof OtpRateLimitedError) {
         res.set('Retry-After', String(retryAfterSecondsFor(error.kind)));
@@ -95,7 +101,7 @@ export class CustomerAuthController {
     }
 
     const ip = req.ip ?? '0.0.0.0';
-    const ok = await this.otpService.verifyOtp(`customer:${slug}`, phone, dto.code, ip);
+    const ok = await this.otpService.verifyOtp(`customer:${slug}`, phoneRecipient(phone, this.messaging), dto.code, ip);
     if (!ok) throw new BadRequestException('Código inválido ou expirado.');
 
     return this.requestContext.run({ tenantId, isPlatform: false }, async () => {

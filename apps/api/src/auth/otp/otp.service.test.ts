@@ -4,6 +4,7 @@ import { SmsQuotaExceededError } from '../../messaging/messaging-provider.port';
 import { InMemoryCooldown } from './cooldown';
 import { InMemoryOtpChallengeStore } from './otp-challenge-store';
 import { OtpRateLimitedError } from './otp-errors';
+import { phoneRecipient } from './otp-recipient';
 import { OtpService } from './otp.service';
 import { InMemorySlidingWindowRateLimiter } from '../../rate-limit/rate-limiter';
 
@@ -33,7 +34,6 @@ function setup(overrides: { clock?: ReturnType<typeof makeClock> } = {}) {
   const clock = overrides.clock ?? makeClock();
   const messaging = new FakeMessagingProvider();
   const service = new OtpService({
-    messaging,
     challengeStore: new InMemoryOtpChallengeStore(clock.now),
     phoneRateLimiter: new InMemorySlidingWindowRateLimiter(clock.now),
     ipRateLimiter: new InMemorySlidingWindowRateLimiter(clock.now),
@@ -41,7 +41,11 @@ function setup(overrides: { clock?: ReturnType<typeof makeClock> } = {}) {
     hmacKey: HMAC_KEY,
     logger: { log: vi.fn() },
   });
-  return { service, messaging, clock };
+  // Recipiente de telefone (SMS) — o path testado continua sendo o de antes:
+  // identifier = E.164, entrega via messaging.send. As asserções de
+  // `messaging.sent` e de rate limit valem inalteradas.
+  const rcpt = (phone: PhoneNumber) => phoneRecipient(phone, messaging);
+  return { service, messaging, clock, rcpt };
 }
 
 function extractCode(message: string): string {
@@ -52,8 +56,8 @@ function extractCode(message: string): string {
 
 describe('OtpService.requestOtp', () => {
   it('caminho feliz: manda o código via MessagingProvider', async () => {
-    const { service, messaging } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, messaging, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
 
     expect(messaging.sent).toHaveLength(1);
     expect(messaging.sent[0]?.to).toBe(PHONE_A);
@@ -61,107 +65,107 @@ describe('OtpService.requestOtp', () => {
   });
 
   it('cooldown: 2º pedido do mesmo telefone antes de 60s é bloqueado', async () => {
-    const { service, clock } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, clock, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
 
-    await expect(service.requestOtp('staff', PHONE_A, IP)).rejects.toBeInstanceOf(OtpRateLimitedError);
-    await expect(service.requestOtp('staff', PHONE_A, IP)).rejects.toMatchObject({
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).rejects.toBeInstanceOf(OtpRateLimitedError);
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).rejects.toMatchObject({
       kind: 'cooldown',
     });
 
     clock.advance(60_001);
-    await expect(service.requestOtp('staff', PHONE_A, IP)).resolves.toBeUndefined();
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).resolves.toBeUndefined();
   });
 
   it('rate limit por telefone: 6º pedido na mesma hora é bloqueado (limite é 5)', async () => {
-    const { service, clock } = setup();
+    const { service, clock, rcpt } = setup();
     for (let i = 0; i < 5; i++) {
-      await service.requestOtp('staff', PHONE_A, IP);
+      await service.requestOtp('staff', rcpt(PHONE_A), IP);
       clock.advance(COOLDOWN_MS_JUST_OVER());
     }
 
-    await expect(service.requestOtp('staff', PHONE_A, IP)).rejects.toMatchObject({ kind: 'phone' });
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).rejects.toMatchObject({ kind: 'phone' });
   });
 
   it('rate limit por IP: 21º pedido na mesma hora, telefones diferentes, é bloqueado (limite é 20)', async () => {
-    const { service, clock } = setup();
+    const { service, clock, rcpt } = setup();
     // usa telefones/scopes diferentes a cada pedido pra não esbarrar no
     // limite de telefone (5/h) nem no cooldown antes do de IP (20/h) bater.
     for (let i = 0; i < 20; i++) {
       const phone = i % 2 === 0 ? PHONE_A : PHONE_B;
-      await service.requestOtp(`scope-${i}`, phone, IP);
+      await service.requestOtp(`scope-${i}`, rcpt(phone), IP);
       clock.advance(1000);
     }
 
-    await expect(service.requestOtp('scope-novo', PHONE_A, IP)).rejects.toMatchObject({ kind: 'ip' });
+    await expect(service.requestOtp('scope-novo', rcpt(PHONE_A), IP)).rejects.toMatchObject({ kind: 'ip' });
   });
 
   it('rate limit de telefone e de IP são independentes: estourar um não afeta o outro', async () => {
-    const { service, clock } = setup();
+    const { service, clock, rcpt } = setup();
     // Estoura o limite de TELEFONE de A (5/h), do mesmo IP.
     for (let i = 0; i < 5; i++) {
-      await service.requestOtp('staff', PHONE_A, IP);
+      await service.requestOtp('staff', rcpt(PHONE_A), IP);
       clock.advance(COOLDOWN_MS_JUST_OVER());
     }
-    await expect(service.requestOtp('staff', PHONE_A, IP)).rejects.toMatchObject({ kind: 'phone' });
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).rejects.toMatchObject({ kind: 'phone' });
 
     // B, mesmo IP, ainda funciona — o limite de A não vazou pro de B.
-    await expect(service.requestOtp('staff', PHONE_B, IP)).resolves.toBeUndefined();
+    await expect(service.requestOtp('staff', rcpt(PHONE_B), IP)).resolves.toBeUndefined();
   });
 
   it('quota diária do Zenvia estourada: propaga SmsQuotaExceededError, não vira OtpRateLimitedError', async () => {
-    const { service, messaging } = setup();
+    const { service, messaging, rcpt } = setup();
     messaging.throwQuotaExceeded = true;
 
-    await expect(service.requestOtp('staff', PHONE_A, IP)).rejects.toBeInstanceOf(SmsQuotaExceededError);
+    await expect(service.requestOtp('staff', rcpt(PHONE_A), IP)).rejects.toBeInstanceOf(SmsQuotaExceededError);
   });
 });
 
 describe('OtpService.verifyOtp', () => {
   it('código certo na 1ª tentativa: verifica e consome (uso único)', async () => {
-    const { service, messaging } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, messaging, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
     const code = extractCode(messaging.sent[0]?.message ?? '');
 
-    expect(await service.verifyOtp('staff', PHONE_A, code, IP)).toBe(true);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), code, IP)).toBe(true);
     // 2ª tentativa com o MESMO código, já consumido: falha.
-    expect(await service.verifyOtp('staff', PHONE_A, code, IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), code, IP)).toBe(false);
   });
 
   it('brute force: 3 tentativas erradas bloqueiam a 4ª mesmo com o código certo', async () => {
-    const { service, messaging } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, messaging, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
     const code = extractCode(messaging.sent[0]?.message ?? '');
 
-    expect(await service.verifyOtp('staff', PHONE_A, '000000', IP)).toBe(false);
-    expect(await service.verifyOtp('staff', PHONE_A, '000001', IP)).toBe(false);
-    expect(await service.verifyOtp('staff', PHONE_A, '000002', IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), '000000', IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), '000001', IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), '000002', IP)).toBe(false);
     // 3 erradas já eram o limite — a 4ª tentativa nem com o código certo passa.
-    expect(await service.verifyOtp('staff', PHONE_A, code, IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), code, IP)).toBe(false);
   });
 
   it('código expirado depois de 10 minutos: verify falha mesmo com o código certo', async () => {
-    const { service, messaging, clock } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, messaging, clock, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
     const code = extractCode(messaging.sent[0]?.message ?? '');
 
     clock.advance(10 * 60 * 1000 + 1);
 
-    expect(await service.verifyOtp('staff', PHONE_A, code, IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), code, IP)).toBe(false);
   });
 
   it('telefone sem nenhum pedido de OTP: verify falha (não existe desafio)', async () => {
-    const { service } = setup();
-    expect(await service.verifyOtp('staff', PHONE_A, '123456', IP)).toBe(false);
+    const { service, rcpt } = setup();
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), '123456', IP)).toBe(false);
   });
 
   it('scopes diferentes não compartilham o mesmo desafio (staff vs customer)', async () => {
-    const { service, messaging } = setup();
-    await service.requestOtp('staff', PHONE_A, IP);
+    const { service, messaging, rcpt } = setup();
+    await service.requestOtp('staff', rcpt(PHONE_A), IP);
     const code = extractCode(messaging.sent[0]?.message ?? '');
 
-    expect(await service.verifyOtp('customer:pizzaria-roma', PHONE_A, code, IP)).toBe(false);
-    expect(await service.verifyOtp('staff', PHONE_A, code, IP)).toBe(true);
+    expect(await service.verifyOtp('customer:pizzaria-roma', rcpt(PHONE_A), code, IP)).toBe(false);
+    expect(await service.verifyOtp('staff', rcpt(PHONE_A), code, IP)).toBe(true);
   });
 });
 
