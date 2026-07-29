@@ -20,21 +20,29 @@ prosa fica versionável no git). Registrado no Épico 9c ao confirmar o Upstash.
 - O Standard já tem R$ 34,47 de custo / 62% de margem (docs/03) — somar R$ 80–450 de SMS a
   **estoura pra negativo** no plano de entrada.
 
-**Conclusão: OTP de cliente por SMS não é custo de piloto, é FURO de unit economics** — resolver
-ANTES de vender o primeiro contrato. Trocar de provedor de SMS **não** resolve (o furo é o custo
-POR mensagem, não o mínimo mensal). As saídas, por custo:
-- **(a) Não verificar o cliente no piloto** (pedido só com nome+telefone; lojista liga se houver
-  trote) — **custo zero, fecha o furo.** É o que a maioria dos cardápios digitais BR faz.
-- **(b) OTP por WhatsApp** (canal do Épico 11) — mais barato por mensagem que SMS, MAS exige
-  **Cloud API + aprovação de template** (Meta), que o MVP DEFERE pra Fase 2 (CLAUDE.md regra 6:
-  MVP é click-to-chat, Cloud API/Baileys vetados). Reabre a verificação na Fase 2, sem custo agora.
-- **(c) SMS pré-pago sem mínimo (SMSDev)** — tira o mínimo mensal (~R$100), **mas NÃO o custo por
-  mensagem** → o furo persiste (R$80–450/tenant). Só ajuda se a decisão for manter SMS.
+**Conclusão: OTP de cliente por SMS não é custo de piloto, é FURO de unit economics** — o furo é o
+custo POR mensagem (trocar de provedor não resolve; o mínimo mensal é irrelevante perto disso).
 
-**Recomendação: (a) no piloto** — desligar OTP de cliente, criar o customer por nome+telefone não
-verificado, lojista confirma trote por ligação. Revisitar verificação por WhatsApp na Fase 2 (quando
-o Cloud API já estiver na mesa). O custo por tenant deve entrar na `05-unit-economics.xlsx` ANTES de
-precificar qualquer plano.
+**DECISÃO (piloto): OTP por E-MAIL pra staff E cliente, via Resend.** SMS volta ao fim do piloto
+(código todo preservado, reativação por env — ver docs/08). O e-mail troca o custo variável por
+tenant (R$80–450) por um **fixo de US$20/mês compartilhado** entre todos os tenants → **fecha o
+furo no piloto**. Volume de e-mail (800–3.000/tenant/mês) é trivial dentro do plano pago.
+
+**Resend — limites (levantados no 9c):**
+- **Free: 3.000/mês, mas TETO de 100/DIA.** Fatal aqui: 1 tenant do ICP faz 27–100 e-mails/dia em
+  média, com picos de sábado à noite, e o teto é **por CONTA (compartilhado entre tenants)** → 100/dia
+  não serve nem pra um. Teto diário = **checkout PARA numa noite movimentada.**
+- **Pro: US$20/mês, SEM teto diário** (~dezenas de milhares/mês inclusos; overage US$0,90/1k). **É o
+  plano necessário** — entra como **custo fixo** (tabela abaixo), não opcional.
+
+**Ressalva de CONVERSÃO (não tirar conclusão errada dos números do piloto):** pedir e-mail no checkout
+de delivery brasileiro adiciona **fricção real** — cliente no celular, à noite, teria que sair pro app
+de e-mail pra pegar o código. O funil do piloto com e-mail **NÃO vai representar** o funil de produção
+com SMS (ou sem verificação). **É aceitável porque o piloto valida o SISTEMA, não mede conversão** —
+mas ninguém deve ler taxa de conclusão do piloto como sinal de conversão de produção.
+
+**Pós-piloto:** reativar SMS (env, docs/08) OU migrar verificação pra WhatsApp (Fase 2, quando o Cloud
+API entra) — decidir com o custo por tenant na mão. O custo de OTP entra na `05-unit-economics.xlsx`.
 
 ## Upstash Redis — Free Tier
 
@@ -85,14 +93,16 @@ Câmbio assumido ~R$ 5,40/US$. Números a confirmar no faturamento real de cada 
 | **Fly.io** | 2× `shared-cpu-1x` 512MB, GRU, sempre ligadas | ~8 | ~43 |
 | **Neon** | projeto de prod (Launch — free tier NÃO serve: API sempre-ligada mantém o compute ativo, estoura as compute-hours do free) | ~19 | ~103 |
 | **Upstash** | plano pago desde o dia 1 (ver acima) | ~10 | ~54 |
-| **Núcleo (os 3)** | | **~37** | **~200** |
+| **Resend** | Pro (OTP por e-mail no piloto — free 100/dia não serve) | ~20 | ~108 |
+| **Núcleo (os 4)** | | **~57** | **~308** |
 | Vercel (à parte) | Pro exigido p/ uso comercial (Hobby proíbe) | ~20 | ~108 |
 
-**Break-even do núcleo (~R$ 200/mês) no plano Standard (R$ 99/tenant/mês):**
-**~2–3 tenants pagantes cobrem TODA a infra de núcleo** (2 tenants = R$ 198 ≈ empata;
-3 = R$ 297 folga). Somando a Vercel Pro (~R$ 308/mês total), são **~4 tenants Standard**.
-Ou seja: a partir de ~3–4 restaurantes no Standard, a infra é ruído no P&L — o risco de
-custo do piloto não está na infra, está no CAC/suporte.
+**Break-even do núcleo (~R$ 308/mês) no plano Standard (R$ 99/tenant/mês):**
+**~3–4 tenants pagantes cobrem TODA a infra de núcleo** (3 = R$ 297 ≈ empata; 4 = R$ 396 folga).
+Somando a Vercel Pro (~R$ 416/mês total), são **~5 tenants Standard**. Nota: o Resend Pro (US$20)
+**substitui** o furo variável de SMS (R$80–450 POR tenant) por um fixo compartilhado — troca
+excelente. A partir de ~4–5 restaurantes no Standard, a infra é ruído no P&L; o risco de custo do
+piloto está no CAC/suporte, não na infra.
 
 **Mitigações (otimização FUTURA — NÃO implementar agora, o custo não justifica):** (1) o
 rate-limit do storefront é o maior termo de comandos — janela FIXA (1–2 comandos) ou só sob

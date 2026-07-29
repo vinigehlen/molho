@@ -82,7 +82,38 @@ num host público**, não só liberar o mock. Só (a): chave ZENVIA real (mesmo 
     lojista — cada cliente final teria que dar opt-in antes de receber o código, o que quebra o
     fluxo de checkout. É premissa de produto, não detalhe de infra.
 
-### Pré-requisito da validação de fronteira: owner do seed com telefone REAL (opt-in do sandbox)
+### OTP por E-MAIL no piloto (Resend) — SUPERSEDES a dependência do ZENVIA acima
+**Decisão:** no piloto, OTP de **staff E cliente** vai por **e-mail (Resend)**, não SMS. O SMS
+**volta ao fim do piloto** — **nada do código de SMS é removido** (adapter Zenvia, cota diária,
+guarda, testes ficam intactos). Consequências pro 9c:
+- **Zenvia sai do caminho crítico do piloto.** A "dependência dura do ZENVIA" acima passa a valer só
+  pra reativação pós-piloto do SMS. O 9c destrava **sem nenhum SMS**.
+- **Seleção de canal é CONFIG POR ESCOPO** (env), não código: staff e cliente podem ter canais
+  diferentes. **Reativar SMS = mudar env, não escrever código** (gatilho: fim do piloto). Ex. de
+  forma: `OTP_CHANNEL_STAFF=email|sms`, `OTP_CHANNEL_CUSTOMER=email|sms` (nome final na implementação).
+- **Guarda de produção passa a ser POR CANAL EM USO:** exige provider real **do canal selecionado** —
+  escopo em e-mail exige Resend configurado (recusa mock); escopo em SMS exige Zenvia. **Nenhum canal
+  NÃO usado bloqueia o boot; nenhum canal em uso cai pro mock em produção.** (A guarda atual do ZENVIA
+  vira um caso disto.)
+- **Custo:** Resend **Pro US$20/mês** (free tem teto de **100/dia** → checkout para numa noite cheia).
+  Fixo compartilhado, substitui o furo variável de SMS. Ver `docs/05`.
+
+**PRÉ-REQUISITO DE DELIVERABILITY (agora é caminho crítico do FUNIL, não do login) — passo de DNS do
+go-live, com LEAD TIME:** OTP em spam = pedido perdido. Resend usa **subdomínio de envio
+`send.molho.live`** (não exige domínio dedicado). No DNS da Cloudflare (registros **TXT/MX — não
+proxiados**, sem a armadilha da nuvem laranja):
+- **MX** em `send.molho.live` (bounces) + **SPF TXT** em `send.molho.live`
+- **DKIM TXT** em `resend._domainkey` (valor que o Resend gera)
+- **DMARC TXT** em `_dmarc.molho.live` — começar `p=none` com `rua`, subir pra `quarantine`/`reject`
+- Propagação **até 24h** + rampa de reputação do DMARC = **abrir cedo, em paralelo** (como o domínio).
+  Verificar status "Verified" no Resend antes do 1º login de staff.
+
+### Pré-requisito da validação de fronteira: owner do seed com E-MAIL REAL
+(Antes era telefone/SMS; com OTP por e-mail, o identificador de staff no seed vira **e-mail**.)
+`MOLHO_SEED_STAFF_PHONE` → **`MOLHO_SEED_STAFF_EMAIL`**, e o seed de CLIENTE também passa a ter e-mail.
+O resto abaixo (guarda de produção do seed, fallback, cifragem) continua valendo — só muda o campo.
+
+### (histórico) Pré-requisito quando o canal era SMS: owner do seed com telefone REAL (opt-in do sandbox)
 O opt-in do sandbox Zenvia (o número que RECEBE precisa se cadastrar + enviar keyword) tem
 consequência no seed: o owner usa `+5551999990000` (fictício), que **nunca recebe o SMS** → sem OTP
 → sem JWT de staff → **nenhum item de 6–7 roda**. O staging precisa de um owner com um número **REAL
