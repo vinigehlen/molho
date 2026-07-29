@@ -1,4 +1,5 @@
-import { type PhoneNumber, phoneNumberToE164 } from '@molho/contracts';
+import { type EmailAddress, type PhoneNumber, phoneNumberToE164 } from '@molho/contracts';
+import type { EmailProvider } from '../../messaging/email-provider.port';
 import type { MessagingProvider } from '../../messaging/messaging-provider.port';
 
 /**
@@ -22,5 +23,20 @@ export function phoneRecipient(phone: PhoneNumber, messaging: MessagingProvider)
   return {
     identifier: phoneNumberToE164(phone),
     deliver: (message) => messaging.send(phone, message),
+  };
+}
+
+/** Assunto fixo — o corpo (que carrega o código) vem do OtpService. */
+const OTP_EMAIL_SUBJECT = 'Seu código de acesso Molho';
+
+/**
+ * Destinatário de E-MAIL (Épico 9c). `identifier` é o e-mail já normalizado
+ * pelo `parseEmail` (lowercase) — por isso duas grafias do mesmo endereço
+ * caem no MESMO desafio e no MESMO balde de rate limit.
+ */
+export function emailRecipient(email: EmailAddress, provider: EmailProvider): OtpRecipient {
+  return {
+    identifier: email,
+    deliver: (message) => provider.send(email, OTP_EMAIL_SUBJECT, message),
   };
 }

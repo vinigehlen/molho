@@ -4,6 +4,7 @@ export * from './cart';
 export * from './checkout';
 export * from './copy.pt-BR';
 export * from './delivery-match';
+export * from './email-address';
 export * from './modules';
 export * from './permissions';
 export * from './phone-number';
