@@ -95,8 +95,10 @@ guarda, testes ficam intactos). Consequências pro 9c:
   escopo em e-mail exige Resend configurado (recusa mock); escopo em SMS exige Zenvia. **Nenhum canal
   NÃO usado bloqueia o boot; nenhum canal em uso cai pro mock em produção.** (A guarda atual do ZENVIA
   vira um caso disto.)
-- **Custo:** Resend **Pro US$20/mês** (free tem teto de **100/dia** → checkout para numa noite cheia).
-  Fixo compartilhado, substitui o furo variável de SMS. Ver `docs/05`.
+- **Custo:** durante o 9c/staging o Resend fica no **FREE (US$0)** — 100/dia sobra pra logins de
+  teste. **NÃO assinar o Pro agora.** O **Pro (US$20/mês, sem teto diário)** é **PASSO DE GO-LIVE**:
+  assinar **antes do 1º restaurante real entrar** (quando o volume de cliente cruza 100/dia, senão o
+  checkout para numa noite cheia). Fixo compartilhado, substitui o furo variável de SMS. Ver `docs/05`.
 
 **PRÉ-REQUISITO DE DELIVERABILITY (agora é caminho crítico do FUNIL, não do login) — passo de DNS do
 go-live, com LEAD TIME:** OTP em spam = pedido perdido. Resend usa **subdomínio de envio

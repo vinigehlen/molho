@@ -93,16 +93,19 @@ Câmbio assumido ~R$ 5,40/US$. Números a confirmar no faturamento real de cada 
 | **Fly.io** | 2× `shared-cpu-1x` 512MB, GRU, sempre ligadas | ~8 | ~43 |
 | **Neon** | projeto de prod (Launch — free tier NÃO serve: API sempre-ligada mantém o compute ativo, estoura as compute-hours do free) | ~19 | ~103 |
 | **Upstash** | plano pago desde o dia 1 (ver acima) | ~10 | ~54 |
-| **Resend** | Pro (OTP por e-mail no piloto — free 100/dia não serve) | ~20 | ~108 |
-| **Núcleo (os 4)** | | **~57** | **~308** |
+| **Resend** | **staging: FREE (US$0)** · go-live: Pro | 0 → ~20 | 0 → ~108 |
+| **Núcleo** | staging (4 serviços) → go-live | **~37 → ~57** | **~200 → ~308** |
 | Vercel (à parte) | Pro exigido p/ uso comercial (Hobby proíbe) | ~20 | ~108 |
 
-**Break-even do núcleo (~R$ 308/mês) no plano Standard (R$ 99/tenant/mês):**
-**~3–4 tenants pagantes cobrem TODA a infra de núcleo** (3 = R$ 297 ≈ empata; 4 = R$ 396 folga).
-Somando a Vercel Pro (~R$ 416/mês total), são **~5 tenants Standard**. Nota: o Resend Pro (US$20)
-**substitui** o furo variável de SMS (R$80–450 POR tenant) por um fixo compartilhado — troca
-excelente. A partir de ~4–5 restaurantes no Standard, a infra é ruído no P&L; o risco de custo do
-piloto está no CAC/suporte, não na infra.
+**Resend: NÃO assinar o Pro agora.** Durante o 9c (staging) o **free (3k/mês, 100/dia) sobra** — é um
+punhado de logins de teste. O **Pro (US$20) é PASSO DE GO-LIVE** (ver docs/08): assinar **antes do 1º
+restaurante real entrar** (quando o volume de cliente cruza o teto de 100/dia). Só nesse momento o
+núcleo sobe de ~US$37 pra ~US$57 — **não agora**.
+
+**Break-even do núcleo:** em staging (~R$200/mês) ~2–3 tenants; no go-live (~R$308/mês) ~3–4 tenants
+Standard; +Vercel Pro (~R$416 total) ~5 tenants. O Resend Pro (US$20) **substitui** o furo variável de
+SMS (R$80–450 POR tenant) por um fixo compartilhado — troca excelente. A partir de ~4–5 restaurantes
+no Standard, a infra é ruído no P&L; o risco de custo do piloto está no CAC/suporte, não na infra.
 
 **Mitigações (otimização FUTURA — NÃO implementar agora, o custo não justifica):** (1) o
 rate-limit do storefront é o maior termo de comandos — janela FIXA (1–2 comandos) ou só sob
