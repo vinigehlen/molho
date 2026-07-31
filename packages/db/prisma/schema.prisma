@@ -282,6 +282,13 @@ model User {
   /// HMAC determinístico do telefone — é o que o login por OTP SMS busca.
   /// Único só entre linhas vivas — índice único parcial criado à mão na
   /// migration (Prisma não expressa índice parcial no DSL).
+  ///
+  /// NULLABLE: como SELETOR, o valor SEMPRE vem de `hashPhoneForLookup()`,
+  /// nunca de um `string | null` lido do banco — `where: { phoneLookupHash:
+  /// null }` não acha "nada", acha TODO staff sem telefone (foi assim que um
+  /// `deleteMany` de teste quase apagou todos os staff de e-mail). Filtrar
+  /// "sem telefone" exige `null` LITERAL, com intenção. Ver CLAUDE.md
+  /// § "Convenções de schema" → seletor por `*_lookup_hash`.
   phoneLookupHash String?   @map("phone_lookup_hash")
   /// Versão da chave de cifra usada (rotação lazy, sem migration em massa).
   phoneKeyVersion Int       @default(1) @map("phone_key_version")
@@ -292,6 +299,10 @@ model User {
   /// HMAC(e-mail normalizado, MOLHO_EMAIL_PEPPER) — é o que o login de staff
   /// por OTP de e-mail busca, e a CHAVE DE IDENTIDADE de staff no piloto.
   /// Único só entre linhas vivas — índice único parcial à mão na migration.
+  ///
+  /// NULLABLE: mesma regra de seletor do `phoneLookupHash` acima — o valor
+  /// vem sempre de `hashEmailForLookup()`, nunca de leitura do banco, e
+  /// `null` como filtro casa com todo staff SEM e-mail.
   emailLookupHash String?   @map("email_lookup_hash")
   emailKeyVersion Int       @default(1) @map("email_key_version")
   /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
