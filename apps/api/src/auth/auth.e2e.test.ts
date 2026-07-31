@@ -138,7 +138,14 @@ describe('POST /v1/auth/otp (staff)', () => {
 
     expect(second.body.user.id).toBe(first.body.user.id);
 
-    const count = await migratorPrisma.user.count({ where: { phoneLookupHash: (await migratorPrisma.user.findUniqueOrThrow({ where: { id: first.body.user.id } })).phoneLookupHash } });
+    // Extrai e ASSERTA não-nulo antes de usar como seletor: `count({
+    // phoneLookupHash: null })` contaria todo staff criado por e-mail e o
+    // teste passaria/falharia por motivo errado. Ver nota do cleanup acima.
+    const { phoneLookupHash } = await migratorPrisma.user.findUniqueOrThrow({
+      where: { id: first.body.user.id },
+    });
+    expect(phoneLookupHash).not.toBeNull();
+    const count = await migratorPrisma.user.count({ where: { phoneLookupHash } });
     expect(count).toBe(1);
   }, 70_000);
 
