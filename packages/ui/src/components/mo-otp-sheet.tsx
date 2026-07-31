@@ -10,10 +10,17 @@ export type MoOtpActionResult = { ok: true } | { ok: false; message: string };
 export interface MoOtpSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Chamada ao enviar o telefone (passo 1). Dispara o SMS via OTP do lojista/plataforma. */
-  onRequestCode: (phone: string) => Promise<MoOtpActionResult>;
+  /**
+   * Canal de ENTREGA do código (Épico 9c) — vem do backend, que é fonte única
+   * (`otpChannel` no payload de GET /v1/store/:slug), nunca de env do front.
+   * O telefone é pedido nos DOIS canais: ele é a identidade do cliente, o
+   * e-mail é só por onde o código chega no piloto.
+   */
+  channel?: 'sms' | 'email';
+  /** Chamada ao enviar telefone (+ e-mail, no canal de e-mail) — passo 1. */
+  onRequestCode: (phone: string, email?: string) => Promise<MoOtpActionResult>;
   /** Chamada ao enviar o código (passo 2). */
-  onVerifyCode: (phone: string, code: string) => Promise<MoOtpActionResult>;
+  onVerifyCode: (phone: string, code: string, email?: string) => Promise<MoOtpActionResult>;
   /** Código verificado com sucesso — quem chama decide o que fazer depois (fechar o sheet, seguir o fluxo). */
   onVerified: () => void;
   className?: string;
@@ -26,14 +33,23 @@ type Step = 'phone' | 'code';
  * pede telefone (CLAUDE.md regra 13: só no "Fazer pedido" final, nunca antes).
  *
  * Sem `@molho/contracts` (mesmo padrão de MoAddressSheet) — quem chama
- * decide como formatar/normalizar o telefone antes de mandar pro backend;
- * aqui só valida "tem 11 dígitos" (DDD + nono dígito + número, sempre
- * celular — OTP é por SMS, fixo nunca recebe), a mesma checagem grosseira
- * que já libera o botão.
+ * decide como formatar/normalizar antes de mandar pro backend; aqui só valida
+ * "tem 11 dígitos" (DDD + nono dígito + número, sempre celular — fixo nunca
+ * recebe SMS) e, no canal de e-mail, a forma grosseira do e-mail: a mesma
+ * checagem que libera o botão, sem round-trip só pra descobrir formato.
  */
-export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, onVerified, className }: MoOtpSheetProps) {
+export function MoOtpSheet({
+  open,
+  onOpenChange,
+  channel = 'sms',
+  onRequestCode,
+  onVerifyCode,
+  onVerified,
+  className,
+}: MoOtpSheetProps) {
   const [step, setStep] = React.useState<Step>('phone');
   const [phone, setPhone] = React.useState('');
+  const [email, setEmail] = React.useState('');
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -42,6 +58,7 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
     if (!open) return;
     setStep('phone');
     setPhone('');
+    setEmail('');
     setCode('');
     setError(null);
     setLoading(false);
@@ -49,19 +66,21 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
 
   if (!open) return null;
 
+  const porEmail = channel === 'email';
   const digitos = phone.replace(/\D/g, '');
-  // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — OTP é por SMS,
-  // fixo (10 dígitos) nunca recebe. Mesma exigência de parsePhoneNumber
-  // (@molho/contracts), que rejeitaria um fixo de qualquer forma; validar
-  // aqui evita o round-trip só pra descobrir isso.
+  // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — fixo (10 dígitos)
+  // nunca recebe SMS. Mesma exigência de parsePhoneNumber (@molho/contracts),
+  // que rejeitaria um fixo de qualquer forma.
   const telefoneValido = digitos.length === 11;
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const contatoValido = telefoneValido && (!porEmail || emailValido);
   const codigoValido = code.replace(/\D/g, '').length === 6;
 
   async function enviarTelefone() {
-    if (!telefoneValido || loading) return;
+    if (!contatoValido || loading) return;
     setLoading(true);
     setError(null);
-    const resultado = await onRequestCode(phone);
+    const resultado = await onRequestCode(phone, porEmail ? email.trim() : undefined);
     setLoading(false);
     if (!resultado.ok) {
       setError(resultado.message);
@@ -74,7 +93,7 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
     if (!codigoValido || loading) return;
     setLoading(true);
     setError(null);
-    const resultado = await onVerifyCode(phone, code);
+    const resultado = await onVerifyCode(phone, code, porEmail ? email.trim() : undefined);
     setLoading(false);
     if (!resultado.ok) {
       setError(resultado.message);
@@ -92,7 +111,7 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
   async function reenviarCodigo() {
     setError(null);
     setLoading(true);
-    const resultado = await onRequestCode(phone);
+    const resultado = await onRequestCode(phone, porEmail ? email.trim() : undefined);
     setLoading(false);
     if (!resultado.ok) setError(resultado.message);
   }
@@ -101,11 +120,15 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
     <MoSheet
       open={open}
       onOpenChange={onOpenChange}
-      title={step === 'phone' ? 'Confirma seu telefone' : 'Digite o código'}
+      title={step === 'phone' ? (porEmail ? 'Confirma seus contatos' : 'Confirma seu telefone') : 'Digite o código'}
       description={
         step === 'phone'
-          ? 'A gente manda um código por SMS pra confirmar seu pedido.'
-          : `Enviamos um código de 6 dígitos por SMS pro ${phone}.`
+          ? porEmail
+            ? 'A gente manda um código pro seu e-mail pra confirmar seu pedido.'
+            : 'A gente manda um código por SMS pra confirmar seu pedido.'
+          : porEmail
+            ? `Enviamos um código de 6 dígitos pro seu e-mail. Confere também o spam.`
+            : `Enviamos um código de 6 dígitos por SMS pro ${phone}.`
       }
       className={className}
     >
@@ -120,9 +143,21 @@ export function MoOtpSheet({ open, onOpenChange, onRequestCode, onVerifyCode, on
               placeholder="(51) 99999-9999"
               inputMode="tel"
               autoFocus
-              error={error ?? undefined}
+              error={porEmail ? undefined : (error ?? undefined)}
             />
-            <MoButton disabled={!telefoneValido} loading={loading} onClick={enviarTelefone}>
+            {porEmail ? (
+              <MoInput
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@email.com"
+                inputMode="email"
+                autoComplete="email"
+                error={error ?? undefined}
+              />
+            ) : null}
+            <MoButton disabled={!contatoValido} loading={loading} onClick={enviarTelefone}>
               Enviar código
             </MoButton>
           </>

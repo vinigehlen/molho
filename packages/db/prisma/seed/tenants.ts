@@ -24,6 +24,14 @@ export interface SeedTenantDef {
     name: string;
     /** E.164 — nunca gravado em claro, ver packages/db/src/crypto/phone.ts */
     phone: string;
+    /**
+     * Identidade de staff no piloto (canal e-mail, Épico 9c) — nunca gravado
+     * em claro, ver packages/db/src/crypto/email.ts. O owner do seed nasce com
+     * telefone E e-mail de propósito: assim ele é achável nos DOIS canais e
+     * trocar `OTP_CHANNEL_STAFF` não deixa o staging sem acesso nem cria um
+     * segundo `user` pro mesmo humano.
+     */
+    email: string;
   };
 }
 
@@ -53,6 +61,9 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
     owner: {
       name: 'Vinicius',
       phone: '+5551999990000',
+      // .test é TLD reservado (RFC 2606) — nunca resolve, nunca vaza e-mail
+      // pra domínio de terceiro. Sobrescrito por MOLHO_SEED_STAFF_EMAIL.
+      email: 'owner@hamburgueria-da-vila.test',
     },
   },
   {
@@ -77,6 +88,7 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
     owner: {
       name: 'Ana',
       phone: '+5551988880000',
+      email: 'owner@pizzaria-roma.test',
     },
   },
 ] as const;

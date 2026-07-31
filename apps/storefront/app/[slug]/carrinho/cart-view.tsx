@@ -59,6 +59,8 @@ export interface CartViewProps {
   storeName: string;
   /** `GET /v1/store/:slug` (Épico 8, docs/02 §5.5) — array vazio é um estado real: loja sem nenhum método pronto. */
   availablePaymentMethods: CheckoutPaymentMethod[];
+  /** `GET /v1/store/:slug` — backend é fonte única do canal de OTP (Épico 9c). */
+  otpChannel: 'sms' | 'email';
   emptyTitle: string;
   emptyBody: string;
   emptyActionLabel: string;
@@ -71,7 +73,15 @@ export interface CartViewProps {
  * concentra toda a orquestração (revalidação → revisão → OTP → criação) —
  * esta view só liga estado a componente visual.
  */
-export function CartView({ slug, storeName, availablePaymentMethods, emptyTitle, emptyBody, emptyActionLabel }: CartViewProps) {
+export function CartView({
+  slug,
+  storeName,
+  availablePaymentMethods,
+  otpChannel,
+  emptyTitle,
+  emptyBody,
+  emptyActionLabel,
+}: CartViewProps) {
   const cart = useCart(slug);
   const { address, setAddress } = useAddress(slug);
   const checkout = useCheckout(slug, cart.cart, address);
@@ -274,6 +284,7 @@ export function CartView({ slug, storeName, availablePaymentMethods, emptyTitle,
         onOpenChange={(open) => {
           if (!open) checkout.cancelOtp();
         }}
+        channel={otpChannel}
         onRequestCode={checkout.requestOtpCode}
         onVerifyCode={checkout.verifyOtpCode}
         onVerified={() => {}}

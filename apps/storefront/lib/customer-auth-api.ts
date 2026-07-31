@@ -9,13 +9,15 @@ export type OtpVerifyResult = { ok: true; accessToken: string; customerId: strin
  * erro em pt-BR prontas pra `MoOtpSheet` exibir direto, sem o chamador
  * precisar traduzir status HTTP.
  */
-export async function requestOtp(slug: string, phone: string): Promise<OtpRequestResult> {
+export async function requestOtp(slug: string, phone: string, email?: string): Promise<OtpRequestResult> {
   let response: Response;
   try {
     response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/auth/otp/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
+      // `email` só vai no canal de e-mail (Épico 9c) — é destino de ENTREGA,
+      // não identidade: quem chaveia o cliente é o telefone, sempre.
+      body: JSON.stringify(email ? { phone, email } : { phone }),
     });
   } catch {
     return { ok: false, message: 'Não deu pra enviar o código agora. Confere sua internet e tenta de novo.' };
@@ -26,13 +28,18 @@ export async function requestOtp(slug: string, phone: string): Promise<OtpReques
   return { ok: false, message: 'Não deu pra enviar o código agora. Confere o número e tenta de novo.' };
 }
 
-export async function verifyOtp(slug: string, phone: string, code: string): Promise<OtpVerifyResult> {
+export async function verifyOtp(
+  slug: string,
+  phone: string,
+  code: string,
+  email?: string,
+): Promise<OtpVerifyResult> {
   let response: Response;
   try {
     response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/auth/otp/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify(email ? { phone, code, email } : { phone, code }),
     });
   } catch {
     return { ok: false, message: 'Não deu pra confirmar o código agora. Confere sua internet e tenta de novo.' };

@@ -9,14 +9,16 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { parsePhoneNumber } from '@molho/contracts';
+import { type EmailAddress, type PhoneNumber, parseEmail, parsePhoneNumber, phoneNumberToE164 } from '@molho/contracts';
 import type { Response } from 'express';
 import type { Request } from 'express';
 import { RequestContextService } from '../context/request-context.service';
 import { PLATFORM_CONTEXT_TENANT_ID } from '../context/tenant-context.constants';
-import { MESSAGING_PROVIDER } from '../messaging/messaging.module';
+import type { EmailProvider } from '../messaging/email-provider.port';
+import { EMAIL_PROVIDER, MESSAGING_PROVIDER } from '../messaging/messaging.module';
 import type { MessagingProvider } from '../messaging/messaging-provider.port';
-import { phoneRecipient } from './otp/otp-recipient';
+import { otpChannelFor } from '../messaging/otp-channel';
+import { emailRecipient, identityOnly, phoneRecipient } from './otp/otp-recipient';
 import { OTP_SERVICE } from './otp/otp.module';
 import type { OtpService } from './otp/otp.service';
 import { TOKEN_SERVICE } from './token/token.module';
@@ -47,12 +49,30 @@ export class StaffAuthController {
     // Vitest não gera de forma confiável — achado rodando os testes e2e de
     // verdade (funcionava sob `nest start`, quebrava sob Vitest).
     @Inject(RequestContextService) private readonly requestContext: RequestContextService,
-    // Canal de entrega do OTP. No piloto (Épico 9c) staff vai por e-mail; hoje,
-    // ainda SMS via phoneRecipient (o canal por escopo entra no passo 3). O
-    // OtpService não conhece o canal — o controller monta o recipiente.
+    // Os DOIS canais de entrega ficam injetados; qual é usado sai de
+    // otpChannelFor('staff') (env). O OtpService não conhece canal — o
+    // controller monta o recipiente. Trocar de canal é trocar env.
     @Inject(MESSAGING_PROVIDER) private readonly messaging: MessagingProvider,
+    @Inject(EMAIL_PROVIDER) private readonly email: EmailProvider,
   ) {
     this.staffIdentity = new StaffIdentityRepository(requestContext);
+  }
+
+  /**
+   * Identificador de staff conforme o canal: e-mail é a CHAVE DE IDENTIDADE no
+   * piloto (Épico 9c); telefone continua valendo pra rollback por env.
+   * Campo ausente pro canal em uso é 400 com mensagem em pt-BR — a
+   * obrigatoriedade é do canal, não do DTO (ver otp-request.dto.ts).
+   */
+  private identifierFor(
+    dto: { phone?: string; email?: string },
+  ): { channel: 'email'; email: EmailAddress } | { channel: 'sms'; phone: PhoneNumber } {
+    if (otpChannelFor(SCOPE) === 'email') {
+      if (!dto.email) throw new BadRequestException('Informe o e-mail.');
+      return { channel: 'email', email: parseEmail(dto.email) };
+    }
+    if (!dto.phone) throw new BadRequestException('Informe o telefone.');
+    return { channel: 'sms', phone: parsePhoneNumber(dto.phone) };
   }
 
   @Post('request')
@@ -63,14 +83,18 @@ export class StaffAuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<Record<string, never>> {
     try {
-      const phone = parsePhoneNumber(dto.phone);
-      await this.otpService.requestOtp(SCOPE, phoneRecipient(phone, this.messaging), req.ip ?? '0.0.0.0');
+      const identifier = this.identifierFor(dto);
+      const recipient =
+        identifier.channel === 'email'
+          ? emailRecipient(identifier.email, this.email)
+          : phoneRecipient(identifier.phone, this.messaging);
+      await this.otpService.requestOtp(SCOPE, recipient, req.ip ?? '0.0.0.0');
     } catch (error) {
       if (error instanceof OtpRateLimitedError) {
         res.set('Retry-After', String(retryAfterSecondsFor(error.kind)));
       }
       throw toAuthHttpException(error);
-      // 202 pra QUALQUER telefone (exista ou não): não há branch de
+      // 202 pra QUALQUER identificador (exista ou não): não há branch de
       // existência de conta em nenhum caminho de sucesso deste método —
       // é isso que sustenta a anti-enumeração, não um try/catch escondendo.
     }
@@ -80,21 +104,29 @@ export class StaffAuthController {
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   async verify(@Body() dto: OtpVerifyDto, @Req() req: Request) {
-    let phone;
+    let identifier;
     try {
-      phone = parsePhoneNumber(dto.phone);
+      identifier = this.identifierFor(dto);
     } catch (error) {
       throw toAuthHttpException(error);
     }
 
     const ip = req.ip ?? '0.0.0.0';
-    const ok = await this.otpService.verifyOtp(SCOPE, phoneRecipient(phone, this.messaging), dto.code, ip);
+    // identityOnly: verify não entrega nada, só precisa da chave do desafio —
+    // e assim não há como um verify mandar SMS num deploy configurado
+    // pra e-mail.
+    const challengeKey =
+      identifier.channel === 'email' ? identifier.email : phoneNumberToE164(identifier.phone);
+    const ok = await this.otpService.verifyOtp(SCOPE, identityOnly(challengeKey), dto.code, ip);
     if (!ok) throw new BadRequestException('Código inválido ou expirado.');
 
     return this.requestContext.run(
       { tenantId: PLATFORM_CONTEXT_TENANT_ID, isPlatform: true },
       async () => {
-        const { identity } = await this.staffIdentity.findOrCreateByPhone(phone);
+        const { identity } =
+          identifier.channel === 'email'
+            ? await this.staffIdentity.findOrCreateByEmail(identifier.email)
+            : await this.staffIdentity.findOrCreateByPhone(identifier.phone);
         const userRepository = new PrismaUserAuthRepository(this.requestContext);
         const scopes = await userRepository.getRoleAssignments(identity.id);
         const roles = [...new Set(scopes.map((s) => s.role))];

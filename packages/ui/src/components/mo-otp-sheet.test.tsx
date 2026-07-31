@@ -59,8 +59,35 @@ describe('MoOtpSheet', () => {
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
 
-    expect(onRequestCode).toHaveBeenCalledWith('(51) 99999-0000');
+    // `undefined` no 2º argumento: canal SMS não manda e-mail nenhum.
+    expect(onRequestCode).toHaveBeenCalledWith('(51) 99999-0000', undefined);
     expect(await screen.findByText('Digite o código')).toBeInTheDocument();
+  });
+
+  // Canal de e-mail (Épico 9c): o telefone continua sendo pedido porque é a
+  // IDENTIDADE do cliente — o e-mail é só por onde o código chega.
+  it('canal e-mail: pede telefone E e-mail, e só libera o botão com os dois', async () => {
+    const user = userEvent.setup();
+    const { onRequestCode } = setup({ channel: 'email' });
+
+    const botao = screen.getByRole('button', { name: 'Enviar código' });
+    await user.type(screen.getByLabelText('Telefone'), '51999990000');
+    expect(botao).toBeDisabled();
+
+    await user.type(screen.getByLabelText('E-mail'), 'ana@loja.com');
+    expect(botao).toBeEnabled();
+
+    await user.click(botao);
+    expect(onRequestCode).toHaveBeenCalledWith('(51) 99999-0000', 'ana@loja.com');
+  });
+
+  it('canal e-mail: e-mail mal formado mantém o botão desabilitado', async () => {
+    const user = userEvent.setup();
+    setup({ channel: 'email' });
+
+    await user.type(screen.getByLabelText('Telefone'), '51999990000');
+    await user.type(screen.getByLabelText('E-mail'), 'ana@loja');
+    expect(screen.getByRole('button', { name: 'Enviar código' })).toBeDisabled();
   });
 
   it('onRequestCode falha (ex.: rate limit): mostra erro, não avança de passo', async () => {
@@ -85,7 +112,7 @@ describe('MoOtpSheet', () => {
     await user.type(screen.getByLabelText('Código'), '123456');
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
-    expect(onVerifyCode).toHaveBeenCalledWith('(51) 99999-0000', '123456');
+    expect(onVerifyCode).toHaveBeenCalledWith('(51) 99999-0000', '123456', undefined);
     expect(onVerified).toHaveBeenCalled();
   });
 

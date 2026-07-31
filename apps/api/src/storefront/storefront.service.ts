@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import type { StorefrontPayload } from '@molho/contracts';
+import { otpChannelFor } from '../messaging/otp-channel';
 import { resolvePublicImageUrl } from '../storage/public-url';
 import type { AvailablePaymentMethodsResolver } from './available-payment-methods';
 import type { StorefrontRepository } from './storefront.repository';
@@ -58,6 +59,10 @@ export class StorefrontService {
         nextOpensAt,
         availablePaymentMethods,
       },
+      // Backend é fonte única do canal de OTP — o front NÃO tem env própria
+      // pra isso (duas fontes divergiriam num deploy e o login pararia sem
+      // ninguém entender). Ver docs/08 § fiação.
+      otpChannel: otpChannelFor('customer'),
       categories: categories.map((category) => ({
         id: category.id,
         name: category.name,

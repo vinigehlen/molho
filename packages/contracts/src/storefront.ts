@@ -113,6 +113,15 @@ export const storefrontStoreSchema = z.object({
 export const storefrontPayloadSchema = z.object({
   store: storefrontStoreSchema,
   categories: z.array(storefrontCategorySchema),
+  /**
+   * Canal do OTP de cliente (Épico 9c) — o BACKEND é fonte única. O front lê
+   * daqui pra saber se pede telefone (SMS) ou telefone + e-mail, em vez de uma
+   * `NEXT_PUBLIC_*` própria: duas envs podem divergir num deploy e ninguém
+   * descobre até o login parar. Hoje o valor é global de deploy, mas vem por um
+   * endpoint POR TENANT — quando virar config de tenant, o contrato já está no
+   * lugar certo.
+   */
+  otpChannel: z.enum(['sms', 'email']),
 });
 
 export type StorefrontModifier = z.infer<typeof storefrontModifierSchema>;

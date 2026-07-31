@@ -40,3 +40,39 @@ export function emailRecipient(email: EmailAddress, provider: EmailProvider): Ot
     deliver: (message) => provider.send(email, OTP_EMAIL_SUBJECT, message),
   };
 }
+
+/**
+ * CLIENTE no piloto: identidade é o TELEFONE, entrega é por E-MAIL. É o único
+ * lugar onde `identifier` e alvo de entrega divergem, e é deliberado — o
+ * identifier continua sendo o E.164, então chave de desafio, balde de rate
+ * limit e cooldown ficam byte a byte iguais aos do SMS, e voltar pro SMS ao
+ * fim do piloto é trocar env. Ver CLAUDE.md regra 13 e docs/08.
+ *
+ * A escolha de QUAL e-mail (o de registro, via TOFU, ou o digitado) é do
+ * controller — aqui só se entrega no que foi decidido.
+ */
+export function phoneIdentityViaEmail(
+  phone: PhoneNumber,
+  email: EmailAddress,
+  provider: EmailProvider,
+): OtpRecipient {
+  return {
+    identifier: phoneNumberToE164(phone),
+    deliver: (message) => provider.send(email, OTP_EMAIL_SUBJECT, message),
+  };
+}
+
+/**
+ * Só identidade, sem canal — `verifyOtp` nunca entrega nada, só precisa da
+ * chave do desafio. `deliver` LANÇA de propósito: se algum caminho futuro
+ * tentar enviar por aqui, explode no teste em vez de mandar SMS silenciosamente
+ * num deploy configurado pra e-mail.
+ */
+export function identityOnly(identifier: string): OtpRecipient {
+  return {
+    identifier,
+    deliver: () => {
+      throw new Error('identityOnly não entrega — use phoneRecipient/emailRecipient pra enviar OTP.');
+    },
+  };
+}

@@ -7,6 +7,7 @@ import {
 } from '@molho/contracts';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { S3Client } from '@aws-sdk/client-s3';
+import { encryptEmail, hashEmailForLookup } from '../../src/crypto/email';
 import { encryptPhone, hashPhoneForLookup } from '../../src/crypto/phone';
 import { PrismaClient } from '../generated/client/client';
 import { type SeedCategoryDef, SEED_CATALOGS } from './catalog';
@@ -96,7 +97,13 @@ async function seedTenant(
     WHERE id = ${store.id}::uuid
   `;
 
+  // Owner nasce com telefone E e-mail: achável nos DOIS canais de OTP, então
+  // trocar OTP_CHANNEL_STAFF não deixa o staging sem acesso (o login por
+  // e-mail cairia num user novo, sem papel nenhum) nem cria um segundo `user`
+  // pro mesmo humano. Ver docs/08 § passo 3.
   const phoneHash = hashPhoneForLookup(def.owner.phone);
+  const emailHash = hashEmailForLookup(def.owner.email);
+  const encryptedEmail = encryptEmail(def.owner.email);
   let owner = await prisma.user.findFirst({
     where: { phoneLookupHash: phoneHash, deletedAt: null },
   });
@@ -110,11 +117,28 @@ async function seedTenant(
         phoneCiphertext: new Uint8Array(ciphertext),
         phoneLookupHash: phoneHash,
         phoneKeyVersion: keyVersion,
+        emailCiphertext: new Uint8Array(encryptedEmail.ciphertext),
+        emailLookupHash: emailHash,
+        emailKeyVersion: encryptedEmail.keyVersion,
       },
     });
     console.log(`  owner "${def.owner.name}" criado (${owner.id})`);
   } else {
-    console.log(`  owner "${def.owner.name}" já existia (${owner.id})`);
+    // Owner de antes da identidade por e-mail: backfill idempotente, senão o
+    // seed re-rodado num banco existente deixaria o canal de e-mail sem dono.
+    if (!owner.emailLookupHash) {
+      owner = await prisma.user.update({
+        where: { id: owner.id },
+        data: {
+          emailCiphertext: new Uint8Array(encryptedEmail.ciphertext),
+          emailLookupHash: emailHash,
+          emailKeyVersion: encryptedEmail.keyVersion,
+        },
+      });
+      console.log(`  owner "${def.owner.name}" já existia — e-mail preenchido (${owner.id})`);
+    } else {
+      console.log(`  owner "${def.owner.name}" já existia (${owner.id})`);
+    }
   }
 
   await prisma.userRole.upsert({
@@ -381,6 +405,19 @@ async function main() {
     );
   }
 
+  // Mesmo papel do telefone, pro canal de e-mail (Épico 9c): o owner do 1º
+  // tenant precisa de um e-mail REAL que o operador controle pra receber o OTP
+  // no staging. Fora do repo (só no .env.local); ausente = fictício .test,
+  // mantendo CI/dev determinísticos. Normalizado (trim+lowercase) porque é o
+  // que o hash de lookup indexa — divergir de grafia aqui deixaria o owner
+  // inacessível pelo login, que normaliza.
+  const staffEmail = process.env.MOLHO_SEED_STAFF_EMAIL?.trim().toLowerCase();
+  if (staffEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffEmail)) {
+    throw new Error(
+      `MOLHO_SEED_STAFF_EMAIL inválido (${staffEmail}) — precisa ser um e-mail (ex.: voce@gmail.com).`,
+    );
+  }
+
   const directUrl = process.env.DIRECT_URL;
   if (!directUrl) throw new Error('DIRECT_URL não configurada — seed roda como app_migrator');
 
@@ -411,10 +448,17 @@ async function main() {
       // Override do owner do 1º tenant (hamburgueria-da-vila) pelo número real de
       // staging, sem mutar o array importado. Os outros tenants ficam fictícios.
       const effectiveDef =
-        staffPhone && def.slug === 'hamburgueria-da-vila'
-          ? { ...def, owner: { ...def.owner, phone: staffPhone } }
+        (staffPhone || staffEmail) && def.slug === 'hamburgueria-da-vila'
+          ? {
+              ...def,
+              owner: {
+                ...def.owner,
+                ...(staffPhone ? { phone: staffPhone } : {}),
+                ...(staffEmail ? { email: staffEmail } : {}),
+              },
+            }
           : def;
-      if (effectiveDef !== def) console.log(`  (owner de ${def.slug} sobrescrito por MOLHO_SEED_STAFF_PHONE)`);
+      if (effectiveDef !== def) console.log(`  (owner de ${def.slug} sobrescrito por MOLHO_SEED_STAFF_PHONE/EMAIL)`);
       console.log(`\nseed: ${effectiveDef.name} (${effectiveDef.slug})`);
       await seedTenant(prisma, effectiveDef);
     }

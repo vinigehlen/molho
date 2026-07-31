@@ -43,6 +43,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
         ],
       },
     ],
+    otpChannel: 'sms',
     ...overrides,
   };
 }

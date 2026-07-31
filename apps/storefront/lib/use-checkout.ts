@@ -29,8 +29,8 @@ export interface UseCheckoutResult {
   startCheckout: () => Promise<void>;
   /** Chamado pelo botão "Confirmar pedido" da tela de revisão. */
   confirmReview: () => void;
-  requestOtpCode: (phone: string) => Promise<{ ok: true } | { ok: false; message: string }>;
-  verifyOtpCode: (phone: string, code: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  requestOtpCode: (phone: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  verifyOtpCode: (phone: string, code: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Fecha a tela de revisão — carrinho/endereço continuam intactos, cliente pode tentar de novo quando quiser. */
   closeCheckout: () => void;
   /** Fecha o sheet de OTP SEM abandonar o checkout — volta pra revisão, que o cliente já viu. */
@@ -118,11 +118,14 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
     void submitOrder(token);
   }, [submitOrder, token]);
 
-  const requestOtpCode = React.useCallback(async (phone: string) => requestOtp(slug, phone), [slug]);
+  const requestOtpCode = React.useCallback(
+    async (phone: string, email?: string) => requestOtp(slug, phone, email),
+    [slug],
+  );
 
   const verifyOtpCode = React.useCallback(
-    async (phone: string, code: string) => {
-      const result = await verifyOtp(slug, phone, code);
+    async (phone: string, code: string, email?: string) => {
+      const result = await verifyOtp(slug, phone, code, email);
       if (!result.ok) return result;
 
       setToken(result.accessToken, result.customerId);
