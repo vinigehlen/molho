@@ -110,10 +110,154 @@ proxiados**, sem a armadilha da nuvem laranja):
 - Propagação **até 24h** + rampa de reputação do DMARC = **abrir cedo, em paralelo** (como o domínio).
   Verificar status "Verified" no Resend antes do 1º login de staff.
 
+### OTP por e-mail — passo 3: IDENTIDADE (desenho aprovado pelo PM)
+
+Passo 1 tornou o `OtpService` agnóstico de canal (`OtpRecipient`); passo 2 entregou
+`EmailAddress`, a porta `EmailProvider` (Resend/Mock) e o roteamento de canal por escopo
+(`otpChannelFor`) com guarda de produção por canal em uso. **Este passo é identidade + migration.**
+
+**A regra que organiza tudo:** `findOrCreate` **não é "por canal", é por CHAVE DE IDENTIDADE**.
+Canal é entrega; identidade é chave. Não misturar os dois é o que impede o fim do piloto (volta do
+SMS) de virar re-migração de identidade.
+
+- **Staff:** identidade passa a ser chaveada por **e-mail**, permanente.
+- **Cliente:** identidade **CONTINUA chaveada por telefone**. O e-mail entra **apenas como canal de
+  entrega** durante o piloto (motivo: custo de SMS, ver docs/05). **Invariante: `customers` NÃO ganha
+  lookup hash, NÃO ganha unique, NÃO ganha índice por e-mail.** Voltar pro SMS é trocar env.
+
+#### Schema
+
+`users` (staff — identidade vira e-mail):
+```
++ email_ciphertext   BYTEA        NULL      -- AES-256-GCM, mesmo helper do telefone
++ email_key_version  INT NOT NULL DEFAULT 1
++ email_lookup_hash  TEXT         NULL      -- HMAC-SHA256(email normalizado, pepper)
+~ phone_ciphertext   BYTEA -> NULLABLE      -- staff nascido por e-mail não tem telefone
+~ phone_lookup_hash  TEXT  -> NULLABLE
+- email              TEXT                   -- coluna MORTA desde o init, DROP
+```
+Índice único parcial `users_active_email_hash ON users (email_lookup_hash) WHERE deleted_at IS NULL`
+(padrão da casa). O único parcial de telefone (`users_active_phone_hash`) fica **intacto** — SMS de
+staff continua funcional pra rollback.
+
+`users.email` é dropada porque nunca recebeu um byte (zero leitura/escrita em `apps/api/src`,
+`packages/db/src` e no seed desde o `init`). Mantê-la em claro ao lado do hash **anularia o pepper**:
+quem tem o dump leria a lista direto.
+
+`customers` (identidade INALTERADA):
+```
++ email_ciphertext   BYTEA        NULL
++ email_key_version  INT NOT NULL DEFAULT 1
+```
+**Sem hash, sem unique, sem índice** — o cliente nunca é buscado por e-mail. É estrutural, não
+convenção: sem índice, um `findFirst` futuro não *pode* chavear cliente por e-mail nem por acidente.
+
+#### Cifra em repouso do e-mail: SIM, nos dois lados
+Perde-se `WHERE email LIKE`, leitura direta no psql em suporte e relatório por domínio. Ganha-se: um
+dump vazado **não entrega a lista de e-mails de lojistas** — que são exatamente as contas com poder de
+`owner`, alvo pronto de phishing. O custo de suporte é baixo porque o hash cobre o caso real ("esse
+e-mail tem conta?" = aplicar o HMAC e buscar pelo hash); ler o e-mail de um usuário conhecido é script
+admin com `decrypt`. **Argumento decisivo:** o telefone já é cifrado na MESMA tabela — deixar o e-mail
+em claro criaria duas políticas de PII lado a lado, e a mais fraca vira o teto real (LGPD, regra 11).
+
+#### Pepper: `MOLHO_EMAIL_PEPPER`, dedicada
+HMAC-SHA256 determinístico, pepper **fora do banco**: env var (`fly secrets set` em deploy,
+`.env.local` em dev), carregada em `packages/db/src/crypto/email.ts`; **ausente = lança**, nunca
+degrada pra hash sem pepper.
+
+**Não reusar `MOLHO_ENCRYPTION_KEYS`** (que é o que `hashPhoneForLookup` faz hoje, usando a chave AES
+como chave HMAC). Precedente correto no repo é o `MOLHO_OTP_HMAC_KEY`, já separado. Motivo além da
+higiene de primitivas: **os ciclos de vida são diferentes**. A chave de cifra rotaciona barato
+(`*_key_version`, rotação lazy linha a linha). O **pepper não** — o hash É o índice de busca, então
+trocar o pepper exige re-hashear a tabela num job offline. Amarrar os dois faria toda rotação de cifra
+virar migração em massa. **O pepper é chave de vida longa, por desenho.**
+
+#### Migration (SQL à mão, idempotente)
+`ADD COLUMN IF NOT EXISTS`, `CREATE UNIQUE INDEX IF NOT EXISTS`, `ALTER COLUMN … DROP NOT NULL`,
+`DROP COLUMN IF EXISTS` — replay do shadow database exige idempotência (CLAUDE.md).
+
+- **Múltiplos NULL:** não é problema. Índice único do Postgres trata cada NULL como distinto, então os
+  staff atuais (todos sem e-mail) convivem sob `users_active_email_hash` **sem backfill prévio**.
+- **Colisão por normalização:** **não existe na migration** — a coluna `email` nunca recebeu dado, o
+  backfill é de zero linhas, não há duas grafias pra colidir. O caso existe só em **runtime** e o
+  desenho já o resolve: `parseEmail` normaliza (trim+lowercase) ANTES do HMAC, então `Ana@x.com` e
+  `ana@x.com` batem no mesmo hash e caem no mesmo registro — que é o comportamento certo (é a mesma
+  pessoa). Corrida de dois requests simultâneos: catch de `P2002` → re-`findFirst`. Se um dia houver
+  dado real em claro pra migrar, aí sim precisa de passo de deduplicação — **não aplicável hoje**.
+- **Unique só onde a identidade é por e-mail:** `users` sim, `customers` **nunca**.
+- **RLS:** nada muda. `users` não tem RLS por desenho; as policies de `customers` são por linha
+  (`app_tenant_visible(tenant_id)`) e cobrem colunas novas automaticamente.
+
+#### Fluxo por escopo
+
+**Staff:**
+```
+request:  parseEmail(dto.email) → emailRecipient(email, EMAIL_PROVIDER) → requestOtp('staff', …)
+verify:   parseEmail(dto.email) → verifyOtp(…) → staffIdentity.findOrCreateByEmail(email)
+```
+`findOrCreateByEmail` espelha o método atual (hash → `findFirst` → senão `create`), grava
+`email_ciphertext`/`email_key_version`/`email_lookup_hash` e **nenhum telefone**. Segue nascendo **sem
+`user_role`** (menor privilégio, regra 2). `findOrCreateByPhone` **não é removido**.
+
+**Cliente (TOFU — trust on first use):**
+```
+request(dto.phone, dto.email):
+  identifier do desafio = E.164 do telefone        ← INALTERADO (chave, rate limit, cooldown)
+  entrega = existe customer com esse phone_lookup_hash E email_ciphertext?
+              → e-mail DE REGISTRO (IGNORA o digitado)
+              → senão: e-mail digitado
+verify:  verifyOtp(identifier = telefone) → findOrCreate(tenantId, phone)
+         → grava email_ciphertext se ainda não houver
+```
+Chave do desafio, balde de rate limit e cooldown continuam **byte a byte** o que são hoje. Só o
+`deliver` troca de canal — é isso que torna a volta do SMS uma troca de env.
+
+#### Riscos aceitos e registrados (decisão consciente do PM, não gap silencioso)
+
+**TOFU no cliente — a janela é praticamente o piloto inteiro.** Com entrega por e-mail, o fator
+verificado deixa de ser o telefone: o código prova controle do **e-mail**, e o telefone que chaveia a
+identidade passa a ser auto-declarado. O TOFU protege quem **já tem** registro (a entrega vai pro
+e-mail de registro, ignorando o digitado), mas **o piloto começa com a base em ZERO** — logo, para
+todo telefone ainda sem registro, quem chegar primeiro vincula aquele telefone ao e-mail que digitar.
+Na prática a janela de tomada de conta cobre quase todo o piloto. **Risco aceito** porque o ativo é de
+baixo valor (endereço salvo + histórico de pedidos, por tenant) e **não há dado de pagamento** — o PIX
+é estático/manual, cartão nunca toca o servidor (regra 10). A alternativa (entregar sempre no e-mail
+digitado) foi **rejeitada**: abriria tomada de conta de cliente EXISTENTE. Ao voltar pro SMS, os
+telefones voltam a ser verificados naturalmente, sem migração.
+
+**Merge de identidades de staff — Fase 2, explicitamente.** Um mesmo humano que logou por SMS e depois
+por e-mail vira **dois `users`**: chaves diferentes, sem vínculo, e os `user_roles` ficam presos ao
+registro antigo. No piloto é inofensivo (o canal é fixo por deploy, os dois não coexistem) e o owner do
+seed nasce já com e-mail. **Unificar identidades por múltiplos identificadores é Fase 2** — não existe
+neste passo, e não deve ser improvisado depois sem entrar no plano.
+
+#### Fiação nos controllers e no front
+- Controllers injetam `EMAIL_PROVIDER` além do `MESSAGING_PROVIDER` e chamam `otpChannelFor(escopo)`
+  pra montar o recipiente — função local de poucas linhas, **sem** `RecipientFactory` no DI.
+- **DTOs:** campos `@IsOptional` + checagem de presença no controller conforme o canal (em vez de
+  validação condicional do `class-validator`, ilegível, ou DTOs duplicados por canal).
+- **Anti-enumeração preservada:** `202` incondicional no `request`, sem branch de existência de conta
+  em nenhum caminho de sucesso — vale igual pra e-mail.
+- **Canal no front: BACKEND É FONTE ÚNICA.** `GET /v1/store/:slug` passa a devolver `otpChannel`
+  (populado de `otpChannelFor('customer')`, da env do backend) e o storefront lê o canal de lá.
+  **`NEXT_PUBLIC_OTP_CHANNEL_CUSTOMER` está REJEITADO** — env pública no front duplicaria a fonte de
+  verdade e as duas poderiam divergir num deploy. Hoje o valor é global de deploy, mas é entregue por
+  um endpoint **por-tenant**: quando o canal virar config de tenant, o contrato já está no lugar certo.
+- **Storefront:** `MoOtpSheet` (wired em `apps/storefront/app/[slug]/carrinho/cart-view.tsx`) tem
+  `step: 'phone' | 'code'` e a copy "Enviamos um código de 6 dígitos por SMS" hardcoded — ganha campo
+  de e-mail e copy condicional ao canal.
+- **Backoffice:** nada a fazer — o login de staff é o 9b. Este passo entrega o backend que ele consome.
+
 ### Pré-requisito da validação de fronteira: owner do seed com E-MAIL REAL
 (Antes era telefone/SMS; com OTP por e-mail, o identificador de staff no seed vira **e-mail**.)
 `MOLHO_SEED_STAFF_PHONE` → **`MOLHO_SEED_STAFF_EMAIL`**, e o seed de CLIENTE também passa a ter e-mail.
 O resto abaixo (guarda de produção do seed, fallback, cifragem) continua valendo — só muda o campo.
+
+**Isto é BLOQUEANTE, não cosmético:** o owner do seed hoje só tem telefone → não é achável por e-mail
+→ o primeiro login por e-mail criaria um `user` NOVO **sem papel nenhum**, e o backoffice do staging
+fica inacessível. O seed passa a gravar e-mail no owner: `MOLHO_SEED_STAFF_EMAIL` quando presente,
+fictício determinístico (`owner@hamburgueria-da-vila.test`) no fallback — CI/dev seguem
+determinísticos e a guarda de `NODE_ENV=production` continua valendo.
 
 ### (histórico) Pré-requisito quando o canal era SMS: owner do seed com telefone REAL (opt-in do sandbox)
 O opt-in do sandbox Zenvia (o número que RECEBE precisa se cadastrar + enviar keyword) tem
