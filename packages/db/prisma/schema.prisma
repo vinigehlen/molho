@@ -231,6 +231,13 @@ model Customer {
   /// composto criado à mão na migration (Prisma não expressa índice parcial).
   phoneLookupHash String    @map("phone_lookup_hash")
   phoneKeyVersion Int       @default(1) @map("phone_key_version")
+  /// E-mail cifrado — APENAS canal de entrega do OTP durante o piloto (custo
+  /// de SMS). A identidade do cliente CONTINUA sendo o telefone: de propósito
+  /// NÃO existe email_lookup_hash, nem unique, nem índice por e-mail aqui —
+  /// sem índice, nenhum findFirst futuro consegue chavear cliente por e-mail
+  /// nem por acidente, e voltar pro SMS é trocar env, não re-migrar.
+  emailCiphertext Bytes?    @map("email_ciphertext")
+  emailKeyVersion Int       @default(1) @map("email_key_version")
   /// Corta sessões na hora, mesmo mecanismo de users.token_version.
   tokenVersion    Int       @default(0) @map("token_version")
   version         Int       @default(0)
@@ -269,14 +276,24 @@ model User {
   id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   name            String
   /// Telefone cifrado na aplicação (AES-256-GCM), nunca em claro — LGPD.
-  phoneCiphertext Bytes     @map("phone_ciphertext")
-  /// HMAC determinístico do telefone — é o que o login por OTP busca.
+  /// NULLABLE desde o passo 3 do OTP por e-mail: staff que nasce pelo canal
+  /// de e-mail não tem telefone nenhum.
+  phoneCiphertext Bytes?    @map("phone_ciphertext")
+  /// HMAC determinístico do telefone — é o que o login por OTP SMS busca.
   /// Único só entre linhas vivas — índice único parcial criado à mão na
   /// migration (Prisma não expressa índice parcial no DSL).
-  phoneLookupHash String    @map("phone_lookup_hash")
+  phoneLookupHash String?   @map("phone_lookup_hash")
   /// Versão da chave de cifra usada (rotação lazy, sem migration em massa).
   phoneKeyVersion Int       @default(1) @map("phone_key_version")
-  email           String?
+  /// E-mail cifrado (AES-256-GCM) — mesma política do telefone, nunca em
+  /// claro. A coluna `email` em TEXTO que existia aqui foi dropada: nunca
+  /// recebeu um byte, e em claro ao lado do hash anularia o pepper.
+  emailCiphertext Bytes?    @map("email_ciphertext")
+  /// HMAC(e-mail normalizado, MOLHO_EMAIL_PEPPER) — é o que o login de staff
+  /// por OTP de e-mail busca, e a CHAVE DE IDENTIDADE de staff no piloto.
+  /// Único só entre linhas vivas — índice único parcial à mão na migration.
+  emailLookupHash String?   @map("email_lookup_hash")
+  emailKeyVersion Int       @default(1) @map("email_key_version")
   /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
   tokenVersion    Int       @default(0) @map("token_version")
   version         Int       @default(0)

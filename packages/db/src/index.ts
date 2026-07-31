@@ -26,3 +26,4 @@ export * from './modules/module-logger';
 export * from './modules/module-invalidation-extension';
 
 export * from './crypto/phone';
+export * from './crypto/email';

@@ -38,7 +38,11 @@ let app: INestApplication;
 let migratorPrisma: PrismaClient;
 let testTenantId: string;
 const testTenantSlug = `e2e-test-${Date.now()}`;
-const createdUserPhoneHashes: string[] = [];
+// Nullable desde a identidade de staff por e-mail (Épico 9c): staff criado
+// pelo canal de e-mail não tem hash de telefone. O `continue` no cleanup NÃO
+// é cosmético — `deleteMany({ phoneLookupHash: null })` apagaria TODO staff
+// por e-mail do banco de staging.
+const createdUserPhoneHashes: (string | null)[] = [];
 // Tenants extras criados NO MEIO de um teste (não o principal do
 // beforeAll/afterAll) — registrados aqui, não limpos inline no corpo do
 // teste, pra sobreviver a uma falha/timeout no meio do caminho e não
@@ -71,6 +75,7 @@ afterAll(async () => {
     await migratorPrisma.tenant.delete({ where: { id } }).catch(() => {}); // já pode ter sido apagado
   }
   for (const hash of createdUserPhoneHashes) {
+    if (!hash) continue;
     await migratorPrisma.user.deleteMany({ where: { phoneLookupHash: hash } });
   }
   await migratorPrisma.$disconnect();

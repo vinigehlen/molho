@@ -30,7 +30,9 @@ function extractCode(message: string): string {
 
 let app: INestApplication;
 let migratorPrisma: PrismaClient;
-const createdUserPhoneHashes: string[] = [];
+// Ver nota em auth.e2e.test.ts: nullable desde a identidade por e-mail, e o
+// `continue` no cleanup evita apagar TODO staff por e-mail do staging.
+const createdUserPhoneHashes: (string | null)[] = [];
 
 beforeAll(async () => {
   const redisCleanup = new Redis(process.env.REDIS_URL as string);
@@ -48,6 +50,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const hash of createdUserPhoneHashes) {
+    if (!hash) continue;
     await migratorPrisma.user.deleteMany({ where: { phoneLookupHash: hash } });
   }
   await migratorPrisma.$disconnect();

@@ -94,7 +94,7 @@ export class StaffAuthController {
     return this.requestContext.run(
       { tenantId: PLATFORM_CONTEXT_TENANT_ID, isPlatform: true },
       async () => {
-        const { identity } = await this.staffIdentity.findOrCreate(phone);
+        const { identity } = await this.staffIdentity.findOrCreateByPhone(phone);
         const userRepository = new PrismaUserAuthRepository(this.requestContext);
         const scopes = await userRepository.getRoleAssignments(identity.id);
         const roles = [...new Set(scopes.map((s) => s.role))];
