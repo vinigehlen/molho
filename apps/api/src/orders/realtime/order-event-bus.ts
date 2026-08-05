@@ -19,6 +19,21 @@ export interface OrderEvent {
   version: number;
 }
 
+/**
+ * Observabilidade do teste de pub/sub cross-instância (Épico 9). DESLIGADA por
+ * default: sem a env, nada de `hello`, nada de `_via` — contrato de produção
+ * idêntico. Env lida a cada uso (não no load do módulo) pra teste ligar/desligar
+ * sem remontar o módulo.
+ */
+export function pubsubDebugEnabled(): boolean {
+  return Boolean(process.env.MOLHO_DEBUG_PUBSUB);
+}
+
+/** Identidade da instância — `local` fora da Fly. Nunca contém dado de pedido. */
+export function machineId(): string {
+  return process.env.FLY_MACHINE_ID ?? 'local';
+}
+
 /** `merchant.{tenantId}.orders` — tenantId é uuid (sem pontos), então o split de volta é seguro. */
 function channel(tenantId: string): string {
   return `merchant.${tenantId}.orders`;
@@ -134,7 +149,12 @@ export class RedisOrderEventBus implements OrderEventBus {
   }
 
   async publish(tenantId: string, event: OrderEvent): Promise<void> {
-    await this.pub.publish(channel(tenantId), JSON.stringify(event));
+    // `_via` carimba a instância que ORIGINA o evento, ANTES de entrar no canal —
+    // é o que prova fan-out cross-instância (evento publicado em A chega em B
+    // carregando `_via=A`). Carimbar na ENTREGA mostraria sempre a máquina local
+    // e não provaria nada. Só o id da máquina: nunca payload de pedido (PII).
+    const payload = pubsubDebugEnabled() ? { ...event, _via: machineId() } : event;
+    await this.pub.publish(channel(tenantId), JSON.stringify(payload));
   }
 
   subscribe(tenantId: string, deliver: Deliver): () => void {

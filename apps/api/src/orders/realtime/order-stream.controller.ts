@@ -20,6 +20,7 @@ import { type Actor, type Role, can, isRole } from '@molho/contracts';
 import { JwtAuthGuard, type RequestWithUser } from '../../auth/guards/jwt-auth.guard';
 import type { TokenScope } from '../../auth/token/token-payload';
 import { ORDER_EVENT_BUS } from '../orders.tokens';
+import { machineId, pubsubDebugEnabled } from './order-event-bus';
 import type { OrderEvent, OrderEventBus } from './order-event-bus';
 import { STREAM_COOKIE_NAME, StreamCookieAuthGuard } from './stream-cookie-auth.guard';
 
@@ -124,6 +125,21 @@ export class OrderStreamController implements OnApplicationShutdown {
     const frozenTenantId = tenantId;
 
     return new Observable<MessageEvent>((subscriber) => {
+      // PRIMEIRO evento da conexão, só com a flag de debug: identifica a
+      // instância que SERVE este stream (prova em qual máquina a conexão caiu).
+      // Tipo próprio `hello` — o front só escuta eventos nomeados de pedido, então
+      // ignora este sem tocar no parser.
+      if (pubsubDebugEnabled()) {
+        subscriber.next({
+          type: 'hello',
+          data: JSON.stringify({
+            machine: machineId(),
+            region: process.env.FLY_REGION ?? 'local',
+            ts: new Date().toISOString(),
+          }),
+        });
+      }
+
       // Keepalive: evento nomeado a cada 25s. Proxy/LB matam SSE ocioso; o
       // cliente ignora o tipo `ping`. (Comentário `:ping` puro não é
       // expressável via MessageEvent do Nest — evento nomeado tem o mesmo
