@@ -9,4 +9,5 @@ export * from './modules';
 export * from './permissions';
 export * from './phone-number';
 export * from './pix';
+export * from './postal-code';
 export * from './storefront';

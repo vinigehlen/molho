@@ -104,6 +104,12 @@ A `apps/api` (NestJS) é um **processo Node de vida longa** — não roda server
 
 **Guards rodam ANTES de qualquer Interceptor** (Middleware → Guards → Interceptors "antes" → Pipes → Handler). `TenantContextInterceptor` normalmente abre o `RequestContextService.run()` que envolve o handler — um Guard que precise ler o banco (ex.: `JwtAuthGuard` conferindo `token_version`) executa ANTES desse `run()` existir. Solução: o Guard abre seu próprio contexto de plataforma, isolado, pra sua leitura pontual.
 
+**REGRA HARD: NENHUM I/O externo (HTTP, DNS, S3, PSP) dentro de um `RequestContextService.run()`.** O `run()` abre uma transação do Postgres e **fixa uma conexão física do pool** por toda a duração dela. Uma chamada HTTP de 2–5s lá dentro segura essa conexão o tempo todo — com `max` do pool na casa de 10 por instância, algumas dezenas de requests concorrentes esgotam o pool e o sintoma é P2028/timeout de conexão (docs/07), não erro de rede. Pior em superfície **pública e pré-OTP**: é weaponizável (bot com entradas distintas fura o cache e prende N conexões sem nunca se autenticar).
+
+O `TenantContextInterceptor` abre o `run()` **envolvendo o handler inteiro** (`intercept()` → `from(this.requestContext.run(ctx, () => firstValueFrom(next.handle())))`) — logo, **controller e service já rodam dentro da transação**. "Fazer o I/O no começo do service" ou "antes do `lockProductsForUpdate`" NÃO resolve: a conexão já foi adquirida.
+
+O único ponto que roda antes do `run()` é **Middleware** (Middleware → Guards → Interceptors → Pipes → Handler). Então: I/O externo que alimenta um handler vive em middleware, que resolve o valor e o anexa ao `request` (mesmo padrão de `request.user`); o handler consome o valor já pronto. É o desenho do geocoding do Épico 6 (`apps/api/src/geo/` + `geocode.middleware.ts`): Redis + ViaCEP + Nominatim resolvem o ponto **inteiramente fora** da transação, e a revalidação/criação de pedido só recebe `lat`/`lng` já materializados. **Rate limit por IP dessas rotas também tem que ser middleware, ordenado ANTES do middleware de I/O** — um `CanActivate` roda depois e não protegeria a chamada externa.
+
 **`@typescript-eslint/consistent-type-imports` está DESLIGADA em `apps/api/src/**`** (fora de teste) — NestJS resolve DI e valida DTO via reflexão de CLASSE (`design:paramtypes`/`emitDecoratorMetadata`), e `import type` apaga essa referência em runtime, quebrando injeção e validação na prática.
 
 ## Design system "Tempero"
