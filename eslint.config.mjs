@@ -127,6 +127,57 @@ export default tseslint.config(
     },
   },
 
+  // ─── apps/api: o geocoder só pode ser tocado no middleware ────────────────
+  // Geocodar é HTTP externo de 2–5s. Se um service chamar o geocoder, ele
+  // roda DENTRO da transação do RequestContextService (TenantContextInterceptor
+  // envolve o handler inteiro) e segura uma conexão do pool o request todo —
+  // P2028 sob carga, numa rota pública e pré-OTP. O geocode acontece em
+  // MIDDLEWARE, antes de qualquer conexão ser adquirida, e o resto do request
+  // só LÊ `req.geocoded` (ver CLAUDE.md § Contexto de request).
+  //
+  // O TIPO `GeocodedAddress` continua livre — é dado, não capacidade de
+  // chamar. O que é proibido é a PORTA (`Geocoder`), o token (`GEOCODER`) e a
+  // implementação.
+  //
+  // ATENÇÃO: este bloco REPETE a restrição de PrismaClient acima de
+  // propósito. `no-restricted-imports` não SOMA entre blocos do flat config —
+  // o último que casa com o arquivo substitui o anterior por inteiro. Sem a
+  // repetição, este bloco desligaria silenciosamente a guarda de PrismaClient
+  // em todo apps/api/src fora de geo/**. Os `ignores` também têm que repetir
+  // as exceções do outro bloco, senão elas voltam a ser proibidas.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/geo/**',
+      'apps/api/src/context/context.module.ts',
+      'apps/api/src/context/request-context.service.ts',
+      'apps/api/src/**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@molho/db',
+              importNames: ['PrismaClient'],
+              message:
+                'Nunca importe PrismaClient direto aqui — todo acesso ao banco em request path passa pelo client transacional do RequestContextService (ver CLAUDE.md § Contexto de request). Use RequestContextService.getClient().',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/geo/geocoder', '**/geo/viacep-nominatim.geocoder'],
+              importNames: ['GEOCODER', 'Geocoder', 'ViaCepNominatimGeocoder'],
+              message:
+                'Nunca injete o geocoder fora de apps/api/src/geo — geocodar é HTTP externo e só pode acontecer em MIDDLEWARE, antes da transação de request abrir (CLAUDE.md § Contexto de request). Leia `req.geocoded` e passe o valor já resolvido.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // ─── apps/api: consistent-type-imports conflita com o Nest ─────────────────
   // NestJS resolve DI implícita (constructor param sem @Inject) e faz
   // @Body()/@Param() virarem instância de DTO (ValidationPipe+class-
