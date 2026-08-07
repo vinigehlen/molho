@@ -9,8 +9,13 @@ import type { DeliveryMatchRepository } from './delivery-match.repository';
 export class DeliveryMatchService {
   constructor(private readonly repository: DeliveryMatchRepository) {}
 
+  /**
+   * Ainda por ponto: o contrato público de `/delivery-match` só inverte pra
+   * CEP no Bloco 2, junto com o resto do checkout. Aqui o repositório já
+   * aceita cidade — este call-site é que ainda não tem uma pra passar.
+   */
   async match(lat: number, lng: number): Promise<DeliveryMatchResponse> {
-    const zone = await this.repository.findMatchingZone(lat, lng);
+    const zone = await this.repository.findMatchingZone({ city: null, state: null, lat, lng });
     if (!zone) return { withinZone: false };
 
     return {

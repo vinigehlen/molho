@@ -30,7 +30,15 @@ export class CheckoutRevalidationService {
       this.checkoutRepo.findStore(),
       this.checkoutRepo.listStoreHours(),
       this.checkoutRepo.findProductsByIds(uniqueProductIds),
-      this.deliveryMatchRepo.findMatchingZone(request.address.lat, request.address.lng),
+      // Cidade E ponto: a zona por cidade decide a taxa da Cabanhas, a por
+      // polígono continua valendo pra quem cobra por raio. No Bloco 2 a
+      // cidade passa a vir do ViaCEP (via middleware) em vez do payload.
+      this.deliveryMatchRepo.findMatchingZone({
+        city: request.address.city,
+        state: request.address.state,
+        lat: request.address.lat,
+        lng: request.address.lng,
+      }),
     ]);
 
     const productById = new Map(products.map((product) => [product.id, product]));

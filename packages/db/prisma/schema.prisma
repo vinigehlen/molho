@@ -503,9 +503,19 @@ model DeliveryZone {
   storeId       String                                  @map("store_id") @db.Uuid
   /// Identificação pro lojista (ex. "Zona padrão") — sem uso no match.
   name          String
-  /// geography(Polygon,4326). Seed gera um círculo de 10km via ST_Buffer a
-  /// partir do Store.geo.
-  polygon       Unsupported("geography(Polygon, 4326)")
+  /// Zona por CIDADE (Épico 6, pivot): município servido, taxa fixa. Casa por
+  /// `molho_city_key(city)` (minúsculo, sem acento, sem espaço nas pontas) +
+  /// `upper(btrim(state))`. XOR com `polygon` — CHECK
+  /// `delivery_zones_city_xor_polygon` na migration.
+  city          String?
+  /// UF. TEXT livre de propósito: validação de sigla pertence ao form do
+  /// backoffice e ao ViaCEP, não a um CHECK no banco.
+  state         String?
+  /// geography(Polygon,4326) — zona por RAIO, via ST_Buffer a partir do
+  /// Store.geo. NULLABLE desde o pivot pra cidade: uma zona tem city XOR
+  /// polygon. Caminho vivo, não legado — tenant que cobra por distância usa
+  /// este.
+  polygon       Unsupported("geography(Polygon, 4326)")?
   feeCents      Int                                     @map("fee_cents")
   etaMinMinutes Int                                     @map("eta_min_minutes")
   etaMaxMinutes Int                                     @map("eta_max_minutes")
@@ -522,7 +532,9 @@ model DeliveryZone {
 
   // FK composta (store_id, tenant_id) → stores(id, tenant_id) na migration.
   // Índice GiST em `polygon` (obrigatório pra ST_Contains, Prisma não
-  // expressa) também à mão — ver migration SQL.
+  // expressa) também à mão — ver migration SQL. Único parcial de
+  // (tenant, store, cidade, UF) idem: expressão de função, o DSL não
+  // expressa.
   @@index([tenantId, storeId])
   @@map("delivery_zones")
 }
