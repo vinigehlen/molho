@@ -16,7 +16,7 @@
     "build": "pnpm run db:generate && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "db:generate": "DIRECT_URL=postgresql://generate:generate@localhost:5432/generate NEONDB_SHADOW_URL=postgresql://generate:generate@localhost:5432/generate_shadow prisma generate",
+    "db:generate": "DIRECT_URL=postgresql://generate:generate@localhost:5432/generate prisma generate",
     "db:migrate:dev": "dotenv -e ../../.env.local -- prisma migrate dev",
     "db:migrate:deploy": "dotenv -e ../../.env.local -- prisma migrate deploy",
     "db:migrate:status": "dotenv -e ../../.env.local -- prisma migrate status",

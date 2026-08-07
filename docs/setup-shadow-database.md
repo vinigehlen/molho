@@ -46,6 +46,41 @@ NEONDB_SHADOW_URL="postgresql://app_migrator:<senha>@<host>/neondb_shadow?sslmod
 5. Pronto. `pnpm --filter @molho/db db:migrate:dev` volta a funcionar normal
    — sem precisar escrever migration à mão por causa do PostGIS.
 
+## O shadow é POR PROJETO NEON — trocar de região refaz tudo
+
+Migrar de região (foi o caso: `aws-us-east-1` → `aws-sa-east-1`, Épico 9c) é
+**projeto Neon novo**, com roles e senhas próprias. O shadow do projeto
+antigo continua existindo e continua aceitando conexão — então nada avisa
+que ele ficou órfão. É preciso, de uma vez:
+
+1. Refazer os passos 1–3 acima no projeto NOVO (o `neondb_shadow` não
+   viaja junto).
+2. Reapontar as **quatro** URLs do `.env.local` pro projeto novo:
+
+| Var | Host | Banco | Role |
+|---|---|---|---|
+| `DATABASE_URL` | com `-pooler` | `neondb` | `app_runtime` |
+| `DIRECT_URL` | sem `-pooler` | `neondb` | `app_migrator` |
+| `NEONDB_SHADOW_URL` | sem `-pooler`, **mesmo host do `DIRECT_URL`** | `neondb_shadow` | `app_migrator` |
+| `NEON_ADMIN_URL` | sem `-pooler` | `neondb` | `neondb_owner` |
+
+`NEONDB_SHADOW_URL` e `DIRECT_URL` diferem **só no nome do banco**.
+
+**Como esse erro se apresenta (registrado porque custou caro):** shadow órfão
+num projeto aposentado aparece como **falha de autenticação sem relação
+aparente** — `P1000` no `prisma migrate deploy`, `28P01` no `test:e2e` — e
+manda a investigação pro lado errado, porque o sintoma é credencial e a
+causa é topologia. `prisma.config.ts` hoje tem assertivas que barram os dois
+casos (host divergente e shadow apontando pro mesmo banco do `DIRECT_URL`)
+com mensagem explícita, antes de qualquer conexão.
+
+**`NEONDB_SHADOW_URL` ausente não quebra nada além do `migrate dev`.** O
+`shadowDatabaseUrl` é declarado condicionalmente no `prisma.config.ts`, e o
+Prisma VALIDA o shadow ao carregar a config mesmo em comandos que não o usam
+(`migrate deploy` inclusive). Enquanto o `neondb_shadow` não existir no
+projeto novo, deixe a var comentada — deploy, generate e status seguem
+funcionando.
+
 ## Se `prisma migrate dev` continuar falhando
 
 O shadow é **replayado do zero a cada rodada** (Prisma reseta o schema
