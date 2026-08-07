@@ -70,6 +70,15 @@ export class PrismaDeliveryMatchRepository implements DeliveryMatchRepository {
     // polígono, e `priority` só desempata DENTRO do mesmo tipo. Um tenant
     // que queira "raio premium sobrepõe a taxa de cidade" é revisita de
     // desenho, não bug desta ordenação.
+    //
+    // `fee_cents ASC, id ASC` depois do `priority` existe porque empate no
+    // ORDER BY é ordem ARBITRÁRIA no Postgres — duas zonas sobrepostas com a
+    // mesma priority fariam o mesmo endereço receber taxas diferentes entre
+    // requisições. `priority` continua sendo o botão explícito do lojista
+    // ("zona premium menor vence" = priority menor); no EMPATE, ganha a mais
+    // barata (CLAUDE.md regra 14: cobrar mais exige consentimento, cobrar
+    // menos nunca exige) e o `id` (uuid v7, ordena por criação) fecha o caso
+    // de empatar até na taxa.
     const rows = await this.requestContext.getClient().$queryRaw<DeliveryZoneMatch[]>`
       SELECT
         "name",
@@ -87,7 +96,7 @@ export class PrismaDeliveryMatchRepository implements DeliveryMatchRepository {
                       "polygon",
                       ST_SetSRID(ST_MakePoint(${lng}::double precision, ${lat}::double precision), 4326)::geography))
             )
-      ORDER BY ("city" IS NULL) ASC, "priority" ASC
+      ORDER BY ("city" IS NULL) ASC, "priority" ASC, "fee_cents" ASC, "id" ASC
       LIMIT 1
     `;
     return rows[0] ?? null;
