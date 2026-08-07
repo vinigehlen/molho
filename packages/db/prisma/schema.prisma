@@ -474,10 +474,12 @@ model Address {
   postalCode     String?                               @map("postal_code")
   /// "Perto da padaria" — padrão BR, útil pro motoboy. Livre, sem estrutura.
   referencePoint String?                               @map("reference_point")
-  /// geography(Point,4326) — mesmo tipo do Store.geo. NOT NULL: esta tabela só
-  /// ganha linhas no Épico 7, quando pin/geolocalização já é pré-requisito
-  /// pra salvar (nunca existe o caso legado "endereço sem coordenada").
-  geo            Unsupported("geography(Point, 4326)")
+  /// geography(Point,4326) — mesmo tipo do Store.geo. NULLABLE desde o Bloco
+  /// 2 do Épico 6: com taxa por município, o preço vem da CIDADE e o ponto
+  /// não participa do cálculo — serve pro motoboy/mapa. Geocoder mudo (OSM
+  /// fora do ar) não pode recusar endereço válido. Sem fallback pro geo da
+  /// loja: pin falso é pior que pin ausente.
+  geo            Unsupported("geography(Point, 4326)")?
   version        Int                                   @default(0)
   createdAt      DateTime                              @default(now()) @map("created_at")
   updatedAt      DateTime                              @updatedAt @map("updated_at")
@@ -669,10 +671,13 @@ model Order {
   deliveryState          String                                @map("delivery_state")
   deliveryPostalCode     String?                               @map("delivery_postal_code")
   deliveryReferencePoint String?                               @map("delivery_reference_point")
-  /// geography(Point,4326) NOT NULL — checkout já exige zona validada antes
-  /// de chegar aqui, então sempre existe coordenada (ver débito adiado no
-  /// topo do arquivo sobre pickup, que mudaria isso).
-  deliveryGeo            Unsupported("geography(Point, 4326)") @map("delivery_geo")
+  /// geography(Point,4326) NULLABLE — mesmo racional de Address.geo (Épico
+  /// 6, Bloco 2): a zona por município decide a taxa sem ponto nenhum.
+  deliveryGeo            Unsupported("geography(Point, 4326)")? @map("delivery_geo")
+  /// Falso quando o ViaCEP ficou mudo e a CIDADE que decidiu a taxa veio do
+  /// texto digitado pelo cliente, não de fonte autoritativa — o gestor mostra
+  /// pro lojista conferir a taxa antes de despachar.
+  deliveryPostalCodeVerified Boolean                           @default(true) @map("delivery_postal_code_verified")
 
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
