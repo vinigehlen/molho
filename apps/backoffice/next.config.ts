@@ -8,6 +8,23 @@ const nextConfig: NextConfig = {
   // apps/storefront/next.config.ts sobre o "import.meta" quebrando no dev.
   transpilePackages: ['@molho/ui'],
 
+  // Headers constantes. `X-Frame-Options: DENY` importa aqui de verdade: o
+  // backoffice move dinheiro (confirmar pagamento, cancelar pedido) e é o alvo
+  // clássico de clickjacking. HSTS NÃO entra até o TLS de molho.live estar
+  // validado — ver apps/api/src/bootstrap/security-headers.ts.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ];
+  },
+
   // Em produção, SUBSTITUI o módulo `dev-only-auth` (atalho de login só-dev,
   // débito docs/07) por um stub vazio. O import dinâmico do Next emite o chunk
   // pro disco mesmo com o call site morto — então dead-code no call site não

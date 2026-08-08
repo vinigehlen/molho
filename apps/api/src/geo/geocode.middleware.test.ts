@@ -35,19 +35,19 @@ const res = {} as Response;
 describe('GeocodeMiddleware', () => {
   it('resolve o CEP e anexa req.geocoded (body do checkout, endereço em `address`)', async () => {
     const geocoder = new FakeGeocoder();
-    const request = req({ address: { postalCode: '93600-000', number: '1684', city: '', street: '', neighborhood: '', state: '' } });
+    const request = req({ address: { postalCode: '93610-000', number: '1684', city: '', street: '', neighborhood: '', state: '' } });
     const next = vi.fn() as unknown as NextFunction;
 
     await new GeocodeMiddleware(geocoder).use(request, res, next);
 
-    expect(geocoder.chamadas).toEqual([{ postalCode: '93600-000', number: '1684' }]);
+    expect(geocoder.chamadas).toEqual([{ postalCode: '93610-000', number: '1684' }]);
     expect(request.geocoded).toEqual(RESOLVIDO);
     expect(next).toHaveBeenCalledOnce();
   });
 
   it('aceita o endereço na RAIZ do body (/delivery-match)', async () => {
     const geocoder = new FakeGeocoder();
-    const request = req({ postalCode: '93600000', number: '1684' });
+    const request = req({ postalCode: '93610000', number: '1684' });
 
     await new GeocodeMiddleware(geocoder).use(request, res, vi.fn() as unknown as NextFunction);
 
@@ -86,7 +86,7 @@ describe('GeocodeMiddleware', () => {
     const geocoder = new FakeGeocoder();
     geocoder.resposta = { ...RESOLVIDO, street: null, neighborhood: null, city: null, state: null, postalCodeFound: false };
     const request = req({
-      address: { postalCode: '93600-000', number: '1684', city: 'Estância Velha', state: 'RS', street: 'Av. Brasil', neighborhood: 'Centro' },
+      address: { postalCode: '93610-000', number: '1684', city: 'Estância Velha', state: 'RS', street: 'Av. Brasil', neighborhood: 'Centro' },
     });
     const next = vi.fn() as unknown as NextFunction;
 
@@ -99,7 +99,7 @@ describe('GeocodeMiddleware', () => {
   it('sem ponto nenhum mas com cidade do ViaCEP: PASSA — ponto não bloqueia', async () => {
     const geocoder = new FakeGeocoder();
     geocoder.resposta = { ...RESOLVIDO, lat: null, lng: null, precision: 'unverified' };
-    const request = req({ address: { postalCode: '93600-000', number: '1684', city: '', street: '', neighborhood: '', state: '' } });
+    const request = req({ address: { postalCode: '93610-000', number: '1684', city: '', street: '', neighborhood: '', state: '' } });
     const next = vi.fn() as unknown as NextFunction;
 
     await new GeocodeMiddleware(geocoder).use(request, res, next);

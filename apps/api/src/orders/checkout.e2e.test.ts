@@ -27,8 +27,14 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 
 const STORE_LAT = -29.6;
 const STORE_LNG = -51.17;
-/** CEP real de Estância Velha/RS — o ViaCEP resolve pra cidade da zona semeada. */
-const CEP_ATENDIDO = '93600-000';
+/**
+ * CEP REAL de Estância Velha/RS (Rua Ereda Weber, bairro União) — conferido
+ * no ViaCEP, não inventado. `93600-000` PARECE o CEP geral da cidade e não
+ * existe (`{"erro":"true"}`), o que fazia todo checkout virar 422
+ * `cep_not_found`. Se este teste começar a dar 422, confira o CEP no ViaCEP
+ * ANTES de suspeitar do middleware.
+ */
+const CEP_ATENDIDO = '93610-000';
 /** CEP real de São Paulo/SP — cidade que a loja não atende. */
 const CEP_FORA_DE_AREA = '01310-100';
 
@@ -340,7 +346,15 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
 
     const address = await migratorPrisma.address.findUniqueOrThrow({ where: { id: order.deliveryAddressId! } });
     expect(address.customerId).toBe(customerId);
-    expect(address.street).toBe('Rua das Palmeiras');
+    // O endereço gravado é o do ViaCEP, não o texto que o cliente mandou —
+    // o body vai com street/city vazios de propósito (Épico 6, Bloco 2). É a
+    // prova ponta a ponta de que o servidor é a fonte de verdade do endereço.
+    expect(address.street).toBe('Rua Ereda Weber');
+    expect(address.city).toBe('Estância Velha');
+    expect(address.postalCode).toBe(CEP_ATENDIDO);
+    // CEP autoritativo: o pedido nasce sem marca de conferência pro lojista.
+    expect(order.deliveryPostalCodeVerified).toBe(true);
+    expect(order.deliveryCity).toBe('Estância Velha');
 
     const items = await migratorPrisma.orderItem.findMany({ where: { orderId: order.id } });
     expect(items).toHaveLength(1);

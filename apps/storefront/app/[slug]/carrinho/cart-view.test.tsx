@@ -65,7 +65,7 @@ function salvarEndereco(overrides: Partial<Record<string, unknown>> = {}) {
       neighborhood: 'Bela Vista',
       city: 'Estância Velha',
       state: 'RS',
-      postalCode: '93600-000',
+      postalCode: '93610-000',
       referencePoint: null,
       lat: -29.6,
       lng: -51.17,

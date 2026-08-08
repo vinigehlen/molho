@@ -20,7 +20,7 @@ const ADDRESS = {
   neighborhood: 'Centro',
   city: 'Estância Velha',
   state: 'RS',
-  postalCode: '93600-000',
+  postalCode: '93610-000',
   referencePoint: null,
   expectedDeliveryFeeCents: 800,
 };

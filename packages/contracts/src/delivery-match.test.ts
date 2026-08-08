@@ -3,13 +3,13 @@ import { deliveryMatchRequestSchema, deliveryMatchResponseSchema } from './deliv
 
 describe('deliveryMatchRequestSchema', () => {
   it('aceita CEP com ou sem hífen', () => {
-    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93600-000', number: '1684' }).success).toBe(true);
-    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93600000', number: null }).success).toBe(true);
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93610-000', number: '1684' }).success).toBe(true);
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93610000', number: null }).success).toBe(true);
   });
 
   it('rejeita CEP que não tem 8 dígitos', () => {
     expect(deliveryMatchRequestSchema.safeParse({ postalCode: '9360', number: null }).success).toBe(false);
-    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '936000000', number: null }).success).toBe(false);
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '936100000', number: null }).success).toBe(false);
   });
 
   it('NÃO aceita lat/lng do cliente — o servidor é quem deriva o ponto', () => {

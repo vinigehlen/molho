@@ -58,7 +58,7 @@ export const checkoutItemInputSchema = z.object({
  */
 export const checkoutAddressInputSchema = z.object({
   label: z.string(),
-  /** Aceita "93600-000" ou "93600000" — a normalização é do servidor. */
+  /** Aceita "93610-000" ou "93610000" — a normalização é do servidor. */
   postalCode: z.string().refine((raw) => normalizePostalCode(raw) !== null, 'CEP precisa ter 8 dígitos'),
   /** Obrigatório: sem número não há entrega. `"s/n"` é um valor válido, não ausência. */
   number: z.string().min(1),

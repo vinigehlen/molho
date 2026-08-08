@@ -16,8 +16,8 @@ async function validar(payload: unknown) {
 
 describe('DeliveryMatchRequestDto', () => {
   it('aceita CEP com ou sem hífen; número é opcional', async () => {
-    await expect(validar({ postalCode: '93600-000', number: '1684' })).resolves.toHaveLength(0);
-    await expect(validar({ postalCode: '93600000', number: null })).resolves.toHaveLength(0);
+    await expect(validar({ postalCode: '93610-000', number: '1684' })).resolves.toHaveLength(0);
+    await expect(validar({ postalCode: '93610000', number: null })).resolves.toHaveLength(0);
   });
 
   it('rejeita CEP que não tem 8 dígitos', async () => {
@@ -37,10 +37,10 @@ describe('DeliveryMatchRequestDto', () => {
     // ignorados, não viram fonte de verdade nenhuma.
     const pipe = new ValidationPipe({ whitelist: true, transform: true });
     const limpo = await pipe.transform(
-      { postalCode: '93600-000', number: null, lat: -29.6, lng: -51.17 },
+      { postalCode: '93610-000', number: null, lat: -29.6, lng: -51.17 },
       { type: 'body', metatype: DeliveryMatchRequestDto },
     );
 
-    expect(limpo).toEqual({ postalCode: '93600-000', number: null });
+    expect(limpo).toEqual({ postalCode: '93610-000', number: null });
   });
 });
