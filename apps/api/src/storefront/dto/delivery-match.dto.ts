@@ -1,17 +1,12 @@
-import { Type } from 'class-transformer';
-import { IsNumber, Max, Min } from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 /** Mesmo intervalo de `deliveryMatchRequestSchema` em @molho/contracts. */
 export class DeliveryMatchRequestDto {
-  @Type(() => Number)
-  @IsNumber()
-  @Min(-90)
-  @Max(90)
-  lat!: number;
+  @Matches(/^\d{5}-?\d{3}$/, { message: 'CEP precisa ter 8 dígitos' })
+  postalCode!: string;
 
-  @Type(() => Number)
-  @IsNumber()
-  @Min(-180)
-  @Max(180)
-  lng!: number;
+  /** Opcional: a taxa vem da CIDADE, o número só refina o ponto. */
+  @IsOptional()
+  @IsString()
+  number!: string | null;
 }

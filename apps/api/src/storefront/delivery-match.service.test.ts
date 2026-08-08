@@ -1,6 +1,21 @@
 import { deliveryMatchResponseSchema } from '@molho/contracts';
 import { describe, expect, it } from 'vitest';
+import type { ResolvedAddress } from '../geo/resolve-address';
 import type { DeliveryMatchRepository, DeliveryZoneMatch } from './delivery-match.repository';
+
+/** O middleware de geocode já resolveu isto — o cliente só mandou CEP. */
+function resolvido(overrides: Partial<ResolvedAddress> = {}): ResolvedAddress {
+  return {
+    street: 'Avenida Brasil',
+    neighborhood: 'Rincão',
+    city: 'Estância Velha',
+    state: 'RS',
+    lat: -29.6,
+    lng: -51.17,
+    postalCodeVerified: true,
+    ...overrides,
+  };
+}
 import { DeliveryMatchService } from './delivery-match.service';
 
 class FakeDeliveryMatchRepository implements DeliveryMatchRepository {
@@ -16,7 +31,7 @@ describe('DeliveryMatchService', () => {
     const repository = new FakeDeliveryMatchRepository();
     repository.zone = { name: 'Zona padrão', feeCents: 800, etaMinMinutes: 30, etaMaxMinutes: 45 };
 
-    const result = await new DeliveryMatchService(repository).match(-29.6, -51.17);
+    const result = await new DeliveryMatchService(repository).match(resolvido());
 
     expect(result).toEqual({
       withinZone: true,
@@ -32,7 +47,7 @@ describe('DeliveryMatchService', () => {
     const repository = new FakeDeliveryMatchRepository();
     repository.zone = null;
 
-    const result = await new DeliveryMatchService(repository).match(0, 0);
+    const result = await new DeliveryMatchService(repository).match(resolvido({ city: 'Canoas', lat: 0, lng: 0 }));
 
     expect(result).toEqual({ withinZone: false });
     expect(deliveryMatchResponseSchema.safeParse(result).success).toBe(true);

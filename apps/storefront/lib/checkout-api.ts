@@ -21,16 +21,16 @@ export interface CheckoutRequestBody {
   }[];
   address: {
     label: string;
-    street: string;
-    number: string | null;
+    /** O servidor deriva cidade/rua/ponto a partir daqui (Épico 6, Bloco 2). */
+    postalCode: string;
+    number: string;
     complement: string | null;
+    /** Fallback de texto: o servidor sobrescreve com o ViaCEP quando ele responde. */
+    street: string;
     neighborhood: string;
     city: string;
     state: string;
-    postalCode: string | null;
     referencePoint: string | null;
-    lat: number;
-    lng: number;
     expectedDeliveryFeeCents: number | null;
   };
   paymentMethod: CheckoutPaymentMethod;
@@ -179,18 +179,16 @@ function isCheckoutOrderPix(value: unknown): value is CheckoutOrderPix {
 function addressBody(address: CustomerAddress, expectedDeliveryFeeCents: number | null): CheckoutRequestBody['address'] {
   return {
     label: address.label,
-    street: address.street,
-    number: address.number,
+    // Chamador garante CEP e número antes de iniciar o checkout
+    // (checkoutAddressInputSchema exige os dois).
+    postalCode: address.postalCode as string,
+    number: address.number as string,
     complement: address.complement,
+    street: address.street,
     neighborhood: address.neighborhood,
     city: address.city,
     state: address.state,
-    postalCode: address.postalCode,
     referencePoint: address.referencePoint,
-    // Chamador garante lat/lng não-nulos antes de iniciar o checkout
-    // (checkoutAddressInputSchema exige — sem pickup neste épico).
-    lat: address.lat as number,
-    lng: address.lng as number,
     expectedDeliveryFeeCents,
   };
 }

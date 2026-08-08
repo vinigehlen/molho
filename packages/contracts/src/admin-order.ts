@@ -42,6 +42,12 @@ const adminOrderDeliverySchema = z.object({
   state: z.string(),
   postalCode: z.string().nullable(),
   referencePoint: z.string().nullable(),
+  /**
+   * `false` quando o ViaCEP ficou mudo no checkout e a CIDADE que decidiu a
+   * taxa veio do texto digitado pelo cliente. O gestor destaca pro lojista
+   * conferir a taxa antes de despachar (Épico 6, Bloco 2).
+   */
+  postalCodeVerified: z.boolean(),
 });
 
 /**

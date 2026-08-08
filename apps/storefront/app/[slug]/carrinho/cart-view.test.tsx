@@ -65,7 +65,7 @@ function salvarEndereco(overrides: Partial<Record<string, unknown>> = {}) {
       neighborhood: 'Bela Vista',
       city: 'Estância Velha',
       state: 'RS',
-      postalCode: null,
+      postalCode: '93600-000',
       referencePoint: null,
       lat: -29.6,
       lng: -51.17,
@@ -227,14 +227,16 @@ describe('CartView — checkout (Épico 7)', () => {
     expect(screen.getByRole('button', { name: 'Fazer pedido' })).toBeDisabled();
   });
 
-  it('endereço sem lat/lng confirmados: "Fazer pedido" continua desabilitado, com aviso', async () => {
+  it('endereço sem CEP: "Fazer pedido" continua desabilitado, com aviso', async () => {
+    // É o CEP que o servidor geocoda — sem ele não há cidade, e sem cidade
+    // não há taxa (Épico 6, Bloco 2). lat/lng do cliente não contam mais.
     salvarCarrinho([item()]);
-    salvarEndereco({ lat: null, lng: null });
+    salvarEndereco({ postalCode: null });
     renderCartView();
 
     await screen.findByText(/Rua das Palmeiras/);
     expect(screen.getByRole('button', { name: 'Fazer pedido' })).toBeDisabled();
-    expect(screen.getByText(/Falta confirmar a localização/)).toBeInTheDocument();
+    expect(screen.getByText(/Falta o CEP/)).toBeInTheDocument();
   });
 
   it('endereço completo: "Fazer pedido" habilitado, clique revalida e abre a tela de revisão', async () => {

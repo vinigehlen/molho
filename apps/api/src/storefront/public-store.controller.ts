@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Header, HttpCode, Inject, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Inject, Post, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { RequestWithGeocode } from '../geo/geocode.middleware';
+import { resolveAddress } from '../geo/resolve-address';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
@@ -61,7 +63,9 @@ export class PublicStoreController {
    */
   @Post(':slug/delivery-match')
   @HttpCode(200)
-  deliveryMatch(@Body() body: DeliveryMatchRequestDto) {
-    return this.deliveryMatchService.match(body.lat, body.lng);
+  deliveryMatch(@Body() body: DeliveryMatchRequestDto, @Req() req: RequestWithGeocode) {
+    // O endereço já foi resolvido no middleware, FORA da transação de request
+    // (CLAUDE.md § Contexto de request). `body` só carrega o fallback de texto.
+    return this.deliveryMatchService.match(resolveAddress({ street: '', neighborhood: '', city: '', state: '' }, req.geocoded));
   }
 }

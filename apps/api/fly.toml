@@ -1,4 +1,5 @@
-# DRAFT (Épico 9c) — NÃO validado contra deploy real. Ver docs/08-plano-9c.md.
+# Épico 9c — deploy real executado em 2026-08-03 (imagem sobe, Nest inicia).
+# Ver docs/08-plano-9c.md § "ESTADO ATUAL DO STAGING".
 # API do Molho: processo Node de vida longa (SSE + Redis pub/sub), São Paulo,
 # DUAS máquinas sempre ligadas com rolling deploy. NUNCA scale-to-zero.
 
@@ -8,11 +9,22 @@ app = "molho-api-staging"    # staging (dev-local, descartável). `molho-api` fi
 primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
 
 [build]
+  # ATENÇÃO: `dockerfile` é resolvido pela Fly RELATIVO A ESTE TOML (que vive em
+  # apps/api/), NÃO à raiz do monorepo — por isso "Dockerfile" liso. Escrever
+  # "apps/api/Dockerfile" aqui vira apps/api/apps/api/Dockerfile e o deploy falha.
+  # O build CONTEXT é outra coisa: é o argumento posicional do comando, e TEM que
+  # ser a raiz (o Dockerfile é multi-stage de workspace — COPY pnpm-workspace.yaml,
+  # packages/db, packages/contracts). Deploy sempre, rodado da raiz:
+  #   fly deploy . -c apps/api/fly.toml
+  # (o `.` é o WORKING_DIRECTORY = build context; `-c` só aponta o TOML.)
   dockerfile = "Dockerfile"
 
 [env]
   PORT = "3333"
-  NODE_ENV = "production"    # liga a guarda: boot falha sem ZENVIA_API_KEY real
+  NODE_ENV = "production"
+  # A guarda de produção do OTP é POR CANAL EM USO (messaging.module.ts):
+  # com OTP_CHANNEL_STAFF/CUSTOMER = "email" (secrets), o boot exige
+  # RESEND_API_KEY + MOLHO_EMAIL_FROM — e NÃO a ZENVIA_API_KEY.
 
 [http_service]
   internal_port = 3333
@@ -23,6 +35,15 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
   auto_start_machines = false
   # Duas sempre ligadas: rolling derruba UMA por vez, a outra segura os streams.
   min_machines_running = 2
+
+  # /health existe (HealthController, sem prefixo global e sem guard) — resposta
+  # estática, não toca banco nem Redis: check de liveness, não de dependência.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
 
   [http_service.concurrency]
     # Conexão longa (SSE), não request curta. Limites são ESTIMATIVA a MEDIR no
@@ -40,10 +61,3 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
   # Drain do SIGTERM: o graceful shutdown fecha os streams com server_shutdown e
   # completa (rápido), mas deixar folga. TODO(9c): confirmar que basta.
   # kill_timeout configurável no [[vm]]/serviço conforme a medição.
-
-# Health check: hoje NÃO há endpoint /health (docs/08 passo 3). TCP na porta até
-# existir um /health leve. TODO(9c): trocar por http check quando o endpoint entrar.
-[[services.tcp_checks]]
-  interval = "15s"
-  timeout = "2s"
-  grace_period = "10s"

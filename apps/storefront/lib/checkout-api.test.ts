@@ -48,7 +48,7 @@ function address(overrides: Partial<CustomerAddress> = {}): CustomerAddress {
     neighborhood: 'Bela Vista',
     city: 'Estância Velha',
     state: 'RS',
-    postalCode: null,
+    postalCode: '93600-000',
     referencePoint: null,
     lat: -29.6,
     lng: -51.17,
@@ -100,7 +100,10 @@ describe('buildCheckoutRequestFromCart', () => {
         notes: 'sem cebola',
       },
     ]);
-    expect(body.address).toMatchObject({ street: 'Rua das Palmeiras', lat: -29.6, lng: -51.17, expectedDeliveryFeeCents: null });
+    expect(body.address).toMatchObject({ postalCode: '93600-000', number: '120', street: 'Rua das Palmeiras', expectedDeliveryFeeCents: null });
+    // lat/lng NUNCA saem do cliente (Épico 6, Bloco 2) — o servidor deriva.
+    expect(body.address).not.toHaveProperty('lat');
+    expect(body.address).not.toHaveProperty('lng');
   });
 });
 

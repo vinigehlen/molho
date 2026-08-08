@@ -4,7 +4,7 @@
  *
  * Segunda rota pública sem autenticação do storefront (a primeira é `GET
  * /v1/store/:slug`, ver `storefront.ts`) — por isso é `POST`, não `GET`: o
- * dado de entrada (lat/lng do cliente) é dado pessoal de localização, não
+ * dado de entrada (CEP do cliente) é dado pessoal de localização, não
  * pertence numa query string (nunca em URL, CLAUDE.md §Privacidade).
  *
  * Responde só com o que o cliente PRECISA saber pra decidir se compra —
@@ -20,10 +20,18 @@
  */
 
 import { z } from 'zod';
+import { normalizePostalCode } from './postal-code';
 
+/**
+ * CEP, não lat/lng (Épico 6, Bloco 2): o cliente nunca fornece coordenada — o
+ * servidor deriva cidade e ponto. `number` é OPCIONAL aqui, diferente do
+ * checkout: esta rota só responde "entrega aí? por quanto?", e a taxa vem da
+ * CIDADE — o número apenas refina o ponto, que não participa do preço. Exigir
+ * número pra mostrar a taxa seria atrito sem contrapartida.
+ */
 export const deliveryMatchRequestSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+  postalCode: z.string().refine((raw) => normalizePostalCode(raw) !== null, 'CEP precisa ter 8 dígitos'),
+  number: z.string().nullable(),
 });
 
 export const deliveryMatchResponseSchema = z.discriminatedUnion('withinZone', [

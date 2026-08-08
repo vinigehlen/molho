@@ -4,12 +4,11 @@ import {
   IsArray,
   IsIn,
   IsInt,
-  IsLatitude,
-  IsLongitude,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
   ValidateIf,
@@ -53,49 +52,46 @@ class CheckoutItemInputDto {
   notes!: string | null;
 }
 
-/** Espelha checkoutAddressInputSchema. */
+/**
+ * Espelha checkoutAddressInputSchema (Épico 6, Bloco 2): CEP + número
+ * obrigatórios, lat/lng NUNCA vêm do cliente.
+ *
+ * street/neighborhood/city/state são fallback de TEXTO e aceitam string
+ * vazia (`@IsString()` sem `@IsNotEmpty()`) — o normal é o ViaCEP no
+ * servidor sobrescrever todos eles. Exigir não-vazio aqui rejeitaria o
+ * caminho feliz.
+ */
 class CheckoutAddressInputDto {
   @IsString()
   @IsNotEmpty()
   label!: string;
 
+  @Matches(/^\d{5}-?\d{3}$/, { message: 'CEP precisa ter 8 dígitos' })
+  postalCode!: string;
+
   @IsString()
   @IsNotEmpty()
-  street!: string;
-
-  @IsOptional()
-  @IsString()
-  number!: string | null;
+  number!: string;
 
   @IsOptional()
   @IsString()
   complement!: string | null;
 
   @IsString()
-  @IsNotEmpty()
+  street!: string;
+
+  @IsString()
   neighborhood!: string;
 
   @IsString()
-  @IsNotEmpty()
   city!: string;
 
   @IsString()
-  @IsNotEmpty()
   state!: string;
 
   @IsOptional()
   @IsString()
-  postalCode!: string | null;
-
-  @IsOptional()
-  @IsString()
   referencePoint!: string | null;
-
-  @IsLatitude()
-  lat!: number;
-
-  @IsLongitude()
-  lng!: number;
 
   @IsOptional()
   @IsInt()

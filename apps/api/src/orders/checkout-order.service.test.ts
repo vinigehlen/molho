@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ResolvedAddress } from '../geo/resolve-address';
 import type { CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
 import {
   CheckoutCustomerNotFoundError,
@@ -6,7 +7,7 @@ import {
   InvalidChangeAmountError,
   PaymentMethodNotAvailableError,
 } from './order-errors';
-import type { CheckoutOrderRepository, CreateOrderParams, StoreForOrder } from './checkout-order.repository';
+import type { CheckoutOrderRepository, CreateOrderParams, DeliveryAddressSnapshot, StoreForOrder } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import type { PaymentMethodModuleGate } from './payment-method-module-gate';
 
@@ -19,11 +20,20 @@ const ADDRESS = {
   neighborhood: 'Centro',
   city: 'Estância Velha',
   state: 'RS',
-  postalCode: null,
+  postalCode: '93600-000',
   referencePoint: null,
+  expectedDeliveryFeeCents: 800,
+};
+
+/** O que o middleware de geocode resolveu — nunca vem do cliente. */
+const RESOLVED: ResolvedAddress = {
+  street: 'Avenida Brasil',
+  neighborhood: 'Rincão',
+  city: 'Estância Velha',
+  state: 'RS',
   lat: -29.6,
   lng: -51.17,
-  expectedDeliveryFeeCents: 800,
+  postalCodeVerified: true,
 };
 
 const REQUEST: CheckoutRequest = { items: ITEMS, address: ADDRESS, paymentMethod: 'pix' };
@@ -82,7 +92,9 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   async lockProductsForUpdate(productIds: readonly string[]) {
     this.lockProductsForUpdateCalls.push([...productIds]);
   }
-  async createAddress() {
+  createAddressCalls: DeliveryAddressSnapshot[] = [];
+  async createAddress(_customerId: string, address: DeliveryAddressSnapshot) {
+    this.createAddressCalls.push(address);
     return 'address-1';
   }
   async createOrder(params: CreateOrderParams) {
@@ -118,7 +130,7 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, revalidationService, service } = setup();
     repo.customer = null;
 
-    await expect(service.createOrder('tenant-1', 'customer-x', REQUEST)).rejects.toThrow(CheckoutCustomerNotFoundError);
+    await expect(service.createOrder('tenant-1', 'customer-x', REQUEST, RESOLVED)).rejects.toThrow(CheckoutCustomerNotFoundError);
     expect(revalidationService.revalidate).not.toHaveBeenCalled();
   });
 
@@ -126,21 +138,21 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, service } = setup();
     repo.store = null;
 
-    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST)).rejects.toThrow(CheckoutStoreNotConfiguredError);
+    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED)).rejects.toThrow(CheckoutStoreNotConfiguredError);
   });
 
   it('2b) loja existe mas sem chave PIX configurada: lança CheckoutStoreNotConfiguredError (mesma natureza — não está pronta pra vender)', async () => {
     const { repo, service } = setup();
     repo.store = { ...repo.store!, pixKey: null };
 
-    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST)).rejects.toThrow(CheckoutStoreNotConfiguredError);
+    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED)).rejects.toThrow(CheckoutStoreNotConfiguredError);
   });
 
   it('3) canSubmit false: devolve ok:false com a revalidação, não cria nada', async () => {
     const { repo, revalidationService, service } = setup();
     revalidationService.revalidate.mockResolvedValue(happyRevalidation({ canSubmit: false, withinZone: false }));
 
-    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST);
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
 
     expect(result.ok).toBe(false);
     expect(repo.createOrderCalls).toHaveLength(0);
@@ -150,7 +162,7 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, revalidationService, service } = setup();
     revalidationService.revalidate.mockResolvedValue(happyRevalidation({ hasUnfavorableDivergence: true }));
 
-    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST);
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
 
     expect(result.ok).toBe(false);
     expect(repo.createOrderCalls).toHaveLength(0);
@@ -173,7 +185,7 @@ describe('CheckoutOrderService.createOrder', () => {
       items: [...REQUEST.items, { ...REQUEST.items[0]!, notes: 'outra linha, mesmo produto' }],
     };
 
-    await service.createOrder('tenant-1', 'customer-1', requestComItemRepetido);
+    await service.createOrder('tenant-1', 'customer-1', requestComItemRepetido, RESOLVED);
 
     expect(ordem).toEqual(['lock', 'revalidate']);
     expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']); // dedup — 2 linhas, 1 produto só
@@ -182,7 +194,7 @@ describe('CheckoutOrderService.createOrder', () => {
   it('5) caminho feliz (pix): cria endereço, pedido, itens, grava order_status_history e devolve o QR', async () => {
     const { repo, orderStatusService, service } = setup();
 
-    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST);
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
 
     expect(result).toMatchObject({
       ok: true,
@@ -210,7 +222,7 @@ describe('CheckoutOrderService.createOrder', () => {
   it('7) caminho feliz (cash_on_delivery): devolve changeForCents, nunca pix', async () => {
     const { repo, service } = setup();
 
-    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST_CASH);
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST_CASH, RESOLVED);
 
     expect(result).toMatchObject({
       ok: true,
@@ -223,7 +235,7 @@ describe('CheckoutOrderService.createOrder', () => {
   it('8) caminho feliz (card_on_delivery): sem pix, sem changeForCents', async () => {
     const { repo, service } = setup();
 
-    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST_CARD);
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST_CARD, RESOLVED);
 
     expect(result).toMatchObject({ ok: true, response: { paymentMethod: 'card_on_delivery' } });
     if (result.ok) {
@@ -237,7 +249,7 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, service } = setup();
     const pedirTrocoDeMenos: CheckoutRequest = { ...REQUEST_CASH, changeForCents: 1000 }; // total é 3690
 
-    await expect(service.createOrder('tenant-1', 'customer-1', pedirTrocoDeMenos)).rejects.toThrow(InvalidChangeAmountError);
+    await expect(service.createOrder('tenant-1', 'customer-1', pedirTrocoDeMenos, RESOLVED)).rejects.toThrow(InvalidChangeAmountError);
     expect(repo.createOrderCalls).toHaveLength(0);
   });
 
@@ -245,7 +257,7 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, service } = setup();
     const semTroco: CheckoutRequest = { ...REQUEST_CASH, changeForCents: null };
 
-    const result = await service.createOrder('tenant-1', 'customer-1', semTroco);
+    const result = await service.createOrder('tenant-1', 'customer-1', semTroco, RESOLVED);
 
     expect(result).toMatchObject({ ok: true, response: { changeForCents: null } });
     expect(repo.createOrderCalls[0]).toMatchObject({ changeForCents: null });
@@ -255,9 +267,54 @@ describe('CheckoutOrderService.createOrder', () => {
     const { repo, revalidationService, moduleGate, service } = setup();
     moduleGate.active = false;
 
-    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST_CASH)).rejects.toThrow(PaymentMethodNotAvailableError);
+    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST_CASH, RESOLVED)).rejects.toThrow(PaymentMethodNotAvailableError);
     expect(moduleGate.calls).toEqual(['cash_on_delivery']);
     expect(revalidationService.revalidate).not.toHaveBeenCalled();
     expect(repo.lockProductsForUpdateCalls).toHaveLength(0);
+  });
+});
+
+/**
+ * O flag `postalCodeVerified` distingue os dois subcasos em que o pedido
+ * PASSA sem ponto exato — a diferença importa porque num deles a CIDADE que
+ * decidiu a taxa não veio de fonte autoritativa.
+ */
+describe('CheckoutOrderService — CEP verificado vs. não verificado (Épico 6, Bloco 2)', () => {
+  it('ViaCEP autoritativo sem ponto: grava verified=true e geo nulo', async () => {
+    const { repo, service } = setup();
+    const semPonto: ResolvedAddress = { ...RESOLVED, lat: null, lng: null, postalCodeVerified: true };
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, semPonto);
+
+    expect(result).toMatchObject({ ok: true });
+    // Endereço e snapshot do pedido saem do MESMO objeto — não podem divergir.
+    expect(repo.createAddressCalls[0]).toMatchObject({ lat: null, lng: null, postalCodeVerified: true });
+    expect(repo.createOrderCalls[0]?.address).toBe(repo.createAddressCalls[0]);
+    // A rua veio do ViaCEP, não do texto que o cliente digitou.
+    expect(repo.createOrderCalls[0]?.address.street).toBe('Avenida Brasil');
+  });
+
+  it('ViaCEP mudo: cidade vem do texto do cliente e o pedido nasce verified=false', async () => {
+    const { repo, service } = setup();
+    // Nada de autoritativo: o middleware caiu inteiro no fallback de texto.
+    const doTexto: ResolvedAddress = {
+      street: REQUEST.address.street,
+      neighborhood: REQUEST.address.neighborhood,
+      city: REQUEST.address.city,
+      state: REQUEST.address.state,
+      lat: null,
+      lng: null,
+      postalCodeVerified: false,
+    };
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, doTexto);
+
+    expect(result).toMatchObject({ ok: true });
+    // Passa — a taxa é conhecida —, mas marcado: o lojista confere antes de
+    // despachar, porque quem afirmou a cidade foi o cliente.
+    expect(repo.createOrderCalls[0]?.address).toMatchObject({
+      city: 'Estância Velha',
+      postalCodeVerified: false,
+    });
   });
 });

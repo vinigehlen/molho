@@ -22,6 +22,7 @@
 
 import { z } from 'zod';
 import type { ModuleKey } from './modules';
+import { normalizePostalCode } from './postal-code';
 
 const centsSchema = z.int().nonnegative();
 
@@ -44,23 +45,29 @@ export const checkoutItemInputSchema = z.object({
 });
 
 /**
- * lat/lng são OBRIGATÓRIOS aqui — diferente do `CustomerAddress` de
- * navegação (Épico 6), que aceita endereço só em texto. Checkout exige
- * cobertura de entrega confirmada; não há pickup neste épico (débito
- * adiado, ver schema.prisma).
+ * O cliente NUNCA manda lat/lng (Épico 6, Bloco 2 — "Mundo A"): ele digita
+ * CEP + número, e o SERVIDOR deriva cidade, rua e ponto (ViaCEP + Nominatim,
+ * no middleware de geocode). A taxa vem da CIDADE, não do ponto — zona de
+ * entrega é por município.
+ *
+ * `street`/`neighborhood`/`city`/`state` continuam aqui como FALLBACK DE
+ * TEXTO: o servidor sobrescreve cada um com o valor do ViaCEP quando ele
+ * responde, e só usa o que veio do cliente pro que faltar (ver
+ * `resolveAddress` na API). Podem chegar vazios — é o caso normal quando o
+ * ViaCEP respondeu no browser e o cliente não editou nada.
  */
 export const checkoutAddressInputSchema = z.object({
   label: z.string(),
-  street: z.string(),
-  number: z.string().nullable(),
+  /** Aceita "93600-000" ou "93600000" — a normalização é do servidor. */
+  postalCode: z.string().refine((raw) => normalizePostalCode(raw) !== null, 'CEP precisa ter 8 dígitos'),
+  /** Obrigatório: sem número não há entrega. `"s/n"` é um valor válido, não ausência. */
+  number: z.string().min(1),
   complement: z.string().nullable(),
+  street: z.string(),
   neighborhood: z.string(),
   city: z.string(),
   state: z.string(),
-  postalCode: z.string().nullable(),
   referencePoint: z.string().nullable(),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
   /**
    * Taxa que o cliente viu no `MoAddressSheet` (Épico 6) ao escolher este
    * endereço — mesma razão de `checkoutItemInputSchema.unitBasePriceCents`:

@@ -52,7 +52,7 @@ function address(): CustomerAddress {
     neighborhood: 'Bela Vista',
     city: 'Estância Velha',
     state: 'RS',
-    postalCode: null,
+    postalCode: '93600-000',
     referencePoint: null,
     lat: -29.6,
     lng: -51.17,
@@ -104,7 +104,7 @@ afterEach(() => {
 
 describe('useCheckout', () => {
   it('1) startCheckout sem lat/lng no endereço: não faz nada (continua idle)', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), enderecoSemCoordenadas()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), enderecoSemCep()));
     await act(async () => result.current.startCheckout());
     expect(result.current.step.kind).toBe('idle');
     expect(revalidateCheckout).not.toHaveBeenCalled();
@@ -288,6 +288,7 @@ describe('useCheckout', () => {
   });
 });
 
-function enderecoSemCoordenadas(): CustomerAddress {
-  return { ...address(), lat: null, lng: null };
+/** Sem CEP o checkout não pode começar — é o CEP que o servidor geocoda. */
+function enderecoSemCep(): CustomerAddress {
+  return { ...address(), postalCode: null };
 }

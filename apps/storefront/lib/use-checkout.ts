@@ -25,7 +25,7 @@ export type CheckoutStep =
 
 export interface UseCheckoutResult {
   step: CheckoutStep;
-  /** Chamado pelo botão "Fazer pedido" — exige endereço com lat/lng já resolvidos. */
+  /** Chamado pelo botão "Fazer pedido" — exige endereço com CEP e número. */
   startCheckout: () => Promise<void>;
   /** Chamado pelo botão "Confirmar pedido" da tela de revisão. */
   confirmReview: () => void;
@@ -92,7 +92,7 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
   );
 
   const startCheckout = React.useCallback(async () => {
-    if (!address || address.lat === null || address.lng === null) return;
+    if (!address || !address.postalCode || !address.number) return;
 
     setStep({ kind: 'review', review: null, errorMessage: null, submitting: false });
     const body = buildCheckoutRequestFromCart(cart, address);

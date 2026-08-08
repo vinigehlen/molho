@@ -5,6 +5,8 @@ import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
 import { RequestContextService } from '../context/request-context.service';
+import type { RequestWithGeocode } from '../geo/geocode.middleware';
+import { resolveAddress } from '../geo/resolve-address';
 import { StorefrontRateLimitGuard } from '../storefront/storefront-rate-limit.guard';
 import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
@@ -39,8 +41,12 @@ export class CheckoutController {
   @Post('revalidate')
   @UseGuards(StorefrontRateLimitGuard, RequireModuleGuard)
   @HttpCode(HttpStatus.OK)
-  revalidate(@Body() dto: CheckoutRequestDto) {
-    return this.revalidationService.revalidate(toCheckoutRequest(dto));
+  revalidate(@Body() dto: CheckoutRequestDto, @Req() req: RequestWithGeocode) {
+    const request = toCheckoutRequest(dto);
+    // O geocode já rodou no middleware, FORA da transação de request. Cidade
+    // conhecida mas não atendida NÃO é erro aqui: sai como 200 com
+    // `withinZone: false` (o 422 de endereço irresolúvel morre no middleware).
+    return this.revalidationService.revalidate(request, resolveAddress(request.address, req.geocoded));
   }
 
   /**
@@ -56,11 +62,17 @@ export class CheckoutController {
   @HttpCode(HttpStatus.CREATED)
   async createOrder(
     @Body() dto: CheckoutRequestDto,
-    @Req() req: RequestWithCustomer,
+    @Req() req: RequestWithCustomer & RequestWithGeocode,
     @Res({ passthrough: true }) res: Response,
   ) {
     const tenantId = this.requestContext.getTenantId();
-    const result = await this.orderService.createOrder(tenantId, req.user.sub, toCheckoutRequest(dto));
+    const request = toCheckoutRequest(dto);
+    const result = await this.orderService.createOrder(
+      tenantId,
+      req.user.sub,
+      request,
+      resolveAddress(request.address, req.geocoded),
+    );
     if (!result.ok) {
       res.status(HttpStatus.CONFLICT);
       return result.revalidation;

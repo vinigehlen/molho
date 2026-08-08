@@ -23,23 +23,25 @@ function isDeliveryMatchResponse(value: unknown): value is DeliveryMatchResponse
 }
 
 /**
- * Chamado a partir de um clique ou do callback de `navigator.geolocation`
- * — nunca do render inicial (é `POST`, precisa de lat/lng em mãos). Devolve
+ * Chamado quando o cliente termina de informar o CEP — nunca do render
+ * inicial (é `POST`, e CEP é dado pessoal que não vai em query string).
+ * O servidor deriva cidade e ponto; o número é opcional porque a taxa vem
+ * da CIDADE (Épico 6, Bloco 2). Devolve
  * `null` pra qualquer falha (rede, não-200, formato inesperado) — nunca
  * lança; quem chama decide a mensagem ("não deu pra confirmar cobertura
  * agora" é sempre mais honesto que estourar a tela).
  */
 export async function fetchDeliveryMatch(
   slug: string,
-  lat: number,
-  lng: number,
+  postalCode: string,
+  number: string | null,
 ): Promise<DeliveryMatchResponse | null> {
   let response: Response;
   try {
     response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/delivery-match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lng }),
+      body: JSON.stringify({ postalCode, number }),
     });
   } catch {
     return null;

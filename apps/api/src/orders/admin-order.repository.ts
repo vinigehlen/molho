@@ -22,6 +22,7 @@ export interface AdminOrderRow {
   deliveryState: string;
   deliveryPostalCode: string | null;
   deliveryReferencePoint: string | null;
+  deliveryPostalCodeVerified: boolean;
   customer: { name: string };
   items: { name: string; quantity: number; lineTotalCents: number }[];
 }
@@ -50,6 +51,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
       state: row.deliveryState,
       postalCode: row.deliveryPostalCode,
       referencePoint: row.deliveryReferencePoint,
+      postalCodeVerified: row.deliveryPostalCodeVerified,
     },
     items: row.items.map((i) => ({ name: i.name, quantity: i.quantity, lineTotalCents: i.lineTotalCents })),
   };
@@ -75,6 +77,7 @@ const SELECT = {
   deliveryState: true,
   deliveryPostalCode: true,
   deliveryReferencePoint: true,
+  deliveryPostalCodeVerified: true,
   customer: { select: { name: true } },
   items: { select: { name: true, quantity: true, lineTotalCents: true } },
 } as const;

@@ -4,6 +4,13 @@
 #
 # apps/api é processo Node de vida longa (SSE + pub/sub) — nunca serverless.
 # Multi-stage: builder instala tudo e compila; runner leva só o necessário.
+#
+# ⚠ BUILD CONTEXT = RAIZ DO MONOREPO, não `apps/`. Os COPY abaixo referenciam
+# pnpm-workspace.yaml / packages/* — Docker não deixa sair do context (`../..`),
+# então não existe versão deste arquivo que builde a partir de apps/api.
+# Comando único (da raiz):
+#   fly deploy . -c apps/api/fly.toml --dockerfile apps/api/Dockerfile
+# O `.dockerignore` da RAIZ é o que mantém o context em poucos MB.
 
 # ── builder ────────────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
@@ -50,5 +57,4 @@ CMD ["node", "dist/main"]
 
 # TODO(9c) a validar no deploy:
 # - o `pnpm deploy --prod` leva o Prisma client gerado (packages/db) e o engine.
-# - health check: hoje não há /health (ver docs/08 passo 3) — TCP check no fly.toml.
 # - graceful shutdown: confirmar SIGTERM chegando (enableShutdownHooks já no código).

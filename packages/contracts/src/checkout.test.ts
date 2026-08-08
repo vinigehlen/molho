@@ -17,20 +17,21 @@ function address(overrides: Partial<Record<string, unknown>> = {}) {
     neighborhood: 'Bela Vista',
     city: 'Estância Velha',
     state: 'RS',
-    postalCode: null,
+    postalCode: '93600-000',
     referencePoint: null,
-    lat: -29.6,
-    lng: -51.17,
     expectedDeliveryFeeCents: 800,
     ...overrides,
   };
 }
 
 describe('checkoutAddressInputSchema', () => {
-  it('exige lat/lng — diferente do endereço de navegação (Épico 6), aqui não é opcional', () => {
+  it('exige CEP e número; NÃO aceita lat/lng do cliente (Épico 6, Bloco 2)', () => {
     expect(checkoutAddressInputSchema.safeParse(address()).success).toBe(true);
-    expect(checkoutAddressInputSchema.safeParse(address({ lat: null })).success).toBe(false);
-    expect(checkoutAddressInputSchema.safeParse(address({ lng: null })).success).toBe(false);
+    expect(checkoutAddressInputSchema.safeParse(address({ postalCode: '9360' })).success).toBe(false);
+    expect(checkoutAddressInputSchema.safeParse(address({ number: '' })).success).toBe(false);
+    // Rua/bairro/cidade/UF vazios são o caso NORMAL: o ViaCEP no servidor
+    // sobrescreve os quatro. Exigir não-vazio rejeitaria o caminho feliz.
+    expect(checkoutAddressInputSchema.safeParse(address({ street: '', city: '' })).success).toBe(true);
   });
 });
 

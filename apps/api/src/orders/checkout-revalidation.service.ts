@@ -1,4 +1,5 @@
 import type { CheckoutRequest, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import type { ResolvedAddress } from '../geo/resolve-address';
 import type { DeliveryMatchRepository } from '../storefront/delivery-match.repository';
 import { computeStoreOpenState } from '../storefront/store-hours';
 import type { CheckoutRepository } from './checkout-revalidation.repository';
@@ -23,7 +24,13 @@ export class CheckoutRevalidationService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async revalidate(request: CheckoutRequest): Promise<RevalidatedCheckout> {
+  /**
+   * `resolved` vem do middleware de geocode — este service NUNCA geocoda
+   * (regra de lint em eslint.config.mjs: HTTP externo dentro da transação de
+   * request esgota o pool). A taxa sai da CIDADE resolvida; `lat`/`lng` só
+   * alimentam zona por raio e podem ser nulos sem bloquear nada.
+   */
+  async revalidate(request: CheckoutRequest, resolved: ResolvedAddress): Promise<RevalidatedCheckout> {
     const uniqueProductIds = [...new Set(request.items.map((item) => item.productId))];
 
     const [store, hours, products, zoneMatch] = await Promise.all([
@@ -31,13 +38,12 @@ export class CheckoutRevalidationService {
       this.checkoutRepo.listStoreHours(),
       this.checkoutRepo.findProductsByIds(uniqueProductIds),
       // Cidade E ponto: a zona por cidade decide a taxa da Cabanhas, a por
-      // polígono continua valendo pra quem cobra por raio. No Bloco 2 a
-      // cidade passa a vir do ViaCEP (via middleware) em vez do payload.
+      // polígono continua valendo pra quem cobra por raio.
       this.deliveryMatchRepo.findMatchingZone({
-        city: request.address.city,
-        state: request.address.state,
-        lat: request.address.lat,
-        lng: request.address.lng,
+        city: resolved.city,
+        state: resolved.state,
+        lat: resolved.lat,
+        lng: resolved.lng,
       }),
     ]);
 

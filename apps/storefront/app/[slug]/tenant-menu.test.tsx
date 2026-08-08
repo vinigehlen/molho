@@ -115,12 +115,12 @@ describe('TenantMenu — Épico 6', () => {
         schemaVersion: 1,
         label: 'Casa',
         street: 'Rua Longe',
-        number: null,
+        number: '99',
         complement: null,
         neighborhood: 'Longe',
         city: 'Outra Cidade',
         state: 'RS',
-        postalCode: null,
+        postalCode: '93700-000',
         referencePoint: null,
         lat: -30.03,
         lng: -51.21,
@@ -130,7 +130,7 @@ describe('TenantMenu — Épico 6', () => {
 
     renderTenantMenu();
 
-    await waitFor(() => expect(fetchDeliveryMatchMock).toHaveBeenCalledWith(SLUG, -30.03, -51.21));
+    await waitFor(() => expect(fetchDeliveryMatchMock).toHaveBeenCalledWith(SLUG, '93700-000', '99'));
     expect(await screen.findByText(/Ainda não chegamos aí/)).toBeInTheDocument();
   });
 

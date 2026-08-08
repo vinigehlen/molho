@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { deliveryMatchRequestSchema, deliveryMatchResponseSchema } from './delivery-match';
 
 describe('deliveryMatchRequestSchema', () => {
-  it('aceita lat/lng válidos', () => {
-    expect(deliveryMatchRequestSchema.safeParse({ lat: -29.6, lng: -51.17 }).success).toBe(true);
+  it('aceita CEP com ou sem hífen', () => {
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93600-000', number: '1684' }).success).toBe(true);
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '93600000', number: null }).success).toBe(true);
   });
 
-  it('rejeita lat/lng fora do intervalo geográfico válido', () => {
-    expect(deliveryMatchRequestSchema.safeParse({ lat: 200, lng: -51.17 }).success).toBe(false);
-    expect(deliveryMatchRequestSchema.safeParse({ lat: -29.6, lng: -500 }).success).toBe(false);
+  it('rejeita CEP que não tem 8 dígitos', () => {
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '9360', number: null }).success).toBe(false);
+    expect(deliveryMatchRequestSchema.safeParse({ postalCode: '936000000', number: null }).success).toBe(false);
+  });
+
+  it('NÃO aceita lat/lng do cliente — o servidor é quem deriva o ponto', () => {
+    expect(deliveryMatchRequestSchema.safeParse({ lat: -29.6, lng: -51.17 }).success).toBe(false);
   });
 });
 

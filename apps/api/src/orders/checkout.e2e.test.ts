@@ -27,6 +27,10 @@ import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 
 const STORE_LAT = -29.6;
 const STORE_LNG = -51.17;
+/** CEP real de Estância Velha/RS — o ViaCEP resolve pra cidade da zona semeada. */
+const CEP_ATENDIDO = '93600-000';
+/** CEP real de São Paulo/SP — cidade que a loja não atende. */
+const CEP_FORA_DE_AREA = '01310-100';
 
 function randomPhone(): string {
   const suffix = randomBytes(4).readUInt32BE(0) % 100_000_000;
@@ -75,6 +79,7 @@ function checkoutBody(
   overrides: {
     unitBasePriceCents?: number;
     expectedDeliveryFeeCents?: number;
+    postalCode?: string;
     paymentMethod?: 'pix' | 'cash_on_delivery' | 'card_on_delivery';
     changeForCents?: number | null;
   } = {},
@@ -91,16 +96,17 @@ function checkoutBody(
     ],
     address: {
       label: 'Casa',
-      street: 'Rua das Palmeiras',
+      // CEP + número: o servidor deriva cidade/rua/ponto (Épico 6, Bloco 2).
+      // Os campos de texto vão vazios de propósito — é o caminho normal,
+      // com o ViaCEP do servidor preenchendo tudo.
+      postalCode: overrides.postalCode ?? CEP_ATENDIDO,
       number: '120',
       complement: null,
-      neighborhood: 'Centro',
-      city: 'Estância Velha',
-      state: 'RS',
-      postalCode: null,
+      street: '',
+      neighborhood: '',
+      city: '',
+      state: '',
       referencePoint: null,
-      lat: STORE_LAT,
-      lng: STORE_LNG,
       expectedDeliveryFeeCents: overrides.expectedDeliveryFeeCents ?? 800,
     },
     paymentMethod: overrides.paymentMethod ?? 'pix',
@@ -173,10 +179,11 @@ beforeAll(async () => {
     await migratorPrisma.storeHours.create({ data: { tenantId, storeId, dayOfWeek, opensAtMinutes: 0, closesAtMinutes: 1439 } });
   }
 
-  // Zona de 5km ao redor da própria loja — o endereço do checkout usa as MESMAS coordenadas (distância 0).
+  // Zona por CIDADE (Épico 6, Bloco 2): o CEP do checkout resolve pra
+  // Estância Velha, e é a CIDADE que decide a taxa — não a distância.
   await migratorPrisma.$executeRaw`
-    INSERT INTO delivery_zones (tenant_id, store_id, name, polygon, fee_cents, eta_min_minutes, eta_max_minutes, priority)
-    VALUES (${tenantId}::uuid, ${storeId}::uuid, 'Zona única', ST_Buffer((SELECT geo FROM stores WHERE id = ${storeId}::uuid), 5000), 800, 30, 50, 0)
+    INSERT INTO delivery_zones (tenant_id, store_id, name, city, state, fee_cents, eta_min_minutes, eta_max_minutes, priority)
+    VALUES (${tenantId}::uuid, ${storeId}::uuid, 'Estância Velha', 'Estância Velha', 'RS', 800, 30, 50, 0)
   `;
 
   // Tenant B: só existe pra provar isolamento — login por OTP não exige
@@ -242,6 +249,49 @@ describe('POST /v1/store/:slug/checkout/revalidate', () => {
       hasUnfavorableDivergence: false,
       canSubmit: true,
     });
+  });
+
+  /**
+   * Os TRÊS desfechos do Bloco 2, ponta a ponta — a distinção entre eles é o
+   * que decide se o cliente consegue comprar.
+   *
+   * Estes dois casos batem no ViaCEP/Nominatim DE VERDADE (é e2e). O
+   * middleware cacheia por CEP no Redis, então repetição não vira tráfego
+   * externo — mas ViaCEP fora do ar faz falhar aqui.
+   */
+  it('1b) cidade não atendida: 200 gracioso com withinZone false, NUNCA 4xx', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/revalidate`)
+      .send(checkoutBody({ postalCode: CEP_FORA_DE_AREA }))
+      .expect(200);
+
+    // "Não entregamos aí" é resposta de negócio: o cliente vê o motivo e
+    // troca de endereço. Erro seria mentira — o endereço existe.
+    expect(res.body).toMatchObject({ withinZone: false, deliveryFeeCents: null, totalCents: null, canSubmit: false });
+  });
+
+  it('1c) CEP inexistente: 422 — o único caso em que não dá pra prosseguir', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/revalidate`)
+      .send(checkoutBody({ postalCode: '00000-000' }))
+      .expect(422);
+
+    expect(res.body).toMatchObject({ error: 'address_unresolvable', reason: 'cep_not_found' });
+  });
+
+  it('1d) lat/lng mandados pelo cliente são descartados, não usados como ponto', async () => {
+    // Cliente antigo (ou adulterado) mandando coordenada: `whitelist: true`
+    // no ValidationPipe tira do body, e a taxa continua vindo da CIDADE.
+    const comCoordenada = checkoutBody();
+    (comCoordenada.address as Record<string, unknown>).lat = -23.55;
+    (comCoordenada.address as Record<string, unknown>).lng = -46.63;
+
+    const res = await request(app.getHttpServer())
+      .post(`/v1/store/${slug}/checkout/revalidate`)
+      .send(comCoordenada)
+      .expect(200);
+
+    expect(res.body).toMatchObject({ withinZone: true, deliveryFeeCents: 800 });
   });
 });
 

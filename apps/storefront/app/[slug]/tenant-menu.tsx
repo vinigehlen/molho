@@ -72,23 +72,24 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const { address, setAddress } = useAddress(slug);
   const router = useRouter();
 
-  // Roda de novo sempre que a coordenada mudar (endereço novo salvo, ou já
-  // veio de uma visita anterior com geolocalização) — sem isto, o cliente
-  // precisaria reabrir o formulário toda vez só pra reconfirmar cobertura.
+  // Roda de novo sempre que o CEP mudar (endereço novo salvo, ou já veio de
+  // uma visita anterior) — sem isto, o cliente precisaria reabrir o
+  // formulário toda vez só pra reconfirmar cobertura. O número entra quando
+  // existe: ele só refina o ponto, a taxa vem da CIDADE (Épico 6, Bloco 2).
   React.useEffect(() => {
-    if (address?.lat == null || address?.lng == null) {
+    if (!address?.postalCode) {
       setDeliveryMatch(null);
       return;
     }
 
     let cancelado = false;
-    fetchDeliveryMatch(slug, address.lat, address.lng).then((resultado) => {
+    fetchDeliveryMatch(slug, address.postalCode, address.number).then((resultado) => {
       if (!cancelado) setDeliveryMatch(resultado);
     });
     return () => {
       cancelado = true;
     };
-  }, [slug, address?.lat, address?.lng]);
+  }, [slug, address?.postalCode, address?.number]);
 
   // Scroll-spy: a seção mais visível vira a categoria ativa nos chips,
   // mesmo quando o cliente rola a página na mão (sem clicar em nenhum chip).

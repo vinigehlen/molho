@@ -22,6 +22,7 @@ const ROW: AdminOrderRow = {
   deliveryState: 'RS',
   deliveryPostalCode: '90000-000',
   deliveryReferencePoint: 'Perto da praça',
+  deliveryPostalCodeVerified: true,
   customer: { name: 'Ana Souza' },
   items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200 }],
 };
@@ -42,6 +43,7 @@ describe('toAdminOrder', () => {
       state: 'RS',
       postalCode: '90000-000',
       referencePoint: 'Perto da praça',
+      postalCodeVerified: true,
     });
     expect(order.changeForCents).toBe(5000);
     expect(order.items).toEqual([{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200 }]);
@@ -53,5 +55,14 @@ describe('toAdminOrder', () => {
     const order = toAdminOrder({ ...ROW, paymentMethod: 'pix', changeForCents: null });
     expect(order.changeForCents).toBeNull();
     expect(adminOrderSchema.safeParse(order).success).toBe(true);
+  });
+
+  it('CEP não verificado chega ao gestor — é o que faz o lojista conferir a taxa', () => {
+    // Pedido criado com o ViaCEP mudo: a cidade que decidiu a taxa veio do
+    // texto do cliente (Épico 6, Bloco 2).
+    const naoVerificado = toAdminOrder({ ...ROW, deliveryPostalCodeVerified: false });
+
+    expect(naoVerificado.delivery.postalCodeVerified).toBe(false);
+    expect(adminOrderSchema.safeParse(naoVerificado).success).toBe(true);
   });
 });

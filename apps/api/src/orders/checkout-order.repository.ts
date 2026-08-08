@@ -1,11 +1,39 @@
 import type { CheckoutAddressInput, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
+import type { ResolvedAddress } from '../geo/resolve-address';
+
+/**
+ * O endereço que vai pro banco: o que o cliente digitou (rótulo, número,
+ * complemento, CEP, referência) MAIS o que o servidor resolveu (rua, bairro,
+ * cidade, UF, ponto). Montado uma vez em `CheckoutOrderService` e usado nas
+ * duas escritas (`addresses` e o snapshot em `orders`), pra não existir
+ * chance de a linha e o snapshot divergirem.
+ */
+export interface DeliveryAddressSnapshot extends ResolvedAddress {
+  label: string;
+  number: string;
+  complement: string | null;
+  postalCode: string;
+  referencePoint: string | null;
+}
+
+export function toDeliverySnapshot(input: CheckoutAddressInput, resolved: ResolvedAddress): DeliveryAddressSnapshot {
+  return {
+    ...resolved,
+    label: input.label,
+    number: input.number,
+    complement: input.complement,
+    postalCode: input.postalCode,
+    referencePoint: input.referencePoint,
+  };
+}
 
 export interface CreateOrderParams {
   storeId: string;
   customerId: string;
   deliveryAddressId: string;
-  address: CheckoutAddressInput;
+  address: DeliveryAddressSnapshot;
   /** Já garantido `withinZone && canSubmit` por quem chama — deliveryFeeCents/totalCents nunca nulos aqui. */
   revalidated: RevalidatedCheckout;
   paymentMethod: PaymentMethod;
@@ -39,9 +67,20 @@ export interface CheckoutOrderRepository {
    */
   lockProductsForUpdate(productIds: readonly string[]): Promise<void>;
   /** Grava o endereço do localStorage como linha real, vinculada ao customer autenticado (CLAUDE.md regra 13). */
-  createAddress(customerId: string, address: CheckoutAddressInput): Promise<string>;
+  createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string>;
   createOrder(params: CreateOrderParams): Promise<string>;
   createOrderItems(orderId: string, items: readonly RevalidatedItem[]): Promise<void>;
+}
+
+/**
+ * Ponto NULO é caso normal (Épico 6, Bloco 2): a zona por município decide a
+ * taxa sem coordenada nenhuma. `ST_MakePoint(NULL, NULL)` já resultaria em
+ * NULL, mas o `Prisma.sql` explícito deixa a intenção visível e evita
+ * depender de propagação de NULL dentro do PostGIS.
+ */
+function pontoOuNulo(address: DeliveryAddressSnapshot) {
+  if (address.lat === null || address.lng === null) return Prisma.sql`NULL`;
+  return Prisma.sql`ST_SetSRID(ST_MakePoint(${address.lng}, ${address.lat}), 4326)::geography`;
 }
 
 /**
@@ -80,7 +119,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     `;
   }
 
-  async createAddress(customerId: string, address: CheckoutAddressInput): Promise<string> {
+  async createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string> {
     const tenantId = this.requestContext.getTenantId();
     const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
       INSERT INTO "addresses" (
@@ -89,7 +128,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       ) VALUES (
         ${tenantId}::uuid, ${customerId}::uuid, ${address.label}, ${address.street}, ${address.number}, ${address.complement},
         ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},
-        ST_SetSRID(ST_MakePoint(${address.lng}, ${address.lat}), 4326)::geography
+        ${pontoOuNulo(address)}
       )
       RETURNING "id"
     `;
@@ -108,14 +147,14 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
-        "delivery_geo"
+        "delivery_geo", "delivery_postal_code_verified"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
         ${deliveryAddressId}::uuid, ${address.label}, ${address.street}, ${address.number}, ${address.complement},
         ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},
-        ST_SetSRID(ST_MakePoint(${address.lng}, ${address.lat}), 4326)::geography
+        ${pontoOuNulo(address)}, ${address.postalCodeVerified}
       )
       RETURNING "id"
     `;

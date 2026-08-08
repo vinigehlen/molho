@@ -164,7 +164,8 @@ export function CartView({
     setEnderecoSheetAberto(false);
   }
 
-  const enderecoConfirmado = address !== null && address.lat !== null && address.lng !== null;
+  // CEP + número são o que o checkout exige agora — o servidor deriva o resto.
+  const enderecoConfirmado = address !== null && !!address.postalCode && !!address.number;
 
   return (
     <div className="flex min-h-screen flex-col pb-44">
@@ -188,7 +189,7 @@ export function CartView({
       </button>
       {address && !enderecoConfirmado ? (
         <p className="px-4 py-2 text-caption text-critical-strong">
-          Falta confirmar a localização deste endereço — usa "minha localização" no formulário pra fazer o pedido.
+          Falta o CEP e o número deste endereço — completa o formulário pra fazer o pedido.
         </p>
       ) : null}
 

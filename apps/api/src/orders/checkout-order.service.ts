@@ -2,7 +2,8 @@ import { buildPixBrCode } from '@molho/contracts';
 import type { CheckoutOrderPix, CheckoutOrderResponse, CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
 import { CheckoutCustomerNotFoundError, CheckoutStoreNotConfiguredError, InvalidChangeAmountError } from './order-errors';
-import type { CheckoutOrderRepository, StoreForOrder } from './checkout-order.repository';
+import type { ResolvedAddress } from '../geo/resolve-address';
+import { type CheckoutOrderRepository, type StoreForOrder, toDeliverySnapshot } from './checkout-order.repository';
 import type { OrderStatusService } from './order-status.service';
 import type { PaymentMethodModuleGate } from './payment-method-module-gate';
 
@@ -54,7 +55,12 @@ export class CheckoutOrderService {
     private readonly moduleGate: PaymentMethodModuleGate,
   ) {}
 
-  async createOrder(tenantId: string, customerId: string, request: CheckoutRequest): Promise<CreateOrderResult> {
+  async createOrder(
+    tenantId: string,
+    customerId: string,
+    request: CheckoutRequest,
+    resolved: ResolvedAddress,
+  ): Promise<CreateOrderResult> {
     const customer = await this.repo.findCustomer(customerId);
     if (!customer) throw new CheckoutCustomerNotFoundError();
 
@@ -79,7 +85,7 @@ export class CheckoutOrderService {
 
     // Nunca reaproveita o resultado de /checkout/revalidate — revalida de
     // novo aqui dentro, contra o estado FRESCO do banco (regra 14).
-    const revalidation = await this.revalidationService.revalidate(request);
+    const revalidation = await this.revalidationService.revalidate(request, resolved);
     if (!revalidation.canSubmit || revalidation.hasUnfavorableDivergence) {
       return { ok: false, revalidation };
     }
@@ -95,12 +101,15 @@ export class CheckoutOrderService {
       throw new InvalidChangeAmountError();
     }
 
-    const deliveryAddressId = await this.repo.createAddress(customerId, request.address);
+    // Um snapshot só pras DUAS escritas — linha em `addresses` e cópia
+    // congelada em `orders` nunca podem divergir.
+    const address = toDeliverySnapshot(request.address, resolved);
+    const deliveryAddressId = await this.repo.createAddress(customerId, address);
     const orderId = await this.repo.createOrder({
       storeId: store.id,
       customerId,
       deliveryAddressId,
-      address: request.address,
+      address,
       revalidated: revalidation,
       paymentMethod: request.paymentMethod,
       changeForCents,

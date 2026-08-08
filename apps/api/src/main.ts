@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { COPY, t } from '@molho/contracts';
 import { AppModule } from './app.module';
 import { configureCors } from './bootstrap/cors';
+import { configureSecurityHeaders } from './bootstrap/security-headers';
 import { configureTrustProxy } from './bootstrap/trust-proxy';
 
 const PORTA_PADRAO = 3333;
@@ -27,6 +28,10 @@ async function bootstrap() {
   // SSE autenticado por cookie, CORS PASSA a ser fronteira de segurança: só as
   // origens da allowlist podem ler respostas credenciadas. Ver bootstrap/cors.
   configureCors(app);
+
+  // nosniff + frame-options + referrer-policy em toda resposta. HSTS FICA DE
+  // FORA até o TLS de molho.live estar validado — ver security-headers.ts.
+  configureSecurityHeaders(app);
 
   // SIGTERM do rolling deploy (Fly) fecha os streams SSE limpo em vez de
   // deixá-los pendurar até timeout de TCP — ver OrderStreamController.

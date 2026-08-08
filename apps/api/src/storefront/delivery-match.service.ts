@@ -1,4 +1,5 @@
 import type { DeliveryMatchResponse } from '@molho/contracts';
+import type { ResolvedAddress } from '../geo/resolve-address';
 import type { DeliveryMatchRepository } from './delivery-match.repository';
 
 /**
@@ -10,12 +11,17 @@ export class DeliveryMatchService {
   constructor(private readonly repository: DeliveryMatchRepository) {}
 
   /**
-   * Ainda por ponto: o contrato público de `/delivery-match` só inverte pra
-   * CEP no Bloco 2, junto com o resto do checkout. Aqui o repositório já
-   * aceita cidade — este call-site é que ainda não tem uma pra passar.
+   * `resolved` vem do middleware de geocode (CEP → cidade + ponto), nunca do
+   * payload: o cliente não fornece coordenada nem cidade autoritativa. A
+   * CIDADE é o que decide a taxa; o ponto só serve pra zona por raio.
    */
-  async match(lat: number, lng: number): Promise<DeliveryMatchResponse> {
-    const zone = await this.repository.findMatchingZone({ city: null, state: null, lat, lng });
+  async match(resolved: ResolvedAddress): Promise<DeliveryMatchResponse> {
+    const zone = await this.repository.findMatchingZone({
+      city: resolved.city,
+      state: resolved.state,
+      lat: resolved.lat,
+      lng: resolved.lng,
+    });
     if (!zone) return { withinZone: false };
 
     return {
