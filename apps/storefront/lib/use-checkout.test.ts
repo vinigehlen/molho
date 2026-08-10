@@ -148,7 +148,7 @@ describe('useCheckout', () => {
       await result.current.verifyOtpCode('51999990000', '123456');
     });
 
-    expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), 'token-x');
+    expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), { accessToken: 'token-x' });
     expect(result.current.step).toEqual({ kind: 'success', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
   });
 
@@ -176,7 +176,7 @@ describe('useCheckout', () => {
     expect(createOrder).toHaveBeenCalledWith(
       SLUG,
       expect.objectContaining({ paymentMethod: 'cash_on_delivery', changeForCents: 5000 }),
-      'token-x',
+      { accessToken: 'token-x' },
     );
     expect(result.current.step).toEqual({
       kind: 'success',
@@ -290,3 +290,71 @@ describe('useCheckout', () => {
 function enderecoSemCep(): CustomerAddress {
   return { ...address(), postalCode: null };
 }
+
+/**
+ * Checkout sem OTP (Épico 9c) — o flag vem do payload público, e é DICA DE UI:
+ * o servidor decide de novo, e recusa igual se isto mentir.
+ */
+describe('useCheckout — checkout guest', () => {
+  const PIX_GUEST = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
+
+  it('sem sessão e com guestCheckout LIGADO: confirmReview abre o passo guest, não o de OTP', async () => {
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    await act(async () => result.current.startCheckout());
+
+    act(() => result.current.confirmReview());
+
+    expect(result.current.step.kind).toBe('guest');
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it('sem sessão e com guestCheckout DESLIGADO: segue no OTP (o default)', async () => {
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), false));
+    await act(async () => result.current.startCheckout());
+
+    act(() => result.current.confirmReview());
+
+    expect(result.current.step.kind).toBe('otp');
+  });
+
+  it('submitGuest manda nome/telefone no lugar do token e chega no sucesso', async () => {
+    createOrder.mockResolvedValue({
+      status: 'created',
+      orderId: 'order-guest',
+      totalCents: 3690,
+      paymentMethod: 'pix',
+      pix: PIX_GUEST,
+    });
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    await act(async () => result.current.startCheckout());
+    act(() => result.current.confirmReview());
+
+    await act(async () => {
+      await result.current.submitGuest('Ana Souza', '51999990000');
+    });
+
+    expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), {
+      guest: { name: 'Ana Souza', phone: '51999990000' },
+    });
+    expect(result.current.step).toEqual({
+      kind: 'success',
+      orderId: 'order-guest',
+      totalCents: 3690,
+      paymentMethod: 'pix',
+      pix: PIX_GUEST,
+    });
+  });
+
+  it('401 no meio do guest (lojista desligou o módulo): cai pro OTP em vez de travar', async () => {
+    createOrder.mockResolvedValue({ status: 'unauthorized' });
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    await act(async () => result.current.startCheckout());
+    act(() => result.current.confirmReview());
+
+    await act(async () => {
+      await result.current.submitGuest('Ana Souza', '51999990000');
+    });
+
+    expect(result.current.step.kind).toBe('otp');
+  });
+});

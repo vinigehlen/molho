@@ -12,6 +12,7 @@ import {
   MoButton,
   MoCheckoutReviewSheet,
   MoEmptyState,
+  MoGuestCheckoutSheet,
   MoOtpSheet,
   MoPixPayment,
   MoStepper,
@@ -62,6 +63,8 @@ export interface CartViewProps {
   availablePaymentMethods: CheckoutPaymentMethod[];
   /** `GET /v1/store/:slug` — backend é fonte única do canal de OTP (Épico 9c). */
   otpChannel: 'sms' | 'email';
+  /** `GET /v1/store/:slug` — módulo `checkout.guest` do tenant. Dica de UI: o servidor recusa igual se isto mentir. */
+  guestCheckout: boolean;
   emptyTitle: string;
   emptyBody: string;
   emptyActionLabel: string;
@@ -79,13 +82,14 @@ export function CartView({
   storeName,
   availablePaymentMethods,
   otpChannel,
+  guestCheckout,
   emptyTitle,
   emptyBody,
   emptyActionLabel,
 }: CartViewProps) {
   const cart = useCart(slug);
   const { address, setAddress } = useAddress(slug);
-  const checkout = useCheckout(slug, cart.cart, address);
+  const checkout = useCheckout(slug, cart.cart, address, guestCheckout);
   const router = useRouter();
 
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
@@ -280,6 +284,14 @@ export function CartView({
         onPaymentMethodChange={checkout.setPaymentMethod}
         changeForCents={checkout.changeForCents}
         onChangeForCentsChange={checkout.setChangeForCents}
+      />
+
+      <MoGuestCheckoutSheet
+        open={checkout.step.kind === 'guest'}
+        onOpenChange={(open) => {
+          if (!open) checkout.cancelOtp();
+        }}
+        onSubmit={checkout.submitGuest}
       />
 
       <MoOtpSheet

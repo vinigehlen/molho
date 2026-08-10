@@ -7,6 +7,7 @@ import {
   buildCheckoutRequestFromReview,
   createOrder,
   revalidateCheckout,
+  type CheckoutIdentity,
   type CheckoutOrderPix,
   type CheckoutPaymentMethod,
   type CheckoutReview,
@@ -19,6 +20,8 @@ export type CheckoutStep =
   | { kind: 'idle' }
   | { kind: 'review'; review: CheckoutReview | null; errorMessage: string | null; submitting: boolean }
   | { kind: 'otp' }
+  /** Sem OTP (`checkout.guest` ligado no tenant): só nome + telefone, e o pedido nasce. */
+  | { kind: 'guest' }
   | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'pix'; pix: CheckoutOrderPix }
   | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
   | { kind: 'success'; orderId: string; totalCents: number; paymentMethod: 'card_on_delivery' };
@@ -30,10 +33,12 @@ export interface UseCheckoutResult {
   /** Chamado pelo botão "Confirmar pedido" da tela de revisão. */
   confirmReview: () => void;
   requestOtpCode: (phone: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  /** Finaliza sem OTP — só existe quando o tenant tem `checkout.guest` ligado. */
+  submitGuest: (name: string, phone: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   verifyOtpCode: (phone: string, code: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Fecha a tela de revisão — carrinho/endereço continuam intactos, cliente pode tentar de novo quando quiser. */
   closeCheckout: () => void;
-  /** Fecha o sheet de OTP SEM abandonar o checkout — volta pra revisão, que o cliente já viu. */
+  /** Fecha o sheet de OTP (ou o de guest) SEM abandonar o checkout — volta pra revisão, que o cliente já viu. */
   cancelOtp: () => void;
   /** Seletor de forma de pagamento da tela de revisão (Épico 8, docs/02 §5.5). */
   paymentMethod: CheckoutPaymentMethod;
@@ -57,7 +62,13 @@ const ERRO_CRIACAO = 'Não deu pra confirmar seu pedido agora. Tenta de novo.';
  * na hora de criar o pedido, e o servidor rejeitaria a mesma divergência
  * pra sempre, em loop.
  */
-export function useCheckout(slug: string, cart: Cart, address: CustomerAddress | null): UseCheckoutResult {
+export function useCheckout(
+  slug: string,
+  cart: Cart,
+  address: CustomerAddress | null,
+  /** Vem do payload público (`guestCheckout`), que é fonte única — o servidor recusa igual se isto mentir. */
+  guestCheckout = false,
+): UseCheckoutResult {
   const [step, setStep] = React.useState<CheckoutStep>({ kind: 'idle' });
   const { token, setToken, clearToken } = useCustomerToken(slug);
   const lastReviewRef = React.useRef<CheckoutReview | null>(null);
@@ -65,11 +76,11 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
   const [changeForCents, setChangeForCents] = React.useState<number | null>(null);
 
   const submitOrder = React.useCallback(
-    async (accessToken: string) => {
+    async (identity: CheckoutIdentity) => {
       if (!address || !lastReviewRef.current) return;
 
       const body = buildCheckoutRequestFromReview(lastReviewRef.current, address, paymentMethod, changeForCents);
-      const result = await createOrder(slug, body, accessToken);
+      const result = await createOrder(slug, body, identity);
 
       if (result.status === 'created') {
         const { status: _status, ...success } = result;
@@ -82,6 +93,9 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
         return;
       }
       if (result.status === 'unauthorized') {
+        // 401 no caminho guest = o lojista desligou o módulo no meio do
+        // pedido. Cair no OTP é a saída certa nos dois casos: com token, ele
+        // venceu/foi revogado; sem token, agora exige-se identidade provada.
         clearToken();
         setStep({ kind: 'otp' });
         return;
@@ -110,13 +124,25 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
     if (!lastReviewRef.current) return;
 
     if (!token) {
-      setStep({ kind: 'otp' });
+      // Sessão de OTP tem precedência quando existe; sem ela, o tenant decide
+      // se pede identidade provada ou declarada.
+      setStep({ kind: guestCheckout ? 'guest' : 'otp' });
       return;
     }
 
     setStep((prev) => (prev.kind === 'review' ? { ...prev, submitting: true } : prev));
-    void submitOrder(token);
-  }, [submitOrder, token]);
+    void submitOrder({ accessToken: token });
+  }, [guestCheckout, submitOrder, token]);
+
+  const submitGuest = React.useCallback(
+    async (name: string, phone: string) => {
+      await submitOrder({ guest: { name, phone } });
+      // O erro real já virou estado (`step`) dentro de submitOrder — o sheet
+      // não duplica mensagem, só para de carregar.
+      return { ok: true as const };
+    },
+    [submitOrder],
+  );
 
   const requestOtpCode = React.useCallback(
     async (phone: string, email?: string) => requestOtp(slug, phone, email),
@@ -132,7 +158,7 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
       // Passa o token direto (não lê de volta do hook) — setToken só
       // atualiza o state React na próxima renderização, e submitOrder
       // precisa dele JÁ, sem esperar esse ciclo.
-      await submitOrder(result.accessToken);
+      await submitOrder({ accessToken: result.accessToken });
       return { ok: true as const };
     },
     [setToken, slug, submitOrder],
@@ -155,6 +181,7 @@ export function useCheckout(slug: string, cart: Cart, address: CustomerAddress |
     startCheckout,
     confirmReview,
     requestOtpCode,
+    submitGuest,
     verifyOtpCode,
     closeCheckout,
     cancelOtp,

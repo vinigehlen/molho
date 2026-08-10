@@ -93,12 +93,19 @@ function salvarCarrinho(items: CartItem[]) {
   localStorage.setItem(cartStorageKey(SLUG), JSON.stringify(cart));
 }
 
-function renderCartView(overrides: { availablePaymentMethods?: ('pix' | 'cash_on_delivery' | 'card_on_delivery')[] } = {}) {
+function renderCartView(
+  overrides: {
+    availablePaymentMethods?: ('pix' | 'cash_on_delivery' | 'card_on_delivery')[];
+    guestCheckout?: boolean;
+  } = {},
+) {
   return render(
     <CartView
       slug={SLUG}
       storeName="Hamburgueria da Vila"
       availablePaymentMethods={overrides.availablePaymentMethods ?? ['pix', 'cash_on_delivery', 'card_on_delivery']}
+      otpChannel="sms"
+      guestCheckout={overrides.guestCheckout ?? false}
       emptyTitle="Seu carrinho tá vazio"
       emptyBody="Bora resolver isso?"
       emptyActionLabel="Ver o cardápio"
@@ -317,7 +324,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
     expect(await screen.findByText('Pedido feito! 🎉')).toBeInTheDocument();
-    expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), 'token-x');
+    expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), { accessToken: 'token-x' });
 
     const salvo = JSON.parse(localStorage.getItem(cartStorageKey(SLUG)) ?? '{}');
     expect(salvo.items).toEqual([]);
@@ -361,7 +368,7 @@ describe('CartView — checkout (Épico 7)', () => {
     expect(createOrder).toHaveBeenCalledWith(
       SLUG,
       expect.objectContaining({ paymentMethod: 'cash_on_delivery', changeForCents: 5000 }),
-      'token-x',
+      { accessToken: 'token-x' },
     );
   });
 

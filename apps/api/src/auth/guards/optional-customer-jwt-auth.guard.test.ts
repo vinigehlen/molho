@@ -51,7 +51,7 @@ describe('OptionalCustomerJwtAuthGuard', () => {
   });
 
   for (const [nome, erro] of [
-    ['inválido', new InvalidTokenError()],
+    ['inválido', new InvalidTokenError('assinatura não confere')],
     ['expirado', new ExpiredTokenError()],
     ['revogado', new RevokedTokenError()],
   ] as const) {

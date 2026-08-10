@@ -127,13 +127,29 @@ export type CreateOrderResult =
   | { status: 'error' };
 
 /** `/checkout/orders` — autenticado (accessToken do OTP do cliente). */
-export async function createOrder(slug: string, body: CheckoutRequestBody, accessToken: string): Promise<CreateOrderResult> {
+/**
+ * As DUAS identidades possíveis do pedido, como união — nunca as duas juntas.
+ * O servidor rejeita com 400 um request que traga token E bloco `customer`
+ * (CLAUDE.md regra 13, EMENDA); modelar como união faz o front não conseguir
+ * montar esse request nem por engano.
+ */
+export type CheckoutIdentity = { accessToken: string } | { guest: { name: string; phone: string } };
+
+export async function createOrder(
+  slug: string,
+  body: CheckoutRequestBody,
+  identity: CheckoutIdentity,
+): Promise<CreateOrderResult> {
+  const autenticado = 'accessToken' in identity;
   let response: Response;
   try {
     response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/checkout/orders`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify(body),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(autenticado ? { Authorization: `Bearer ${identity.accessToken}` } : {}),
+      },
+      body: JSON.stringify(autenticado ? body : { ...body, customer: identity.guest }),
     });
   } catch {
     return { status: 'error' };

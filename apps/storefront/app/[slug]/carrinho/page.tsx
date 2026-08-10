@@ -24,6 +24,7 @@ export default async function CarrinhoPage({ params }: CarrinhoPageProps) {
       storeName={store.store.name}
       availablePaymentMethods={store.store.availablePaymentMethods}
       otpChannel={store.otpChannel}
+      guestCheckout={store.guestCheckout}
       emptyTitle={COPY.storefront.carrinhoVazioTitulo}
       emptyBody={COPY.storefront.carrinhoVazioCorpo}
       emptyActionLabel={COPY.storefront.carrinhoVazioAcao}

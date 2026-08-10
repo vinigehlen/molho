@@ -211,7 +211,7 @@ describe('createOrder', () => {
       })),
     );
 
-    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
     expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, paymentMethod: 'pix', pix });
   });
 
@@ -232,7 +232,7 @@ describe('createOrder', () => {
       })),
     );
 
-    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
     expect(resultado).toEqual({ status: 'created', orderId: 'order-2', totalCents: 7380, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
   });
 
@@ -252,7 +252,7 @@ describe('createOrder', () => {
       })),
     );
 
-    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
     expect(resultado).toEqual({ status: 'created', orderId: 'order-3', totalCents: 7380, paymentMethod: 'card_on_delivery' });
   });
 
@@ -272,20 +272,20 @@ describe('createOrder', () => {
       })),
     );
 
-    const resultado = await createOrder('hamburgueria-da-vila', body, 'token-x');
+    const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
     expect(resultado).toEqual({ status: 'error' });
   });
 
   it('401: devolve status unauthorized', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })));
-    expect(await createOrder('x', body, 'token-x')).toEqual({ status: 'unauthorized' });
+    expect(await createOrder('x', body, { accessToken: 'token-x' })).toEqual({ status: 'unauthorized' });
   });
 
   it('409: devolve status divergent com a revalidação fresca', async () => {
     const revalidacaoFresca = review({ hasUnfavorableDivergence: true, canSubmit: false });
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 409, json: async () => revalidacaoFresca })));
 
-    const resultado = await createOrder('x', body, 'token-x');
+    const resultado = await createOrder('x', body, { accessToken: 'token-x' });
     expect(resultado.status).toBe('divergent');
     if (resultado.status === 'divergent') expect(resultado.review.hasUnfavorableDivergence).toBe(true);
   });
@@ -297,11 +297,11 @@ describe('createOrder', () => {
         throw new Error('offline');
       }),
     );
-    expect(await createOrder('x', body, 'token-x')).toEqual({ status: 'error' });
+    expect(await createOrder('x', body, { accessToken: 'token-x' })).toEqual({ status: 'error' });
   });
 
   it('500: devolve status error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })));
-    expect(await createOrder('x', body, 'token-x')).toEqual({ status: 'error' });
+    expect(await createOrder('x', body, { accessToken: 'token-x' })).toEqual({ status: 'error' });
   });
 });
