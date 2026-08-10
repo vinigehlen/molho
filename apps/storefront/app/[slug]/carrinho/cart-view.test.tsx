@@ -67,8 +67,6 @@ function salvarEndereco(overrides: Partial<Record<string, unknown>> = {}) {
       state: 'RS',
       postalCode: '93610-000',
       referencePoint: null,
-      lat: -29.6,
-      lng: -51.17,
       updatedAt: new Date().toISOString(),
       ...overrides,
     }),
@@ -229,7 +227,7 @@ describe('CartView — checkout (Épico 7)', () => {
 
   it('endereço sem CEP: "Fazer pedido" continua desabilitado, com aviso', async () => {
     // É o CEP que o servidor geocoda — sem ele não há cidade, e sem cidade
-    // não há taxa (Épico 6, Bloco 2). lat/lng do cliente não contam mais.
+    // não há taxa (Épico 6, Bloco 2).
     salvarCarrinho([item()]);
     salvarEndereco({ postalCode: null });
     renderCartView();
@@ -251,6 +249,33 @@ describe('CartView — checkout (Épico 7)', () => {
 
     expect(await screen.findByText('Revisa seu pedido')).toBeInTheDocument();
     expect(revalidateCheckout).toHaveBeenCalledWith(SLUG, expect.any(Object));
+  });
+
+  it('cidade não atendida: aviso na revisão e "Confirmar pedido" desabilitado — nunca erro de formulário', async () => {
+    // 200 com withinZone:false é RESPOSTA DE NEGÓCIO, não erro (o 422 do
+    // GeocodeMiddleware é só pra CEP que ninguém consegue resolver).
+    revalidateCheckout.mockResolvedValue({
+      ...REVIEW_PADRAO,
+      withinZone: false,
+      deliveryFeeCents: null,
+      etaMinMinutes: null,
+      etaMaxMinutes: null,
+      totalCents: null,
+      hasUnfavorableDivergence: true,
+      canSubmit: false,
+    });
+    const user = userEvent.setup();
+    salvarCarrinho([item()]);
+    salvarEndereco({ postalCode: '01310-100' }); // São Paulo, fora da zona da loja
+    renderCartView();
+
+    await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
+
+    expect(await screen.findByText('Esse endereço está fora da nossa área de entrega.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar pedido' })).toBeDisabled();
+    // Nada de "erro"/"falha": o carrinho continua intacto pra trocar o endereço.
+    expect(screen.queryByText(/Não deu pra conferir/)).not.toBeInTheDocument();
+    expect(screen.getByText('Taxa de entrega').nextElementSibling).toHaveTextContent('—');
   });
 
   it('confirmar a revisão sem sessão: abre o sheet de OTP', async () => {

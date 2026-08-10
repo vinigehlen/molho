@@ -54,8 +54,6 @@ function address(): CustomerAddress {
     state: 'RS',
     postalCode: '93610-000',
     referencePoint: null,
-    lat: -29.6,
-    lng: -51.17,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -103,7 +101,7 @@ afterEach(() => {
 });
 
 describe('useCheckout', () => {
-  it('1) startCheckout sem lat/lng no endereço: não faz nada (continua idle)', async () => {
+  it('1) startCheckout sem CEP no endereço: não faz nada (continua idle)', async () => {
     const { result } = renderHook(() => useCheckout(SLUG, cart(), enderecoSemCep()));
     await act(async () => result.current.startCheckout());
     expect(result.current.step.kind).toBe('idle');

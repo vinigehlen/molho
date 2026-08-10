@@ -15,8 +15,6 @@ function address(overrides: Partial<CustomerAddress> = {}): CustomerAddress {
     state: 'RS',
     postalCode: '93610-000',
     referencePoint: 'perto da padaria',
-    lat: -29.6,
-    lng: -51.17,
     updatedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -41,15 +39,6 @@ describe('parseStoredAddress', () => {
   it('não lança em JSON corrompido — devolve null', () => {
     expect(() => parseStoredAddress('{isto não é json')).not.toThrow();
     expect(parseStoredAddress('{isto não é json')).toBeNull();
-  });
-
-  it('aceita endereço sem coordenada', () => {
-    const semGeo = address({ lat: null, lng: null });
-    expect(parseStoredAddress(JSON.stringify(semGeo))).toEqual(semGeo);
-  });
-
-  it('descarta endereço com lat/lng fora do intervalo válido', () => {
-    expect(parseStoredAddress(JSON.stringify(address({ lat: 200 })))).toBeNull();
   });
 
   it('descarta endereço gravado em formato antigo', () => {

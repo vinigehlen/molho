@@ -7,18 +7,24 @@
  * nisto. Só depois do OTP no checkout (Épico 7) é que um endereço vira linha
  * em `addresses` (Prisma), vinculada ao `customer` autenticado.
  *
- * `lat`/`lng` são NULLABLE de propósito: este épico não tem nenhuma API de
- * mapa (nem geocoding) — só existem se o cliente tocou "usar minha
- * localização" (`navigator.geolocation`, nativo do browser, sem provider
- * nenhum). Endereço só em texto (sem coordenada) é um estado válido: o
- * cliente pode preencher o formulário, mas o back não confirma cobertura de
- * entrega até ter coordenada — ver `delivery-match.ts`.
+ * O cliente informa CEP + número; o SERVIDOR deriva rua, bairro, cidade e
+ * ponto (`GeocodeMiddleware` + `resolveAddress`, Épico 6 Bloco 2). Por isso
+ * não há `lat`/`lng` aqui: coordenada vinda do cliente é ignorada pelo
+ * backend desde a inversão do contrato, e campo que ninguém lê é campo que
+ * mente. Os campos de texto continuam existindo como FALLBACK (ViaCEP mudo)
+ * e pra exibir o endereço sem uma ida ao servidor.
  */
 
 import { z } from 'zod';
 
-/** Formato atual. Subir isto invalida (descarta) todo endereço salvo no formato antigo — mesma ideia do CART_SCHEMA_VERSION. */
-export const ADDRESS_SCHEMA_VERSION = 1;
+/**
+ * Formato atual. Subir isto invalida (descarta) todo endereço salvo no
+ * formato antigo — mesma ideia do CART_SCHEMA_VERSION. v2 removeu
+ * `lat`/`lng`; descartar os endereços v1 é o comportamento desejado, porque
+ * eles são anteriores ao CEP+número obrigatórios e travariam o cliente no
+ * aviso "falta o CEP" em vez de num formulário limpo.
+ */
+export const ADDRESS_SCHEMA_VERSION = 2;
 
 export const customerAddressSchema = z.object({
   schemaVersion: z.literal(ADDRESS_SCHEMA_VERSION),
@@ -34,9 +40,6 @@ export const customerAddressSchema = z.object({
   postalCode: z.string().nullable(),
   /** "Perto da padaria" — padrão BR, útil pro motoboy. */
   referencePoint: z.string().nullable(),
-  /** Só existe se veio de `navigator.geolocation` — ver aviso no topo do arquivo. */
-  lat: z.number().min(-90).max(90).nullable(),
-  lng: z.number().min(-180).max(180).nullable(),
   updatedAt: z.iso.datetime(),
 });
 
@@ -49,9 +52,8 @@ export function addressStorageKey(slug: string): string {
 
 /**
  * Lê um endereço vindo do `localStorage` de forma fail-safe. Devolve `null`
- * (nunca lança) quando não há nada salvo, o JSON está corrompido, é de
- * formato antigo, ou tem `lat`/`lng` fora do intervalo válido (payload
- * adulterado à mão) — mesmo tratamento defensivo de `parseStoredCart`.
+ * (nunca lança) quando não há nada salvo, o JSON está corrompido ou é de
+ * formato antigo — mesmo tratamento defensivo de `parseStoredCart`.
  */
 export function parseStoredAddress(raw: string | null): CustomerAddress | null {
   if (!raw) return null;

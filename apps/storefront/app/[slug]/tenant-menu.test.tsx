@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { StorefrontCategory } from '@molho/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addressStorageKey } from '../../lib/address-storage';
+import { ADDRESS_SCHEMA_VERSION, addressStorageKey } from '../../lib/address-storage';
 import { cartStorageKey } from '../../lib/cart-storage';
 import { TenantMenu } from './tenant-menu';
 
@@ -14,6 +14,11 @@ vi.mock('next/navigation', () => ({
 const fetchDeliveryMatchMock = vi.fn();
 vi.mock('../../lib/delivery-match-api', () => ({
   fetchDeliveryMatch: (...args: unknown[]) => fetchDeliveryMatchMock(...args),
+}));
+
+const lookupPostalCodeMock = vi.fn();
+vi.mock('../../lib/viacep', () => ({
+  lookupPostalCode: (...args: unknown[]) => lookupPostalCodeMock(...args),
 }));
 
 // jsdom não implementa IntersectionObserver — TenantMenu usa pro scroll-spy
@@ -63,6 +68,11 @@ beforeEach(() => {
   push.mockClear();
   fetchDeliveryMatchMock.mockReset();
   fetchDeliveryMatchMock.mockResolvedValue(null);
+  lookupPostalCodeMock.mockReset();
+  lookupPostalCodeMock.mockResolvedValue({
+    status: 'found',
+    address: { street: 'Rua Nova', neighborhood: 'Centro', city: 'Estância Velha', state: 'RS' },
+  });
 });
 
 describe('TenantMenu — Épico 6', () => {
@@ -90,21 +100,21 @@ describe('TenantMenu — Épico 6', () => {
     expect(await screen.findByText('Seu endereço')).toBeInTheDocument();
   });
 
-  it('salvar endereço com coordenada dispara o match de zona e persiste no localStorage', async () => {
+  it('salvar endereço por CEP+número persiste no localStorage e dispara o match de zona', async () => {
     fetchDeliveryMatchMock.mockResolvedValue({ withinZone: false });
     const user = userEvent.setup();
     renderTenantMenu();
 
     await user.click(screen.getByText('Adicionar endereço de entrega'));
-    await user.type(screen.getByLabelText('Rua'), 'Rua Nova');
-    await user.type(screen.getByLabelText('Bairro'), 'Centro');
-    await user.type(screen.getByLabelText('Cidade'), 'Estância Velha');
-    await user.type(screen.getByLabelText('Estado'), 'RS');
+    await user.type(screen.getByLabelText('CEP'), '93610000');
+    await screen.findByText('Endereço encontrado pelo CEP.');
+    await user.type(screen.getByLabelText('Número'), '120');
     await user.click(screen.getByRole('button', { name: 'Salvar endereço' }));
 
     const salvo = JSON.parse(localStorage.getItem(addressStorageKey(SLUG)) ?? 'null');
-    expect(salvo?.street).toBe('Rua Nova');
-    expect(fetchDeliveryMatchMock).not.toHaveBeenCalled(); // sem lat/lng (não tocou geolocalização) — não dá pra confirmar cobertura ainda.
+    expect(salvo?.street).toBe('Rua Nova'); // veio do CEP, não digitado
+    expect(salvo?.number).toBe('120');
+    await waitFor(() => expect(fetchDeliveryMatchMock).toHaveBeenCalledWith(SLUG, '93610-000', '120'));
   });
 
   it('endereço fora da zona: mostra o banner "ainda não chegamos aí"', async () => {
@@ -112,7 +122,7 @@ describe('TenantMenu — Épico 6', () => {
     localStorage.setItem(
       addressStorageKey(SLUG),
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: ADDRESS_SCHEMA_VERSION,
         label: 'Casa',
         street: 'Rua Longe',
         number: '99',

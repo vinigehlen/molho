@@ -15,7 +15,7 @@ import type { CustomerAddress } from '@molho/contracts';
  * campos de `customerAddressSchema` dos dois arquivos e reprova se
  * divergirem — mesma rede de segurança do carrinho.
  */
-export const ADDRESS_SCHEMA_VERSION = 1;
+export const ADDRESS_SCHEMA_VERSION = 2;
 
 export const customerAddressSchema = z.object({
   schemaVersion: z.literal(ADDRESS_SCHEMA_VERSION),
@@ -28,8 +28,6 @@ export const customerAddressSchema = z.object({
   state: z.string(),
   postalCode: z.string().nullable(),
   referencePoint: z.string().nullable(),
-  lat: z.number().min(-90).max(90).nullable(),
-  lng: z.number().min(-180).max(180).nullable(),
   updatedAt: z.iso.datetime(),
 });
 

@@ -9,6 +9,8 @@ node_modules
 .env*
 !.env.example
 .vercel
+# Cookie jar de `curl -c` — carrega JWT vivo do staging (__Host-molho_stream).
+cookies.txt
 
 # ─── Builds ────────────────────────────────
 .next

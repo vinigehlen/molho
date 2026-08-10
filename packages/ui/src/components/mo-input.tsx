@@ -69,6 +69,9 @@ export const MoInput = React.forwardRef<HTMLInputElement, MoInputProps>(function
           'transition duration-base ease-out',
           'focus-visible:outline-none focus-visible:border-brand focus-visible:shadow-focus',
           'disabled:bg-disabled-surface disabled:text-disabled-text disabled:cursor-not-allowed',
+          // read-only ≠ disabled: o valor foi preenchido por nós (CEP), o campo
+          // continua focável e lido por leitor de tela — só não se edita.
+          'read-only:bg-disabled-surface read-only:cursor-default',
           error && 'border-critical',
           className,
         )}

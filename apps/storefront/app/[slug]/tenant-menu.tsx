@@ -18,6 +18,7 @@ import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
 import { fetchDeliveryMatch } from '../../lib/delivery-match-api';
 import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
+import { lookupPostalCode } from '../../lib/viacep';
 
 /**
  * Espelhado de packages/contracts/src/copy.pt-BR.ts (COPY.storefront) — só
@@ -239,6 +240,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         open={enderecoSheetAberto}
         onOpenChange={setEnderecoSheetAberto}
         initialValue={address}
+        onLookupPostalCode={lookupPostalCode}
         onSave={salvarEndereco}
       />
 

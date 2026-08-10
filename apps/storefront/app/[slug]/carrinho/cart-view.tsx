@@ -23,6 +23,7 @@ import type { CheckoutPaymentMethod, CheckoutReview } from '../../../lib/checkou
 import { useAddress } from '../../../lib/use-address';
 import { useCart } from '../../../lib/use-cart';
 import { useCheckout, type CheckoutStep } from '../../../lib/use-checkout';
+import { lookupPostalCode } from '../../../lib/viacep';
 
 /**
  * Um branch por `paymentMethod` (Épico 8) — `pix` mostra o QR de verdade;
@@ -261,6 +262,7 @@ export function CartView({
         open={enderecoSheetAberto}
         onOpenChange={setEnderecoSheetAberto}
         initialValue={address}
+        onLookupPostalCode={lookupPostalCode}
         onSave={salvarEndereco}
       />
 

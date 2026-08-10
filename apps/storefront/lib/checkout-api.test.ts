@@ -50,8 +50,6 @@ function address(overrides: Partial<CustomerAddress> = {}): CustomerAddress {
     state: 'RS',
     postalCode: '93610-000',
     referencePoint: null,
-    lat: -29.6,
-    lng: -51.17,
     updatedAt: new Date().toISOString(),
     ...overrides,
   };
