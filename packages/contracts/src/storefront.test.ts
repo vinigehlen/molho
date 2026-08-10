@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type StorefrontPayload, storefrontPayloadSchema, storefrontProductSchema } from './storefront';
+import { type StorefrontPayload, guestCustomerSchema, storefrontPayloadSchema, storefrontProductSchema } from './storefront';
 
 const UUID = '0193f1a0-0000-7000-8000-000000000001';
 
@@ -44,6 +44,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
       },
     ],
     otpChannel: 'sms',
+    guestCheckout: false,
     ...overrides,
   };
 }
@@ -131,5 +132,20 @@ describe('storefrontProductSchema — dinheiro', () => {
 
   it('rejeita imageUrl que não é URL', () => {
     expect(storefrontProductSchema.safeParse(product({ imageUrl: 'produtos/abc.jpg' })).success).toBe(false);
+  });
+});
+
+describe('guestCustomerSchema', () => {
+  it('aceita nome e telefone', () => {
+    expect(guestCustomerSchema.safeParse({ name: 'Ana Souza', phone: '51999990000' }).success).toBe(true);
+  });
+
+  it('rejeita nome vazio — comanda anônima é justamente o que o guest não pode produzir', () => {
+    expect(guestCustomerSchema.safeParse({ name: ' ', phone: '51999990000' }).success).toBe(false);
+  });
+
+  it('rejeita campo extra — `.strict()` impede o body de carregar identidade não prevista', () => {
+    const extra = { name: 'Ana', phone: '51999990000', email: 'ana@x.com' };
+    expect(guestCustomerSchema.safeParse(extra).success).toBe(false);
   });
 });

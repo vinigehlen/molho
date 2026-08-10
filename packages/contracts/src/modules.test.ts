@@ -117,6 +117,12 @@ describe('provisionamento', () => {
     expect(ligados).not.toContain('fiscal.nfce');
   });
 
+  it('checkout.guest NÃO nasce ligado em nenhum plano — quem assume o risco do telefone auto-declarado é o lojista', () => {
+    for (const plan of PLANS) {
+      expect(defaultModulesForPlan(plan)).not.toContain('checkout.guest');
+    }
+  });
+
   it('módulo external não nasce ligado nem no premium (exige conectar credencial)', () => {
     expect(defaultModulesForPlan('premium')).not.toContain('channel.ifood');
     expect(defaultModulesForPlan('premium')).not.toContain('payments.pix_online');

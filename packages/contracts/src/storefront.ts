@@ -122,7 +122,32 @@ export const storefrontPayloadSchema = z.object({
    * lugar certo.
    */
   otpChannel: z.enum(['sms', 'email']),
+  /**
+   * `true` = módulo `checkout.guest` ativo neste tenant: o front pede nome +
+   * telefone e finaliza SEM OTP. Dica de UI, NUNCA gate — o servidor recusa
+   * igual se o cliente mentir (CLAUDE.md regra 13, EMENDA). Mesma razão do
+   * `otpChannel` acima pra vir daqui e não de uma `NEXT_PUBLIC_*`: fonte
+   * única, e este já é por tenant de verdade.
+   */
+  guestCheckout: z.boolean(),
 });
+
+/**
+ * Identidade auto-declarada do checkout guest — FORA de `checkoutRequestSchema`
+ * de propósito. Aquele schema serve os DOIS endpoints, e `/checkout/revalidate`
+ * é público, anônimo e de alto volume: pôr telefone na base levaria PII pra uma
+ * superfície que não precisa dela (CLAUDE.md regra 13, EMENDA).
+ *
+ * O telefone é validado de verdade (DDD, nono dígito) por `parsePhoneNumber` no
+ * servidor — aqui é só forma. Nome é obrigatório: sem verificação e sem nome, a
+ * comanda chega anônima e o lojista perde o que o WhatsApp já dava.
+ */
+export const guestCustomerSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    phone: z.string().min(1),
+  })
+  .strict();
 
 export type StorefrontModifier = z.infer<typeof storefrontModifierSchema>;
 export type StorefrontModifierGroup = z.infer<typeof storefrontModifierGroupSchema>;
@@ -130,3 +155,4 @@ export type StorefrontProduct = z.infer<typeof storefrontProductSchema>;
 export type StorefrontCategory = z.infer<typeof storefrontCategorySchema>;
 export type StorefrontStore = z.infer<typeof storefrontStoreSchema>;
 export type StorefrontPayload = z.infer<typeof storefrontPayloadSchema>;
+export type GuestCustomer = z.infer<typeof guestCustomerSchema>;

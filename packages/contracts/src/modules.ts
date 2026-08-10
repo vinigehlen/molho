@@ -47,6 +47,14 @@ export const MODULES = {
 
   // ─── Canais de venda ────────────────────────────────────────────────────────
   'channel.storefront': { plans: PLANS, default: true },
+  // Checkout SEM OTP (Épico 9c). O nome aponta pra ponta PERMISSIVA de
+  // propósito: sem linha em tenant_settings o registry responde `false`, ou
+  // seja OTP exigido — fail-closed por construção. Um `checkout.require_otp`
+  // desligaria a verificação por esquecimento de provisionamento.
+  // `default: false` mesmo dentro do plano: é o lojista que assume o risco de
+  // pedido com telefone auto-declarado, nunca o provisionamento por nós.
+  // Ver CLAUDE.md regra 13 (EMENDA) pras invariantes que ele NÃO afrouxa.
+  'checkout.guest': { plans: PLANS, default: false, requires: ['channel.storefront'] },
   'channel.qrcode_table': { plans: ['premium'], requires: ['tables'] },
   'channel.waiter_app': { plans: ['premium'], requires: ['tables'] },
   'channel.ifood': { plans: ['premium'], external: true },
