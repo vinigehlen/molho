@@ -5,6 +5,100 @@ Infra que destrava a validação de fronteira do Épico 9. **Não é código de 
 Redis cross-instância, CSP). Ver `CLAUDE.md` → "Infra de produção (decidida no Épico 9)"
 pras decisões travadas, e `docs/07` § "Débito técnico ABERTO" pro checklist de fronteira.
 
+## ESTADO ATUAL DO STAGING (2026-08-04) — ler antes dos passos
+
+Fonte única do que já está de pé. Os passos da "Ordem de execução" abaixo continuam válidos
+como desenho; este bloco diz onde a execução parou.
+
+> **`molho-api-staging` está NO AR** — 1 máquina em `gru`, `https://api.staging.molho.live/health`
+> responde **HTTP 200**. Não há bloqueio de boot. Próximo movimento: escalar pra 2 e provar o
+> ★ pub/sub cross-instância (§7.7).
+
+**Feito:**
+- **Invólucro de build: RESOLVIDO — o deploy da raiz builda e sobe.** Comando final:
+  ```
+  fly deploy . -c apps/api/fly.toml --ha=false
+  ```
+  O Dockerfile é multi-stage de workspace (`COPY pnpm-workspace.yaml`, `packages/db`,
+  `packages/contracts`) e o Docker proíbe sair do context (`../..`) — então a correção é a
+  **invocação**: em `fly deploy [WORKING_DIRECTORY]` o argumento posicional É o build context
+  (`-c` só aponta o TOML, não move o context). Correções da mesma unidade:
+  `[[http_service.checks]]` em `/health` (endpoint já existe — ver passo 3),
+  `[[services.tcp_checks]]` órfão **removido** (em TOML ele criava um `[[services]]` implícito
+  sem `internal_port` — origem do warning "service must expose a port"), e o comentário do
+  `NODE_ENV` corrigido (ver passo 4).
+  - **Correção final (a que destravou):** `[build] dockerfile` estava `"apps/api/Dockerfile"`,
+    mas **a Fly resolve esse caminho relativo AO TOML** (que vive em `apps/api/`) — virava
+    `apps/api/apps/api/Dockerfile`. Valor certo: `"Dockerfile"` liso. ⚠ **`dockerfile` e build
+    context têm bases DIFERENTES**: o primeiro é relativo ao TOML, o segundo é o argumento
+    posicional (a raiz). O comentário do `[build]` que dizia "relativo à raiz do monorepo" era
+    **falso** e **já foi corrigido** no `fly.toml` (não é mais pendência).
+- **App bootou na Fly pela 1ª vez (2026-08-03):** imagem no registry (132MB), Nest inicia,
+  `MessagingModule`/`StorageModule` em **Mock** (canal `email`, sem Zenvia/S3 — esperado), 11
+  secrets aplicados. Um crash-loop de `MOLHO_JWT_SECRETS` seguiu-se e foi **resolvido** (abaixo).
+- **`MOLHO_JWT_SECRETS`: RESOLVIDO (2026-08-04).** O crash-loop no boot era **placeholder
+  não-JSON** no secret — `loadJwtSecrets` (`auth/token/token-payload.ts`) faz `JSON.parse` no
+  carregamento do módulo. O formato é **objeto JSON versionado** `{"1":"<32 bytes base64>"}`
+  (mesmo padrão de `MOLHO_ENCRYPTION_KEYS`/`MOLHO_OTP_HMAC_KEY`; ver `.env.example`). Re-setado
+  com JSON válido via `fly secrets set` — **aspas simples por fora no shell** pra proteger as
+  aspas duplas do JSON, e **sem `--stage`** (aplica e redeploya na hora). **Não era bug de código.**
+- **APP VIVO (2026-08-04):** 1 máquina, boot limpo — `Nest application successfully started` +
+  `Molho API no ar em …:3333` —, health check em `/health` porta 3333 **PASSING**,
+  `curl https://api.staging.molho.live/health` → **HTTP 200**.
+  - **Todas as rotas mapeadas** no boot: `auth/otp` (staff **e** customer), sessions, catálogo,
+    checkout, e o **SSE `orders/stream`**. Ou seja, o wiring do Épico 9 subiu inteiro no ambiente
+    real — o que falta pra exercitá-lo é sessão de staff (gate do Resend) e a 2ª máquina.
+  - **Headers de segurança ativos** na resposta: `X-Content-Type-Options: nosniff`,
+    `X-Frame-Options: DENY`, e ACAO com credentials (passo 6 parcialmente entregue — falta só a
+    verificação de allowlist/origem do §7.2–7.3).
+- **Estado de configuração do app no ar:** OTP em **e-mail**; `MessagingProvider` e
+  `StorageProvider` em **Mock** (`ZENVIA_API_KEY` e `S3_ACCESS_KEY_ID` ausentes — **esperado**,
+  a guarda é por canal em uso). Se for testar upload, o R2/S3 vira secret. **Uma máquina só**
+  (`--ha=false` no deploy).
+- **12 secrets staged** em `molho-api-staging`: `DATABASE_URL`, `DIRECT_URL`,
+  `MOLHO_ENCRYPTION_KEYS`, `MOLHO_OTP_HMAC_KEY`, `REDIS_URL`, `OTP_CHANNEL_STAFF=email`,
+  `OTP_CHANNEL_CUSTOMER=email`, `MOLHO_EMAIL_FROM`, `MOLHO_EMAIL_PEPPER`, `RESEND_API_KEY`,
+  `MOLHO_JWT_SECRETS`, `MOLHO_CORS_ORIGINS=https://staging.molho.live`.
+  Staged materializa no próximo `fly deploy` — não precisa de `fly secrets deploy` separado.
+  **No deploy de 2026-08-03 a máquina reportou 11 secrets** (conferir a diferença ao re-setar o
+  `MOLHO_JWT_SECRETS`; `fly secrets list` mostra os nomes).
+- **DNS do staging pronto e CINZA (DNS-only) na Cloudflare** — `staging.molho.live` (CNAME
+  Vercel, backoffice) e `api.staging.molho.live` (A/AAAA Fly, cert Let's Encrypt **Issued**).
+  `molho.live` fica **reservado pro piloto**. ⚠ Nomenclatura final é
+  `staging.` / `api.staging.`, **não** o `staging-app`/`staging-api` que aparece no resto deste
+  doc e no comentário do `fly.toml` — os dois pares são same-site sob `molho.live` do mesmo jeito,
+  mas ao ler o §7 traduza os nomes.
+
+**PRÓXIMO BLOCO — não feito, PRECISA DE PLANO ANTES:** `fly scale count 2 --region gru`, que é o
+**1º teste do ★ pub/sub Redis cross-instância** (`/v1/admin/orders/stream`, §7.7 — o único
+mecanismo do Épico 9 que ninguém nunca viu rodar). **Não é "subir 2 e torcer".** O experimento
+tem que ser desenhado: abrir **duas conexões SSE em máquinas DISTINTAS** (a Fly balanceia sozinha
+— não presumir, **confirmar em qual máquina cada conexão caiu**), publicar um evento numa e
+**provar de propósito** que a aba da OUTRA recebe o cutuque. Sem isolar a máquina de cada conexão,
+um verde não distingue fan-out cross-instância de duas conexões na mesma máquina — seria o pior
+resultado possível: falso positivo no item de maior risco do épico. Depende da cadeia
+OTP→JWT→`arm` funcionando, logo do gate do Resend abaixo.
+
+**Pendências registradas (não bloqueiam o §7.7):**
+- **Cap por IP in-app no request de OTP — ANTES do piloto.** O IP público da Fly **já está
+  tomando scan de bots**, e a nuvem CINZA (DNS-only, exigida pelo SSE — §6) significa **sem WAF
+  da Cloudflare na frente**: a única defesa é in-app. O `OtpService` já tem sliding window de
+  20/hora por IP (CLAUDE.md § Segurança) — a pendência é **verificar que ela cobre a superfície
+  exposta e apertar o teto** antes do piloto, não construir do zero.
+- **Limpar órfãos de MX/SPF em `send.molho.live`** no Cloudflare (registros em 1 nível a mais do
+  que deveriam) — higiene de DNS, mexe no gate do Resend abaixo.
+- ~~Corrigir o comentário mentiroso do `[build]` no `fly.toml`~~ — **FEITO** (dizia "relativo à
+  raiz", é relativo ao TOML).
+
+**GATE PENDENTE — bloqueia a validação de OTP (não o boot):** `send.molho.live` **ainda não verificado no Resend**
+(DNS propagando). Com `OTP_CHANNEL_*=email`, esse é o único caminho de OTP. **O app JÁ SUBIU sem
+isso** — a guarda só exige `RESEND_API_KEY` + `MOLHO_EMAIL_FROM` **presentes** (ver passo 4), não
+verificados. O que falha é a **ENTREGA**, silenciosamente, e aí
+ninguém loga e o §7 inteiro trava sem erro visível. Esperar o Verified.
+
+**Por que UMA máquina primeiro** (`--ha=false`): isola bug de imagem/secret de bug de fan-out.
+Não é contradição com "duas sempre ligadas" — isso é regra de operação, não de primeiro boot.
+
 ## Decisões de escopo (não deixar implícito)
 
 ### Este ambiente é STAGING DESCARTÁVEL, não o piloto
@@ -313,11 +407,30 @@ Neon não muda região de projeto existente → criar projeto novo em São Paulo
 - `fly.toml`: região `gru`, `min_machines_running = 2`, **sem scale-to-zero**, `strategy = "rolling"`, concorrência dimensionada pra **conexão longa** (SSE não é request curta), `kill_timeout` folgado pro drain do SIGTERM.
 - Graceful shutdown **já no código** (`enableShutdownHooks()` + `OrderStreamController.onApplicationShutdown()` fecha os streams com `server_shutdown`). **Validar que o SIGTERM da Fly chega e a janela de drain basta.**
 - **Mudança de CÓDIGO do 9c:** `max` do pool do adapter `PrismaPg` EXPLÍCITO por instância, dimensionado pra `2 × max` caber no limite de conexão do compute Neon (hoje herda o default 10). Não é config de infra.
-- **Health check:** hoje NÃO existe endpoint de health (`/v1/health` dá 404; raiz loga "Épico 2"). Ou usar check TCP na porta, ou adicionar um `/health` leve (pequena mudança de código do 9c).
+- **Health check: RESOLVIDO.** `/health` existe (`src/health/health.controller.ts`) — sem prefixo global, sem guard global no `AppModule`, payload estático que **não toca banco nem Redis** (liveness, não readiness de dependência). O `fly.toml` usa `[[http_service.checks]]` nele; o check TCP saiu.
+- **Build context: RESOLVIDO** (ver "ESTADO ATUAL" no topo) — builda da RAIZ do monorepo, comando único documentado no cabeçalho do `fly.toml`. O `.dockerignore` da raiz já existia e cobre `**/node_modules`, `**/.next`, `**/dist`, `**/.turbo`, `.git`, `**/.env*`: sem ele o context vai de poucos MB pra ~1,5 GB.
+- **`pnpm install --frozen-lockfile` com manifests parciais** (só `apps/api` + `packages/db` + `packages/contracts`, sem `packages/ui`) **funciona** — verificado fora do Docker replicando o context. O lockfile não exige o importer ausente.
 
-### 4. Secrets na Fly (`fly secrets set`)
-- **Obrigatórios:** `DATABASE_URL` (pooled), `DIRECT_URL` (direto), `REDIS_URL` (Upstash SP — depende do passo 0), `ZENVIA_API_KEY` (**boot falha sem ele em prod**), `MOLHO_ENCRYPTION_KEYS`, segredos de JWT.
-- **Opcionais:** `MOLHO_MAX_SMS_PER_DAY` (teto de custo de SMS).
+### 4. Secrets na Fly (`fly secrets set`) — FEITO, 12 staged (lista no "ESTADO ATUAL")
+- **A guarda de produção do OTP é POR CANAL EM USO, não global** (`messaging.module.ts`): com
+  `OTP_CHANNEL_*=email`, o boot exige `RESEND_API_KEY` + `MOLHO_EMAIL_FROM` e **NÃO a
+  `ZENVIA_API_KEY`** — o canal SMS desligado não bloqueia o boot. (A linha antiga deste passo,
+  "`ZENVIA_API_KEY` — boot falha sem ele em prod", era de quando o canal era SMS; ficou obsoleta
+  com a decisão de OTP por e-mail §"SUPERSEDES" acima. Não é bug de código.)
+- ⚠ **`otpChannelFor` faz default `'sms'` quando a env está ausente** — de propósito (a virada é
+  ato explícito de config). Consequência operacional: se `OTP_CHANNEL_*` não chegar na máquina, o
+  boot **falha pedindo Zenvia**. Fail-closed correto, e o modo de falha mais provável do 1º deploy.
+- **`MOLHO_EMAIL_PEPPER` não é checada no boot** — explode no primeiro `hashEmailForLookup()`
+  (`packages/db/src/crypto/email.ts`): throw preguiçoso, quebra o **primeiro login**, não o boot.
+  Não confiar em "subiu = está configurado" — a prova é o passo 7, não o `/health`.
+- **`MOLHO_JWT_SECRETS` é diferente: quebra o BOOT** (`loadJwtSecrets` roda no carregamento do
+  módulo). Formato = **mapa JSON versão→chave** `{"1":"<32 bytes base64>"}`. Valor não-JSON =
+  crash-loop, não erro de login — foi exatamente o que aconteceu no 1º deploy (ver "ESTADO
+  ATUAL"). Setar com aspas simples por fora no shell.
+- **`MOLHO_CORS_ORIGINS` é obrigatória na prática:** sem ela o CORS cai no default de DEV
+  (`localhost:3000/3001`) e a validação de fronteira do §7 não funciona. Staging aponta pra
+  `https://staging.molho.live`.
+- **Opcionais:** `MOLHO_MAX_SMS_PER_DAY` (teto de custo de SMS — irrelevante com o canal em e-mail).
 - Nada de secret no repo; `.env.local` nunca vai pro deploy.
 
 ### 5. Duas máquinas
@@ -330,7 +443,9 @@ Neon não muda região de projeto existente → criar projeto novo em São Paulo
 - `app.` e `api.` sob o mesmo registrable domain = **same-site** — é o que faz o cookie de stream funcionar (a fronteira que NÃO é validável em dev, docs/07).
 - **Mudanças de CÓDIGO do 9c:**
   - CORS de produção na `apps/api` (`main.ts`): allowlist **exata** `https://app.molho.live` + `Allow-Credentials: true`, nunca curinga nem eco do `Origin`. Hoje o CORS é de dev (localhost).
-  - **`X-Content-Type-Options: nosniff`** — o docs/07 dizia que entraria no Épico 9, mas **NÃO entrou** (confirmado: nenhum `headers()` em nenhum `next.config.ts`, nenhum nosniff no código). **Entra aqui**, risco zero. (CSP completa segue sendo item PM separado, pré-go-live — não neste passo.)
+  - **`X-Content-Type-Options: nosniff` — FEITO e verificado no ar (2026-08-04):** a resposta de
+    `api.staging.molho.live` traz `nosniff` + `X-Frame-Options: DENY` + ACAO com credentials.
+    (CSP completa segue sendo item PM separado, pré-go-live — não neste passo.)
 
 #### Armadilha da Cloudflare: proxy (nuvem laranja) NA FRENTE do SSE — CONFIRMADA
 O `molho.live` está registrado e o DNS é gerido na Cloudflare. **`api.molho.live` NUNCA pode
@@ -358,6 +473,10 @@ Cloudflare na frente do Vercel é fonte conhecida de loop de redirect / handshak
 **ESPERA o app da Fly existir (passo 3/5):**
 - `api.molho.live` → só depois do app na Fly (pra ter os IPs/target). Aí: registro A/AAAA (ou CNAME)
   pro app da Fly, **nuvem CINZA (DNS-only)**, e `fly certs add api.molho.live` pra TLS na Fly.
+
+**FEITO no staging (2026-08-03):** `staging.molho.live` (CNAME Vercel) e `api.staging.molho.live`
+(A/AAAA Fly, cert Let's Encrypt **Issued**), ambos **CINZA**. `molho.live` (raiz, `app.`, `api.`,
+`*.`) segue **reservado pro piloto** — este passo continua pendente pra produção.
 
 ### 7. Checklist de validação de fronteira (condição de go-live — docs/07 §ABERTO)
 Só verificável contra os domínios reais na Fly. Ordem:
