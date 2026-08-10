@@ -342,6 +342,48 @@ neste passo, e não deve ser improvisado depois sem entrar no plano.
   de e-mail e copy condicional ao canal.
 - **Backoffice:** nada a fazer — o login de staff é o 9b. Este passo entrega o backend que ele consome.
 
+### Interruptor de CHECKOUT SEM OTP — módulo `checkout.guest` (desenho aprovado pelo PM)
+
+**Problema:** OTP por e-mail resolveu o custo de SMS pro login de STAFF, mas no cliente final ele
+cobra um preço de funil — pedir e-mail + código pra quem só quer pedir uma pizza é atrito num ponto
+onde o baseline que estamos substituindo (pedido anotado no WhatsApp à mão) tem verificação **zero**.
+O interruptor deixa o lojista escolher, por tenant, sem deploy.
+
+**Onde mora:** módulo `checkout.guest` no registry (`{ plans: PLANS, default: false }`), consumido de
+forma **DINÂMICA** dentro do service — não por `@RequireModule`, que devolveria 403 com o módulo
+inativo, o oposto do que se quer aqui (inativo = exija OTP, não recuse a rota). Precedente exato:
+`PrismaPaymentMethodModuleGate`. Vem de graça, por já existir: controle por tenant, painel do
+super-admin (Épico 14), trilha em `module_audit` (quem ligou e quando — o lojista vai querer poder
+apontar isso depois), cache e invalidação.
+
+**Rejeitado — env var (`CHECKOUT_REQUIRE_OTP`):** global a todos os tenants, invisível no backoffice,
+sem trilha, e mudar exige deploy. O único ganho seria não mexer em banco; não vale um segundo
+mecanismo de gate ao lado do registry.
+
+**Semântica e invariantes:** ver **CLAUDE.md regra 13 (EMENDA)** — é lá que a regra vive, não aqui.
+Resumo: sem sessão (nenhum token emitido), `Authorization` inválido nunca vira guest, token presente
+rejeita `customer` no body com 400, `customer.phone` fora do schema compartilhado com `/revalidate`,
+cap de escrita pública por middleware antes do geocode, procedência gravada em
+`customers.phone_verified_at` + snapshot `orders.customer_verified`.
+
+**Identidade:** guest reusa `CustomerIdentityRepository.findOrCreate` — um `customer` por telefone por
+tenant, como hoje. Linha separada por pedido guest foi **rejeitada**: quebraria o único parcial
+`(tenant_id, phone_lookup_hash)` e destruiria "cliente que volta", que é o dado que interessa ao
+lojista. Consequência aceita: dois pedidos guest com o mesmo telefone caem no mesmo `customer`, e
+digitar o telefone do vizinho é possível. Como não há sessão nem leitura, o pior caso é **pedido no
+nome errado** — não vazamento. O telefone errado é o telefone que o lojista vai ligar; é o mesmo risco
+do WhatsApp de hoje.
+
+**Nome é obrigatório no guest** (decisão do PM): sem verificação e sem nome, a comanda chega anônima e
+o lojista perde o que o WhatsApp já dava. `customers.name` deixa de ser o placeholder `'Cliente'` neste
+caminho.
+
+**Ligar/desligar no piloto:** SQL à mão no tenant da Cabanhas (o super-admin é o Épico 14). O `UPDATE`
+exato está em `packages/db/prisma/seed/checkout-guest.sql`.
+
+**Restrição herdada pro Épico 12:** pedido guest não tem sessão — acompanhamento só por link
+não-adivinhável, nunca por "meus pedidos".
+
 ### Pré-requisito da validação de fronteira: owner do seed com E-MAIL REAL
 (Antes era telefone/SMS; com OTP por e-mail, o identificador de staff no seed vira **e-mail**.)
 `MOLHO_SEED_STAFF_PHONE` → **`MOLHO_SEED_STAFF_EMAIL`**, e o seed de CLIENTE também passa a ter e-mail.
