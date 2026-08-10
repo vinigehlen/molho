@@ -238,6 +238,12 @@ model Customer {
   /// nem por acidente, e voltar pro SMS é trocar env, não re-migrar.
   emailCiphertext Bytes?    @map("email_ciphertext")
   emailKeyVersion Int       @default(1) @map("email_key_version")
+  /// Quando o telefone foi PROVADO por OTP. `null` = auto-declarado (nasceu
+  /// pelo checkout guest, Épico 9c) — sem isso, "esse telefone é real?" vira
+  /// pergunta sem resposta no banco quando o SMS voltar. Só o verify do OTP
+  /// carimba; o guest nunca. Carimba também um registro que JÁ existia como
+  /// guest e depois verificou — é upgrade de procedência, não identidade nova.
+  phoneVerifiedAt DateTime? @map("phone_verified_at")
   /// Corta sessões na hora, mesmo mecanismo de users.token_version.
   tokenVersion    Int       @default(0) @map("token_version")
   version         Int       @default(0)
@@ -678,6 +684,15 @@ model Order {
   /// texto digitado pelo cliente, não de fonte autoritativa — o gestor mostra
   /// pro lojista conferir a taxa antes de despachar.
   deliveryPostalCodeVerified Boolean                           @default(true) @map("delivery_postal_code_verified")
+  /// Snapshot da procedência da IDENTIDADE no momento do pedido (Épico 9c):
+  /// `false` = nasceu pelo checkout guest (`checkout.guest`), com telefone
+  /// auto-declarado e sem OTP. Snapshot, e não JOIN em
+  /// `customers.phone_verified_at`, porque aquele campo é mutável (o cliente
+  /// pode verificar depois) e reescreveria a história — a decisão "confio
+  /// nesse pedido" acontece na hora do pedido. SEM `@default` de propósito:
+  /// quem insere é SQL cru que lista a coluna, e um default `true` deixaria
+  /// um writer futuro carimbar "verificado" por omissão.
+  customerVerified           Boolean                           @map("customer_verified")
 
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
