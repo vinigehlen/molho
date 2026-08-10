@@ -10,6 +10,7 @@ import {
   type RateLimiter,
   RedisSlidingWindowRateLimiter,
 } from '../rate-limit/rate-limiter';
+import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
 import { PrismaAvailablePaymentMethodsResolver } from './available-payment-methods';
 import { DeliveryMatchService } from './delivery-match.service';
 import { PrismaDeliveryMatchRepository } from './delivery-match.repository';
@@ -38,6 +39,7 @@ import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } f
           new PrismaStorefrontRepository(requestContext),
           process.env.S3_PUBLIC_URL,
           new PrismaAvailablePaymentMethodsResolver(requestContext, moduleCache),
+          new PrismaCheckoutGuestGate(requestContext, moduleCache),
         ),
     },
     {

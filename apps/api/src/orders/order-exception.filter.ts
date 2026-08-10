@@ -2,7 +2,10 @@ import { type ArgumentsHost, Catch, type ExceptionFilter } from '@nestjs/common'
 import type { Response } from 'express';
 import {
   CheckoutCustomerNotFoundError,
+  CheckoutOtpRequiredError,
   CheckoutStoreNotConfiguredError,
+  GuestCustomerNotAllowedError,
+  GuestCustomerRequiredError,
   IllegalOrderTransitionError,
   InvalidChangeAmountError,
   MissingCancelReasonError,
@@ -21,6 +24,9 @@ type OrderDomainError =
   | MissingCancelReasonError
   | CheckoutCustomerNotFoundError
   | CheckoutStoreNotConfiguredError
+  | CheckoutOtpRequiredError
+  | GuestCustomerNotAllowedError
+  | GuestCustomerRequiredError
   | PaymentAlreadyConfirmedError
   | PaymentMethodNotAvailableError
   | PaymentNotConfirmedError
@@ -34,6 +40,9 @@ type OrderDomainError =
   MissingCancelReasonError,
   CheckoutCustomerNotFoundError,
   CheckoutStoreNotConfiguredError,
+  CheckoutOtpRequiredError,
+  GuestCustomerNotAllowedError,
+  GuestCustomerRequiredError,
   PaymentAlreadyConfirmedError,
   PaymentMethodNotAvailableError,
   PaymentNotConfirmedError,

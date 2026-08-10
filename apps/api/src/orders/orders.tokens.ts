@@ -7,3 +7,5 @@ export const ORDER_EVENT_BUS = Symbol('ORDER_EVENT_BUS');
 export const ORDER_STATUS_SERVICE = Symbol('ORDER_STATUS_SERVICE');
 /** Leitura do gestor (board + detalhe) — Épico 9. */
 export const ADMIN_ORDER_REPOSITORY = Symbol('ADMIN_ORDER_REPOSITORY');
+/** Balde do cap de criação de pedido (Épico 9c) — separado do STOREFRONT_RATE_LIMITER: navegar não pode consumir a cota de pedir. */
+export const CHECKOUT_ORDER_RATE_LIMITER = Symbol('CHECKOUT_ORDER_RATE_LIMITER');

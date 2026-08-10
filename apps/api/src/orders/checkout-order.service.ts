@@ -1,7 +1,22 @@
-import { buildPixBrCode } from '@molho/contracts';
-import type { CheckoutOrderPix, CheckoutOrderResponse, CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
+import { buildPixBrCode, parsePhoneNumber } from '@molho/contracts';
+import type {
+  CheckoutOrderPix,
+  CheckoutOrderResponse,
+  CheckoutRequest,
+  GuestCustomer,
+  RevalidatedCheckout,
+} from '@molho/contracts';
+import type { CustomerIdentityRepository } from '../auth/customer-identity.repository';
+import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
-import { CheckoutCustomerNotFoundError, CheckoutStoreNotConfiguredError, InvalidChangeAmountError } from './order-errors';
+import {
+  CheckoutCustomerNotFoundError,
+  CheckoutOtpRequiredError,
+  CheckoutStoreNotConfiguredError,
+  GuestCustomerNotAllowedError,
+  GuestCustomerRequiredError,
+  InvalidChangeAmountError,
+} from './order-errors';
 import type { ResolvedAddress } from '../geo/resolve-address';
 import { type CheckoutOrderRepository, type StoreForOrder, toDeliverySnapshot } from './checkout-order.repository';
 import type { OrderStatusService } from './order-status.service';
@@ -53,16 +68,63 @@ export class CheckoutOrderService {
     private readonly revalidationService: CheckoutRevalidationService,
     private readonly orderStatusService: OrderStatusService,
     private readonly moduleGate: PaymentMethodModuleGate,
+    private readonly guestGate: CheckoutGuestGate,
+    private readonly customerIdentity: CustomerIdentityRepository,
   ) {}
+
+  /**
+   * Resolve QUEM é o cliente deste pedido — a única porta por onde um pedido
+   * pode nascer sem OTP (CLAUDE.md regra 13, EMENDA).
+   *
+   * `authenticatedCustomerId` vem do JWT (null = request anônima; token ruim
+   * nem chega aqui, morre no guard). `guest` vem do body. As três combinações
+   * que não são o caminho feliz são erros DISTINTOS de propósito — cada uma
+   * vira um HTTP diferente e uma decisão de UI diferente.
+   *
+   * Devolve também `verified`, que vira o snapshot `orders.customer_verified`.
+   */
+  private async resolveCustomer(
+    tenantId: string,
+    authenticatedCustomerId: string | null,
+    guest: GuestCustomer | null,
+  ): Promise<{ customerId: string; verified: boolean }> {
+    if (authenticatedCustomerId !== null) {
+      // Rejeitado, nunca ignorado: descartar o bloco em silêncio deixaria o
+      // cliente achar que pediu com o telefone que digitou; aceitá-lo deixaria
+      // ele carimbar o pedido no telefone de OUTRA pessoa.
+      if (guest) throw new GuestCustomerNotAllowedError();
+      const customer = await this.repo.findCustomer(authenticatedCustomerId);
+      if (!customer) throw new CheckoutCustomerNotFoundError();
+      // Da linha, não do fato de haver token: um customer criado como guest e
+      // que só DEPOIS verificou tem que aparecer como verificado aqui.
+      return { customerId: customer.id, verified: customer.phoneVerifiedAt !== null };
+    }
+
+    // Anônimo: só passa com o módulo ligado. Módulo desligado (o default, e o
+    // estado de qualquer tenant sem linha em tenant_settings) = OTP exigido.
+    if (!(await this.guestGate.isActive())) throw new CheckoutOtpRequiredError();
+    if (!guest) throw new GuestCustomerRequiredError();
+
+    // `parsePhoneNumber` valida DDD real e nono dígito — é o pouco que dá pra
+    // afirmar sobre um telefone sem OTP, e é melhor gastar aqui do que
+    // descobrir na hora de ligar. Lança se for impossível (vira 400 no filtro
+    // de contratos, mesmo caminho do OTP).
+    const phone = parsePhoneNumber(guest.phone);
+    const { identity } = await this.customerIdentity.findOrCreate(tenantId, phone, {
+      name: guest.name,
+      verified: false,
+    });
+    return { customerId: identity.id, verified: false };
+  }
 
   async createOrder(
     tenantId: string,
-    customerId: string,
+    authenticatedCustomerId: string | null,
     request: CheckoutRequest,
     resolved: ResolvedAddress,
+    guest: GuestCustomer | null = null,
   ): Promise<CreateOrderResult> {
-    const customer = await this.repo.findCustomer(customerId);
-    if (!customer) throw new CheckoutCustomerNotFoundError();
+    const { customerId, verified } = await this.resolveCustomer(tenantId, authenticatedCustomerId, guest);
 
     const store = await this.repo.findStore();
     if (!store) throw new CheckoutStoreNotConfiguredError();
@@ -113,6 +175,7 @@ export class CheckoutOrderService {
       revalidated: revalidation,
       paymentMethod: request.paymentMethod,
       changeForCents,
+      customerVerified: verified,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });

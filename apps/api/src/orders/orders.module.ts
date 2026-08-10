@@ -1,14 +1,22 @@
 import { Module } from '@nestjs/common';
 import Redis from 'ioredis';
+import {
+  InMemorySlidingWindowRateLimiter,
+  type RateLimiter,
+  RedisSlidingWindowRateLimiter,
+} from '../rate-limit/rate-limiter';
 import type { ModuleCache } from '@molho/db';
 import { AuthModule } from '../auth/auth.module';
 import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
+import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
+import { CustomerIdentityRepository } from '../auth/customer-identity.repository';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { PrismaDeliveryMatchRepository } from '../storefront/delivery-match.repository';
 import { CheckoutController } from './checkout.controller';
+import { CheckoutOrderRateLimitMiddleware } from './checkout-order-rate-limit.middleware';
 import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
@@ -24,6 +32,7 @@ import { OrderStreamController } from './realtime/order-stream.controller';
 import { StreamCookieAuthGuard } from './realtime/stream-cookie-auth.guard';
 import {
   ADMIN_ORDER_REPOSITORY,
+  CHECKOUT_ORDER_RATE_LIMITER,
   CHECKOUT_ORDER_SERVICE,
   CHECKOUT_REVALIDATION_SERVICE,
   ORDER_EVENT_BUS,
@@ -52,6 +61,17 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
   providers: [
     StreamCookieAuthGuard,
     OrderPublishInterceptor,
+    CheckoutOrderRateLimitMiddleware,
+    {
+      // Mesmo padrão dos outros limitadores: sem REDIS_URL cai em memória (dev
+      // de uma instância só); em produção com 2 instâncias só o Redis conta
+      // certo, senão o cap dobra na prática.
+      provide: CHECKOUT_ORDER_RATE_LIMITER,
+      useFactory: (): RateLimiter => {
+        const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
+        return redis ? new RedisSlidingWindowRateLimiter(redis) : new InMemorySlidingWindowRateLimiter();
+      },
+    },
     {
       provide: ORDER_STATUS_SERVICE,
       inject: [RequestContextService],
@@ -101,9 +121,16 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
           revalidationService,
           new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
           new PrismaPaymentMethodModuleGate(requestContext, moduleCache),
+          new PrismaCheckoutGuestGate(requestContext, moduleCache),
+          new CustomerIdentityRepository(requestContext),
         ),
     },
   ],
-  exports: [CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMATION_SERVICE],
+  exports: [
+    CHECKOUT_REVALIDATION_SERVICE,
+    CHECKOUT_ORDER_SERVICE,
+    PAYMENT_CONFIRMATION_SERVICE,
+    CheckoutOrderRateLimitMiddleware,
+  ],
 })
 export class OrdersModule {}

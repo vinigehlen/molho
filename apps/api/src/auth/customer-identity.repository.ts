@@ -40,33 +40,63 @@ export class CustomerIdentityRepository {
     return decryptEmail(Buffer.from(existing.emailCiphertext), existing.emailKeyVersion) as EmailAddress;
   }
 
+  /** Placeholder de quando não há nome nenhum a gravar — mesmo caso de `users`, o OTP não tem campo de nome. */
+  private static readonly NOME_PLACEHOLDER = 'Cliente';
+
   /**
-   * Busca/cria SEMPRE pelo telefone. `email` (só quando o canal é e-mail) é
-   * gravado apenas se o registro ainda não tiver vínculo — nunca sobrescreve
-   * vínculo existente, senão o TOFU do `findBoundEmail` seria contornável.
+   * Busca/cria SEMPRE pelo telefone — inclusive no checkout guest (Épico 9c):
+   * um `customer` por telefone por tenant continua sendo a regra, senão
+   * "cliente que volta" (o dado que interessa ao lojista) se perderia e o
+   * único parcial `(tenant_id, phone_lookup_hash)` seria violado.
+   *
+   * `verified` é OBRIGATÓRIO de propósito — sem default, nenhum caminho novo
+   * carimba procedência por omissão:
+   * - `true` (verify do OTP) grava `phone_verified_at` na criação **e** carimba
+   *   um registro que já existia sem ele. Isso é upgrade de procedência de um
+   *   telefone que passou a ser provado, não identidade nova.
+   * - `false` (checkout guest) NUNCA carimba, e nunca APAGA um carimbo
+   *   existente: quem já provou o telefone não volta a ser não-verificado por
+   *   ter feito um pedido sem logar.
+   *
+   * `email` (só quando o canal do OTP é e-mail) e `name` seguem a mesma regra
+   * do TOFU: gravados apenas quando ainda não há valor de verdade. Não
+   * sobrescrever e-mail é o que impede contornar o `findBoundEmail`; não
+   * sobrescrever nome impede que um pedido guest renomeie o registro de outra
+   * pessoa que digitou o mesmo telefone.
    */
   async findOrCreate(
     tenantId: string,
     phone: PhoneNumber,
-    email?: EmailAddress,
+    options: { email?: EmailAddress; name?: string; verified: boolean },
   ): Promise<{ identity: Identity; created: boolean }> {
+    const { email, name, verified } = options;
     const client = this.requestContext.getClient();
     const phoneHash = hashPhoneForLookup(phoneNumberToE164(phone));
     const encryptedEmail = email ? encryptEmail(email) : null;
 
     const existing = await client.customer.findFirst({
       where: { tenantId, phoneLookupHash: phoneHash, deletedAt: null },
-      select: { id: true, name: true, emailCiphertext: true },
+      select: { id: true, name: true, emailCiphertext: true, phoneVerifiedAt: true },
     });
     if (existing) {
-      if (encryptedEmail && !existing.emailCiphertext) {
-        await client.customer.update({
+      const semNomeDeVerdade = existing.name.trim() === '' || existing.name === CustomerIdentityRepository.NOME_PLACEHOLDER;
+      const dados = {
+        ...(encryptedEmail && !existing.emailCiphertext
+          ? {
+              emailCiphertext: new Uint8Array(encryptedEmail.ciphertext),
+              emailKeyVersion: encryptedEmail.keyVersion,
+            }
+          : {}),
+        ...(name && semNomeDeVerdade ? { name } : {}),
+        ...(verified && existing.phoneVerifiedAt === null ? { phoneVerifiedAt: new Date() } : {}),
+      };
+      if (Object.keys(dados).length > 0) {
+        const atualizado = await client.customer.update({
           where: { id: existing.id },
-          data: {
-            emailCiphertext: new Uint8Array(encryptedEmail.ciphertext),
-            emailKeyVersion: encryptedEmail.keyVersion,
-          },
+          data: dados,
+          select: { id: true, name: true },
         });
+        return { identity: atualizado, created: false };
       }
       return { identity: { id: existing.id, name: existing.name }, created: false };
     }
@@ -75,11 +105,11 @@ export class CustomerIdentityRepository {
     const created = await client.customer.create({
       data: {
         tenantId,
-        // Placeholder — mesmo caso de users, sem campo de nome no OTP.
-        name: 'Cliente',
+        name: name ?? CustomerIdentityRepository.NOME_PLACEHOLDER,
         phoneCiphertext: new Uint8Array(ciphertext),
         phoneLookupHash: phoneHash,
         phoneKeyVersion: keyVersion,
+        ...(verified ? { phoneVerifiedAt: new Date() } : {}),
         ...(encryptedEmail
           ? {
               emailCiphertext: new Uint8Array(encryptedEmail.ciphertext),

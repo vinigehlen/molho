@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { type PaymentMethod, type StorefrontPayload, storefrontPayloadSchema } from '@molho/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
 import type { AvailablePaymentMethodsResolver, StoreForPaymentMethods } from './available-payment-methods';
 import type {
   StorefrontCategoryRecord,
@@ -64,8 +65,17 @@ class FakeAvailablePaymentMethodsResolver implements AvailablePaymentMethodsReso
 function buildService(
   repository: StorefrontRepository,
   resolver: AvailablePaymentMethodsResolver = new FakeAvailablePaymentMethodsResolver(),
+  guestGate: CheckoutGuestGate = new FakeCheckoutGuestGate(),
 ): StorefrontService {
-  return new StorefrontService(repository, PUBLIC_URL, resolver);
+  return new StorefrontService(repository, PUBLIC_URL, resolver, guestGate);
+}
+
+/** Módulo `checkout.guest` — desligado por padrão, como todo tenant sem linha em tenant_settings. */
+class FakeCheckoutGuestGate implements CheckoutGuestGate {
+  constructor(private readonly active = false) {}
+  async isActive() {
+    return this.active;
+  }
 }
 
 function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): StorefrontCategoryRecord {
@@ -133,7 +143,12 @@ describe('StorefrontService', () => {
     // new StorefrontService() direto, não buildService(): default param de publicUrl
     // dispara em cima de `undefined` explícito também — não dá pra "passar undefined
     // de propósito" por uma função com default nesse parâmetro.
-    const payload = await new StorefrontService(repository, undefined, new FakeAvailablePaymentMethodsResolver()).getStorefront();
+    const payload = await new StorefrontService(
+      repository,
+      undefined,
+      new FakeAvailablePaymentMethodsResolver(),
+      new FakeCheckoutGuestGate(),
+    ).getStorefront();
 
     expect(primeiroProduto(payload).imageUrl).toBeNull();
     expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
@@ -253,5 +268,26 @@ describe('StorefrontService', () => {
       expect(resolver.lastStoreSeen).toBeNull();
       expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
     });
+  });
+});
+
+describe('StorefrontService — guestCheckout no payload', () => {
+  it('reflete o módulo DESLIGADO: front pede OTP (o default de qualquer tenant)', async () => {
+    const repository = new FakeStorefrontRepository();
+    const payload = await buildService(repository).getStorefront();
+
+    expect(payload.guestCheckout).toBe(false);
+    expect(storefrontPayloadSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('reflete o módulo LIGADO: front pode oferecer o checkout sem OTP', async () => {
+    const repository = new FakeStorefrontRepository();
+    const payload = await buildService(
+      repository,
+      new FakeAvailablePaymentMethodsResolver(),
+      new FakeCheckoutGuestGate(true),
+    ).getStorefront();
+
+    expect(payload.guestCheckout).toBe(true);
   });
 });

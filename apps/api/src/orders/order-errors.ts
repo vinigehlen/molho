@@ -95,3 +95,39 @@ export class InvalidChangeAmountError extends Error {
     this.name = 'InvalidChangeAmountError';
   }
 }
+
+/**
+ * Request anônima (sem `Authorization`) num tenant com `checkout.guest`
+ * DESLIGADO — o caminho normal, e o default de qualquer tenant. Vira 401, não
+ * 403: o que falta é identidade, e a ação do cliente é fazer o OTP.
+ *
+ * Nunca é o erro de um token ruim: token presente e inválido morre no
+ * `CustomerJwtAuthGuard`, antes daqui (CLAUDE.md regra 13, EMENDA).
+ */
+export class CheckoutOtpRequiredError extends Error {
+  constructor() {
+    super('Confirme seu telefone para finalizar o pedido.');
+    this.name = 'CheckoutOtpRequiredError';
+  }
+}
+
+/**
+ * Veio JWT de cliente E bloco `customer` no body. Rejeitado, nunca ignorado:
+ * silenciosamente descartar o bloco deixaria um cliente logado achar que
+ * carimbou o pedido no telefone que digitou — e aceitar o bloco deixaria ele
+ * carimbar no telefone de OUTRO. Com token, a identidade é a do token, ponto.
+ */
+export class GuestCustomerNotAllowedError extends Error {
+  constructor() {
+    super('Pedido autenticado não aceita dados de cliente no corpo da requisição.');
+    this.name = 'GuestCustomerNotAllowedError';
+  }
+}
+
+/** `checkout.guest` ativo, request anônima, mas sem nome/telefone no body — sem eles a comanda chega anônima na cozinha. */
+export class GuestCustomerRequiredError extends Error {
+  constructor() {
+    super('Informe nome e telefone para finalizar o pedido.');
+    this.name = 'GuestCustomerRequiredError';
+  }
+}

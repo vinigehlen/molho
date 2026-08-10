@@ -146,7 +146,9 @@ export class CustomerAuthController {
     if (!ok) throw new BadRequestException('Código inválido ou expirado.');
 
     return this.requestContext.run({ tenantId, isPlatform: false }, async () => {
-      const { identity } = await this.customerIdentity.findOrCreate(tenantId, phone, email);
+      // `verified: true` — este é o caminho que ACABOU de provar o telefone por
+      // OTP; é o único que carimba `phone_verified_at` (Épico 9c).
+      const { identity } = await this.customerIdentity.findOrCreate(tenantId, phone, { email, verified: true });
       const customerRepository = new PrismaCustomerAuthRepository(this.requestContext);
       const scopes = await customerRepository.getRoleAssignments();
 

@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import type { StorefrontPayload } from '@molho/contracts';
 import { otpChannelFor } from '../messaging/otp-channel';
 import { resolvePublicImageUrl } from '../storage/public-url';
+import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
 import type { AvailablePaymentMethodsResolver } from './available-payment-methods';
 import type { StorefrontRepository } from './storefront.repository';
 import { computeStoreOpenState } from './store-hours';
@@ -20,6 +21,7 @@ export class StorefrontService {
     /** `S3_PUBLIC_URL`. Vazia = bucket sem leitura pública; toda foto vira `null`. */
     private readonly publicImageBaseUrl: string | undefined,
     private readonly paymentMethods: AvailablePaymentMethodsResolver,
+    private readonly guestGate: CheckoutGuestGate,
   ) {}
 
   async getStorefront(): Promise<StorefrontPayload> {
@@ -30,6 +32,7 @@ export class StorefrontService {
       this.repository.listStoreHours(),
     ]);
     const availablePaymentMethods = await this.paymentMethods.list(store);
+    const guestCheckout = await this.guestGate.isActive();
 
     // O slug já resolveu pra um tenant no interceptor, então não achar o
     // tenant aqui significa que ele foi soft-deletado entre uma coisa e
@@ -63,6 +66,11 @@ export class StorefrontService {
       // pra isso (duas fontes divergiriam num deploy e o login pararia sem
       // ninguém entender). Ver docs/08 § fiação.
       otpChannel: otpChannelFor('customer'),
+      // Dica de UI, NUNCA gate: o servidor recusa igual se o front mentir
+      // (CLAUDE.md regra 13, EMENDA). Vem daqui e não de uma `NEXT_PUBLIC_*`
+      // pelo mesmo motivo do otpChannel — fonte única —, com a diferença de
+      // que este JÁ é config por tenant de verdade.
+      guestCheckout,
       categories: categories.map((category) => ({
         id: category.id,
         name: category.name,

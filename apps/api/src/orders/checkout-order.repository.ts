@@ -39,6 +39,8 @@ export interface CreateOrderParams {
   paymentMethod: PaymentMethod;
   /** Só relevante quando paymentMethod === 'cash_on_delivery' — null nos outros dois (CLAUDE.md regra 4 não se aplica aqui, é ausência de troco, não zero). */
   changeForCents: number | null;
+  /** Snapshot da procedência da identidade (Épico 9c): `false` = pedido guest, telefone auto-declarado. Ver o comentário do campo no schema. */
+  customerVerified: boolean;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -51,8 +53,13 @@ export interface StoreForOrder {
 }
 
 export interface CheckoutOrderRepository {
-  /** RLS tenant-scoped normal (sem bypass de plataforma) — null tanto pra "não existe" quanto pra "é de outro tenant", de propósito (mesma ambiguidade de CatalogNotFoundError). */
-  findCustomer(customerId: string): Promise<{ id: string } | null>;
+  /**
+   * RLS tenant-scoped normal (sem bypass de plataforma) — null tanto pra "não
+   * existe" quanto pra "é de outro tenant", de propósito (mesma ambiguidade de
+   * CatalogNotFoundError). `phoneVerifiedAt` sai junto porque é ele, e não a
+   * presença do token, que decide `orders.customer_verified`.
+   */
+  findCustomer(customerId: string): Promise<{ id: string; phoneVerifiedAt: Date | null } | null>;
   /** MVP assume uma loja por tenant (mesma suposição de StorefrontRepository/CheckoutRepository). */
   findStore(): Promise<StoreForOrder | null>;
   /**
@@ -97,10 +104,10 @@ function pontoOuNulo(address: DeliveryAddressSnapshot) {
 export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
-  async findCustomer(customerId: string): Promise<{ id: string } | null> {
+  async findCustomer(customerId: string): Promise<{ id: string; phoneVerifiedAt: Date | null } | null> {
     return this.requestContext.getClient().customer.findFirst({
       where: { id: customerId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, phoneVerifiedAt: true },
     });
   }
 
@@ -139,7 +146,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
 
   async createOrder(params: CreateOrderParams): Promise<string> {
     const tenantId = this.requestContext.getTenantId();
-    const { storeId, customerId, deliveryAddressId, address, revalidated, paymentMethod, changeForCents } = params;
+    const { storeId, customerId, deliveryAddressId, address, revalidated, paymentMethod, changeForCents, customerVerified } =
+      params;
     const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
       INSERT INTO "orders" (
         "tenant_id", "store_id", "customer_id", "status", "payment_method", "payment_status", "refund_status",
@@ -147,14 +155,14 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
-        "delivery_geo", "delivery_postal_code_verified"
+        "delivery_geo", "delivery_postal_code_verified", "customer_verified"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
         ${deliveryAddressId}::uuid, ${address.label}, ${address.street}, ${address.number}, ${address.complement},
         ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},
-        ${pontoOuNulo(address)}, ${address.postalCodeVerified}
+        ${pontoOuNulo(address)}, ${address.postalCodeVerified}, ${customerVerified}
       )
       RETURNING "id"
     `;

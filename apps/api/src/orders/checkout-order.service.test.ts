@@ -3,13 +3,17 @@ import type { ResolvedAddress } from '../geo/resolve-address';
 import type { CheckoutRequest, RevalidatedCheckout } from '@molho/contracts';
 import {
   CheckoutCustomerNotFoundError,
+  CheckoutOtpRequiredError,
   CheckoutStoreNotConfiguredError,
+  GuestCustomerNotAllowedError,
+  GuestCustomerRequiredError,
   InvalidChangeAmountError,
   PaymentMethodNotAvailableError,
 } from './order-errors';
 import type { CheckoutOrderRepository, CreateOrderParams, DeliveryAddressSnapshot, StoreForOrder } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import type { PaymentMethodModuleGate } from './payment-method-module-gate';
+import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
 
 const ITEMS = [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [], quantity: 1, notes: null }];
 const ADDRESS = {
@@ -71,7 +75,7 @@ function happyRevalidation(overrides: Partial<RevalidatedCheckout> = {}): Revali
 }
 
 class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
-  customer: { id: string } | null = { id: 'customer-1' };
+  customer: { id: string; phoneVerifiedAt: Date | null } | null = { id: 'customer-1', phoneVerifiedAt: new Date() };
   store: StoreForOrder | null = {
     id: 'store-1',
     pixKey: 'loja@exemplo.com',
@@ -116,13 +120,40 @@ class FakeModuleGate implements PaymentMethodModuleGate {
   }
 }
 
+/** `checkout.guest` — desligado por padrão, como todo tenant sem linha em tenant_settings. */
+class FakeCheckoutGuestGate implements CheckoutGuestGate {
+  active = false;
+  async isActive() {
+    return this.active;
+  }
+}
+
+/** Espelha o contrato de `CustomerIdentityRepository.findOrCreate` só no que o service usa. */
+class FakeCustomerIdentityRepository {
+  calls: { tenantId: string; phone: string; options: { name?: string; verified: boolean } }[] = [];
+
+  async findOrCreate(tenantId: string, phone: { e164?: string } | unknown, options: { name?: string; verified: boolean }) {
+    this.calls.push({ tenantId, phone: String((phone as { toString(): string }).toString()), options });
+    return { identity: { id: 'customer-guest-1', name: options.name ?? 'Cliente' }, created: true };
+  }
+}
+
 function setup() {
   const repo = new FakeCheckoutOrderRepository();
   const revalidationService = { revalidate: vi.fn().mockResolvedValue(happyRevalidation()) };
   const orderStatusService = { recordCreation: vi.fn().mockResolvedValue(undefined) };
   const moduleGate = new FakeModuleGate();
-  const service = new CheckoutOrderService(repo, revalidationService as never, orderStatusService as never, moduleGate);
-  return { repo, revalidationService, orderStatusService, moduleGate, service };
+  const guestGate = new FakeCheckoutGuestGate();
+  const customerIdentity = new FakeCustomerIdentityRepository();
+  const service = new CheckoutOrderService(
+    repo,
+    revalidationService as never,
+    orderStatusService as never,
+    moduleGate,
+    guestGate,
+    customerIdentity as never,
+  );
+  return { repo, revalidationService, orderStatusService, moduleGate, guestGate, customerIdentity, service };
 }
 
 describe('CheckoutOrderService.createOrder', () => {
@@ -316,5 +347,101 @@ describe('CheckoutOrderService — CEP verificado vs. não verificado (Épico 6,
       city: 'Estância Velha',
       postalCodeVerified: false,
     });
+  });
+});
+
+/**
+ * Checkout sem OTP (Épico 9c) — CLAUDE.md regra 13, EMENDA.
+ *
+ * O guard já garantiu que token PRESENTE e inválido virou 401 antes de chegar
+ * aqui: pro service, `null` significa "request anônima", nunca "token que
+ * falhou". Por isso os casos abaixo são sobre POLÍTICA (módulo ligado?
+ * identidade declarada?), não sobre validação de token.
+ */
+describe('CheckoutOrderService.createOrder — checkout guest', () => {
+  const GUEST = { name: 'Ana Souza', phone: '51999990000' };
+
+  it('anônimo com o módulo DESLIGADO: exige OTP e não cria nada', async () => {
+    const { service, revalidationService, repo } = setup();
+
+    await expect(service.createOrder('tenant-1', null, REQUEST, RESOLVED, GUEST)).rejects.toThrow(CheckoutOtpRequiredError);
+    expect(revalidationService.revalidate).not.toHaveBeenCalled();
+    expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('anônimo com o módulo LIGADO mas sem nome/telefone: 400, comanda anônima não passa', async () => {
+    const { service, guestGate, repo } = setup();
+    guestGate.active = true;
+
+    await expect(service.createOrder('tenant-1', null, REQUEST, RESOLVED, null)).rejects.toThrow(GuestCustomerRequiredError);
+    expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('TOKEN presente + bloco customer no body: 400, nunca ignora o bloco', async () => {
+    const { service, repo, revalidationService } = setup();
+
+    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED, GUEST)).rejects.toThrow(
+      GuestCustomerNotAllowedError,
+    );
+    // Nada foi lido nem escrito: a rejeição vem antes de tudo, senão o cliente
+    // logado teria carimbado o pedido no telefone que digitou.
+    expect(revalidationService.revalidate).not.toHaveBeenCalled();
+    expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('TOKEN presente + bloco customer: rejeita MESMO com o módulo guest ligado', async () => {
+    const { service, guestGate, repo } = setup();
+    guestGate.active = true;
+
+    await expect(service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED, GUEST)).rejects.toThrow(
+      GuestCustomerNotAllowedError,
+    );
+    expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('guest completo: cria o pedido com customer_verified FALSE e sem carimbar verificação', async () => {
+    const { service, guestGate, customerIdentity, repo } = setup();
+    guestGate.active = true;
+
+    const result = await service.createOrder('tenant-1', null, REQUEST, RESOLVED, GUEST);
+
+    expect(result.ok).toBe(true);
+    expect(customerIdentity.calls).toHaveLength(1);
+    expect(customerIdentity.calls[0]?.options).toEqual({ name: 'Ana Souza', verified: false });
+    expect(repo.createOrderCalls[0]?.customerVerified).toBe(false);
+    expect(repo.createOrderCalls[0]?.customerId).toBe('customer-guest-1');
+  });
+
+  it('guest com telefone impossível (DDD inexistente): rejeita antes de criar cliente ou pedido', async () => {
+    const { service, guestGate, customerIdentity, repo } = setup();
+    guestGate.active = true;
+
+    await expect(
+      service.createOrder('tenant-1', null, REQUEST, RESOLVED, { name: 'Ana', phone: '11111111111' }),
+    ).rejects.toThrow();
+    expect(customerIdentity.calls).toHaveLength(0);
+    expect(repo.createOrderCalls).toHaveLength(0);
+  });
+
+  it('autenticado: customer_verified sai da LINHA, não da presença do token', async () => {
+    const { service, repo } = setup();
+    // Cliente que pediu como guest antes e nunca verificou, agora com token
+    // (cenário do módulo indo e voltando). O pedido tem que registrar a
+    // verdade da linha.
+    repo.customer = { id: 'customer-1', phoneVerifiedAt: null };
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(result.ok).toBe(true);
+    expect(repo.createOrderCalls[0]?.customerVerified).toBe(false);
+  });
+
+  it('autenticado e verificado: customer_verified TRUE (caminho normal de hoje)', async () => {
+    const { service, repo } = setup();
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(result.ok).toBe(true);
+    expect(repo.createOrderCalls[0]?.customerVerified).toBe(true);
   });
 });

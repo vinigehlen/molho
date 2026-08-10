@@ -1,6 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Inject, Post, Req, Res, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { Response } from 'express';
-import { CustomerJwtAuthGuard, type RequestWithCustomer } from '../auth/guards/customer-jwt-auth.guard';
+import {
+  OptionalCustomerJwtAuthGuard,
+  type RequestWithOptionalCustomer,
+} from '../auth/guards/optional-customer-jwt-auth.guard';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
@@ -9,6 +12,7 @@ import type { RequestWithGeocode } from '../geo/geocode.middleware';
 import { resolveAddress } from '../geo/resolve-address';
 import { StorefrontRateLimitGuard } from '../storefront/storefront-rate-limit.guard';
 import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dto';
+import { CheckoutOrderRequestDto, toGuestCustomer } from './dto/checkout-order-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
 import type { CheckoutOrderService } from './checkout-order.service';
@@ -50,28 +54,39 @@ export class CheckoutController {
   }
 
   /**
-   * Autenticado por OTP de cliente (`CustomerJwtAuthGuard`) — só aqui que o
-   * endereço anônimo vira linha real em `addresses` e o pedido nasce (regra
-   * 13). 409 com o corpo de `RevalidatedCheckout` (não o `{statusCode,
-   * message}` padrão do Nest) quando ainda sobra divergência desfavorável
-   * na revalidação interna — ver `CheckoutOrderService` pro porquê de não
-   * ser uma exceção.
+   * Só aqui que o endereço anônimo vira linha real em `addresses` e o pedido
+   * nasce (regra 13). 409 com o corpo de `RevalidatedCheckout` (não o
+   * `{statusCode, message}` padrão do Nest) quando ainda sobra divergência
+   * desfavorável na revalidação interna — ver `CheckoutOrderService` pro
+   * porquê de não ser uma exceção.
+   *
+   * `OptionalCustomerJwtAuthGuard`, não `CustomerJwtAuthGuard`: com o módulo
+   * `checkout.guest` ligado o pedido nasce sem OTP (regra 13, EMENDA). O guard
+   * resolve só a IDENTIDADE — token ausente passa com `req.user` indefinido,
+   * token PRESENTE e inválido continua 401. Quem decide se anônimo vale neste
+   * tenant é o service, que checa o módulo; o controller não conhece a regra.
+   *
+   * O cap de escrita pública desta rota (5/10min por slug+IP) é MIDDLEWARE
+   * (`CheckoutOrderRateLimitMiddleware`, registrado no `AppModule`), não um
+   * guard daqui: guard rodaria depois de todo middleware, ou seja depois do
+   * geocode ter feito a chamada externa.
    */
   @Post('orders')
-  @UseGuards(CustomerJwtAuthGuard, RequireModuleGuard)
+  @UseGuards(OptionalCustomerJwtAuthGuard, RequireModuleGuard)
   @HttpCode(HttpStatus.CREATED)
   async createOrder(
-    @Body() dto: CheckoutRequestDto,
-    @Req() req: RequestWithCustomer & RequestWithGeocode,
+    @Body() dto: CheckoutOrderRequestDto,
+    @Req() req: RequestWithOptionalCustomer & RequestWithGeocode,
     @Res({ passthrough: true }) res: Response,
   ) {
     const tenantId = this.requestContext.getTenantId();
     const request = toCheckoutRequest(dto);
     const result = await this.orderService.createOrder(
       tenantId,
-      req.user.sub,
+      req.user?.sub ?? null,
       request,
       resolveAddress(request.address, req.geocoded),
+      toGuestCustomer(dto),
     );
     if (!result.ok) {
       res.status(HttpStatus.CONFLICT);

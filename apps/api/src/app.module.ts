@@ -6,6 +6,7 @@ import { GeoModule } from './geo/geo.module';
 import { GeocodeIpRateLimitMiddleware, GeocodeMiddleware } from './geo/geocode.middleware';
 import { HealthController } from './health/health.controller';
 import { MessagingModule } from './messaging/messaging.module';
+import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
 import { StorefrontModule } from './storefront/storefront.module';
 
@@ -29,6 +30,14 @@ export class AppModule implements NestModule {
    * rodam depois de todo middleware.
    */
   configure(consumer: MiddlewareConsumer): void {
+    // ANTES do bloco de geocode, e por isso num `apply()` próprio: o cap de
+    // criação de pedido tem que barrar o bot antes de ele custar uma chamada
+    // externa. `checkout.guest` (CLAUDE.md regra 13, EMENDA) torna esta rota
+    // uma ESCRITA PÚBLICA — ver checkout-order-rate-limit.middleware.ts.
+    consumer
+      .apply(CheckoutOrderRateLimitMiddleware)
+      .forRoutes({ path: 'v1/store/:slug/checkout/orders', method: RequestMethod.POST });
+
     consumer.apply(GeocodeIpRateLimitMiddleware, GeocodeMiddleware).forRoutes(
       { path: 'v1/store/:slug/delivery-match', method: RequestMethod.POST },
       { path: 'v1/store/:slug/checkout/revalidate', method: RequestMethod.POST },

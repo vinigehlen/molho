@@ -1,7 +1,16 @@
-import { BadRequestException, ConflictException, type HttpException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  type HttpException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import {
   CheckoutCustomerNotFoundError,
+  CheckoutOtpRequiredError,
   CheckoutStoreNotConfiguredError,
+  GuestCustomerNotAllowedError,
+  GuestCustomerRequiredError,
   IllegalOrderTransitionError,
   InvalidChangeAmountError,
   MissingCancelReasonError,
@@ -27,5 +36,8 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof PaymentNotConfirmedError) return new ConflictException(error.message);
   if (error instanceof PaymentMethodNotAvailableError) return new ConflictException(error.message);
   if (error instanceof InvalidChangeAmountError) return new BadRequestException(error.message);
+  if (error instanceof CheckoutOtpRequiredError) return new UnauthorizedException(error.message);
+  if (error instanceof GuestCustomerNotAllowedError) return new BadRequestException(error.message);
+  if (error instanceof GuestCustomerRequiredError) return new BadRequestException(error.message);
   throw error;
 }
