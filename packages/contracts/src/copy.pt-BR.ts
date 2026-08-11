@@ -88,6 +88,21 @@ export const COPY = {
     semConexao: 'Sem conexão — tentando reconectar. Seus pedidos estão salvos aqui.',
   },
 
+  /**
+   * Click-to-chat (Épico 11): o que VOCÊ manda pro cliente no WhatsApp, pelo
+   * seu número normal. Não é o produto falando — é você, então a voz é a sua,
+   * na primeira pessoa. Sempre EDITÁVEL antes de enviar: isto é ponto de
+   * partida, não texto travado.
+   *
+   * Sem emoji de propósito: toda mensagem carrega valor em dinheiro (§2.4).
+   * Vars: {nome} {resumo} {total}
+   */
+  whatsapp: {
+    confirmado: 'Oi, {nome}! Confirmei seu pedido: {resumo}. Total {total}. Já entrou pra praça.',
+    prontoRetirada: 'Oi, {nome}! Seu pedido tá pronto pra retirada: {resumo}. Total {total}. É só passar aqui.',
+    saiuEntrega: 'Oi, {nome}! Seu pedido saiu pra entrega: {resumo}. Total {total}. Já já chega aí.',
+  },
+
   /** Usada enquanto uma área do produto ainda não existe (scaffold dos apps). */
   sistema: {
     /** Vars: {epico} */
