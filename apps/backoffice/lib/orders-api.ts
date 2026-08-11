@@ -64,6 +64,20 @@ export async function confirmPayment(id: string, version: number): Promise<Respo
   });
 }
 
+/**
+ * Telefone do cliente pro click-to-chat (Épico 11). Buscado SÓ no clique do
+ * botão: PII não trafega no payload do board. 403 = módulo `notify.whatsapp_ctc`
+ * desligado pro tenant — devolve `null` igual ao 404, quem chama mostra o
+ * mesmo "não deu pra avisar por aqui" (o lojista não precisa saber se foi
+ * módulo ou pedido sumido, e a UI não tem ação diferente pra cada caso).
+ */
+export async function fetchCustomerPhone(id: string): Promise<string | null> {
+  const res = await apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/customer-phone`);
+  if (res.status === 404 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`Falha ao buscar o telefone (${res.status})`);
+  return ((await res.json()) as { phone: string }).phone;
+}
+
 /** Agrupa pedidos por coluna do board, preservando a ordem de chegada (FIFO). Puro, testável. */
 export function groupByColumn(orders: AdminOrder[]): Record<BoardColumn, AdminOrder[]> {
   const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [] };

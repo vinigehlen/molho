@@ -12,6 +12,7 @@ import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
+import { WhatsAppSheet } from './whatsapp-sheet';
 
 /** Próxima ação do fluxo por status (o botão "Avançar" do card). */
 const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status']; label: string }>> = {
@@ -98,6 +99,9 @@ export default function GestorPage() {
   // fila offline: é gateada por alcançabilidade (só habilita online), então nunca
   // é disparada offline pra precisar enfileirar.
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  // Click-to-chat (Épico 11): qual pedido está com o sheet de aviso aberto.
+  const [avisando, setAvisando] = useState<AdminOrder | null>(null);
   async function markPaid(order: AdminOrder) {
     setConfirmingId(order.id);
     try {
@@ -164,6 +168,7 @@ export default function GestorPage() {
                       confirming={confirmingId === order.id}
                       onAdvance={(to) => void submit(order, to)}
                       onMarkPaid={() => void markPaid(order)}
+                      onNotify={() => setAvisando(order)}
                     />
                   ))
                 : // skeletons no load
@@ -218,6 +223,8 @@ export default function GestorPage() {
           </ul>
         </section>
       )}
+
+      {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} />}
     </main>
   );
 }
@@ -229,6 +236,7 @@ function OrderCard({
   confirming,
   onAdvance,
   onMarkPaid,
+  onNotify,
 }: {
   order: AdminOrder;
   pending: boolean;
@@ -236,6 +244,7 @@ function OrderCard({
   confirming: boolean;
   onAdvance: (to: AdminOrder['status']) => void;
   onMarkPaid: () => void;
+  onNotify: () => void;
 }) {
   const next = NEXT_ACTION[order.status];
   return (
@@ -261,7 +270,15 @@ function OrderCard({
         {pending ? (
           <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
         ) : (
-          <span />
+          // Click-to-chat (Épico 11): ocupa o lugar do selo de pendência. Só
+          // precisa de rede quando o sheet abre (busca o telefone), então não
+          // é gateado por `online` como o "Marcar pago".
+          <button
+            className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+            onClick={onNotify}
+          >
+            💬 Avisar cliente
+          </button>
         )}
         {next && (
           <button
