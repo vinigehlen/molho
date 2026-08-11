@@ -66,6 +66,24 @@ export class OrderAdminController {
     return order;
   }
 
+  /**
+   * Telefone do cliente pro click-to-chat (Épico 11) — buscado SOB DEMANDA, no
+   * clique do botão, nunca no payload do board.
+   *
+   * `@RequireModule('notify.whatsapp_ctc')` no método SOBRESCREVE o `orders` da
+   * classe (`getAllAndOverride`: handler vence). Sem perda: `orders` é
+   * `core: true`, sempre ativo — o gate que importa aqui é o do módulo de
+   * notificação, que o lojista pode desligar.
+   */
+  @Get(':id/customer-phone')
+  @RequireModule('notify.whatsapp_ctc')
+  @RequirePermission('order.view')
+  async customerPhone(@Param('id') id: string): Promise<{ phone: string }> {
+    const phone = await this.orders.findCustomerPhoneForChat(id);
+    if (!phone) throw new NotFoundException('Pedido não encontrado.');
+    return { phone };
+  }
+
   @Patch(':id/status')
   @RequirePermission('order.update_status')
   @HttpCode(HttpStatus.NO_CONTENT)

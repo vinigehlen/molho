@@ -9,6 +9,7 @@ const ROW: AdminOrderRow = {
   createdAt: new Date('2026-07-26T18:30:00.000Z'),
   paymentMethod: 'cash_on_delivery',
   paymentStatus: 'aguardando_confirmacao',
+  customerVerified: true,
   changeForCents: 5000,
   subtotalCents: 3200,
   deliveryFeeCents: 490,
@@ -55,6 +56,17 @@ describe('toAdminOrder', () => {
     const order = toAdminOrder({ ...ROW, paymentMethod: 'pix', changeForCents: null });
     expect(order.changeForCents).toBeNull();
     expect(adminOrderSchema.safeParse(order).success).toBe(true);
+  });
+
+  it('pedido guest chega ao gestor marcado como não verificado — é o que dispara o aviso no sheet do WhatsApp', () => {
+    const guest = toAdminOrder({ ...ROW, customerVerified: false });
+
+    expect(guest.customerVerified).toBe(false);
+    expect(adminOrderSchema.safeParse(guest).success).toBe(true);
+  });
+
+  it('nenhum telefone vaza no payload do board — PII só sai pelo endpoint dedicado', () => {
+    expect(JSON.stringify(toAdminOrder(ROW))).not.toMatch(/phone|telefone/i);
   });
 
   it('CEP não verificado chega ao gestor — é o que faz o lojista conferir a taxa', () => {
