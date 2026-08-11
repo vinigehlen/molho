@@ -55,7 +55,9 @@ const adminOrderDeliverySchema = z.object({
  * (só faz sentido em cash_on_delivery, mas mantido no shape plano — nullable —
  * pra não discriminar a união no board; o troco a DEVOLVER = change − total é
  * calculado na UI, nunca persistido, docs/02 §5.5). `customerName` vem do
- * JOIN com Customer (nome é claro; telefone é cifrado e NÃO entra aqui).
+ * JOIN com Customer (nome é claro; telefone é cifrado e NÃO entra aqui —
+ * o click-to-chat do Épico 11 busca o telefone num endpoint dedicado, sob
+ * demanda, pra PII não trafegar no payload do board inteiro).
  * Valor/horário/nome lado a lado alimentam a reconciliação manual do PIX.
  */
 export const adminOrderSchema = z.object({
@@ -64,6 +66,13 @@ export const adminOrderSchema = z.object({
   version: z.int().nonnegative(),
   createdAt: z.iso.datetime(),
   customerName: z.string(),
+  /**
+   * Snapshot `orders.customer_verified` (Épico 9c): `false` = pedido guest,
+   * telefone auto-declarado, nunca provado por OTP. Booleano, não PII. O
+   * gestor avisa antes de mandar WhatsApp — dígito errado num pedido guest é
+   * plausível, e o lojista precisa saber ANTES de contar com o aviso.
+   */
+  customerVerified: z.boolean(),
   paymentMethod: paymentMethodSchema,
   paymentStatus: paymentStatusSchema,
   changeForCents: centsSchema.nullable(),
