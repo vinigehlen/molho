@@ -17,7 +17,7 @@
     "test:contrast": "playwright test",
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
-    "build": "storybook build -o storybook-static --quiet"
+    "build:storybook": "storybook build -o storybook-static --quiet"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

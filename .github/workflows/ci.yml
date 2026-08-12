@@ -25,8 +25,17 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-      # `build` gera o storybook-static, que é o alvo do teste de contraste.
       - run: pnpm build
+
+      # storybook-static (alvo do teste de contraste abaixo) saiu da task `build`
+      # genérica de propósito: a Vercel roda `turbo run build` pro storefront/
+      # backoffice, e `dependsOn: ["^build"]` arrastava o build do Storybook de
+      # @molho/ui pra dentro do deploy dos fronts — algo que eles nunca consomem
+      # (Next transpila o source cru de @molho/ui direto, via `transpilePackages`)
+      # e que quebrava só na Vercel (devDependency do Storybook resolvida
+      # diferente do ambiente local). Task separada (`build:storybook`), pedida
+      # explicitamente aqui — nunca mais entra no grafo de build de um app.
+      - run: pnpm --filter @molho/ui build:storybook
 
       # Regride em silêncio (config de build): falha se o atalho de auth só-dev
       # (dev-only-auth.ts) vazar pro bundle de produção do backoffice. Roda DEPOIS
