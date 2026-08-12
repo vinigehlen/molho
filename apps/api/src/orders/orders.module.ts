@@ -131,6 +131,16 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     CHECKOUT_ORDER_SERVICE,
     PAYMENT_CONFIRMATION_SERVICE,
     CheckoutOrderRateLimitMiddleware,
+    // O middleware é aplicado em `AppModule.configure()`, não aqui — Nest
+    // resolve as dependências dele no injector do módulo que CHAMA
+    // `consumer.apply()` (AppModule), não no módulo que o registra como
+    // provider. Exportar só a CLASSE do middleware não basta: o token que
+    // o construtor injeta (`CHECKOUT_ORDER_RATE_LIMITER`) também precisa
+    // estar visível pra quem importa este módulo. Mesmo padrão de
+    // `GeoModule` (exporta `GeocodeMiddleware`/`GeocodeIpRateLimitMiddleware`
+    // E `GEOCODE_RATE_LIMITER` juntos) — sem isso, boot falha com "Nest
+    // can't resolve dependencies of the CheckoutOrderRateLimitMiddleware".
+    CHECKOUT_ORDER_RATE_LIMITER,
   ],
 })
 export class OrdersModule {}

@@ -205,6 +205,13 @@ beforeAll(async () => {
     redis = new Redis(process.env.REDIS_URL);
     const keys = await redis.keys(`storefront:rl:${slug}:*`);
     if (keys.length) await redis.del(...keys);
+    // CheckoutOrderRateLimitMiddleware (5 pedidos/10min por slug+IP) — este
+    // arquivo sozinho passa de 5 POSTs em /checkout/orders (2, 3, 4, 4b, 4c,
+    // 5), então limpa ANTES de rodar. Nunca precisou disto até o wiring do
+    // provider ser corrigido (`CHECKOUT_ORDER_RATE_LIMITER` não exportado de
+    // `OrdersModule` — o middleware nem carregava, então nunca contava nada).
+    const orderKeys = await redis.keys(`checkout:orders:rl:${slug}:*`);
+    if (orderKeys.length) await redis.del(...orderKeys);
   }
 }, 30_000);
 
@@ -235,6 +242,8 @@ afterAll(async () => {
   if (redis) {
     const keys = await redis.keys(`storefront:rl:${slug}:*`);
     if (keys.length) await redis.del(...keys);
+    const orderKeys = await redis.keys(`checkout:orders:rl:${slug}:*`);
+    if (orderKeys.length) await redis.del(...orderKeys);
     await redis.quit();
   }
   await app?.close();
@@ -402,6 +411,16 @@ describe('POST /v1/store/:slug/checkout/orders', () => {
   }, 15_000);
 
   it('5) token de cliente de OUTRO tenant: 404 — RLS não deixa o customer aparecer neste tenant, nenhum pedido novo criado', async () => {
+    // Este describe já fez 5 POSTs em /checkout/orders antes deste (2, 3, 4,
+    // 4b, 4c) — o MESMO teto que protege a loja de spam (5/10min por
+    // slug+IP, CheckoutOrderRateLimitMiddleware). Isto testa RLS, não rate
+    // limit: reseta o balde pra não confundir "429 porque o arquivo já gastou
+    // a cota" com o 404 que este teste de verdade quer provar.
+    if (redis) {
+      const keys = await redis.keys(`checkout:orders:rl:${slug}:*`);
+      if (keys.length) await redis.del(...keys);
+    }
+
     const { accessToken } = await loginCustomer(otherSlug);
     const countAntes = await migratorPrisma.order.count({ where: { tenantId } });
 
