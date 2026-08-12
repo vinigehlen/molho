@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, UtensilsCrossed } from 'lucide-react';
+import { MapPin, Store, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -10,6 +10,8 @@ import {
   MoAddressSheet,
   type MoAddressSheetValue,
   MoButton,
+  MoChip,
+  MoChipGroup,
   MoCheckoutReviewSheet,
   MoEmptyState,
   MoGuestCheckoutSheet,
@@ -20,7 +22,7 @@ import {
 } from '@molho/ui';
 import { ADDRESS_SCHEMA_VERSION } from '../../../lib/address-storage';
 import { lineTotalCents } from '../../../lib/cart-storage';
-import type { CheckoutPaymentMethod, CheckoutReview } from '../../../lib/checkout-api';
+import type { CheckoutPaymentMethod, CheckoutReview, FulfillmentType } from '../../../lib/checkout-api';
 import { useAddress } from '../../../lib/use-address';
 import { useCart } from '../../../lib/use-cart';
 import { useCheckout, type CheckoutStep } from '../../../lib/use-checkout';
@@ -89,7 +91,11 @@ export function CartView({
 }: CartViewProps) {
   const cart = useCart(slug);
   const { address, setAddress } = useAddress(slug);
-  const checkout = useCheckout(slug, cart.cart, address, guestCheckout);
+  // Entrega é o default — mesma escolha de sempre, o carrinho não "esquece"
+  // pickup entre visitas (não persiste, reseta a cada montagem, igual ao
+  // método de pagamento do checkout).
+  const [fulfillmentType, setFulfillmentType] = React.useState<FulfillmentType>('delivery');
+  const checkout = useCheckout(slug, cart.cart, fulfillmentType, address, guestCheckout);
   const router = useRouter();
 
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
@@ -169,8 +175,9 @@ export function CartView({
     setEnderecoSheetAberto(false);
   }
 
-  // CEP + número são o que o checkout exige agora — o servidor deriva o resto.
-  const enderecoConfirmado = address !== null && !!address.postalCode && !!address.number;
+  // CEP + número são o que o checkout exige agora — o servidor deriva o
+  // resto. Pickup nunca exige endereço: retira no balcão, sem CEP nenhum.
+  const enderecoConfirmado = fulfillmentType === 'pickup' || (address !== null && !!address.postalCode && !!address.number);
 
   return (
     <div className="flex min-h-screen flex-col pb-44">
@@ -182,21 +189,41 @@ export function CartView({
         <p className="text-body opacity-90">{storeName}</p>
       </header>
 
-      <button
-        type="button"
-        onClick={() => setEnderecoSheetAberto(true)}
-        className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-left text-body text-text-muted transition duration-base ease-out hover:bg-bg-card"
-      >
-        <MapPin className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
-        <span className="truncate">
-          {address ? `${address.label} — ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
-        </span>
-      </button>
-      {address && !enderecoConfirmado ? (
-        <p className="px-4 py-2 text-caption text-critical-strong">
-          Falta o CEP e o número deste endereço — completa o formulário pra fazer o pedido.
-        </p>
-      ) : null}
+      <div className="border-b border-border px-4 py-3">
+        <MoChipGroup label="Entrega ou retirada">
+          <MoChip selected={fulfillmentType === 'delivery'} onClick={() => setFulfillmentType('delivery')}>
+            Entrega
+          </MoChip>
+          <MoChip selected={fulfillmentType === 'pickup'} onClick={() => setFulfillmentType('pickup')}>
+            Retirar no balcão
+          </MoChip>
+        </MoChipGroup>
+      </div>
+
+      {fulfillmentType === 'pickup' ? (
+        <div className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-body text-text-muted">
+          <Store className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
+          <span>Retira direto na loja — sem taxa de entrega.</span>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setEnderecoSheetAberto(true)}
+            className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-left text-body text-text-muted transition duration-base ease-out hover:bg-bg-card"
+          >
+            <MapPin className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
+            <span className="truncate">
+              {address ? `${address.label} — ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
+            </span>
+          </button>
+          {address && !enderecoConfirmado ? (
+            <p className="px-4 py-2 text-caption text-critical-strong">
+              Falta o CEP e o número deste endereço — completa o formulário pra fazer o pedido.
+            </p>
+          ) : null}
+        </>
+      )}
 
       <div className="flex flex-1 flex-col divide-y divide-border px-4">
         {cart.cart.items.map((item) => (

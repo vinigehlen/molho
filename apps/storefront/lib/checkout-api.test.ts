@@ -87,7 +87,7 @@ function review(overrides: Partial<CheckoutReview> = {}): CheckoutReview {
 
 describe('buildCheckoutRequestFromCart', () => {
   it('monta o body a partir do carrinho, com expectedDeliveryFeeCents null (primeira revalidação)', () => {
-    const body = buildCheckoutRequestFromCart(cart(), address());
+    const body = buildCheckoutRequestFromCart(cart(), 'delivery', address());
 
     expect(body.items).toEqual([
       {
@@ -103,11 +103,18 @@ describe('buildCheckoutRequestFromCart', () => {
     expect(body.address).not.toHaveProperty('lat');
     expect(body.address).not.toHaveProperty('lng');
   });
+
+  it('pickup: fulfillmentType pickup, address null — retirada não tem endereço de cliente', () => {
+    const body = buildCheckoutRequestFromCart(cart(), 'pickup', null);
+
+    expect(body.fulfillmentType).toBe('pickup');
+    expect(body.address).toBeNull();
+  });
 });
 
 describe('buildCheckoutRequestFromReview', () => {
   it('monta o body a partir da revalidação — nunca do carrinho — e usa a taxa revalidada como esperada', () => {
-    const body = buildCheckoutRequestFromReview(review(), address(), 'pix', null);
+    const body = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'pix', null);
 
     expect(body.items).toEqual([
       {
@@ -118,9 +125,16 @@ describe('buildCheckoutRequestFromReview', () => {
         notes: 'sem cebola',
       },
     ]);
-    expect(body.address.expectedDeliveryFeeCents).toBe(800);
+    expect(body.address?.expectedDeliveryFeeCents).toBe(800);
     expect(body.paymentMethod).toBe('pix');
     expect('changeForCents' in body).toBe(false);
+  });
+
+  it('pickup: fulfillmentType pickup, address null mesmo com a revalidação trazendo endereço no state', () => {
+    const body = buildCheckoutRequestFromReview(review(), 'pickup', null, 'pix', null);
+
+    expect(body.fulfillmentType).toBe('pickup');
+    expect(body.address).toBeNull();
   });
 
   it('exclui itens indisponíveis — confirmar o pedido é confirmar SEM eles', () => {
@@ -141,21 +155,21 @@ describe('buildCheckoutRequestFromReview', () => {
       ],
     });
 
-    const body = buildCheckoutRequestFromReview(comItemEsgotado, address(), 'pix', null);
+    const body = buildCheckoutRequestFromReview(comItemEsgotado, 'delivery', address(), 'pix', null);
 
     expect(body.items).toHaveLength(1);
     expect(body.items[0]?.productId).toBe('0193f1a0-0000-7000-8000-000000000002');
   });
 
   it('cash_on_delivery: inclui changeForCents no body; pix/card_on_delivery nunca incluem', () => {
-    const comTroco = buildCheckoutRequestFromReview(review(), address(), 'cash_on_delivery', 5000);
+    const comTroco = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'cash_on_delivery', 5000);
     expect(comTroco.paymentMethod).toBe('cash_on_delivery');
     expect(comTroco.changeForCents).toBe(5000);
 
-    const semTroco = buildCheckoutRequestFromReview(review(), address(), 'cash_on_delivery', null);
+    const semTroco = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'cash_on_delivery', null);
     expect(semTroco.changeForCents).toBeNull();
 
-    const cartao = buildCheckoutRequestFromReview(review(), address(), 'card_on_delivery', null);
+    const cartao = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'card_on_delivery', null);
     expect('changeForCents' in cartao).toBe(false);
   });
 });
@@ -164,13 +178,13 @@ describe('revalidateCheckout', () => {
   it('resposta 200: devolve a revalidação tipada', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => review() })));
 
-    const resultado = await revalidateCheckout('hamburgueria-da-vila', buildCheckoutRequestFromCart(cart(), address()));
+    const resultado = await revalidateCheckout('hamburgueria-da-vila', buildCheckoutRequestFromCart(cart(), 'delivery', address()));
     expect(resultado?.subtotalCents).toBe(6580);
   });
 
   it('resposta não-200: devolve null, nunca lança', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })));
-    expect(await revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), address()))).toBeNull();
+    expect(await revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), 'delivery', address()))).toBeNull();
   });
 
   it('erro de rede: devolve null, nunca lança', async () => {
@@ -180,17 +194,17 @@ describe('revalidateCheckout', () => {
         throw new Error('offline');
       }),
     );
-    await expect(revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), address()))).resolves.toBeNull();
+    await expect(revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), 'delivery', address()))).resolves.toBeNull();
   });
 
   it('payload em formato inesperado: devolve null', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ algumaCoisa: true }) })));
-    expect(await revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), address()))).toBeNull();
+    expect(await revalidateCheckout('x', buildCheckoutRequestFromCart(cart(), 'delivery', address()))).toBeNull();
   });
 });
 
 describe('createOrder', () => {
-  const body = buildCheckoutRequestFromReview(review(), address(), 'pix', null);
+  const body = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'pix', null);
 
   const pix = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' };
 

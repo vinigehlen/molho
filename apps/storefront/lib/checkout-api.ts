@@ -1,8 +1,9 @@
-import type { Cart, CustomerAddress } from '@molho/contracts';
+import type { Cart, CustomerAddress, FulfillmentType } from '@molho/contracts';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
 
 export type CheckoutPaymentMethod = 'pix' | 'cash_on_delivery' | 'card_on_delivery';
+export type { FulfillmentType };
 
 /**
  * Espelha `checkoutRequestSchema` (@molho/contracts/checkout.ts) — tipo
@@ -19,6 +20,8 @@ export interface CheckoutRequestBody {
     quantity: number;
     notes: string | null;
   }[];
+  fulfillmentType: FulfillmentType;
+  /** `null` ⟺ `fulfillmentType === 'pickup'` — retirada não tem endereço de cliente nenhum. */
   address: {
     label: string;
     /** O servidor deriva cidade/rua/ponto a partir daqui (Épico 6, Bloco 2). */
@@ -32,7 +35,7 @@ export interface CheckoutRequestBody {
     state: string;
     referencePoint: string | null;
     expectedDeliveryFeeCents: number | null;
-  };
+  } | null;
   paymentMethod: CheckoutPaymentMethod;
   /** Só presente (mesmo objeto, `JSON.stringify` derruba `undefined`) quando paymentMethod === 'cash_on_delivery'. */
   changeForCents?: number | null;
@@ -219,7 +222,12 @@ function addressBody(address: CustomerAddress, expectedDeliveryFeeCents: number 
  * `/checkout/revalidate` nunca lê o campo, só existe pro DTO ser o mesmo dos
  * dois endpoints.
  */
-export function buildCheckoutRequestFromCart(cart: Cart, address: CustomerAddress): CheckoutRequestBody {
+/** `address` só é lido em `delivery` — chamador garante não-nulo nesse caso (mesmo padrão de `addressBody`). */
+export function buildCheckoutRequestFromCart(
+  cart: Cart,
+  fulfillmentType: FulfillmentType,
+  address: CustomerAddress | null,
+): CheckoutRequestBody {
   return {
     items: cart.items.map((item) => ({
       productId: item.productId,
@@ -228,7 +236,8 @@ export function buildCheckoutRequestFromCart(cart: Cart, address: CustomerAddres
       quantity: item.quantity,
       notes: item.notes,
     })),
-    address: addressBody(address, null),
+    fulfillmentType,
+    address: fulfillmentType === 'pickup' ? null : addressBody(address as CustomerAddress, null),
     paymentMethod: 'pix',
   };
 }
@@ -246,7 +255,8 @@ export function buildCheckoutRequestFromCart(cart: Cart, address: CustomerAddres
  */
 export function buildCheckoutRequestFromReview(
   review: CheckoutReview,
-  address: CustomerAddress,
+  fulfillmentType: FulfillmentType,
+  address: CustomerAddress | null,
   paymentMethod: CheckoutPaymentMethod,
   changeForCents: number | null,
 ): CheckoutRequestBody {
@@ -260,7 +270,8 @@ export function buildCheckoutRequestFromReview(
         quantity: item.quantity,
         notes: item.notes,
       })),
-    address: addressBody(address, review.deliveryFeeCents),
+    fulfillmentType,
+    address: fulfillmentType === 'pickup' ? null : addressBody(address as CustomerAddress, review.deliveryFeeCents),
     paymentMethod,
     ...(paymentMethod === 'cash_on_delivery' ? { changeForCents } : {}),
   };

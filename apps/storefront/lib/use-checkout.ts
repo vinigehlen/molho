@@ -11,6 +11,7 @@ import {
   type CheckoutOrderPix,
   type CheckoutPaymentMethod,
   type CheckoutReview,
+  type FulfillmentType,
 } from './checkout-api';
 import { requestOtp, verifyOtp } from './customer-auth-api';
 import { useCustomerToken } from './use-customer-token';
@@ -28,7 +29,7 @@ export type CheckoutStep =
 
 export interface UseCheckoutResult {
   step: CheckoutStep;
-  /** Chamado pelo botão "Fazer pedido" — exige endereço com CEP e número. */
+  /** Chamado pelo botão "Fazer pedido" — exige endereço com CEP e número em `delivery`; `pickup` nunca exige endereço. */
   startCheckout: () => Promise<void>;
   /** Chamado pelo botão "Confirmar pedido" da tela de revisão. */
   confirmReview: () => void;
@@ -65,6 +66,8 @@ const ERRO_CRIACAO = 'Não deu pra confirmar seu pedido agora. Tenta de novo.';
 export function useCheckout(
   slug: string,
   cart: Cart,
+  /** `delivery` exige `address` não-nulo; `pickup` ignora `address` inteiramente — retirada não tem endereço de cliente. */
+  fulfillmentType: FulfillmentType,
   address: CustomerAddress | null,
   /** Vem do payload público (`guestCheckout`), que é fonte única — o servidor recusa igual se isto mentir. */
   guestCheckout = false,
@@ -77,9 +80,10 @@ export function useCheckout(
 
   const submitOrder = React.useCallback(
     async (identity: CheckoutIdentity) => {
-      if (!address || !lastReviewRef.current) return;
+      if (!lastReviewRef.current) return;
+      if (fulfillmentType === 'delivery' && !address) return;
 
-      const body = buildCheckoutRequestFromReview(lastReviewRef.current, address, paymentMethod, changeForCents);
+      const body = buildCheckoutRequestFromReview(lastReviewRef.current, fulfillmentType, address, paymentMethod, changeForCents);
       const result = await createOrder(slug, body, identity);
 
       if (result.status === 'created') {
@@ -102,14 +106,15 @@ export function useCheckout(
       }
       setStep({ kind: 'review', review: lastReviewRef.current, errorMessage: ERRO_CRIACAO, submitting: false });
     },
-    [address, changeForCents, clearToken, paymentMethod, slug],
+    [address, changeForCents, clearToken, fulfillmentType, paymentMethod, slug],
   );
 
   const startCheckout = React.useCallback(async () => {
-    if (!address || !address.postalCode || !address.number) return;
+    // Pickup nunca exige endereço — retira no balcão, sem CEP/número nenhum.
+    if (fulfillmentType === 'delivery' && (!address || !address.postalCode || !address.number)) return;
 
     setStep({ kind: 'review', review: null, errorMessage: null, submitting: false });
-    const body = buildCheckoutRequestFromCart(cart, address);
+    const body = buildCheckoutRequestFromCart(cart, fulfillmentType, address);
     const review = await revalidateCheckout(slug, body);
     lastReviewRef.current = review;
 
@@ -118,7 +123,7 @@ export function useCheckout(
         ? { kind: 'review', review, errorMessage: null, submitting: false }
         : { kind: 'review', review: null, errorMessage: ERRO_REVALIDACAO, submitting: false },
     );
-  }, [address, cart, slug]);
+  }, [address, cart, fulfillmentType, slug]);
 
   const confirmReview = React.useCallback(() => {
     if (!lastReviewRef.current) return;

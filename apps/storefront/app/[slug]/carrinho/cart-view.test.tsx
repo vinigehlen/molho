@@ -232,6 +232,24 @@ describe('CartView — checkout (Épico 7)', () => {
     expect(screen.getByRole('button', { name: 'Fazer pedido' })).toBeDisabled();
   });
 
+  it('retirada no balcão: sem endereço salvo nenhum, "Fazer pedido" já habilitado, body sai com fulfillmentType pickup e address null', async () => {
+    const user = userEvent.setup();
+    salvarCarrinho([item()]);
+    renderCartView();
+
+    await user.click(await screen.findByRole('button', { name: 'Retirar no balcão' }));
+    expect(screen.getByText('Retira direto na loja — sem taxa de entrega.')).toBeInTheDocument();
+    // Sem o botão de endereço nem o aviso de CEP — pickup não pede nenhum dos dois.
+    expect(screen.queryByText('Adicionar endereço de entrega')).not.toBeInTheDocument();
+
+    const botao = screen.getByRole('button', { name: 'Fazer pedido' });
+    expect(botao).toBeEnabled();
+    await user.click(botao);
+
+    expect(await screen.findByText('Revisa seu pedido')).toBeInTheDocument();
+    expect(revalidateCheckout).toHaveBeenCalledWith(SLUG, expect.objectContaining({ fulfillmentType: 'pickup', address: null }));
+  });
+
   it('endereço sem CEP: "Fazer pedido" continua desabilitado, com aviso', async () => {
     // É o CEP que o servidor geocoda — sem ele não há cidade, e sem cidade
     // não há taxa (Épico 6, Bloco 2).

@@ -39,34 +39,47 @@ const ITEM = { productId: UUID, unitBasePriceCents: 2890, modifiers: [], quantit
 
 describe('checkoutRequestSchema', () => {
   it('exige pelo menos 1 item — carrinho vazio não faz checkout', () => {
-    const semItens = { items: [], address: address(), paymentMethod: 'pix' };
+    const semItens = { items: [], fulfillmentType: 'delivery', address: address(), paymentMethod: 'pix' };
     expect(checkoutRequestSchema.safeParse(semItens).success).toBe(false);
   });
 
   it('aceita carrinho com item e endereço válidos, método pix (sem changeForCents)', () => {
-    const valido = { items: [ITEM], address: address(), paymentMethod: 'pix' };
+    const valido = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'pix' };
     expect(checkoutRequestSchema.safeParse(valido).success).toBe(true);
   });
 
   it('aceita carrinho com item e endereço válidos, método card_on_delivery', () => {
-    const valido = { items: [ITEM], address: address(), paymentMethod: 'card_on_delivery' };
+    const valido = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'card_on_delivery' };
     expect(checkoutRequestSchema.safeParse(valido).success).toBe(true);
   });
 
   it('cash_on_delivery exige changeForCents (mesmo que null) — não é campo solto opcional', () => {
-    const semCampo = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery' };
+    const semCampo = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'cash_on_delivery' };
     expect(checkoutRequestSchema.safeParse(semCampo).success).toBe(false);
 
-    const semTroco = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery', changeForCents: null };
+    const semTroco = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'cash_on_delivery', changeForCents: null };
     expect(checkoutRequestSchema.safeParse(semTroco).success).toBe(true);
 
-    const comTroco = { items: [ITEM], address: address(), paymentMethod: 'cash_on_delivery', changeForCents: 5000 };
+    const comTroco = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'cash_on_delivery', changeForCents: 5000 };
     expect(checkoutRequestSchema.safeParse(comTroco).success).toBe(true);
   });
 
   it('changeForCents em branch errado (pix/card_on_delivery) é rejeitado — campo não existe fora de cash_on_delivery', () => {
-    const pixComTroco = { items: [ITEM], address: address(), paymentMethod: 'pix', changeForCents: 5000 };
+    const pixComTroco = { items: [ITEM], fulfillmentType: 'delivery', address: address(), paymentMethod: 'pix', changeForCents: 5000 };
     expect(checkoutRequestSchema.safeParse(pixComTroco).success).toBe(false);
+  });
+
+  it('retirada no balcão (docs/03, docs/04): pickup sem endereço passa, delivery sem endereço não', () => {
+    const pickup = { items: [ITEM], fulfillmentType: 'pickup', address: null, paymentMethod: 'pix' };
+    expect(checkoutRequestSchema.safeParse(pickup).success).toBe(true);
+
+    const deliverySemEndereco = { items: [ITEM], fulfillmentType: 'delivery', address: null, paymentMethod: 'pix' };
+    expect(checkoutRequestSchema.safeParse(deliverySemEndereco).success).toBe(false);
+  });
+
+  it('pickup COM endereço é rejeitado — nunca ignora em silêncio um endereço que o servidor não vai olhar', () => {
+    const pickupComEndereco = { items: [ITEM], fulfillmentType: 'pickup', address: address(), paymentMethod: 'pix' };
+    expect(checkoutRequestSchema.safeParse(pickupComEndereco).success).toBe(false);
   });
 });
 

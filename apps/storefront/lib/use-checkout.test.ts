@@ -102,14 +102,14 @@ afterEach(() => {
 
 describe('useCheckout', () => {
   it('1) startCheckout sem CEP no endereço: não faz nada (continua idle)', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), enderecoSemCep()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', enderecoSemCep()));
     await act(async () => result.current.startCheckout());
     expect(result.current.step.kind).toBe('idle');
     expect(revalidateCheckout).not.toHaveBeenCalled();
   });
 
   it('2) startCheckout com endereço completo: revalida e abre a revisão', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
 
     await act(async () => result.current.startCheckout());
 
@@ -119,7 +119,7 @@ describe('useCheckout', () => {
 
   it('3) revalidateCheckout devolve null (erro de rede): mostra errorMessage na revisão', async () => {
     revalidateCheckout.mockResolvedValue(null);
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
 
     await act(async () => result.current.startCheckout());
 
@@ -127,7 +127,7 @@ describe('useCheckout', () => {
   });
 
   it('4) confirmReview sem sessão (sem token): abre o OTP em vez de criar o pedido direto', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
 
     act(() => result.current.confirmReview());
@@ -140,7 +140,7 @@ describe('useCheckout', () => {
 
   it('5) verifyOtpCode ok: guarda o token, cria o pedido, vai pro sucesso (com pix)', async () => {
     createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -160,7 +160,7 @@ describe('useCheckout', () => {
       paymentMethod: 'cash_on_delivery',
       changeForCents: 5000,
     });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
 
     act(() => {
@@ -189,7 +189,7 @@ describe('useCheckout', () => {
 
   it('6) verifyOtpCode falha (código errado): não cria pedido, devolve o erro pro sheet', async () => {
     verifyOtp.mockResolvedValue({ ok: false, message: 'Código inválido ou expirado.' });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -206,7 +206,7 @@ describe('useCheckout', () => {
   it('7) createOrder devolve divergent (409): volta pra revisão com os dados FRESCOS, não pro OTP', async () => {
     const revisaoFresca = review({ hasUnfavorableDivergence: true, canSubmit: true, subtotalCents: 3500 });
     createOrder.mockResolvedValue({ status: 'divergent', review: revisaoFresca });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -219,7 +219,7 @@ describe('useCheckout', () => {
 
   it('8) createOrder devolve unauthorized: limpa o token e reabre o OTP', async () => {
     createOrder.mockResolvedValue({ status: 'unauthorized' });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -232,7 +232,7 @@ describe('useCheckout', () => {
 
   it('9) createOrder devolve error (500/rede): mostra errorMessage, continua na revisão com os dados que já tinha', async () => {
     createOrder.mockResolvedValue({ status: 'error' });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -244,7 +244,7 @@ describe('useCheckout', () => {
   });
 
   it('10) cancelOtp volta pra revisão sem perder o que já tinha sido revalidado', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
     expect(result.current.step.kind).toBe('otp');
@@ -255,7 +255,7 @@ describe('useCheckout', () => {
   });
 
   it('11) closeCheckout reseta pra idle', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
 
     act(() => result.current.closeCheckout());
@@ -267,7 +267,7 @@ describe('useCheckout', () => {
     createOrder.mockResolvedValue({ status: 'created', orderId: 'order-2', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
 
     // Primeira montagem: loga e guarda o token.
-    const primeira = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const primeira = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => primeira.result.current.startCheckout());
     act(() => primeira.result.current.confirmReview());
     await act(async () => {
@@ -276,7 +276,7 @@ describe('useCheckout', () => {
     primeira.unmount();
 
     // Segunda montagem (ex.: reload da página): token ainda válido no localStorage.
-    const segunda = renderHook(() => useCheckout(SLUG, cart(), address()));
+    const segunda = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await waitFor(() => expect(segunda.result.current).toBeDefined());
     await act(async () => segunda.result.current.startCheckout());
     act(() => segunda.result.current.confirmReview());
@@ -299,7 +299,7 @@ describe('useCheckout — checkout guest', () => {
   const PIX_GUEST = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
 
   it('sem sessão e com guestCheckout LIGADO: confirmReview abre o passo guest, não o de OTP', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address(), true));
     await act(async () => result.current.startCheckout());
 
     act(() => result.current.confirmReview());
@@ -309,7 +309,7 @@ describe('useCheckout — checkout guest', () => {
   });
 
   it('sem sessão e com guestCheckout DESLIGADO: segue no OTP (o default)', async () => {
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), false));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address(), false));
     await act(async () => result.current.startCheckout());
 
     act(() => result.current.confirmReview());
@@ -325,7 +325,7 @@ describe('useCheckout — checkout guest', () => {
       paymentMethod: 'pix',
       pix: PIX_GUEST,
     });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address(), true));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
@@ -347,7 +347,7 @@ describe('useCheckout — checkout guest', () => {
 
   it('401 no meio do guest (lojista desligou o módulo): cai pro OTP em vez de travar', async () => {
     createOrder.mockResolvedValue({ status: 'unauthorized' });
-    const { result } = renderHook(() => useCheckout(SLUG, cart(), address(), true));
+    const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address(), true));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
 
