@@ -12,6 +12,7 @@ import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
+import { KitchenTicket } from './kitchen-ticket';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
 /** Próxima ação do fluxo por status (o botão "Avançar" do card). */
@@ -102,6 +103,11 @@ export default function GestorPage() {
 
   // Click-to-chat (Épico 11): qual pedido está com o sheet de aviso aberto.
   const [avisando, setAvisando] = useState<AdminOrder | null>(null);
+
+  // Comanda de cozinha (fallback do Épico 10): qual pedido está imprimindo
+  // agora. Nada é consumido — reimprimir a qualquer momento só reabre o
+  // mesmo diálogo com o MESMO order já em mão (nunca refetch).
+  const [imprimindo, setImprimindo] = useState<AdminOrder | null>(null);
   async function markPaid(order: AdminOrder) {
     setConfirmingId(order.id);
     try {
@@ -169,6 +175,7 @@ export default function GestorPage() {
                       onAdvance={(to) => void submit(order, to)}
                       onMarkPaid={() => void markPaid(order)}
                       onNotify={() => setAvisando(order)}
+                      onPrint={() => setImprimindo(order)}
                     />
                   ))
                 : // skeletons no load
@@ -225,6 +232,7 @@ export default function GestorPage() {
       )}
 
       {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} />}
+      {imprimindo && <KitchenTicket order={imprimindo} onAfterPrint={() => setImprimindo(null)} />}
     </main>
   );
 }
@@ -237,6 +245,7 @@ function OrderCard({
   onAdvance,
   onMarkPaid,
   onNotify,
+  onPrint,
 }: {
   order: AdminOrder;
   pending: boolean;
@@ -245,6 +254,7 @@ function OrderCard({
   onAdvance: (to: AdminOrder['status']) => void;
   onMarkPaid: () => void;
   onNotify: () => void;
+  onPrint: () => void;
 }) {
   const next = NEXT_ACTION[order.status];
   return (
@@ -255,6 +265,11 @@ function OrderCard({
         <span className="font-medium text-text">{order.customerName}</span>
         <span className="text-xs tabular-nums text-text-muted">{isoToTime(order.createdAt)}</span>
       </div>
+      {order.fulfillmentType === 'pickup' && (
+        <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
+          Retirada no balcão
+        </span>
+      )}
       <div className="mt-1 text-sm tabular-nums text-text">{centsToBRL(order.totalCents)}</div>
       <ul className="mt-2 space-y-0.5 text-xs text-text-muted">
         {order.items.map((item, i) => (
@@ -266,19 +281,30 @@ function OrderCard({
 
       <PaymentPanel order={order} online={online} confirming={confirming} onMarkPaid={onMarkPaid} />
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between gap-2">
         {pending ? (
           <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
         ) : (
-          // Click-to-chat (Épico 11): ocupa o lugar do selo de pendência. Só
-          // precisa de rede quando o sheet abre (busca o telefone), então não
-          // é gateado por `online` como o "Marcar pago".
-          <button
-            className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
-            onClick={onNotify}
-          >
-            💬 Avisar cliente
-          </button>
+          <div className="flex gap-2">
+            {/* Comanda de cozinha (fallback do Épico 10, docs/02 §6) — sem
+                network, reimprime a qualquer momento, o pedido já está em mão. */}
+            <button
+              className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+              onClick={onPrint}
+              aria-label="Imprimir comanda"
+            >
+              🖨️
+            </button>
+            {/* Click-to-chat (Épico 11): só precisa de rede quando o sheet abre
+                (busca o telefone), então não é gateado por `online` como o
+                "Marcar pago". */}
+            <button
+              className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+              onClick={onNotify}
+            >
+              💬 Avisar cliente
+            </button>
+          </div>
         )}
         {next && (
           <button

@@ -16,6 +16,7 @@ const ORDER: AdminOrder = {
   subtotalCents: 3200,
   deliveryFeeCents: 490,
   totalCents: 3690,
+  fulfillmentType: 'delivery',
   delivery: {
     label: 'Casa',
     street: 'Rua das Flores',
@@ -29,8 +30,8 @@ const ORDER: AdminOrder = {
     postalCodeVerified: true,
   },
   items: [
-    { name: 'X-Salada', quantity: 2, lineTotalCents: 3200 },
-    { name: 'Coca lata', quantity: 1, lineTotalCents: 490 },
+    { name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] },
+    { name: 'Coca lata', quantity: 1, lineTotalCents: 490, notes: null, modifiers: [] },
   ],
 };
 
@@ -44,10 +45,20 @@ describe('whatsappMessage', () => {
     );
   });
 
-  it('a mensagem sai do status ATUAL — cada coluna do board tem a sua', () => {
+  it('entrega: a mensagem sai do status ATUAL — "ready" ainda não saiu, nunca fala de retirada', () => {
     expect(whatsappMessage({ ...ORDER, status: 'preparing' })).toContain('Confirmei seu pedido');
-    expect(whatsappMessage({ ...ORDER, status: 'ready' })).toContain('pronto pra retirada');
+    expect(whatsappMessage({ ...ORDER, status: 'ready' })).toContain('Confirmei seu pedido');
     expect(whatsappMessage({ ...ORDER, status: 'in_transit' })).toContain('saiu pra entrega');
+  });
+
+  it('pickup: "ready" é a mensagem de retirada, nunca "saiu pra entrega"', () => {
+    const pickup: AdminOrder = { ...ORDER, fulfillmentType: 'pickup', delivery: null };
+
+    expect(whatsappMessage({ ...pickup, status: 'preparing' })).toContain('Confirmei seu pedido');
+    expect(whatsappMessage({ ...pickup, status: 'ready' })).toContain('pronto pra retirada');
+    // Fora do caminho normal (pickup não passa por in_transit na prática),
+    // mas a máquina de estados é a mesma dos dois tipos — nunca null aqui.
+    expect(whatsappMessage({ ...pickup, status: 'in_transit' })).not.toBeNull();
   });
 
   it('status terminal não tem texto pronto — o sheet abre vazio, não com a mensagem errada', () => {

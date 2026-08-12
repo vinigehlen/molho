@@ -27,12 +27,26 @@ const SAIU_ENTREGA = 'Oi, {nome}! Seu pedido saiu pra entrega: {resumo}. Total {
  * De propósito olha o status atual e não a transição que acabou de acontecer:
  * o lojista toca "Saiu p/ entrega", o card re-renderiza em `in_transit`, e aí
  * ele toca "Avisar cliente" — o botão nunca precisa lembrar do que veio antes.
+ *
+ * DOIS mapas, não um — `ready` significa coisas diferentes por
+ * `fulfillmentType` (retirada no balcão): pra pickup é "vem buscar", pra
+ * delivery é só "ainda preparando, vai sair já". Conflar os dois mandaria
+ * "pronto pra retirada" pro cliente de um pedido de ENTREGA.
  */
-const TEMPLATE: Partial<Record<AdminOrder['status'], string>> = {
+const TEMPLATE_DELIVERY: Partial<Record<AdminOrder['status'], string>> = {
+  received: CONFIRMADO,
+  preparing: CONFIRMADO,
+  ready: CONFIRMADO,
+  in_transit: SAIU_ENTREGA,
+};
+const TEMPLATE_PICKUP: Partial<Record<AdminOrder['status'], string>> = {
   received: CONFIRMADO,
   preparing: CONFIRMADO,
   ready: PRONTO_RETIRADA,
-  in_transit: SAIU_ENTREGA,
+  // in_transit não é o caminho normal de pickup (o cliente busca a partir de
+  // `ready`), mas a máquina de estados é a MESMA pros dois tipos (CLAUDE.md
+  // regra 12) — se o lojista avançar mesmo assim, ainda tem mensagem, não `null`.
+  in_transit: PRONTO_RETIRADA,
 };
 
 /** "2× X-Salada, 1× Coca" — o mesmo resumo que o card já mostra. */
@@ -42,7 +56,7 @@ export function orderSummary(order: AdminOrder): string {
 
 /** Texto inicial do sheet (o lojista edita antes de enviar). `null` = status sem mensagem pronta. */
 export function whatsappMessage(order: AdminOrder): string | null {
-  const template = TEMPLATE[order.status];
+  const template = (order.fulfillmentType === 'pickup' ? TEMPLATE_PICKUP : TEMPLATE_DELIVERY)[order.status];
   if (!template) return null;
   const vars: Record<string, string> = {
     nome: order.customerName,

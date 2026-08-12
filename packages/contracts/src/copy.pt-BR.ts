@@ -103,6 +103,18 @@ export const COPY = {
     saiuEntrega: 'Oi, {nome}! Seu pedido saiu pra entrega: {resumo}. Total {total}. Já já chega aí.',
   },
 
+  /**
+   * Comanda de cozinha (fallback universal do Épico 10, docs/02 §6 — o
+   * "Imprimir" que abre o diálogo do navegador, antes do ESC/POS de verdade).
+   * Sem preço nem telefone/endereço — a cozinha só precisa do que vai no
+   * prato, não de dinheiro nem de PII (docs/02 §6, requisito do fallback).
+   */
+  comanda: {
+    pedidoNumero: 'Pedido #{numero}',
+    entrega: 'Entrega',
+    retirada: 'Retirada no balcão',
+  },
+
   /** Usada enquanto uma área do produto ainda não existe (scaffold dos apps). */
   sistema: {
     /** Vars: {epico} */

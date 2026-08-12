@@ -3,3 +3,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Comanda de cozinha (fallback universal do Épico 10, docs/02 §6) — só a
+   comanda sai no papel, o board inteiro (colunas, botões, painel de
+   conflitos) fica de fora. #kitchen-ticket vive dentro de <main>, não como
+   filho direto de <body> — `visibility` (não `display`) porque esconde sem
+   colapsar o layout, e o `position: absolute` tira só o ticket do fluxo pra
+   ele aparecer no topo da página independente de onde está aninhado
+   (ver app/gestor/kitchen-ticket.tsx). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #kitchen-ticket,
+  #kitchen-ticket * {
+    visibility: visible;
+  }
+  #kitchen-ticket {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
