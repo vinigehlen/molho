@@ -100,6 +100,7 @@ function checkoutBody(
         notes: 'sem cebola',
       },
     ],
+    fulfillmentType: 'delivery',
     address: {
       label: 'Casa',
       // CEP + número: o servidor deriva cidade/rua/ponto (Épico 6, Bloco 2).

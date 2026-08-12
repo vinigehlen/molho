@@ -50,7 +50,10 @@ export class CheckoutController {
     // O geocode já rodou no middleware, FORA da transação de request. Cidade
     // conhecida mas não atendida NÃO é erro aqui: sai como 200 com
     // `withinZone: false` (o 422 de endereço irresolúvel morre no middleware).
-    return this.revalidationService.revalidate(request, resolveAddress(request.address, req.geocoded));
+    // Pickup nunca geocoda (o GeocodeMiddleware já no-opa sem `address.postalCode`
+    // no body) — `resolved: null` é o sinal pro service pular zona/taxa inteiras.
+    const resolved = request.address ? resolveAddress(request.address, req.geocoded) : null;
+    return this.revalidationService.revalidate(request, resolved);
   }
 
   /**
@@ -81,11 +84,12 @@ export class CheckoutController {
   ) {
     const tenantId = this.requestContext.getTenantId();
     const request = toCheckoutRequest(dto);
+    const resolved = request.address ? resolveAddress(request.address, req.geocoded) : null;
     const result = await this.orderService.createOrder(
       tenantId,
       req.user?.sub ?? null,
       request,
-      resolveAddress(request.address, req.geocoded),
+      resolved,
       toGuestCustomer(dto),
     );
     if (!result.ok) {

@@ -14,6 +14,7 @@ const ROW: AdminOrderRow = {
   subtotalCents: 3200,
   deliveryFeeCents: 490,
   totalCents: 3690,
+  fulfillmentType: 'delivery',
   deliveryLabel: 'Casa',
   deliveryStreet: 'Rua das Flores',
   deliveryNumber: '123',
@@ -25,7 +26,7 @@ const ROW: AdminOrderRow = {
   deliveryReferencePoint: 'Perto da praça',
   deliveryPostalCodeVerified: true,
   customer: { name: 'Ana Souza' },
-  items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200 }],
+  items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }],
 };
 
 describe('toAdminOrder', () => {
@@ -47,7 +48,7 @@ describe('toAdminOrder', () => {
       postalCodeVerified: true,
     });
     expect(order.changeForCents).toBe(5000);
-    expect(order.items).toEqual([{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200 }]);
+    expect(order.items).toEqual([{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }]);
     // Cinto-e-suspensório: o shape mapeado é válido pro schema que vai pela rede.
     expect(adminOrderSchema.safeParse(order).success).toBe(true);
   });
@@ -74,7 +75,27 @@ describe('toAdminOrder', () => {
     // texto do cliente (Épico 6, Bloco 2).
     const naoVerificado = toAdminOrder({ ...ROW, deliveryPostalCodeVerified: false });
 
-    expect(naoVerificado.delivery.postalCodeVerified).toBe(false);
+    expect(naoVerificado.delivery?.postalCodeVerified).toBe(false);
     expect(adminOrderSchema.safeParse(naoVerificado).success).toBe(true);
+  });
+
+  it('pickup chega sem endereço nenhum — fulfillmentType decide, não a presença de campo', () => {
+    const pickup = toAdminOrder({
+      ...ROW,
+      fulfillmentType: 'pickup',
+      deliveryLabel: null,
+      deliveryStreet: null,
+      deliveryNumber: null,
+      deliveryComplement: null,
+      deliveryNeighborhood: null,
+      deliveryCity: null,
+      deliveryState: null,
+      deliveryPostalCode: null,
+      deliveryReferencePoint: null,
+    });
+
+    expect(pickup.fulfillmentType).toBe('pickup');
+    expect(pickup.delivery).toBeNull();
+    expect(adminOrderSchema.safeParse(pickup).success).toBe(true);
   });
 });

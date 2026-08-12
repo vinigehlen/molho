@@ -15,18 +15,26 @@ export interface AdminOrderRow {
   subtotalCents: number;
   deliveryFeeCents: number;
   totalCents: number;
-  deliveryLabel: string;
-  deliveryStreet: string;
+  fulfillmentType: AdminOrder['fulfillmentType'];
+  /** Nulos juntos ⟺ pickup — CHECK do banco garante que `delivery` nunca tem só alguns. */
+  deliveryLabel: string | null;
+  deliveryStreet: string | null;
   deliveryNumber: string | null;
   deliveryComplement: string | null;
-  deliveryNeighborhood: string;
-  deliveryCity: string;
-  deliveryState: string;
+  deliveryNeighborhood: string | null;
+  deliveryCity: string | null;
+  deliveryState: string | null;
   deliveryPostalCode: string | null;
   deliveryReferencePoint: string | null;
   deliveryPostalCodeVerified: boolean;
   customer: { name: string };
-  items: { name: string; quantity: number; lineTotalCents: number }[];
+  items: {
+    name: string;
+    quantity: number;
+    lineTotalCents: number;
+    notes: string | null;
+    modifiers: { name: string }[];
+  }[];
 }
 
 /** Row do Prisma → shape do contrato. Puro: achata o endereço-snapshot, puxa o nome do JOIN, Date → ISO. */
@@ -44,19 +52,29 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
     subtotalCents: row.subtotalCents,
     deliveryFeeCents: row.deliveryFeeCents,
     totalCents: row.totalCents,
-    delivery: {
-      label: row.deliveryLabel,
-      street: row.deliveryStreet,
-      number: row.deliveryNumber,
-      complement: row.deliveryComplement,
-      neighborhood: row.deliveryNeighborhood,
-      city: row.deliveryCity,
-      state: row.deliveryState,
-      postalCode: row.deliveryPostalCode,
-      referencePoint: row.deliveryReferencePoint,
-      postalCodeVerified: row.deliveryPostalCodeVerified,
-    },
-    items: row.items.map((i) => ({ name: i.name, quantity: i.quantity, lineTotalCents: i.lineTotalCents })),
+    fulfillmentType: row.fulfillmentType,
+    delivery:
+      row.fulfillmentType === 'pickup' || row.deliveryLabel === null
+        ? null
+        : {
+            label: row.deliveryLabel,
+            street: row.deliveryStreet ?? '',
+            number: row.deliveryNumber,
+            complement: row.deliveryComplement,
+            neighborhood: row.deliveryNeighborhood ?? '',
+            city: row.deliveryCity ?? '',
+            state: row.deliveryState ?? '',
+            postalCode: row.deliveryPostalCode,
+            referencePoint: row.deliveryReferencePoint,
+            postalCodeVerified: row.deliveryPostalCodeVerified,
+          },
+    items: row.items.map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      lineTotalCents: i.lineTotalCents,
+      notes: i.notes,
+      modifiers: i.modifiers.map((m) => ({ name: m.name })),
+    })),
   };
 }
 
@@ -72,6 +90,7 @@ const SELECT = {
   subtotalCents: true,
   deliveryFeeCents: true,
   totalCents: true,
+  fulfillmentType: true,
   deliveryLabel: true,
   deliveryStreet: true,
   deliveryNumber: true,
@@ -83,7 +102,15 @@ const SELECT = {
   deliveryReferencePoint: true,
   deliveryPostalCodeVerified: true,
   customer: { select: { name: true } },
-  items: { select: { name: true, quantity: true, lineTotalCents: true } },
+  items: {
+    select: {
+      name: true,
+      quantity: true,
+      lineTotalCents: true,
+      notes: true,
+      modifiers: { select: { name: true } },
+    },
+  },
 } as const;
 
 export interface AdminOrderRepository {

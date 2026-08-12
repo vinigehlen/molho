@@ -121,7 +121,8 @@ export class CheckoutOrderService {
     tenantId: string,
     authenticatedCustomerId: string | null,
     request: CheckoutRequest,
-    resolved: ResolvedAddress,
+    /** `null` ⟺ `request.fulfillmentType === 'pickup'` (invariante do controller). */
+    resolved: ResolvedAddress | null,
     guest: GuestCustomer | null = null,
   ): Promise<CreateOrderResult> {
     const { customerId, verified } = await this.resolveCustomer(tenantId, authenticatedCustomerId, guest);
@@ -164,12 +165,15 @@ export class CheckoutOrderService {
     }
 
     // Um snapshot só pras DUAS escritas — linha em `addresses` e cópia
-    // congelada em `orders` nunca podem divergir.
+    // congelada em `orders` nunca podem divergir. `null` ⟺ pickup: sem
+    // endereço de cliente nenhum, então também sem linha em `addresses`
+    // (retirada não tem CEP/número — nada pra gravar lá).
     const address = toDeliverySnapshot(request.address, resolved);
-    const deliveryAddressId = await this.repo.createAddress(customerId, address);
+    const deliveryAddressId = address ? await this.repo.createAddress(customerId, address) : null;
     const orderId = await this.repo.createOrder({
       storeId: store.id,
       customerId,
+      fulfillmentType: request.fulfillmentType,
       deliveryAddressId,
       address,
       revalidated: revalidation,

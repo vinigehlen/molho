@@ -29,8 +29,14 @@ export class CheckoutRevalidationService {
    * (regra de lint em eslint.config.mjs: HTTP externo dentro da transação de
    * request esgota o pool). A taxa sai da CIDADE resolvida; `lat`/`lng` só
    * alimentam zona por raio e podem ser nulos sem bloquear nada.
+   *
+   * `resolved: null` ⟺ `request.fulfillmentType === 'pickup'` (garantido pelo
+   * controller — pickup nunca geocoda, não tem endereço pra geocodar). Pickup
+   * pula a zona inteira: não existe "fora da área" pra quem retira no balcão,
+   * `withinZone` fica sempre `true` e a taxa sempre `0`.
    */
-  async revalidate(request: CheckoutRequest, resolved: ResolvedAddress): Promise<RevalidatedCheckout> {
+  async revalidate(request: CheckoutRequest, resolved: ResolvedAddress | null): Promise<RevalidatedCheckout> {
+    const isPickup = request.fulfillmentType === 'pickup';
     const uniqueProductIds = [...new Set(request.items.map((item) => item.productId))];
 
     const [store, hours, products, zoneMatch] = await Promise.all([
@@ -38,21 +44,31 @@ export class CheckoutRevalidationService {
       this.checkoutRepo.listStoreHours(),
       this.checkoutRepo.findProductsByIds(uniqueProductIds),
       // Cidade E ponto: a zona por cidade decide a taxa da Cabanhas, a por
-      // polígono continua valendo pra quem cobra por raio.
-      this.deliveryMatchRepo.findMatchingZone({
-        city: resolved.city,
-        state: resolved.state,
-        lat: resolved.lat,
-        lng: resolved.lng,
-      }),
+      // polígono continua valendo pra quem cobra por raio. `resolved` só é
+      // `null` em pickup (invariante do controller) — sem zona nenhuma a checar.
+      resolved === null
+        ? Promise.resolve(null)
+        : this.deliveryMatchRepo.findMatchingZone({
+            city: resolved.city,
+            state: resolved.state,
+            lat: resolved.lat,
+            lng: resolved.lng,
+          }),
     ]);
 
     const productById = new Map(products.map((product) => [product.id, product]));
     const { isOpenNow, nextOpensAt } = computeStoreOpenState(hours, store?.timezone ?? FALLBACK_TIMEZONE, this.now());
-    const withinZone = zoneMatch !== null;
+    const withinZone = isPickup || zoneMatch !== null;
 
     let hasUnfavorableDivergence = !isOpenNow || !withinZone;
-    if (withinZone && request.address.expectedDeliveryFeeCents !== null && zoneMatch.feeCents > request.address.expectedDeliveryFeeCents) {
+    if (
+      !isPickup &&
+      withinZone &&
+      request.address &&
+      request.address.expectedDeliveryFeeCents !== null &&
+      zoneMatch &&
+      zoneMatch.feeCents > request.address.expectedDeliveryFeeCents
+    ) {
       hasUnfavorableDivergence = true;
     }
 
@@ -103,19 +119,23 @@ export class CheckoutRevalidationService {
     const anyUnavailable = items.some((item) => !item.available);
     const canSubmit = withinZone && isOpenNow && !belowMinimum && !anyUnavailable;
 
-    const deliveryFeeCents = withinZone ? zoneMatch.feeCents : null;
+    // Pickup: taxa sempre 0, sem ETA de entrega (não há o que estimar).
+    // Delivery: mesma lógica de sempre — zoneMatch só existe se withinZone.
+    const deliveryFeeCents = isPickup ? 0 : withinZone && zoneMatch ? zoneMatch.feeCents : null;
+    const etaMinMinutes = isPickup ? null : withinZone && zoneMatch ? zoneMatch.etaMinMinutes : null;
+    const etaMaxMinutes = isPickup ? null : withinZone && zoneMatch ? zoneMatch.etaMaxMinutes : null;
 
     return {
       items,
       subtotalCents,
       withinZone,
       deliveryFeeCents,
-      etaMinMinutes: withinZone ? zoneMatch.etaMinMinutes : null,
-      etaMaxMinutes: withinZone ? zoneMatch.etaMaxMinutes : null,
+      etaMinMinutes,
+      etaMaxMinutes,
       isOpenNow,
       nextOpensAt,
       minOrderCents,
-      totalCents: withinZone ? subtotalCents + zoneMatch.feeCents : null,
+      totalCents: withinZone ? subtotalCents + (deliveryFeeCents ?? 0) : null,
       hasUnfavorableDivergence,
       canSubmit,
     };

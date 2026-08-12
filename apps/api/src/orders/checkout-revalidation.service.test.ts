@@ -67,9 +67,10 @@ const RESOLVED: ResolvedAddress = {
   postalCodeVerified: true,
 };
 
-function baseRequest(overrides: Partial<Pick<CheckoutRequest, 'items' | 'address'>> = {}): CheckoutRequest {
+function baseRequest(overrides: Partial<Pick<CheckoutRequest, 'items' | 'address' | 'fulfillmentType'>> = {}): CheckoutRequest {
   return {
     items: [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [{ modifierId: 'mod-bacon', priceDeltaCents: 500 }], quantity: 1, notes: null }],
+    fulfillmentType: 'delivery',
     address: {
       label: 'Casa',
       street: 'Rua X',
@@ -209,7 +210,8 @@ describe('CheckoutRevalidationService.revalidate', () => {
 
   it('11) expectedDeliveryFeeCents nulo: não compara taxa, não quebra', async () => {
     const { service } = setup();
-    const request = baseRequest({ address: { ...baseRequest().address, expectedDeliveryFeeCents: null } });
+    // Non-null: baseRequest() por padrão é sempre `delivery` com endereço cheio.
+    const request = baseRequest({ address: { ...baseRequest().address!, expectedDeliveryFeeCents: null } });
 
     const result = await service.revalidate(request, RESOLVED);
 
@@ -265,8 +267,9 @@ describe('CheckoutRevalidationService — desfechos por cidade (Épico 6, Bloco 
   it('a CIDADE consultada é a resolvida pelo servidor, não a que o cliente digitou', async () => {
     const { deliveryMatchRepo, service } = setup();
     const request = baseRequest();
-    request.address.city = 'Cidade Inventada';
-    request.address.state = 'SP';
+    // Non-null: baseRequest() por padrão é sempre `delivery` com endereço cheio.
+    request.address!.city = 'Cidade Inventada';
+    request.address!.state = 'SP';
 
     await service.revalidate(request, RESOLVED);
 
@@ -289,5 +292,34 @@ describe('CheckoutRevalidationService — desfechos por cidade (Épico 6, Bloco 
     } finally {
       globalThis.fetch = fetchOriginal;
     }
+  });
+});
+
+/** `resolved: null` ⟺ pickup (invariante do controller) — nunca consulta zona. */
+describe('CheckoutRevalidationService — retirada no balcão', () => {
+  it('pickup: sempre withinZone true, taxa 0, sem ETA, nunca consulta zona', async () => {
+    const { deliveryMatchRepo, service } = setup();
+    const request = baseRequest({ fulfillmentType: 'pickup', address: null });
+
+    const result = await service.revalidate(request, null);
+
+    expect(deliveryMatchRepo.ultimaConsulta).toBeNull();
+    expect(result.withinZone).toBe(true);
+    expect(result.deliveryFeeCents).toBe(0);
+    expect(result.etaMinMinutes).toBeNull();
+    expect(result.etaMaxMinutes).toBeNull();
+    expect(result.totalCents).toBe(3390); // só o subtotal, sem taxa
+    expect(result.canSubmit).toBe(true);
+  });
+
+  it('pickup: loja fechada ainda bloqueia canSubmit (retirada não pula horário)', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.hours = [];
+
+    const result = await service.revalidate(baseRequest({ fulfillmentType: 'pickup', address: null }), null);
+
+    expect(result.isOpenNow).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+    expect(result.canSubmit).toBe(false);
   });
 });

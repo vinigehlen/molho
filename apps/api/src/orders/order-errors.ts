@@ -131,3 +131,17 @@ export class GuestCustomerRequiredError extends Error {
     this.name = 'GuestCustomerRequiredError';
   }
 }
+
+/**
+ * `fulfillmentType`/`address` inconsistentes (`checkoutRequestSchema.refine`,
+ * @molho/contracts/checkout.ts) — `delivery` sem endereço, ou `pickup` COM
+ * endereço. O `class-validator` do DTO não expressa "campo A implica campo B
+ * ausente" nativamente, então a checagem cruzada mora aqui, na fronteira
+ * DTO → domínio (`toCheckoutRequest`).
+ */
+export class FulfillmentAddressMismatchError extends Error {
+  constructor() {
+    super('Entrega exige endereço; retirada não pode vir com endereço.');
+    this.name = 'FulfillmentAddressMismatchError';
+  }
+}

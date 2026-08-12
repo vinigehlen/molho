@@ -9,6 +9,7 @@ import {
   CheckoutCustomerNotFoundError,
   CheckoutOtpRequiredError,
   CheckoutStoreNotConfiguredError,
+  FulfillmentAddressMismatchError,
   GuestCustomerNotAllowedError,
   GuestCustomerRequiredError,
   IllegalOrderTransitionError,
@@ -39,5 +40,6 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof CheckoutOtpRequiredError) return new UnauthorizedException(error.message);
   if (error instanceof GuestCustomerNotAllowedError) return new BadRequestException(error.message);
   if (error instanceof GuestCustomerRequiredError) return new BadRequestException(error.message);
+  if (error instanceof FulfillmentAddressMismatchError) return new BadRequestException(error.message);
   throw error;
 }

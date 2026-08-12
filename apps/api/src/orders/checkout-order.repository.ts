@@ -1,4 +1,4 @@
-import type { CheckoutAddressInput, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import type { CheckoutAddressInput, FulfillmentType, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
 import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { ResolvedAddress } from '../geo/resolve-address';
@@ -18,7 +18,12 @@ export interface DeliveryAddressSnapshot extends ResolvedAddress {
   referencePoint: string | null;
 }
 
-export function toDeliverySnapshot(input: CheckoutAddressInput, resolved: ResolvedAddress): DeliveryAddressSnapshot {
+/** `null` ⟺ pickup (nem `input` nem `resolved` existem nesse branch — retirada não tem endereço de cliente nenhum). */
+export function toDeliverySnapshot(
+  input: CheckoutAddressInput | null,
+  resolved: ResolvedAddress | null,
+): DeliveryAddressSnapshot | null {
+  if (!input || !resolved) return null;
   return {
     ...resolved,
     label: input.label,
@@ -32,8 +37,10 @@ export function toDeliverySnapshot(input: CheckoutAddressInput, resolved: Resolv
 export interface CreateOrderParams {
   storeId: string;
   customerId: string;
-  deliveryAddressId: string;
-  address: DeliveryAddressSnapshot;
+  fulfillmentType: FulfillmentType;
+  /** `null` ⟺ pickup — os dois nascem/morrem juntos, garantido por quem chama (`CheckoutOrderService`). */
+  deliveryAddressId: string | null;
+  address: DeliveryAddressSnapshot | null;
   /** Já garantido `withinZone && canSubmit` por quem chama — deliveryFeeCents/totalCents nunca nulos aqui. */
   revalidated: RevalidatedCheckout;
   paymentMethod: PaymentMethod;
@@ -85,8 +92,8 @@ export interface CheckoutOrderRepository {
  * NULL, mas o `Prisma.sql` explícito deixa a intenção visível e evita
  * depender de propagação de NULL dentro do PostGIS.
  */
-function pontoOuNulo(address: DeliveryAddressSnapshot) {
-  if (address.lat === null || address.lng === null) return Prisma.sql`NULL`;
+function pontoOuNulo(address: DeliveryAddressSnapshot | null) {
+  if (!address || address.lat === null || address.lng === null) return Prisma.sql`NULL`;
   return Prisma.sql`ST_SetSRID(ST_MakePoint(${address.lng}, ${address.lat}), 4326)::geography`;
 }
 
@@ -146,11 +153,26 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
 
   async createOrder(params: CreateOrderParams): Promise<string> {
     const tenantId = this.requestContext.getTenantId();
-    const { storeId, customerId, deliveryAddressId, address, revalidated, paymentMethod, changeForCents, customerVerified } =
-      params;
+    const {
+      storeId,
+      customerId,
+      fulfillmentType,
+      deliveryAddressId,
+      address,
+      revalidated,
+      paymentMethod,
+      changeForCents,
+      customerVerified,
+    } = params;
+    // `address`/`deliveryAddressId` nulos ⟺ pickup — o CHECK
+    // `orders_delivery_requires_address_check` (migration) barra a
+    // combinação inválida no banco, não só na aplicação. `postalCodeVerified`
+    // é irrelevante em pickup (nunca há CEP pra ficar mudo) — `true` fixo lá,
+    // igual ao default da coluna.
     const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
       INSERT INTO "orders" (
         "tenant_id", "store_id", "customer_id", "status", "payment_method", "payment_status", "refund_status",
+        "fulfillment_type",
         "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
@@ -158,11 +180,12 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "delivery_geo", "delivery_postal_code_verified", "customer_verified"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
+        ${fulfillmentType}::"FulfillmentType",
         ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
-        ${deliveryAddressId}::uuid, ${address.label}, ${address.street}, ${address.number}, ${address.complement},
-        ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},
-        ${pontoOuNulo(address)}, ${address.postalCodeVerified}, ${customerVerified}
+        ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
+        ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},
+        ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified}
       )
       RETURNING "id"
     `;

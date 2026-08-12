@@ -4,6 +4,7 @@ import {
   CheckoutCustomerNotFoundError,
   CheckoutOtpRequiredError,
   CheckoutStoreNotConfiguredError,
+  FulfillmentAddressMismatchError,
   GuestCustomerNotAllowedError,
   GuestCustomerRequiredError,
   IllegalOrderTransitionError,
@@ -30,7 +31,8 @@ type OrderDomainError =
   | PaymentAlreadyConfirmedError
   | PaymentMethodNotAvailableError
   | PaymentNotConfirmedError
-  | InvalidChangeAmountError;
+  | InvalidChangeAmountError
+  | FulfillmentAddressMismatchError;
 
 /** Traduz os erros de domínio de pedidos/checkout pra HTTP — mesmo padrão de CatalogExceptionFilter. */
 @Catch(
@@ -47,6 +49,7 @@ type OrderDomainError =
   PaymentMethodNotAvailableError,
   PaymentNotConfirmedError,
   InvalidChangeAmountError,
+  FulfillmentAddressMismatchError,
 )
 export class OrderExceptionFilter implements ExceptionFilter {
   catch(error: OrderDomainError, host: ArgumentsHost): void {

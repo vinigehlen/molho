@@ -14,9 +14,11 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import type { CheckoutRequest, PaymentMethod } from '@molho/contracts';
+import type { CheckoutRequest, FulfillmentType, PaymentMethod } from '@molho/contracts';
+import { FulfillmentAddressMismatchError } from '../order-errors';
 
 const PAYMENT_METHODS: readonly PaymentMethod[] = ['pix', 'cash_on_delivery', 'card_on_delivery'];
+const FULFILLMENT_TYPES: readonly FulfillmentType[] = ['delivery', 'pickup'];
 
 /** Espelha o objeto de modifiers de checkoutItemInputSchema (@molho/contracts/checkout.ts). */
 class CheckoutModifierInputDto {
@@ -116,9 +118,20 @@ export class CheckoutRequestDto {
   @Type(() => CheckoutItemInputDto)
   items!: CheckoutItemInputDto[];
 
+  @IsIn(FULFILLMENT_TYPES)
+  fulfillmentType!: FulfillmentType;
+
+  /**
+   * Obrigatório em `delivery`, PROIBIDO em `pickup` — a combinação certa é
+   * responsabilidade do zod (`checkoutRequestSchema.refine`, checado em
+   * `toCheckoutRequest` abaixo), não do `class-validator` aqui: `@ValidateIf`
+   * só sabe pular a validação de FORMA do endereço quando é pickup, não
+   * rejeitar um endereço que veio mandado por engano.
+   */
+  @ValidateIf((dto: CheckoutRequestDto) => dto.fulfillmentType === 'delivery')
   @ValidateNested()
   @Type(() => CheckoutAddressInputDto)
-  address!: CheckoutAddressInputDto;
+  address!: CheckoutAddressInputDto | null;
 
   @IsIn(PAYMENT_METHODS)
   paymentMethod!: PaymentMethod;
@@ -145,12 +158,19 @@ export class CheckoutRequestDto {
  * branch certo — é isso que faz o `if` valer como type guard.
  */
 export function toCheckoutRequest(dto: CheckoutRequestDto): CheckoutRequest {
-  const { items, address } = dto;
+  const { items, fulfillmentType, address } = dto;
+  // Espelha checkoutRequestSchema.refine (@molho/contracts/checkout.ts) — lá é
+  // só documentação de forma (nunca roda em runtime na API, o `class-validator`
+  // é quem valida de verdade aqui). `delivery` sem endereço, ou `pickup` COM
+  // endereço, são os dois request malformado, nunca "ignora e segue".
+  if ((fulfillmentType === 'delivery') !== (address !== null)) {
+    throw new FulfillmentAddressMismatchError();
+  }
   if (dto.paymentMethod === 'cash_on_delivery') {
-    return { items, address, paymentMethod: 'cash_on_delivery', changeForCents: dto.changeForCents ?? null };
+    return { items, fulfillmentType, address, paymentMethod: 'cash_on_delivery', changeForCents: dto.changeForCents ?? null };
   }
   if (dto.paymentMethod === 'pix') {
-    return { items, address, paymentMethod: 'pix' };
+    return { items, fulfillmentType, address, paymentMethod: 'pix' };
   }
-  return { items, address, paymentMethod: 'card_on_delivery' };
+  return { items, fulfillmentType, address, paymentMethod: 'card_on_delivery' };
 }

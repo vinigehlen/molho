@@ -40,9 +40,15 @@ const RESOLVED: ResolvedAddress = {
   postalCodeVerified: true,
 };
 
-const REQUEST: CheckoutRequest = { items: ITEMS, address: ADDRESS, paymentMethod: 'pix' };
-const REQUEST_CASH: CheckoutRequest = { items: ITEMS, address: ADDRESS, paymentMethod: 'cash_on_delivery', changeForCents: 5000 };
-const REQUEST_CARD: CheckoutRequest = { items: ITEMS, address: ADDRESS, paymentMethod: 'card_on_delivery' };
+const REQUEST: CheckoutRequest = { items: ITEMS, fulfillmentType: 'delivery', address: ADDRESS, paymentMethod: 'pix' };
+const REQUEST_CASH: CheckoutRequest = {
+  items: ITEMS,
+  fulfillmentType: 'delivery',
+  address: ADDRESS,
+  paymentMethod: 'cash_on_delivery',
+  changeForCents: 5000,
+};
+const REQUEST_CARD: CheckoutRequest = { items: ITEMS, fulfillmentType: 'delivery', address: ADDRESS, paymentMethod: 'card_on_delivery' };
 
 function happyRevalidation(overrides: Partial<RevalidatedCheckout> = {}): RevalidatedCheckout {
   return {
@@ -322,17 +328,17 @@ describe('CheckoutOrderService — CEP verificado vs. não verificado (Épico 6,
     expect(repo.createAddressCalls[0]).toMatchObject({ lat: null, lng: null, postalCodeVerified: true });
     expect(repo.createOrderCalls[0]?.address).toBe(repo.createAddressCalls[0]);
     // A rua veio do ViaCEP, não do texto que o cliente digitou.
-    expect(repo.createOrderCalls[0]?.address.street).toBe('Avenida Brasil');
+    expect(repo.createOrderCalls[0]?.address?.street).toBe('Avenida Brasil');
   });
 
   it('ViaCEP mudo: cidade vem do texto do cliente e o pedido nasce verified=false', async () => {
     const { repo, service } = setup();
     // Nada de autoritativo: o middleware caiu inteiro no fallback de texto.
     const doTexto: ResolvedAddress = {
-      street: REQUEST.address.street,
-      neighborhood: REQUEST.address.neighborhood,
-      city: REQUEST.address.city,
-      state: REQUEST.address.state,
+      street: ADDRESS.street,
+      neighborhood: ADDRESS.neighborhood,
+      city: ADDRESS.city,
+      state: ADDRESS.state,
       lat: null,
       lng: null,
       postalCodeVerified: false,
@@ -443,5 +449,20 @@ describe('CheckoutOrderService.createOrder — checkout guest', () => {
 
     expect(result.ok).toBe(true);
     expect(repo.createOrderCalls[0]?.customerVerified).toBe(true);
+  });
+});
+
+/** `resolved: null` ⟺ `request.fulfillmentType === 'pickup'` (invariante do controller). */
+describe('CheckoutOrderService.createOrder — retirada no balcão', () => {
+  const REQUEST_PICKUP: CheckoutRequest = { items: ITEMS, fulfillmentType: 'pickup', address: null, paymentMethod: 'pix' };
+
+  it('pickup: não cria linha em addresses, deliveryAddressId e address nulos no pedido', async () => {
+    const { repo, service } = setup();
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST_PICKUP, null);
+
+    expect(result.ok).toBe(true);
+    expect(repo.createAddressCalls).toHaveLength(0);
+    expect(repo.createOrderCalls[0]).toMatchObject({ fulfillmentType: 'pickup', deliveryAddressId: null, address: null });
   });
 });
