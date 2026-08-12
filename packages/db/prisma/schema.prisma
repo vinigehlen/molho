@@ -634,6 +634,15 @@ enum RefundStatus {
   completed
 }
 
+/// Docs/03 §4 e docs/04 §"Checkout" já previam os dois; só nascia MVP
+/// delivery-only. `pickup` = retirada no balcão — o cliente busca no
+/// endereço da PRÓPRIA loja (`Store.addressText`, já existe), então nenhum
+/// campo novo de loja é necessário, só a ausência do endereço do cliente.
+enum FulfillmentType {
+  delivery
+  pickup
+}
+
 model Order {
   id         String @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId   String @map("tenant_id") @db.Uuid
@@ -648,6 +657,11 @@ model Order {
   paymentMethod PaymentMethod @map("payment_method")
   paymentStatus PaymentStatus @default(aguardando_confirmacao) @map("payment_status")
   refundStatus  RefundStatus  @default(not_applicable) @map("refund_status")
+  /// `pickup` = os campos `delivery*` abaixo (exceto `deliveryPostalCodeVerified`,
+  /// irrelevante nesse branch) ficam NULL — CHECK na migration garante que
+  /// `delivery` só nasce sem eles. Sem @default: o cliente escolhe no
+  /// carrinho, nunca "cai" num tipo sem querer (mesmo racional de paymentMethod).
+  fulfillmentType FulfillmentType @map("fulfillment_type")
   /// Só quando paymentMethod = cash_on_delivery — "troco pra quanto" (o valor
   /// que o cliente vai entregar, não o troco em si). docs/02 §5.5.
   changeForCents Int? @map("change_for_cents")
@@ -667,14 +681,19 @@ model Order {
   /// continuar existindo. Snapshot completo abaixo é a fonte de verdade
   /// pra ESTE pedido, pro cliente poder editar o endereço salvo depois sem
   /// alterar pedidos já feitos (mesmo princípio do carrinho).
+  ///
+  /// Nullable (Épico "retirada"): só existem quando `fulfillmentType ==
+  /// delivery` — pickup não coleta endereço do cliente nenhum (retira no
+  /// endereço da PRÓPRIA loja, que o lojista já sabe de cor). CHECK na
+  /// migration barra a combinação inválida (`delivery` sem endereço).
   deliveryAddressId      String?                               @map("delivery_address_id") @db.Uuid
-  deliveryLabel          String                                @map("delivery_label")
-  deliveryStreet         String                                @map("delivery_street")
+  deliveryLabel          String?                               @map("delivery_label")
+  deliveryStreet         String?                               @map("delivery_street")
   deliveryNumber         String?                               @map("delivery_number")
   deliveryComplement     String?                               @map("delivery_complement")
-  deliveryNeighborhood   String                                @map("delivery_neighborhood")
-  deliveryCity           String                                @map("delivery_city")
-  deliveryState          String                                @map("delivery_state")
+  deliveryNeighborhood   String?                               @map("delivery_neighborhood")
+  deliveryCity           String?                               @map("delivery_city")
+  deliveryState          String?                               @map("delivery_state")
   deliveryPostalCode     String?                               @map("delivery_postal_code")
   deliveryReferencePoint String?                               @map("delivery_reference_point")
   /// geography(Point,4326) NULLABLE — mesmo racional de Address.geo (Épico

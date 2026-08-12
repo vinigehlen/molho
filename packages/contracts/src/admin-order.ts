@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { paymentMethodSchema, paymentStatusSchema } from './checkout';
+import { fulfillmentTypeSchema, paymentMethodSchema, paymentStatusSchema } from './checkout';
 
 const centsSchema = z.int().nonnegative();
 
@@ -29,6 +29,9 @@ const adminOrderItemSchema = z.object({
   name: z.string(),
   quantity: z.int().positive(),
   lineTotalCents: centsSchema,
+  /** Pra comanda de cozinha (fallback universal, docs/02 §6) — sem preço, o gestor não mostra o delta. */
+  modifiers: z.array(z.object({ name: z.string() })),
+  notes: z.string().nullable(),
 });
 
 /** Endereço de entrega — snapshot congelado no pedido (nunca JOIN vivo, CLAUDE.md "complexidade deliberada"). */
@@ -79,7 +82,9 @@ export const adminOrderSchema = z.object({
   subtotalCents: centsSchema,
   deliveryFeeCents: centsSchema,
   totalCents: centsSchema,
-  delivery: adminOrderDeliverySchema,
+  fulfillmentType: fulfillmentTypeSchema,
+  /** `null` quando `fulfillmentType === 'pickup'` — retira no endereço da PRÓPRIA loja, que o lojista já sabe de cor. */
+  delivery: adminOrderDeliverySchema.nullable(),
   items: z.array(adminOrderItemSchema),
 });
 export type AdminOrder = z.infer<typeof adminOrderSchema>;

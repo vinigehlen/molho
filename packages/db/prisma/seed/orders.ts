@@ -1,4 +1,5 @@
 import { encryptPhone, hashPhoneForLookup } from '../../src/crypto/phone';
+import { Prisma } from '../generated/client/client';
 import type { PrismaClient } from '../generated/client/client';
 
 /**
@@ -27,6 +28,8 @@ interface SeedOrderDef {
   paymentStatus: 'aguardando_confirmacao' | 'confirmado';
   changeForCents: number | null;
   deliveryFeeCents: number;
+  /** `pickup` = sem endereço nenhum (retira no balcão). Default `delivery` — só o pedido G é pickup, pro board mostrar os dois. */
+  fulfillmentType?: 'delivery' | 'pickup';
   items: SeedOrderItem[];
 }
 
@@ -97,6 +100,18 @@ const SEED_ORDERS: SeedOrderDef[] = [
     deliveryFeeCents: 500,
     items: [{ name: 'X-Tudo', unitBasePriceCents: 3500, quantity: 1 }],
   },
+  {
+    id: '018f0000-0000-7000-8000-0000000000a7',
+    customerName: 'Gustavo Prado',
+    customerPhone: '+5551988880007',
+    status: 'received',
+    paymentMethod: 'pix',
+    paymentStatus: 'confirmado',
+    changeForCents: null,
+    deliveryFeeCents: 0, // pickup nunca tem taxa
+    fulfillmentType: 'pickup',
+    items: [{ name: 'X-Salada', unitBasePriceCents: 2800, quantity: 1 }],
+  },
 ];
 
 // Ponto de entrega (snapshot) — perto de Porto Alegre, dentro da zona seed.
@@ -129,12 +144,35 @@ export async function seedOrders(prisma: PrismaClient, tenantId: string, storeId
     const customerId = await findOrCreateCustomer(prisma, tenantId, def.customerName, def.customerPhone);
     const subtotalCents = def.items.reduce((sum, i) => sum + i.unitBasePriceCents * i.quantity, 0);
     const totalCents = subtotalCents + def.deliveryFeeCents;
+    const fulfillmentType = def.fulfillmentType ?? 'delivery';
+    // Pickup não tem endereço nenhum (CHECK da migration só exige nos 5 campos
+    // quando fulfillment_type = 'delivery').
+    const address =
+      fulfillmentType === 'pickup'
+        ? { label: null, street: null, number: null, neighborhood: null, city: null, state: null, postalCode: null, referencePoint: null }
+        : {
+            label: 'Casa',
+            street: 'Rua das Flores',
+            number: '123',
+            neighborhood: 'Centro',
+            city: 'Porto Alegre',
+            state: 'RS',
+            postalCode: '90000-000',
+            referencePoint: 'Perto da praça',
+          };
+    // geo NULL é o normal em pickup — nada a ver com "ponto não achado" do
+    // branch delivery sem lat/lng.
+    const geo =
+      fulfillmentType === 'pickup'
+        ? Prisma.sql`NULL`
+        : Prisma.sql`ST_SetSRID(ST_MakePoint(${DELIVERY.lng}, ${DELIVERY.lat}), 4326)::geography`;
 
-    // delivery_geo é geography(Point) NOT NULL — Prisma omite Unsupported, então
-    // o INSERT vai por raw (mesmo ST_MakePoint do checkout-order.repository).
+    // delivery_geo é geography(Point) — Prisma omite Unsupported, então o
+    // INSERT vai por raw (mesmo ST_MakePoint do checkout-order.repository).
     await prisma.$executeRaw`
       INSERT INTO "orders" (
         "id", "tenant_id", "store_id", "customer_id", "status", "payment_method", "payment_status", "refund_status",
+        "fulfillment_type",
         "change_for_cents", "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
@@ -142,10 +180,11 @@ export async function seedOrders(prisma: PrismaClient, tenantId: string, storeId
       ) VALUES (
         ${def.id}::uuid, ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid,
         ${def.status}::"OrderStatus", ${def.paymentMethod}::"PaymentMethod", ${def.paymentStatus}::"PaymentStatus", 'not_applicable',
+        ${fulfillmentType}::"FulfillmentType",
         ${def.changeForCents}, ${subtotalCents}, ${def.deliveryFeeCents}, ${totalCents},
-        'Casa', 'Rua das Flores', '123', NULL,
-        'Centro', 'Porto Alegre', 'RS', '90000-000', 'Perto da praça',
-        ST_SetSRID(ST_MakePoint(${DELIVERY.lng}, ${DELIVERY.lat}), 4326)::geography
+        ${address.label}, ${address.street}, ${address.number}, NULL,
+        ${address.neighborhood}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.referencePoint},
+        ${geo}
       )
     `;
 

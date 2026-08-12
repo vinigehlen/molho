@@ -79,6 +79,13 @@ export const checkoutAddressInputSchema = z.object({
   expectedDeliveryFeeCents: centsSchema.nullable(),
 });
 
+/**
+ * Retirada no balcão (docs/03 §4, docs/04 §"Checkout" — previsto desde o
+ * desenho original, MVP nasceu delivery-only). `pickup` usa o endereço da
+ * PRÓPRIA loja (o lojista já sabe de cor); o cliente nunca digita CEP.
+ */
+export const fulfillmentTypeSchema = z.enum(['delivery', 'pickup']);
+
 export const paymentMethodSchema = z.enum(['pix', 'cash_on_delivery', 'card_on_delivery']);
 
 /**
@@ -105,7 +112,13 @@ export const PAYMENT_METHOD_MODULE: Record<z.infer<typeof paymentMethodSchema>, 
 
 const checkoutRequestBase = z.object({
   items: z.array(checkoutItemInputSchema).min(1),
-  address: checkoutAddressInputSchema,
+  fulfillmentType: fulfillmentTypeSchema,
+  /**
+   * `null` só é válido quando `fulfillmentType === 'pickup'` (refine abaixo,
+   * fora da union — precisa ver os dois campos juntos). `delivery` sem
+   * endereço, ou `pickup` COM endereço, são os dois request malformado.
+   */
+  address: checkoutAddressInputSchema.nullable(),
 });
 
 /**
@@ -121,17 +134,26 @@ const checkoutRequestBase = z.object({
 // .strict() em cada branch: changeForCents mandado com paymentMethod !== 'cash_on_delivery'
 // é request malformado, rejeitado — não silenciosamente descartado (comportamento
 // "strip" default do zod pra chave desconhecida).
-export const checkoutRequestSchema = z.discriminatedUnion('paymentMethod', [
-  checkoutRequestBase.extend({ paymentMethod: z.literal('pix') }).strict(),
-  checkoutRequestBase
-    .extend({
-      paymentMethod: z.literal('cash_on_delivery'),
-      /** "Troco pra quanto" — o valor que o cliente vai entregar (ex.: paga R$47 com uma nota de R$50 → 5000), NÃO o troco em si (isso é `changeForCents - totalCents`, calculado na hora de exibir). `null` = não precisa de troco. */
-      changeForCents: centsSchema.nullable(),
-    })
-    .strict(),
-  checkoutRequestBase.extend({ paymentMethod: z.literal('card_on_delivery') }).strict(),
-]);
+export const checkoutRequestSchema = z
+  .discriminatedUnion('paymentMethod', [
+    checkoutRequestBase.extend({ paymentMethod: z.literal('pix') }).strict(),
+    checkoutRequestBase
+      .extend({
+        paymentMethod: z.literal('cash_on_delivery'),
+        /** "Troco pra quanto" — o valor que o cliente vai entregar (ex.: paga R$47 com uma nota de R$50 → 5000), NÃO o troco em si (isso é `changeForCents - totalCents`, calculado na hora de exibir). `null` = não precisa de troco. */
+        changeForCents: centsSchema.nullable(),
+      })
+      .strict(),
+    checkoutRequestBase.extend({ paymentMethod: z.literal('card_on_delivery') }).strict(),
+  ])
+  // Fora da union (as 3 branches são só sobre paymentMethod): endereço
+  // presente SE E SOMENTE SE for entrega. Pickup com address preenchido não
+  // é "ignorado com segurança" — é o cliente achando que mandou um endereço
+  // que o servidor nunca vai olhar, silenciosamente. Rejeita os dois lados.
+  .refine((data) => (data.fulfillmentType === 'delivery') === (data.address !== null), {
+    message: 'Entrega exige endereço; retirada não pode vir com endereço.',
+    path: ['address'],
+  });
 
 export const revalidatedItemSchema = z.object({
   productId: z.uuid(),
@@ -152,9 +174,11 @@ export const revalidatedItemSchema = z.object({
 export const revalidatedCheckoutSchema = z.object({
   items: z.array(revalidatedItemSchema),
   subtotalCents: centsSchema,
+  /** Em pickup sempre `true` — não existe zona pra quem retira no balcão. */
   withinZone: z.boolean(),
-  /** `null` quando `withinZone: false` — não existe taxa fora da área. */
+  /** `null` quando `withinZone: false`. Sempre `0` em pickup (nunca `null` — pickup nunca é "fora da área"). */
   deliveryFeeCents: centsSchema.nullable(),
+  /** Sempre `null` em pickup — não há ETA de entrega pra estimar. */
   etaMinMinutes: z.int().nonnegative().nullable(),
   etaMaxMinutes: z.int().nonnegative().nullable(),
   isOpenNow: z.boolean(),
@@ -203,6 +227,7 @@ export const checkoutOrderResponseSchema = z.discriminatedUnion('paymentMethod',
   checkoutOrderResponseBase.extend({ paymentMethod: z.literal('card_on_delivery') }).strict(),
 ]);
 
+export type FulfillmentType = z.infer<typeof fulfillmentTypeSchema>;
 export type CheckoutItemInput = z.infer<typeof checkoutItemInputSchema>;
 export type CheckoutAddressInput = z.infer<typeof checkoutAddressInputSchema>;
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
