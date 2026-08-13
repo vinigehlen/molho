@@ -14,7 +14,8 @@ Implementado ate aqui:
 - consumidor navegador no gestor para provar `claim -> window.print() ->
   printed/failed`;
 - app `@molho/print-agent` para consumir a fila em processo local e enviar a
-  comanda para stdout/comando do sistema.
+  comanda para stdout/comando do sistema;
+- modo `MOLHO_PRINT_FORMAT=escpos` no agente, com bytes ESC/POS basicos.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -54,6 +55,12 @@ POST /v1/admin/printing/jobs/:id/failed
 Sem `MOLHO_PRINT_COMMAND`, o agente roda em dry-run e escreve a comanda no
 stdout. Com `MOLHO_PRINT_COMMAND`, envia `ticket_text` no stdin do comando local
 sem shell.
+
+O agente suporta `MOLHO_PRINT_FORMAT=text` (default) e
+`MOLHO_PRINT_FORMAT=escpos`. O modo ESC/POS atual e propositalmente minimo:
+inicializa a impressora, alinha a esquerda, imprime texto normal, avanca linhas
+e corta quando `cut=true`. Para evitar mojibake antes de escolher a impressora
+do piloto, ele normaliza acentos para ASCII em vez de apostar numa codepage.
 
 ## Divisao de responsabilidade
 
@@ -312,6 +319,7 @@ Agente local:
 - `apps/print-agent/src/config.ts`;
 - `apps/print-agent/src/api.ts`;
 - `apps/print-agent/src/printer.ts`;
+- `apps/print-agent/src/escpos.ts`;
 - `apps/print-agent/src/agent.ts`;
 - `apps/print-agent/src/main.ts`;
 - `apps/print-agent/README.md`.

@@ -12,6 +12,7 @@ const CONFIG: PrintAgentConfig = {
   pollMs: 3_000,
   printCommand: null,
   printArgs: [],
+  printFormat: 'text',
 };
 
 describe('PrintingApi', () => {

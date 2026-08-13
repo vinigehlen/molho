@@ -20,7 +20,7 @@ export async function runOnce({ api, printer, logger }: AgentDeps): Promise<Agen
   if (!job) return 'idle';
 
   try {
-    await printer.print(job.ticketText);
+    await printer.print(job.ticketText, { cut: job.cut });
     const confirmed = await api.markPrinted(job);
     if (!confirmed) {
       logger.warn(`print_job ${job.id} ja foi alterado por outro worker; ignorando confirmacao stale.`);

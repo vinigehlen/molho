@@ -43,7 +43,7 @@ describe('runOnce', () => {
       }),
     ).resolves.toBe('printed');
 
-    expect(print).toHaveBeenCalledWith('PEDIDO #1');
+    expect(print).toHaveBeenCalledWith('PEDIDO #1', { cut: true });
     expect(markPrinted).toHaveBeenCalledWith(JOB);
   });
 

@@ -19,6 +19,7 @@ describe('readConfig', () => {
       pollMs: 3_000,
       printCommand: null,
       printArgs: [],
+      printFormat: 'text',
     });
   });
 
@@ -29,15 +30,21 @@ describe('readConfig', () => {
         MOLHO_PRINT_WORKER_ID: 'cozinha-1',
         MOLHO_PRINT_COMMAND: 'lp',
         MOLHO_PRINT_ARGS: '["-d","Cozinha"]',
+        MOLHO_PRINT_FORMAT: 'escpos',
       }),
     ).toMatchObject({
       workerId: 'cozinha-1',
       printCommand: 'lp',
       printArgs: ['-d', 'Cozinha'],
+      printFormat: 'escpos',
     });
   });
 
   it('rejeita args que não sejam array de strings', () => {
     expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_ARGS: '{"shell":"nope"}' })).toThrow(/JSON array/);
+  });
+
+  it('rejeita formato de impressão desconhecido', () => {
+    expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_FORMAT: 'pdf' })).toThrow(/text.*escpos/);
   });
 });

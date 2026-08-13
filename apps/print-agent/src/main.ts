@@ -6,8 +6,8 @@ import { CommandPrinter, DryRunPrinter, type Printer } from './printer.js';
 const config = readConfig();
 const api = new PrintingApi(config);
 const printer: Printer = config.printCommand
-  ? new CommandPrinter(config.printCommand, config.printArgs)
-  : new DryRunPrinter((message) => console.log(`[dry-run]\n${message}`));
+  ? new CommandPrinter(config.printCommand, config.printArgs, config.printFormat)
+  : new DryRunPrinter(config.printFormat, (message) => console.log(`[dry-run:${config.printFormat}]\n${message}`));
 
 let stopping = false;
 
@@ -19,7 +19,7 @@ process.once('SIGTERM', () => {
   stopping = true;
 });
 
-console.log(`Molho print-agent iniciado: tenant=${config.tenantId} worker=${config.workerId}`);
+console.log(`Molho print-agent iniciado: tenant=${config.tenantId} worker=${config.workerId} format=${config.printFormat}`);
 if (!config.printCommand) {
   console.warn('MOLHO_PRINT_COMMAND ausente — rodando em dry-run, nada sai na impressora fisica.');
 }

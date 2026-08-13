@@ -1,3 +1,5 @@
+export type PrintFormat = 'text' | 'escpos';
+
 export interface PrintAgentConfig {
   apiUrl: string;
   accessToken: string;
@@ -8,6 +10,7 @@ export interface PrintAgentConfig {
   pollMs: number;
   printCommand: string | null;
   printArgs: string[];
+  printFormat: PrintFormat;
 }
 
 const DEFAULT_WIDTH = 80;
@@ -27,6 +30,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): PrintAgentConf
     pollMs: intEnv(env, 'MOLHO_PRINT_POLL_MS', DEFAULT_POLL_MS, 500, 60_000),
     printCommand: env.MOLHO_PRINT_COMMAND || null,
     printArgs: parsePrintArgs(env.MOLHO_PRINT_ARGS),
+    printFormat: printFormat(env.MOLHO_PRINT_FORMAT),
   };
 }
 
@@ -53,4 +57,10 @@ function parsePrintArgs(raw: string | undefined): string[] {
     throw new Error('MOLHO_PRINT_ARGS precisa ser um JSON array de strings.');
   }
   return parsed;
+}
+
+function printFormat(raw: string | undefined): PrintFormat {
+  if (!raw) return 'text';
+  if (raw === 'text' || raw === 'escpos') return raw;
+  throw new Error('MOLHO_PRINT_FORMAT precisa ser "text" ou "escpos".');
 }
