@@ -172,6 +172,9 @@ export default function GestorPage() {
           <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/impressao">
             🖨️ Impressão
           </Link>
+          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/entrega">
+            🛵 Entrega
+          </Link>
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>
