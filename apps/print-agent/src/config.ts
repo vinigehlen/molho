@@ -1,6 +1,12 @@
 export type PrintFormat = 'text' | 'escpos';
 
-export interface PrintAgentConfig {
+export interface PrintOutputConfig {
+  printCommand: string | null;
+  printArgs: string[];
+  printFormat: PrintFormat;
+}
+
+export interface PrintAgentConfig extends PrintOutputConfig {
   apiUrl: string;
   accessToken: string;
   tenantId: string;
@@ -8,9 +14,6 @@ export interface PrintAgentConfig {
   width: number;
   leaseSeconds: number;
   pollMs: number;
-  printCommand: string | null;
-  printArgs: string[];
-  printFormat: PrintFormat;
 }
 
 const DEFAULT_WIDTH = 80;
@@ -21,6 +24,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): PrintAgentConf
   const apiUrl = required(env, 'MOLHO_API_URL').replace(/\/+$/, '');
   const tenantId = required(env, 'MOLHO_TENANT_ID');
   return {
+    ...readOutputConfig(env),
     apiUrl,
     accessToken: required(env, 'MOLHO_STAFF_ACCESS_TOKEN'),
     tenantId,
@@ -28,6 +32,11 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): PrintAgentConf
     width: intEnv(env, 'MOLHO_PRINT_WIDTH', DEFAULT_WIDTH, 1, 120),
     leaseSeconds: intEnv(env, 'MOLHO_PRINT_LEASE_SECONDS', DEFAULT_LEASE_SECONDS, 5, 300),
     pollMs: intEnv(env, 'MOLHO_PRINT_POLL_MS', DEFAULT_POLL_MS, 500, 60_000),
+  };
+}
+
+export function readOutputConfig(env: NodeJS.ProcessEnv = process.env): PrintOutputConfig {
+  return {
     printCommand: env.MOLHO_PRINT_COMMAND || null,
     printArgs: parsePrintArgs(env.MOLHO_PRINT_ARGS),
     printFormat: printFormat(env.MOLHO_PRINT_FORMAT),

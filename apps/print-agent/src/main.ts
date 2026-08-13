@@ -1,13 +1,11 @@
 import { PrintingApi } from './api.js';
 import { readConfig } from './config.js';
 import { runOnce } from './agent.js';
-import { CommandPrinter, DryRunPrinter, type Printer } from './printer.js';
+import { makePrinter } from './printer-factory.js';
 
 const config = readConfig();
 const api = new PrintingApi(config);
-const printer: Printer = config.printCommand
-  ? new CommandPrinter(config.printCommand, config.printArgs, config.printFormat)
-  : new DryRunPrinter(config.printFormat, (message) => console.log(`[dry-run:${config.printFormat}]\n${message}`));
+const printer = makePrinter(config);
 
 let stopping = false;
 

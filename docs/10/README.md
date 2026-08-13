@@ -15,7 +15,8 @@ Implementado ate aqui:
   printed/failed`;
 - app `@molho/print-agent` para consumir a fila em processo local e enviar a
   comanda para stdout/comando do sistema;
-- modo `MOLHO_PRINT_FORMAT=escpos` no agente, com bytes ESC/POS basicos.
+- modo `MOLHO_PRINT_FORMAT=escpos` no agente, com bytes ESC/POS basicos;
+- comando `test-print` do agente para cupom de teste local sem API/token.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -61,6 +62,11 @@ O agente suporta `MOLHO_PRINT_FORMAT=text` (default) e
 inicializa a impressora, alinha a esquerda, imprime texto normal, avanca linhas
 e corta quando `cut=true`. Para evitar mojibake antes de escolher a impressora
 do piloto, ele normaliza acentos para ASCII em vez de apostar numa codepage.
+
+O comando `pnpm --filter @molho/print-agent test-print` imprime um cupom fixo de
+teste usando somente `MOLHO_PRINT_COMMAND`, `MOLHO_PRINT_ARGS` e
+`MOLHO_PRINT_FORMAT`. Ele nao exige API, token nem tenant, e por isso serve como
+base do wizard de configuracao de impressora.
 
 ## Divisao de responsabilidade
 
@@ -320,6 +326,8 @@ Agente local:
 - `apps/print-agent/src/api.ts`;
 - `apps/print-agent/src/printer.ts`;
 - `apps/print-agent/src/escpos.ts`;
+- `apps/print-agent/src/test-print.ts`;
+- `apps/print-agent/src/test-ticket.ts`;
 - `apps/print-agent/src/agent.ts`;
 - `apps/print-agent/src/main.ts`;
 - `apps/print-agent/README.md`.

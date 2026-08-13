@@ -77,6 +77,21 @@ versao normaliza acentos para ASCII (`Búrguer` vira `Burguer`) em vez de tentar
 adivinhar a codepage do equipamento. Codepage configuravel entra quando a
 impressora do piloto estiver definida.
 
+## Cupom de teste local
+
+Depois do build, da para testar a impressora sem API, token ou tenant:
+
+```bash
+pnpm --filter @molho/print-agent build
+MOLHO_PRINT_COMMAND=lp \
+MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
+MOLHO_PRINT_FORMAT=escpos \
+pnpm --filter @molho/print-agent test-print
+```
+
+Sem `MOLHO_PRINT_COMMAND`, `test-print` roda em dry-run. Em `text`, imprime a
+comanda de teste no stdout; em `escpos`, imprime os bytes em hexadecimal.
+
 ## Limite atual
 
 Esta fatia ainda nao empacota instalador, login proprio, service manager nem

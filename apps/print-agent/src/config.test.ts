@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readConfig } from './config.js';
+import { readConfig, readOutputConfig } from './config.js';
 
 const BASE_ENV = {
   MOLHO_API_URL: 'https://api.staging.molho.live/',
@@ -46,5 +46,21 @@ describe('readConfig', () => {
 
   it('rejeita formato de impressão desconhecido', () => {
     expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_FORMAT: 'pdf' })).toThrow(/text.*escpos/);
+  });
+});
+
+describe('readOutputConfig', () => {
+  it('não exige API/token/tenant para cupom de teste local', () => {
+    expect(
+      readOutputConfig({
+        MOLHO_PRINT_COMMAND: 'lp',
+        MOLHO_PRINT_ARGS: '["-d","Cozinha"]',
+        MOLHO_PRINT_FORMAT: 'escpos',
+      }),
+    ).toEqual({
+      printCommand: 'lp',
+      printArgs: ['-d', 'Cozinha'],
+      printFormat: 'escpos',
+    });
   });
 });
