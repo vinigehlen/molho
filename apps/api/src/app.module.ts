@@ -9,6 +9,7 @@ import { HealthController } from './health/health.controller';
 import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
+import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
 import { StorefrontModule } from './storefront/storefront.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     OrdersModule,
     GeoModule,
     DeliveryZoneAdminModule,
+    StoreHoursAdminModule,
   ],
   controllers: [HealthController],
 })
