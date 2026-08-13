@@ -13,6 +13,7 @@ import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
+import { PrintJobConsumer } from './print-job-consumer';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
 /** Próxima ação do fluxo por status (o botão "Avançar" do card). */
@@ -167,6 +168,7 @@ export default function GestorPage() {
               🔔 Ativar som
             </button>
           )}
+          {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

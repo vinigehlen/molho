@@ -17,6 +17,12 @@ export interface QueuePrintJobResult {
   printedAt: string | null;
 }
 
+export type ClaimedPrintJob = QueuePrintJobResult & {
+  status: 'printing';
+  leasedBy: string;
+  leaseUntil: string;
+};
+
 export class PrintingUnavailableError extends Error {
   constructor() {
     super('Impressão não está ativa para esta loja.');
@@ -37,4 +43,42 @@ export async function queueKitchenTicketCopy(orderId: string, idempotencyKey: st
   if (res.status === 403) throw new PrintingUnavailableError();
   if (!res.ok) throw new Error(`Falha ao enfileirar impressão (${res.status})`);
   return (await res.json()) as QueuePrintJobResult;
+}
+
+export async function claimNextPrintJob(workerId: string, leaseSeconds: number, width = 80): Promise<ClaimedPrintJob | null> {
+  const res = await apiFetch('/v1/admin/printing/jobs/claim', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ workerId, leaseSeconds, width }),
+  });
+
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (!res.ok) throw new Error(`Falha ao buscar impressão (${res.status})`);
+
+  const body = (await res.json()) as Partial<ClaimedPrintJob>;
+  return body.id && body.status === 'printing' && body.leasedBy && body.leaseUntil ? (body as ClaimedPrintJob) : null;
+}
+
+export async function markPrintJobPrinted(job: Pick<ClaimedPrintJob, 'id' | 'version'>, workerId: string): Promise<boolean> {
+  const res = await apiFetch(`/v1/admin/printing/jobs/${encodeURIComponent(job.id)}/printed`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: job.version, workerId }),
+  });
+
+  if (res.status === 409) return false;
+  if (!res.ok) throw new Error(`Falha ao confirmar impressão (${res.status})`);
+  return true;
+}
+
+export async function markPrintJobFailed(job: Pick<ClaimedPrintJob, 'id' | 'version'>, workerId: string, error: string): Promise<boolean> {
+  const res = await apiFetch(`/v1/admin/printing/jobs/${encodeURIComponent(job.id)}/failed`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: job.version, workerId, error }),
+  });
+
+  if (res.status === 409) return false;
+  if (!res.ok) throw new Error(`Falha ao registrar falha de impressão (${res.status})`);
+  return true;
 }

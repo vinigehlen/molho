@@ -10,7 +10,9 @@ Implementado ate aqui:
 - documentacao inicial da fila no commit `1d48e79`;
 - modulo de API em `apps/api/src/printing/` no commit `7b30581`;
 - cobertura e2e de concorrencia/RLS no commit `1e0c0e3`;
-- botao de segunda via no gestor enfileirando job duravel.
+- botao de segunda via no gestor enfileirando job duravel;
+- consumidor navegador no gestor para provar `claim -> window.print() ->
+  printed/failed`.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -18,10 +20,10 @@ enfileira automaticamente a primeira via ao criar pedido quando o modulo
 
 Ainda falta para o epico ficar utilizavel na loja:
 
-- consumidor/agente local que faz poll de `claim`, imprime fisicamente e chama
-  `printed`/`failed`;
-- configuracao/wizard de impressora ESC/POS, que fica no proximo bloco do
-  Epico 10 e nao muda a tabela.
+- agente local ESC/POS para impressao silenciosa/fisica sem dialogo do
+  navegador;
+- configuracao/wizard de impressora ESC/POS, que fica no proximo bloco do Epico
+  10 e nao muda a tabela.
 
 ## Escopo
 
@@ -31,6 +33,12 @@ chega, e permitir segunda via a qualquer momento por acao manual do operador.
 Este epico nao implementa ESC/POS/tipagem de impressora no browser. A tabela
 `print_jobs` guarda uma comanda ja renderizada em texto (`ticket_text`) e o
 agente/consumidor local reivindica os jobs da fila.
+
+O gestor tem um consumidor navegador temporario para fechar o circuito da fila
+duravel no piloto: ele reivindica jobs e abre `window.print()` com a
+`ticket_text`. Isso ainda nao e impressao silenciosa; se o operador cancelar o
+dialogo, o browser nao entrega confirmacao confiavel. A confirmacao real por
+dispositivo fica para o agente ESC/POS.
 
 ## Divisao de responsabilidade
 
@@ -280,6 +288,7 @@ Integracao minima com pedidos:
 Gestor:
 
 - `apps/backoffice/app/gestor/page.tsx`;
+- `apps/backoffice/app/gestor/print-job-consumer.tsx`;
 - `apps/backoffice/lib/printing-api.ts`;
 - `apps/backoffice/lib/printing-api.test.ts`.
 
@@ -328,10 +337,10 @@ unitaria padrao passando; build completo passando.
 
 O proximo passo do Epico 10 deve ser o consumidor da fila:
 
-1. agente/worker local autenticado por tenant fazendo poll em
-   `POST /v1/admin/printing/jobs/claim`;
-2. impressao fisica da `ticket_text`;
-3. confirmacao idempotente via `printed` ou `failed`;
+1. agente local autenticado por tenant substituindo o consumidor navegador;
+2. impressao ESC/POS silenciosa da `ticket_text`;
+3. confirmacao idempotente via `printed` ou `failed` baseada no resultado real
+   do dispositivo;
 4. configuracao/wizard para escolher impressora, largura e teste de impressao.
 
 O contrato ja esta dentro da API. Se o consumidor precisar de tipos
