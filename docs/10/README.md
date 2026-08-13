@@ -17,6 +17,8 @@ Implementado ate aqui:
   comanda para stdout/comando do sistema;
 - modo `MOLHO_PRINT_FORMAT=escpos` no agente, com bytes ESC/POS basicos;
 - comando `test-print` do agente para cupom de teste local sem API/token.
+- wizard operacional em `apps/backoffice/app/gestor/impressao/page.tsx` com o
+  caminho de setup do agente local para a loja piloto.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -67,6 +69,27 @@ O comando `pnpm --filter @molho/print-agent test-print` imprime um cupom fixo de
 teste usando somente `MOLHO_PRINT_COMMAND`, `MOLHO_PRINT_ARGS` e
 `MOLHO_PRINT_FORMAT`. Ele nao exige API, token nem tenant, e por isso serve como
 base do wizard de configuracao de impressora.
+
+## Wizard do gestor
+
+O wizard inicial fica em:
+
+```text
+apps/backoffice/app/gestor/impressao/page.tsx
+```
+
+Ele e deliberadamente operacional/documental nesta fase. O objetivo e guiar a
+loja piloto a validar a ponte local antes de ligar a fila real:
+
+1. explicar que a impressao confiavel/silenciosa roda pelo agente local;
+2. apontar o fallback atual do navegador como prova, nao como caminho final;
+3. orientar o teste fisico com `pnpm --filter @molho/print-agent test-print`;
+4. orientar o start real do agente com API, token de staff, tenant e comando
+   local da impressora.
+
+O wizard nao cria contrato novo, nao pareia agente remotamente e nao persiste
+configuracao no banco. Essas escolhas evitam mexer fora do territorio aprovado
+do Epico 10 enquanto ainda entregam um caminho executavel para o piloto.
 
 ## Divisao de responsabilidade
 

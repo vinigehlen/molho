@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
@@ -168,6 +169,9 @@ export default function GestorPage() {
               🔔 Ativar som
             </button>
           )}
+          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/impressao">
+            🖨️ Impressão
+          </Link>
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>
