@@ -25,32 +25,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
  * o `<html>`.
  */
 export const getStorefront = cache(async (slug: string): Promise<StorefrontPayload | null> => {
-  const url = `${API_URL}/v1/store/${encodeURIComponent(slug)}`;
-  // TEMPORÁRIO (debug do 404 em staging) — remover depois de confirmar qual
-  // dos 3 branches abaixo está devolvendo null. Loga em runtime log da
-  // Vercel (Server Component, roda no servidor).
-  console.log('[getStorefront:debug] API_URL =', API_URL, '| url =', url);
-
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}`, {
       // Mesma janela de 30s que a API já promete na borda (Cache-Control
       // s-maxage=30, Épico 5 commit 2) — o Next não tem por que cachear por
       // mais tempo do que a própria API considera fresco.
       next: { revalidate: 30 },
     });
-  } catch (err) {
-    console.log('[getStorefront:debug] fetch THROW —', err);
+  } catch {
     return null;
   }
 
-  console.log('[getStorefront:debug] status =', response.status, response.statusText);
   if (!response.ok) return null;
 
-  const body = await response.json();
-  const parsed = storefrontPayloadSchema.safeParse(body);
-  if (!parsed.success) {
-    console.log('[getStorefront:debug] safeParse FALHOU —', JSON.stringify(parsed.error.issues));
-  }
+  const parsed = storefrontPayloadSchema.safeParse(await response.json());
   return parsed.success ? parsed.data : null;
 });
