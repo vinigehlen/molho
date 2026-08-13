@@ -118,6 +118,11 @@ falhando. Ele nao conclui, reprocessa nem altera estado.
 
 ## Checklist da loja piloto
 
+Status em 2026-08-13: o teste fisico com impressora real esta documentado, mas
+fica pendente porque a impressora nao esta disponivel agora. Nao bloquear o
+restante do trabalho de software por isso; retomar este checklist quando o
+hardware estiver em maos.
+
 1. Confirmar que o modulo `printing.escpos` esta ativo para o tenant.
 2. No computador ligado a impressora, confirmar que o sistema operacional ve a
    fila local (`lpstat -p` no CUPS/macOS/Linux).
@@ -151,6 +156,77 @@ falhando. Ele nao conclui, reprocessa nem altera estado.
    automaticamente quando o modulo estiver ativo.
 8. Clicar em `Imprimir` no card do pedido para validar segunda via. Isso nao
    muda status do pedido nem pagamento.
+
+### Teste futuro com impressora real
+
+Objetivo: validar a ponte fisica `print-agent -> comando local -> impressora`
+antes de considerar o piloto operacional.
+
+Pre-condicoes:
+
+- estar na branch `epico-10-escpos`;
+- ter Node/pnpm instalados no computador conectado a impressora;
+- ter a impressora configurada no sistema operacional;
+- saber o nome da fila local da impressora (ex.: `Cozinha`).
+
+Passos:
+
+1. Listar impressoras/fila local:
+
+   ```bash
+   lpstat -p
+   ```
+
+2. Gerar build do agente:
+
+   ```bash
+   pnpm --filter @molho/print-agent build
+   ```
+
+3. Imprimir cupom local em ESC/POS cru:
+
+   ```bash
+   MOLHO_PRINT_COMMAND=lp \
+   MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
+   MOLHO_PRINT_FORMAT=escpos \
+   pnpm --filter @molho/print-agent test-print
+   ```
+
+4. Conferir no papel:
+
+   - cupom saiu sem dialogo do navegador;
+   - texto legivel;
+   - linhas nao truncadas;
+   - avanco de papel ok;
+   - corte parcial ok, se a impressora suportar;
+   - acentos podem sair sem acento nesta fase: isso e esperado porque o agente
+     normaliza para ASCII enquanto a codepage do hardware nao foi definida.
+
+5. Se o cupom local passar, validar uma iteracao contra a API:
+
+   ```bash
+   MOLHO_PRINT_ONCE=1 \
+   MOLHO_API_URL=https://api.staging.molho.live \
+   MOLHO_STAFF_ACCESS_TOKEN=... \
+   MOLHO_TENANT_ID=... \
+   MOLHO_PRINT_COMMAND=lp \
+   MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
+   MOLHO_PRINT_FORMAT=escpos \
+   pnpm --filter @molho/print-agent start
+   ```
+
+Resultado esperado:
+
+- sem job: agente encerra com `idle=1`;
+- com job: agente reivindica, imprime e marca `printed`;
+- se o comando falhar: job vira `failed` e aparece no status do wizard.
+
+Se falhar:
+
+- nao mexer em `packages/db` nem `packages/contracts`;
+- investigar primeiro `apps/print-agent/` e a configuracao local da fila CUPS;
+- registrar modelo da impressora, sistema operacional, comando usado e saida do
+  agente em `docs/10/README.md`.
 
 ## Divisao de responsabilidade
 
