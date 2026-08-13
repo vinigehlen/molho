@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
 const TEST_PRINT_COMMAND = `pnpm --filter @molho/print-agent build
 MOLHO_PRINT_COMMAND=lp \\
@@ -102,10 +105,36 @@ function StepCard({ step, title, children }: { step: string; title: string; chil
 }
 
 function CommandCard({ title, description, command }: { title: string; description: string; command: string }) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopyState('copied');
+      window.setTimeout(() => setCopyState('idle'), 2_000);
+    } catch {
+      setCopyState('failed');
+    }
+  }
+
   return (
     <section className="rounded-[20px] border border-border bg-bg-card p-4">
-      <h2 className="text-base font-semibold text-text">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-text">{title}</h2>
+        <button
+          className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text"
+          type="button"
+          onClick={() => void copyCommand()}
+        >
+          {copyState === 'copied' ? 'Copiado!' : 'Copiar comando'}
+        </button>
+      </div>
       <p className="mt-2 text-sm text-text-muted">{description}</p>
+      {copyState === 'failed' && (
+        <p className="mt-2 text-xs font-medium text-critical" aria-live="polite">
+          Não consegui copiar automaticamente. Selecione o comando e copie manualmente.
+        </p>
+      )}
       <pre className="mt-3 overflow-x-auto rounded-[14px] bg-text p-4 text-xs leading-5 text-bg">
         <code>{command}</code>
       </pre>

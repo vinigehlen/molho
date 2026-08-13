@@ -85,7 +85,8 @@ loja piloto a validar a ponte local antes de ligar a fila real:
 2. apontar o fallback atual do navegador como prova, nao como caminho final;
 3. orientar o teste fisico com `pnpm --filter @molho/print-agent test-print`;
 4. orientar o start real do agente com API, token de staff, tenant e comando
-   local da impressora.
+   local da impressora;
+5. permitir copiar os comandos do setup para reduzir erro manual no piloto.
 
 O wizard nao cria contrato novo, nao pareia agente remotamente e nao persiste
 configuracao no banco. Essas escolhas evitam mexer fora do territorio aprovado
