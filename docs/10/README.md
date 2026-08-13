@@ -2,6 +2,27 @@
 
 Desenho aprovado para a fila duravel de impressao do pedido.
 
+## Estado atual
+
+Implementado ate aqui:
+
+- migration `print_jobs` + RLS em `packages/db` no commit `be2caae`;
+- documentacao inicial da fila no commit `1d48e79`;
+- modulo de API em `apps/api/src/printing/` no commit `7b30581`;
+- cobertura e2e de concorrencia/RLS no commit `1e0c0e3`.
+
+O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
+enfileira automaticamente a primeira via ao criar pedido quando o modulo
+`printing.escpos` esta ativo, e permite segunda via por rota manual.
+
+Ainda falta para o epico ficar utilizavel na loja:
+
+- consumidor/agente local que faz poll de `claim`, imprime fisicamente e chama
+  `printed`/`failed`;
+- UI do gestor para segunda via manual no `OrderCard`;
+- configuracao/wizard de impressora ESC/POS, que fica no proximo bloco do
+  Epico 10 e nao muda a tabela.
+
 ## Escopo
 
 O MVP precisa imprimir comanda de cozinha/balcao/caixa quando um pedido novo
@@ -16,6 +37,8 @@ agente/consumidor local reivindica os jobs da fila.
 - `packages/db`: dono do schema, migration `print_jobs` e RLS.
 - `apps/api/src/printing/`: dono das rotas, montagem da comanda, claim, lease e
   conclusao idempotente.
+- `apps/api/src/orders/checkout.controller.ts`: unico toque fora do modulo de
+  impressao, para enfileirar a primeira via depois que o pedido e criado.
 - DTOs ficam internos ao modulo de API. Nao ha contrato compartilhado em
   `packages/contracts` neste desenho.
 
@@ -116,6 +139,16 @@ Chaves sugeridas:
 Pedido novo deve enfileirar automaticamente uma comanda para
 cozinha/balcao/caixa quando a loja tiver impressao ativa.
 
+No codigo atual, isso acontece no checkout: depois que `createOrder()` cria o
+pedido com sucesso, o controller chama a fila de impressao inicial. A chave
+idempotente da via automatica e:
+
+```text
+order:{orderId}:kitchen:v1
+```
+
+Com o modulo `printing.escpos` desligado, o checkout nao cria job de impressao.
+
 Segunda via e sempre manual: o operador clica em "Imprimir", a API cria outro
 `print_job` para o mesmo pedido com outra `idempotency_key`, e o agente imprime.
 
@@ -207,6 +240,28 @@ POST /v1/admin/printing/jobs/:id/failed
 
 Worker marca falha de impressao, com optimistic lock e `last_error`.
 
+## Arquivos implementados
+
+Modulo de impressao:
+
+- `apps/api/src/printing/printing.module.ts`;
+- `apps/api/src/printing/printing.controller.ts`;
+- `apps/api/src/printing/printing.service.ts`;
+- `apps/api/src/printing/print-job.repository.ts`;
+- `apps/api/src/printing/print-ticket.ts`;
+- `apps/api/src/printing/printing.tokens.ts`;
+- `apps/api/src/printing/dto/claim-print-job.dto.ts`;
+- `apps/api/src/printing/dto/create-print-job.dto.ts`;
+- `apps/api/src/printing/dto/finish-print-job.dto.ts`;
+- `apps/api/src/printing/print-ticket.test.ts`;
+- `apps/api/src/printing/printing.service.test.ts`;
+- `apps/api/src/printing/printing.e2e.test.ts`.
+
+Integracao minima com pedidos:
+
+- `apps/api/src/orders/orders.module.ts`;
+- `apps/api/src/orders/checkout.controller.ts`.
+
 ## RLS e worker
 
 Como `print_jobs` usa `FORCE ROW LEVEL SECURITY`, qualquer claim precisa de GUC
@@ -229,3 +284,36 @@ banco continua sendo a ultima linha de isolamento.
 - worker stale recebe conflito quando a versao ou lease nao batem;
 - RLS impede acesso cross-tenant.
 
+Cobertura atual:
+
+- unitarios de montagem da comanda;
+- unitarios de idempotencia, claim e conclusao;
+- e2e real contra Postgres/Neon para idempotencia, `FOR UPDATE SKIP LOCKED`,
+  re-lease expirado, optimistic lock stale e isolamento cross-tenant por RLS.
+
+Comandos usados no fechamento:
+
+```bash
+cd apps/api && pnpm exec dotenv -e ../../.env.local -- vitest run src/printing/printing.e2e.test.ts --no-file-parallelism
+pnpm lint
+pnpm test
+pnpm build
+```
+
+Resultado registrado: e2e isolado de impressao com 6 testes passando; suite
+unitaria padrao passando; build completo passando.
+
+## Proximo bloco
+
+O proximo passo do Epico 10 deve ser o consumidor da fila:
+
+1. no gestor, botao de segunda via no `OrderCard` chamando
+   `POST /v1/admin/printing/orders/:orderId/jobs`;
+2. agente/worker local autenticado por tenant fazendo poll em
+   `POST /v1/admin/printing/jobs/claim`;
+3. impressao fisica da `ticket_text`;
+4. confirmacao idempotente via `printed` ou `failed`.
+
+O contrato ja esta dentro da API. Se o consumidor precisar de tipos
+compartilhados com frontend/agente, reabrir a decisao antes de tocar em
+`packages/contracts`.
