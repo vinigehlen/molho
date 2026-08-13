@@ -12,7 +12,9 @@ Implementado ate aqui:
 - cobertura e2e de concorrencia/RLS no commit `1e0c0e3`;
 - botao de segunda via no gestor enfileirando job duravel;
 - consumidor navegador no gestor para provar `claim -> window.print() ->
-  printed/failed`.
+  printed/failed`;
+- app `@molho/print-agent` para consumir a fila em processo local e enviar a
+  comanda para stdout/comando do sistema.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -20,8 +22,8 @@ enfileira automaticamente a primeira via ao criar pedido quando o modulo
 
 Ainda falta para o epico ficar utilizavel na loja:
 
-- agente local ESC/POS para impressao silenciosa/fisica sem dialogo do
-  navegador;
+- empacotar/configurar o agente local para uma loja piloto;
+- driver/comando ESC/POS definitivo para a impressora escolhida;
 - configuracao/wizard de impressora ESC/POS, que fica no proximo bloco do Epico
   10 e nao muda a tabela.
 
@@ -39,6 +41,19 @@ duravel no piloto: ele reivindica jobs e abre `window.print()` com a
 `ticket_text`. Isso ainda nao e impressao silenciosa; se o operador cancelar o
 dialogo, o browser nao entrega confirmacao confiavel. A confirmacao real por
 dispositivo fica para o agente ESC/POS.
+
+O repo tambem tem um agente local em `apps/print-agent`. Ele usa Node 22, nao
+adiciona dependencia nova, e consome a mesma API:
+
+```text
+POST /v1/admin/printing/jobs/claim
+POST /v1/admin/printing/jobs/:id/printed
+POST /v1/admin/printing/jobs/:id/failed
+```
+
+Sem `MOLHO_PRINT_COMMAND`, o agente roda em dry-run e escreve a comanda no
+stdout. Com `MOLHO_PRINT_COMMAND`, envia `ticket_text` no stdin do comando local
+sem shell.
 
 ## Divisao de responsabilidade
 
@@ -292,6 +307,15 @@ Gestor:
 - `apps/backoffice/lib/printing-api.ts`;
 - `apps/backoffice/lib/printing-api.test.ts`.
 
+Agente local:
+
+- `apps/print-agent/src/config.ts`;
+- `apps/print-agent/src/api.ts`;
+- `apps/print-agent/src/printer.ts`;
+- `apps/print-agent/src/agent.ts`;
+- `apps/print-agent/src/main.ts`;
+- `apps/print-agent/README.md`.
+
 ## RLS e worker
 
 Como `print_jobs` usa `FORCE ROW LEVEL SECURITY`, qualquer claim precisa de GUC
@@ -337,10 +361,11 @@ unitaria padrao passando; build completo passando.
 
 O proximo passo do Epico 10 deve ser o consumidor da fila:
 
-1. agente local autenticado por tenant substituindo o consumidor navegador;
-2. impressao ESC/POS silenciosa da `ticket_text`;
-3. confirmacao idempotente via `printed` ou `failed` baseada no resultado real
-   do dispositivo;
+1. definir a impressora do piloto e o comando/driver real (`lp`, raw USB,
+   serial ou biblioteca ESC/POS);
+2. empacotar o agente para rodar no computador/tablet da loja com login/setup
+   seguro;
+3. substituir o consumidor navegador como caminho principal de producao;
 4. configuracao/wizard para escolher impressora, largura e teste de impressao.
 
 O contrato ja esta dentro da API. Se o consumidor precisar de tipos
