@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@molho/db';
+import { PrismaClient, encryptPhone, hashPhoneForLookup } from '@molho/db';
+import { parsePhoneNumber, phoneNumberToE164 } from '@molho/contracts';
 import Redis from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -65,6 +66,33 @@ async function getLastSentCode(): Promise<string> {
   return extractCode(last.message);
 }
 
+/**
+ * O verify de staff não cria mais User/user_role sozinho (fechado em
+ * staff-auth.controller.ts) — semeia os dois antes do login, mesmo padrão
+ * de auth.e2e.test.ts. scopeType 'platform'/scopeId null porque este
+ * arquivo não precisa de um tenant real pra testar sessões.
+ */
+async function seedStaffUser(phone: string): Promise<void> {
+  const e164 = phoneNumberToE164(parsePhoneNumber(phone));
+  const { ciphertext, keyVersion } = encryptPhone(e164);
+  const user = await migratorPrisma.user.create({
+    data: {
+      name: 'Staff E2E',
+      phoneCiphertext: Buffer.from(ciphertext),
+      phoneLookupHash: hashPhoneForLookup(e164),
+      phoneKeyVersion: keyVersion,
+    },
+  });
+  await migratorPrisma.userRole.create({
+    data: { userId: user.id, role: 'platform_support', scopeType: 'platform', scopeId: null },
+  });
+  createdUserPhoneHashes.push(user.phoneLookupHash);
+}
+
+// Seeding fica FORA de loginStaff (não em toda chamada): o mesmo telefone
+// loga duas vezes em alguns testes (2º dispositivo), e semear de novo bateria
+// no índice único de phoneLookupHash — cada teste semeia uma vez, antes do
+// 1º loginStaff daquele telefone.
 async function loginStaff(phone: string, userAgent: string): Promise<{ accessToken: string; userId: string }> {
   await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
   const code = await getLastSentCode();
@@ -79,11 +107,9 @@ async function loginStaff(phone: string, userAgent: string): Promise<{ accessTok
 describe('/v1/me/sessions', () => {
   it('lista, revoga um, revoga os outros e revoga tudo — fluxo completo com 2 dispositivos', async () => {
     const phone = randomPhone();
+    await seedStaffUser(phone);
 
-    const { accessToken: tokenDeviceA, userId } = await loginStaff(phone, 'device-A/1.0');
-    createdUserPhoneHashes.push(
-      (await migratorPrisma.user.findUniqueOrThrow({ where: { id: userId } })).phoneLookupHash,
-    );
+    const { accessToken: tokenDeviceA } = await loginStaff(phone, 'device-A/1.0');
 
     // 2º login do mesmo telefone precisa esperar o cooldown real de 60s.
     await new Promise((resolve) => setTimeout(resolve, 61_000));
@@ -149,10 +175,8 @@ describe('/v1/me/sessions', () => {
 
   it('revoga um deviceId específico que não é o seu: 204 idempotente (não existe -> nada a fazer)', async () => {
     const phone = randomPhone();
-    const { accessToken: token, userId } = await loginStaff(phone, 'device-solo/1.0');
-    createdUserPhoneHashes.push(
-      (await migratorPrisma.user.findUniqueOrThrow({ where: { id: userId } })).phoneLookupHash,
-    );
+    await seedStaffUser(phone);
+    const { accessToken: token } = await loginStaff(phone, 'device-solo/1.0');
 
     await request(app.getHttpServer())
       .delete('/v1/me/sessions/00000000-0000-0000-0000-000000000000')

@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@molho/db';
+import { PrismaClient, encryptPhone, hashPhoneForLookup } from '@molho/db';
+import { parsePhoneNumber, phoneNumberToE164 } from '@molho/contracts';
 import Redis from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -90,9 +91,33 @@ async function getLastSentCode(): Promise<string> {
   return extractCode(last.message);
 }
 
+/**
+ * O verify de staff não cria mais User/user_role sozinho (fechado nesta
+ * fatia) — o caminho de produção é convite/bootstrap, fora de escopo aqui.
+ * Semeia os dois direto pra exercitar o verify como ele roda depois disso.
+ */
+async function seedStaffUser(phone: string): Promise<string> {
+  const e164 = phoneNumberToE164(parsePhoneNumber(phone));
+  const { ciphertext, keyVersion } = encryptPhone(e164);
+  const user = await migratorPrisma.user.create({
+    data: {
+      name: 'Staff E2E',
+      phoneCiphertext: Buffer.from(ciphertext),
+      phoneLookupHash: hashPhoneForLookup(e164),
+      phoneKeyVersion: keyVersion,
+    },
+  });
+  await migratorPrisma.userRole.create({
+    data: { userId: user.id, role: 'owner', scopeType: 'tenant', scopeId: testTenantId },
+  });
+  createdUserPhoneHashes.push(user.phoneLookupHash);
+  return user.id;
+}
+
 describe('POST /v1/auth/otp (staff)', () => {
-  it('1º login (telefone novo): cria user, devolve accessToken/refreshToken/user', async () => {
+  it('1º login (telefone novo, já com papel): devolve accessToken/refreshToken/user', async () => {
     const phone = randomPhone();
+    const userId = await seedStaffUser(phone);
 
     await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
     const code = await getLastSentCode();
@@ -104,15 +129,48 @@ describe('POST /v1/auth/otp (staff)', () => {
 
     expect(res.body.accessToken).toBeTruthy();
     expect(res.body.refreshToken).toBeTruthy();
-    expect(res.body.user.id).toBeTruthy();
-
-    const created = await migratorPrisma.user.findUnique({ where: { id: res.body.user.id } });
-    expect(created).not.toBeNull();
-    createdUserPhoneHashes.push(created!.phoneLookupHash);
+    expect(res.body.user.id).toBe(userId);
   });
 
-  it('2º login do MESMO telefone: não duplica, devolve o mesmo user', async () => {
+  it('telefone sem user (nunca convidado): 400, mesma resposta de código inválido', async () => {
     const phone = randomPhone();
+    await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
+    const code = await getLastSentCode();
+
+    const res = await request(app.getHttpServer())
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code })
+      .expect(400);
+    expect(res.body.message).toBe('Código inválido ou expirado.');
+  });
+
+  it('user existe mas SEM user_role: 400, mesma resposta de código inválido (sem enumeração)', async () => {
+    const phone = randomPhone();
+    const e164 = phoneNumberToE164(parsePhoneNumber(phone));
+    const { ciphertext, keyVersion } = encryptPhone(e164);
+    const user = await migratorPrisma.user.create({
+      data: {
+        name: 'Staff sem papel E2E',
+        phoneCiphertext: Buffer.from(ciphertext),
+        phoneLookupHash: hashPhoneForLookup(e164),
+        phoneKeyVersion: keyVersion,
+      },
+    });
+    createdUserPhoneHashes.push(user.phoneLookupHash);
+
+    await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
+    const code = await getLastSentCode();
+
+    const res = await request(app.getHttpServer())
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code })
+      .expect(400);
+    expect(res.body.message).toBe('Código inválido ou expirado.');
+  });
+
+  it('2º login do MESMO telefone: devolve o mesmo user', async () => {
+    const phone = randomPhone();
+    const userId = await seedStaffUser(phone);
 
     await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
     const code1 = await getLastSentCode();
@@ -120,9 +178,7 @@ describe('POST /v1/auth/otp (staff)', () => {
       .post('/v1/auth/otp/verify')
       .send({ phone, code: code1 })
       .expect(200);
-    createdUserPhoneHashes.push(
-      (await migratorPrisma.user.findUniqueOrThrow({ where: { id: first.body.user.id } })).phoneLookupHash,
-    );
+    expect(first.body.user.id).toBe(userId);
 
     // 2º login precisa esperar o cooldown de 60s pra pedir outro OTP —
     // aqui simulamos direto pelo challenge store não seria e2e de verdade,
@@ -137,20 +193,11 @@ describe('POST /v1/auth/otp (staff)', () => {
       .expect(200);
 
     expect(second.body.user.id).toBe(first.body.user.id);
-
-    // Extrai e ASSERTA não-nulo antes de usar como seletor: `count({
-    // phoneLookupHash: null })` contaria todo staff criado por e-mail e o
-    // teste passaria/falharia por motivo errado. Ver nota do cleanup acima.
-    const { phoneLookupHash } = await migratorPrisma.user.findUniqueOrThrow({
-      where: { id: first.body.user.id },
-    });
-    expect(phoneLookupHash).not.toBeNull();
-    const count = await migratorPrisma.user.count({ where: { phoneLookupHash } });
-    expect(count).toBe(1);
   }, 70_000);
 
   it('verify errado 3x seguidas: 3ª falha com invalid, 4ª (mesmo com código certo) também falha', async () => {
     const phone = randomPhone();
+    await seedStaffUser(phone);
     await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
     const code = await getLastSentCode();
 

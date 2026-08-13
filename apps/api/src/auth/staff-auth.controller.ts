@@ -117,19 +117,26 @@ export class StaffAuthController {
     // pra e-mail.
     const challengeKey =
       identifier.channel === 'email' ? identifier.email : phoneNumberToE164(identifier.phone);
+    const invalidCode = () => new BadRequestException('Código inválido ou expirado.');
     const ok = await this.otpService.verifyOtp(SCOPE, identityOnly(challengeKey), dto.code, ip);
-    if (!ok) throw new BadRequestException('Código inválido ou expirado.');
+    if (!ok) throw invalidCode();
 
     return this.requestContext.run(
       { tenantId: PLATFORM_CONTEXT_TENANT_ID, isPlatform: true },
       async () => {
-        const { identity } =
+        const identity =
           identifier.channel === 'email'
-            ? await this.staffIdentity.findOrCreateByEmail(identifier.email)
-            : await this.staffIdentity.findOrCreateByPhone(identifier.phone);
+            ? await this.staffIdentity.findByEmail(identifier.email)
+            : await this.staffIdentity.findByPhone(identifier.phone);
+        // Sem identity, ou identity sem nenhum papel: mesma resposta genérica
+        // do código inválido — nunca distinguir "não achei" de "achei sem
+        // papel", senão o endpoint vira oráculo de enumeração de e-mail staff.
+        if (!identity) throw invalidCode();
+
         const userRepository = new PrismaUserAuthRepository(this.requestContext);
         const scopes = await userRepository.getRoleAssignments(identity.id);
         const roles = [...new Set(scopes.map((s) => s.role))];
+        if (roles.length === 0) throw invalidCode();
 
         const tokens = await this.tokenService.issueTokens(identity.id, roles, scopes, {
           ip,
