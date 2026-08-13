@@ -3,6 +3,18 @@ import type { Printer } from './printer.js';
 
 export type AgentOnceResult = 'idle' | 'printed' | 'failed' | 'stale';
 
+export interface AgentRunStats {
+  idle: number;
+  printed: number;
+  failed: number;
+  stale: number;
+  lastResult: AgentOnceResult | null;
+  lastJobId: string | null;
+  lastError: string | null;
+  startedAt: Date;
+  updatedAt: Date;
+}
+
 export interface AgentLogger {
   info(message: string): void;
   warn(message: string): void;
@@ -20,6 +32,7 @@ export async function runOnce({ api, printer, logger }: AgentDeps): Promise<Agen
   if (!job) return 'idle';
 
   try {
+    logger.info(`print_job ${job.id} reivindicado; pedido=${job.orderId} versao=${job.version}.`);
     await printer.print(job.ticketText, { cut: job.cut });
     const confirmed = await api.markPrinted(job);
     if (!confirmed) {
@@ -32,6 +45,38 @@ export async function runOnce({ api, printer, logger }: AgentDeps): Promise<Agen
     await markFailedQuietly(api, logger, job, error);
     return 'failed';
   }
+}
+
+export function createAgentRunStats(now: Date = new Date()): AgentRunStats {
+  return {
+    idle: 0,
+    printed: 0,
+    failed: 0,
+    stale: 0,
+    lastResult: null,
+    lastJobId: null,
+    lastError: null,
+    startedAt: now,
+    updatedAt: now,
+  };
+}
+
+export function recordAgentResult(stats: AgentRunStats, result: AgentOnceResult, now: Date = new Date()): AgentRunStats {
+  return {
+    ...stats,
+    [result]: stats[result] + 1,
+    lastResult: result,
+    lastError: null,
+    updatedAt: now,
+  };
+}
+
+export function recordAgentError(stats: AgentRunStats, error: unknown, now: Date = new Date()): AgentRunStats {
+  return {
+    ...stats,
+    lastError: error instanceof Error ? error.message : 'erro desconhecido',
+    updatedAt: now,
+  };
 }
 
 async function markFailedQuietly(

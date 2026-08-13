@@ -16,6 +16,8 @@ Obrigatorias:
 Opcionais:
 
 - `MOLHO_PRINT_WORKER_ID`: id estavel do worker. Default: `agent:{tenantId}`;
+- `MOLHO_PRINT_ONCE`: `1`/`true` para rodar uma unica iteracao e sair;
+- `MOLHO_PRINT_HEALTH_EVERY`: escreve um resumo a cada N polls. Default: `20`;
 - `MOLHO_PRINT_WIDTH`: largura pedida no claim. Default: `80`;
 - `MOLHO_PRINT_LEASE_SECONDS`: lease do job. Default: `120`;
 - `MOLHO_PRINT_POLL_MS`: intervalo entre polls. Default: `3000`;
@@ -32,6 +34,22 @@ MOLHO_API_URL=https://api.staging.molho.live \
 MOLHO_STAFF_ACCESS_TOKEN=... \
 MOLHO_TENANT_ID=... \
 pnpm --filter @molho/print-agent start
+```
+
+Para diagnostico, rode uma unica iteracao:
+
+```bash
+MOLHO_PRINT_ONCE=1 \
+MOLHO_API_URL=https://api.staging.molho.live \
+MOLHO_STAFF_ACCESS_TOKEN=... \
+MOLHO_TENANT_ID=... \
+pnpm --filter @molho/print-agent start
+```
+
+O agente escreve logs de claim, sucesso/falha e um resumo periodico:
+
+```text
+health: printed=3 failed=0 stale=0 idle=17 last=idle
 ```
 
 ## Impressao via comando do sistema

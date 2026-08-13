@@ -7,6 +7,8 @@ const CONFIG: PrintAgentConfig = {
   accessToken: 'token',
   tenantId: 'tenant-1',
   workerId: 'agent-1',
+  once: false,
+  healthEvery: 20,
   width: 80,
   leaseSeconds: 120,
   pollMs: 3_000,

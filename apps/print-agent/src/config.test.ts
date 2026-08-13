@@ -14,6 +14,8 @@ describe('readConfig', () => {
       accessToken: 'token',
       tenantId: 'tenant-1',
       workerId: 'agent:tenant-1',
+      once: false,
+      healthEvery: 20,
       width: 80,
       leaseSeconds: 120,
       pollMs: 3_000,
@@ -40,12 +42,29 @@ describe('readConfig', () => {
     });
   });
 
+  it('aceita modo once e intervalo de health check', () => {
+    expect(
+      readConfig({
+        ...BASE_ENV,
+        MOLHO_PRINT_ONCE: '1',
+        MOLHO_PRINT_HEALTH_EVERY: '5',
+      }),
+    ).toMatchObject({
+      once: true,
+      healthEvery: 5,
+    });
+  });
+
   it('rejeita args que não sejam array de strings', () => {
     expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_ARGS: '{"shell":"nope"}' })).toThrow(/JSON array/);
   });
 
   it('rejeita formato de impressão desconhecido', () => {
     expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_FORMAT: 'pdf' })).toThrow(/text.*escpos/);
+  });
+
+  it('rejeita booleano inválido no modo once', () => {
+    expect(() => readConfig({ ...BASE_ENV, MOLHO_PRINT_ONCE: 'sim' })).toThrow(/MOLHO_PRINT_ONCE/);
   });
 });
 

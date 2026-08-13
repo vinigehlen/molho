@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runOnce } from './agent.js';
+import { createAgentRunStats, recordAgentError, recordAgentResult, runOnce } from './agent.js';
 import type { PrintJob } from './api.js';
 
 const JOB: PrintJob = {
@@ -69,5 +69,22 @@ describe('runOnce', () => {
         logger,
       }),
     ).resolves.toBe('stale');
+  });
+});
+
+describe('run stats', () => {
+  it('contabiliza resultados e erros sem depender de estado global', () => {
+    const start = new Date('2026-08-13T20:00:00.000Z');
+    const later = new Date('2026-08-13T20:01:00.000Z');
+    const stats = recordAgentError(recordAgentResult(createAgentRunStats(start), 'printed', later), new Error('rede caiu'), later);
+
+    expect(stats).toMatchObject({
+      printed: 1,
+      failed: 0,
+      lastResult: 'printed',
+      lastError: 'rede caiu',
+      startedAt: start,
+      updatedAt: later,
+    });
   });
 });
