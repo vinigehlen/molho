@@ -19,6 +19,9 @@ Implementado ate aqui:
 - comando `test-print` do agente para cupom de teste local sem API/token.
 - wizard operacional em `apps/backoffice/app/gestor/impressao/page.tsx` com o
   caminho de setup do agente local para a loja piloto.
+- modo diagnostico do agente com `MOLHO_PRINT_ONCE=1` e health log periodico;
+- status operacional da fila em `GET /v1/admin/printing/status`, exibido no
+  wizard do gestor.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -91,6 +94,63 @@ loja piloto a validar a ponte local antes de ligar a fila real:
 O wizard nao cria contrato novo, nao pareia agente remotamente e nao persiste
 configuracao no banco. Essas escolhas evitam mexer fora do territorio aprovado
 do Epico 10 enquanto ainda entregam um caminho executavel para o piloto.
+
+## Status da fila
+
+O gestor consulta:
+
+```text
+GET /v1/admin/printing/status
+```
+
+Resposta interna do modulo:
+
+- `queued`: jobs aguardando agente;
+- `printing`: jobs em lease ativo ou vencido;
+- `failed`: jobs marcados como falha;
+- `stalePrinting`: jobs em `printing` com `lease_until < now()`, elegiveis para
+  re-claim;
+- `oldestQueuedAt`: job mais antigo ainda na fila;
+- `lastFailureAt` / `lastError`: ultima falha registrada.
+
+O endpoint e operacional: serve para o gestor mostrar se tem comanda presa ou
+falhando. Ele nao conclui, reprocessa nem altera estado.
+
+## Checklist da loja piloto
+
+1. Confirmar que o modulo `printing.escpos` esta ativo para o tenant.
+2. No computador ligado a impressora, confirmar que o sistema operacional ve a
+   fila local (`lpstat -p` no CUPS/macOS/Linux).
+3. Rodar o cupom local:
+
+   ```bash
+   pnpm --filter @molho/print-agent build
+   MOLHO_PRINT_COMMAND=lp \
+   MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
+   MOLHO_PRINT_FORMAT=escpos \
+   pnpm --filter @molho/print-agent test-print
+   ```
+
+4. Se o papel sair correto, rodar uma iteracao de diagnostico contra a API:
+
+   ```bash
+   MOLHO_PRINT_ONCE=1 \
+   MOLHO_API_URL=https://api.staging.molho.live \
+   MOLHO_STAFF_ACCESS_TOKEN=... \
+   MOLHO_TENANT_ID=... \
+   MOLHO_PRINT_COMMAND=lp \
+   MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
+   MOLHO_PRINT_FORMAT=escpos \
+   pnpm --filter @molho/print-agent start
+   ```
+
+5. Com o diagnostico ok, rodar continuo sem `MOLHO_PRINT_ONCE`.
+6. Abrir `Gestor -> Impressao` e verificar que `Na fila`, `Lease vencido` e
+   `Falhou` ficam em zero depois de imprimir.
+7. Criar um pedido guest e um verificado; ambos devem enfileirar a primeira via
+   automaticamente quando o modulo estiver ativo.
+8. Clicar em `Imprimir` no card do pedido para validar segunda via. Isso nao
+   muda status do pedido nem pagamento.
 
 ## Divisao de responsabilidade
 
