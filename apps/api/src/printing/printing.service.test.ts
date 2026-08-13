@@ -8,6 +8,7 @@ import type {
   FinishPrintJobParams,
   PrintJobRecord,
   PrintJobRepository,
+  PrintQueueStatus,
 } from './print-job.repository';
 import type { PrintTicketOrder } from './print-ticket';
 import type { RequestContextService } from '../context/request-context.service';
@@ -47,6 +48,15 @@ class FakeRepo implements PrintJobRepository {
   nextClaim: PrintJobRecord | null = null;
   printed = true;
   failed = true;
+  queueStatus: PrintQueueStatus = {
+    queued: 1,
+    printing: 2,
+    failed: 3,
+    stalePrinting: 1,
+    oldestQueuedAt: new Date('2026-08-13T22:43:00.000Z'),
+    lastFailureAt: new Date('2026-08-13T22:44:00.000Z'),
+    lastError: 'sem papel',
+  };
 
   async findOrderForTicket(): Promise<PrintTicketOrder | null> {
     return this.order;
@@ -67,6 +77,10 @@ class FakeRepo implements PrintJobRepository {
 
   async markFailed(_params: FailPrintJobParams): Promise<boolean> {
     return this.failed;
+  }
+
+  async getStatus(): Promise<PrintQueueStatus> {
+    return this.queueStatus;
   }
 }
 
@@ -170,5 +184,15 @@ describe('PrintingService', () => {
     await expect(
       service(repo).markFailed({ id: 'job-1', expectedVersion: 1, workerId: 'worker-1', error: 'sem papel' }),
     ).rejects.toThrow(PrintJobConflictError);
+  });
+
+  it('expoe resumo operacional da fila', async () => {
+    await expect(service(new FakeRepo()).status()).resolves.toMatchObject({
+      queued: 1,
+      printing: 2,
+      failed: 3,
+      stalePrinting: 1,
+      lastError: 'sem papel',
+    });
   });
 });

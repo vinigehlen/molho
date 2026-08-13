@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { fetchPrintQueueStatus, PrintingUnavailableError, type PrintQueueStatus } from '../../../lib/printing-api';
 
 const TEST_PRINT_COMMAND = `pnpm --filter @molho/print-agent build
 MOLHO_PRINT_COMMAND=lp \\
@@ -19,6 +20,26 @@ MOLHO_PRINT_FORMAT=escpos \\
 pnpm --filter @molho/print-agent start`;
 
 export default function ImpressaoPage() {
+  const [queueStatus, setQueueStatus] = useState<{ state: 'loading' | 'ready' | 'unavailable' | 'error'; data: PrintQueueStatus | null }>({
+    state: 'loading',
+    data: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPrintQueueStatus()
+      .then((data) => {
+        if (!cancelled) setQueueStatus({ state: 'ready', data });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setQueueStatus({ state: error instanceof PrintingUnavailableError ? 'unavailable' : 'error', data: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-bg p-4">
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -46,6 +67,8 @@ export default function ImpressaoPage() {
             agente local.
           </div>
         </section>
+
+        <QueueStatusCard status={queueStatus} />
 
         <section className="grid gap-4 md:grid-cols-2">
           <StepCard step="1" title="Instale e rode no computador da loja">
@@ -87,6 +110,80 @@ export default function ImpressaoPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function QueueStatusCard({
+  status,
+}: {
+  status: { state: 'loading' | 'ready' | 'unavailable' | 'error'; data: PrintQueueStatus | null };
+}) {
+  if (status.state === 'loading') {
+    return (
+      <section className="rounded-[20px] border border-border bg-bg-card p-4">
+        <h2 className="text-base font-semibold text-text">Fila de impressão</h2>
+        <p className="mt-2 text-sm text-text-muted">Carregando status…</p>
+      </section>
+    );
+  }
+
+  if (status.state === 'unavailable') {
+    return (
+      <section className="rounded-[20px] border border-caution bg-bg-card p-4">
+        <h2 className="text-base font-semibold text-text">Fila de impressão</h2>
+        <p className="mt-2 text-sm text-text-muted">O módulo de impressão não está ativo nesta loja.</p>
+      </section>
+    );
+  }
+
+  if (status.state === 'error' || !status.data) {
+    return (
+      <section className="rounded-[20px] border border-critical bg-bg-card p-4">
+        <h2 className="text-base font-semibold text-text">Fila de impressão</h2>
+        <p className="mt-2 text-sm text-critical">Não deu pra carregar o status da fila agora.</p>
+      </section>
+    );
+  }
+
+  const { queued, printing, failed, stalePrinting, oldestQueuedAt, lastFailureAt, lastError } = status.data;
+  return (
+    <section className="rounded-[20px] border border-border bg-bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-text">Fila de impressão</h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Resumo rápido para ver se tem comanda presa, em impressão ou falhando.
+          </p>
+        </div>
+        {failed > 0 || stalePrinting > 0 ? (
+          <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-white">atenção</span>
+        ) : (
+          <span className="rounded-full bg-positive px-3 py-1 text-xs font-medium text-white">ok</span>
+        )}
+      </div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+        <QueueMetric label="Na fila" value={queued} />
+        <QueueMetric label="Imprimindo" value={printing} />
+        <QueueMetric label="Lease vencido" value={stalePrinting} />
+        <QueueMetric label="Falhou" value={failed} />
+      </dl>
+      {(oldestQueuedAt || lastFailureAt || lastError) && (
+        <div className="mt-4 space-y-1 text-xs text-text-muted">
+          {oldestQueuedAt && <p>Mais antiga na fila: {new Date(oldestQueuedAt).toLocaleString('pt-BR')}</p>}
+          {lastFailureAt && <p>Última falha: {new Date(lastFailureAt).toLocaleString('pt-BR')}</p>}
+          {lastError && <p className="text-critical">Erro recente: {lastError}</p>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function QueueMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-[14px] bg-bg p-3">
+      <dt className="text-xs text-text-muted">{label}</dt>
+      <dd className="mt-1 text-xl font-semibold tabular-nums text-text">{value}</dd>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   PrintingUnavailableError,
   claimNextPrintJob,
+  fetchPrintQueueStatus,
   markPrintJobFailed,
   markPrintJobPrinted,
   queueKitchenTicketCopy,
@@ -60,6 +61,36 @@ describe('queueKitchenTicketCopy', () => {
     apiFetchMock.mockResolvedValueOnce(new Response(null, { status: 403 }));
 
     await expect(queueKitchenTicketCopy('order-1', 'print-copy-1')).rejects.toBeInstanceOf(PrintingUnavailableError);
+  });
+});
+
+describe('fetchPrintQueueStatus', () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+  });
+
+  it('carrega o resumo operacional da fila', async () => {
+    apiFetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          queued: 2,
+          printing: 1,
+          failed: 1,
+          stalePrinting: 1,
+          oldestQueuedAt: '2026-08-13T20:00:00.000Z',
+          lastFailureAt: '2026-08-13T20:01:00.000Z',
+          lastError: 'sem papel',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    await expect(fetchPrintQueueStatus()).resolves.toMatchObject({
+      queued: 2,
+      stalePrinting: 1,
+      lastError: 'sem papel',
+    });
+    expect(apiFetchMock).toHaveBeenCalledWith('/v1/admin/printing/status');
   });
 });
 

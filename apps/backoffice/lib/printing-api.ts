@@ -29,6 +29,24 @@ export class PrintingUnavailableError extends Error {
   }
 }
 
+export interface PrintQueueStatus {
+  queued: number;
+  printing: number;
+  failed: number;
+  stalePrinting: number;
+  oldestQueuedAt: string | null;
+  lastFailureAt: string | null;
+  lastError: string | null;
+}
+
+export async function fetchPrintQueueStatus(): Promise<PrintQueueStatus> {
+  const res = await apiFetch('/v1/admin/printing/status');
+
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (!res.ok) throw new Error(`Falha ao carregar status de impressão (${res.status})`);
+  return (await res.json()) as PrintQueueStatus;
+}
+
 /**
  * Segunda via durável: cada clique gera uma chave nova e cria um job separado.
  * A impressão física acontece no consumidor da fila; aqui só enfileiramos.

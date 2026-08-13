@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Get,
   NotFoundException,
   Param,
   Post,
@@ -30,6 +31,11 @@ import { PrintJobConflictError, PrintOrderNotFoundError, type PrintingService } 
 @RequirePermission('order.view')
 export class PrintingController {
   constructor(@Inject(PRINTING_SERVICE) private readonly printing: PrintingService) {}
+
+  @Get('status')
+  status() {
+    return this.printing.status();
+  }
 
   @Post('orders/:orderId/jobs')
   @HttpCode(HttpStatus.CREATED)
@@ -76,4 +82,3 @@ export class PrintingController {
     }
   }
 }
-

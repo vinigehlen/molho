@@ -7,6 +7,7 @@ import type {
   FinishPrintJobParams,
   PrintJobRecord,
   PrintJobRepository,
+  PrintQueueStatus,
 } from './print-job.repository';
 
 const INITIAL_TICKET_WIDTH = 80;
@@ -72,6 +73,10 @@ export class PrintingService {
   async markFailed(params: FailPrintJobParams): Promise<void> {
     const updated = await this.repo.markFailed(params);
     if (!updated) throw new PrintJobConflictError();
+  }
+
+  status(): Promise<PrintQueueStatus> {
+    return this.repo.getStatus();
   }
 
   private async isPrintingActive(): Promise<boolean> {

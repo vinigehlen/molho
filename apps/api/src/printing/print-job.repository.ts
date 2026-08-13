@@ -43,12 +43,23 @@ export interface FailPrintJobParams extends FinishPrintJobParams {
   error: string;
 }
 
+export interface PrintQueueStatus {
+  queued: number;
+  printing: number;
+  failed: number;
+  stalePrinting: number;
+  oldestQueuedAt: Date | null;
+  lastFailureAt: Date | null;
+  lastError: string | null;
+}
+
 export interface PrintJobRepository {
   findOrderForTicket(orderId: string): Promise<PrintTicketOrder | null>;
   createIdempotent(params: CreatePrintJobParams): Promise<PrintJobRecord>;
   claimNext(params: ClaimPrintJobParams): Promise<PrintJobRecord | null>;
   markPrinted(params: FinishPrintJobParams): Promise<boolean>;
   markFailed(params: FailPrintJobParams): Promise<boolean>;
+  getStatus(): Promise<PrintQueueStatus>;
 }
 
 const PRINT_JOB_SELECT = {
@@ -85,6 +96,16 @@ type RawPrintJobRow = {
   printed_at: Date | null;
 };
 
+type RawPrintQueueStatusRow = {
+  queued: bigint | number;
+  printing: bigint | number;
+  failed: bigint | number;
+  stale_printing: bigint | number;
+  oldest_queued_at: Date | null;
+  last_failure_at: Date | null;
+  last_error: string | null;
+};
+
 function toPrintJob(row: RawPrintJobRow): PrintJobRecord {
   return {
     id: row.id,
@@ -102,6 +123,10 @@ function toPrintJob(row: RawPrintJobRow): PrintJobRecord {
     createdAt: row.created_at,
     printedAt: row.printed_at,
   };
+}
+
+function toNumber(value: bigint | number): number {
+  return typeof value === 'bigint' ? Number(value) : value;
 }
 
 function returningPrintJobSql() {
@@ -239,5 +264,40 @@ export class PrismaPrintJobRepository implements PrintJobRepository {
       RETURNING "id"
     `;
     return rows.length > 0;
+  }
+
+  async getStatus(): Promise<PrintQueueStatus> {
+    const tenantId = this.requestContext.getTenantId();
+    const rows = await this.requestContext.getClient().$queryRaw<RawPrintQueueStatusRow[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE "status" = 'queued') AS "queued",
+        COUNT(*) FILTER (WHERE "status" = 'printing') AS "printing",
+        COUNT(*) FILTER (WHERE "status" = 'failed') AS "failed",
+        COUNT(*) FILTER (WHERE "status" = 'printing' AND "lease_until" < now()) AS "stale_printing",
+        MIN("created_at") FILTER (WHERE "status" = 'queued') AS "oldest_queued_at",
+        MAX("updated_at") FILTER (WHERE "status" = 'failed') AS "last_failure_at",
+        (
+          SELECT "last_error"
+          FROM "print_jobs"
+          WHERE "tenant_id" = ${tenantId}::uuid
+            AND "deleted_at" IS NULL
+            AND "status" = 'failed'
+          ORDER BY "updated_at" DESC
+          LIMIT 1
+        ) AS "last_error"
+      FROM "print_jobs"
+      WHERE "tenant_id" = ${tenantId}::uuid
+        AND "deleted_at" IS NULL
+    `;
+    const row = rows[0];
+    return {
+      queued: toNumber(row?.queued ?? 0),
+      printing: toNumber(row?.printing ?? 0),
+      failed: toNumber(row?.failed ?? 0),
+      stalePrinting: toNumber(row?.stale_printing ?? 0),
+      oldestQueuedAt: row?.oldest_queued_at ?? null,
+      lastFailureAt: row?.last_failure_at ?? null,
+      lastError: row?.last_error ?? null,
+    };
   }
 }
