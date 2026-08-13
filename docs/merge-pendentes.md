@@ -36,10 +36,26 @@ automático: o Vinicius revisa e mescla na ordem abaixo.
      - `CI=true pnpm --filter @molho/api run test:e2e`
      - Resultado e2e na ocasião: `10 passed (10)`, `75 passed (75)`, `0 skipped`.
 
-## Próxima fila sugerida
-
-Depois dos dois merges acima:
-
-1. Criar branch de UI do backoffice a partir do `main` atualizado.
-2. Território provável: `apps/backoffice`.
-3. Implementar UI de zonas e horários usando os contratos e endpoints já mesclados.
+3. `epico-6-ui-zona-horario`
+   - Commits:
+     - `cbc8dce adiciona clients de entrega do backoffice`
+     - `9259e28 adiciona tela de zonas e horários no gestor`
+   - Branch empilhada sobre: `epico-6-api-horario`
+   - Dependência de merge: só revisar/mesclar depois de `epico-6-api-zona` e
+     `epico-6-api-horario`.
+   - Território: `apps/backoffice`
+   - Conteúdo:
+     - client de zonas de entrega usando os contratos de admin
+     - client de horários da loja usando `GET/PUT /v1/admin/stores/:storeId/hours`
+     - rota `/gestor/entrega` para listar/criar/editar/excluir zonas por cidade
+     - zonas `polygon` aparecem read-only como "zona por raio — editar via suporte"
+     - grade semanal com N turnos por dia, dia fechado sem turnos e turno cruzando
+       meia-noite permitido
+   - Observação: enquanto o backoffice não expõe seletor/catálogo de lojas, a tela
+     recebe o `storeId` manualmente e salva o último valor no `localStorage`.
+   - Gate registrado na fatia:
+     - `CI=true pnpm --filter @molho/backoffice typecheck`
+     - `CI=true pnpm --filter @molho/backoffice test`
+     - `CI=true pnpm lint`
+     - `CI=true pnpm test`
+     - `CI=true pnpm build`
