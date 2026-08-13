@@ -9,13 +9,15 @@ function order(id: string, status: AdminOrder['status'], version = 0): AdminOrde
     version,
     createdAt: '2026-07-26T18:00:00.000Z',
     customerName: 'X',
+    customerVerified: true,
     paymentMethod: 'pix',
     paymentStatus: 'confirmado',
     changeForCents: null,
     subtotalCents: 100,
     deliveryFeeCents: 0,
     totalCents: 100,
-    delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null },
+    fulfillmentType: 'delivery',
+    delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
     items: [],
   };
 }

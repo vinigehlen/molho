@@ -12,7 +12,7 @@ import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
-import { KitchenTicket } from './kitchen-ticket';
+import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
 /** Próxima ação do fluxo por status (o botão "Avançar" do card). */
@@ -104,10 +104,22 @@ export default function GestorPage() {
   // Click-to-chat (Épico 11): qual pedido está com o sheet de aviso aberto.
   const [avisando, setAvisando] = useState<AdminOrder | null>(null);
 
-  // Comanda de cozinha (fallback do Épico 10): qual pedido está imprimindo
-  // agora. Nada é consumido — reimprimir a qualquer momento só reabre o
-  // mesmo diálogo com o MESMO order já em mão (nunca refetch).
-  const [imprimindo, setImprimindo] = useState<AdminOrder | null>(null);
+  // Segunda via durável (Épico 10): o botão só enfileira. Quem imprime de fato
+  // é o consumidor local da fila, via claim/printed/failed.
+  const [printFeedback, setPrintFeedback] = useState<Record<string, { state: 'queueing' | 'queued' | 'failed'; message: string }>>({});
+
+  async function queuePrintCopy(order: AdminOrder) {
+    setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queueing', message: 'Enfileirando…' } }));
+    try {
+      const key = `manual:${order.id}:${crypto.randomUUID()}`;
+      await queueKitchenTicketCopy(order.id, key);
+      setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queued', message: '2ª via na fila' } }));
+    } catch (error) {
+      const message = error instanceof PrintingUnavailableError ? 'Impressão não ativa' : 'Não deu pra enfileirar';
+      setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'failed', message } }));
+    }
+  }
+
   async function markPaid(order: AdminOrder) {
     setConfirmingId(order.id);
     try {
@@ -175,7 +187,8 @@ export default function GestorPage() {
                       onAdvance={(to) => void submit(order, to)}
                       onMarkPaid={() => void markPaid(order)}
                       onNotify={() => setAvisando(order)}
-                      onPrint={() => setImprimindo(order)}
+                      onPrint={() => void queuePrintCopy(order)}
+                      printFeedback={printFeedback[order.id] ?? null}
                     />
                   ))
                 : // skeletons no load
@@ -232,7 +245,6 @@ export default function GestorPage() {
       )}
 
       {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} />}
-      {imprimindo && <KitchenTicket order={imprimindo} onAfterPrint={() => setImprimindo(null)} />}
     </main>
   );
 }
@@ -246,6 +258,7 @@ function OrderCard({
   onMarkPaid,
   onNotify,
   onPrint,
+  printFeedback,
 }: {
   order: AdminOrder;
   pending: boolean;
@@ -255,8 +268,10 @@ function OrderCard({
   onMarkPaid: () => void;
   onNotify: () => void;
   onPrint: () => void;
+  printFeedback: { state: 'queueing' | 'queued' | 'failed'; message: string } | null;
 }) {
   const next = NEXT_ACTION[order.status];
+  const printDisabled = printFeedback?.state === 'queueing';
   return (
     <article className="rounded-[14px] border border-border bg-bg p-3">
       {/* Nome + horário + valor: a TRÍADE de reconciliação do PIX estático (§5.5) —
@@ -285,16 +300,27 @@ function OrderCard({
         {pending ? (
           <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
         ) : (
-          <div className="flex gap-2">
-            {/* Comanda de cozinha (fallback do Épico 10, docs/02 §6) — sem
-                network, reimprime a qualquer momento, o pedido já está em mão. */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Segunda via durável (Épico 10): cria `print_job`; o agente local
+                imprime depois pelo claim da fila. Não muda estado do pedido. */}
             <button
               className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+              disabled={printDisabled}
               onClick={onPrint}
               aria-label="Imprimir comanda"
             >
-              🖨️
+              {printDisabled ? 'Enfileirando…' : '🖨️ Imprimir'}
             </button>
+            {printFeedback && printFeedback.state !== 'queueing' && (
+              <span
+                className={`text-[11px] ${
+                  printFeedback.state === 'queued' ? 'text-positive' : 'text-critical'
+                }`}
+                aria-live="polite"
+              >
+                {printFeedback.message}
+              </span>
+            )}
             {/* Click-to-chat (Épico 11): só precisa de rede quando o sheet abre
                 (busca o telefone), então não é gateado por `online` como o
                 "Marcar pago". */}

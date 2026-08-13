@@ -9,7 +9,8 @@ Implementado ate aqui:
 - migration `print_jobs` + RLS em `packages/db` no commit `be2caae`;
 - documentacao inicial da fila no commit `1d48e79`;
 - modulo de API em `apps/api/src/printing/` no commit `7b30581`;
-- cobertura e2e de concorrencia/RLS no commit `1e0c0e3`.
+- cobertura e2e de concorrencia/RLS no commit `1e0c0e3`;
+- botao de segunda via no gestor enfileirando job duravel.
 
 O modulo de API ja consome a tabela duravel, monta a comanda como snapshot,
 enfileira automaticamente a primeira via ao criar pedido quando o modulo
@@ -19,7 +20,6 @@ Ainda falta para o epico ficar utilizavel na loja:
 
 - consumidor/agente local que faz poll de `claim`, imprime fisicamente e chama
   `printed`/`failed`;
-- UI do gestor para segunda via manual no `OrderCard`;
 - configuracao/wizard de impressora ESC/POS, que fica no proximo bloco do
   Epico 10 e nao muda a tabela.
 
@@ -152,6 +152,21 @@ Com o modulo `printing.escpos` desligado, o checkout nao cria job de impressao.
 Segunda via e sempre manual: o operador clica em "Imprimir", a API cria outro
 `print_job` para o mesmo pedido com outra `idempotency_key`, e o agente imprime.
 
+No gestor atual, o botao vive no `OrderCard` em
+`apps/backoffice/app/gestor/page.tsx`. Ele chama
+`queueKitchenTicketCopy()` em `apps/backoffice/lib/printing-api.ts`, que por sua
+vez chama:
+
+```text
+POST /v1/admin/printing/orders/:orderId/jobs
+```
+
+Cada clique gera uma chave nova no formato:
+
+```text
+manual:{orderId}:{randomUUID}
+```
+
 Reimprimir nao consome estado:
 
 - nao altera status do pedido;
@@ -262,6 +277,12 @@ Integracao minima com pedidos:
 - `apps/api/src/orders/orders.module.ts`;
 - `apps/api/src/orders/checkout.controller.ts`.
 
+Gestor:
+
+- `apps/backoffice/app/gestor/page.tsx`;
+- `apps/backoffice/lib/printing-api.ts`;
+- `apps/backoffice/lib/printing-api.test.ts`.
+
 ## RLS e worker
 
 Como `print_jobs` usa `FORCE ROW LEVEL SECURITY`, qualquer claim precisa de GUC
@@ -307,12 +328,11 @@ unitaria padrao passando; build completo passando.
 
 O proximo passo do Epico 10 deve ser o consumidor da fila:
 
-1. no gestor, botao de segunda via no `OrderCard` chamando
-   `POST /v1/admin/printing/orders/:orderId/jobs`;
-2. agente/worker local autenticado por tenant fazendo poll em
+1. agente/worker local autenticado por tenant fazendo poll em
    `POST /v1/admin/printing/jobs/claim`;
-3. impressao fisica da `ticket_text`;
-4. confirmacao idempotente via `printed` ou `failed`.
+2. impressao fisica da `ticket_text`;
+3. confirmacao idempotente via `printed` ou `failed`;
+4. configuracao/wizard para escolher impressora, largura e teste de impressao.
 
 O contrato ja esta dentro da API. Se o consumidor precisar de tipos
 compartilhados com frontend/agente, reabrir a decisao antes de tocar em

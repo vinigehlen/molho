@@ -9,12 +9,14 @@ function order(id: string, status: AdminOrder['status']): AdminOrder {
     version: 0,
     createdAt: '2026-07-26T18:00:00.000Z',
     customerName: 'X',
+    customerVerified: true,
     paymentMethod: 'pix',
     paymentStatus: 'confirmado',
     changeForCents: null,
     subtotalCents: 100,
     deliveryFeeCents: 0,
     totalCents: 100,
+    fulfillmentType: 'delivery',
     delivery: {
       label: 'Casa',
       street: 'R',
@@ -25,6 +27,7 @@ function order(id: string, status: AdminOrder['status']): AdminOrder {
       state: 'RS',
       postalCode: null,
       referencePoint: null,
+      postalCodeVerified: false,
     },
     items: [],
   };
