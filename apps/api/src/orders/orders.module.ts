@@ -12,6 +12,7 @@ import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
 import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
+import { PrintingModule } from '../printing/printing.module';
 import { CustomerIdentityRepository } from '../auth/customer-identity.repository';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { PrismaDeliveryMatchRepository } from '../storefront/delivery-match.repository';
@@ -56,7 +57,7 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  * precisam.
  */
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule],
   controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController],
   providers: [
     StreamCookieAuthGuard,

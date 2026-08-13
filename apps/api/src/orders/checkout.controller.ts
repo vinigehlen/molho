@@ -15,8 +15,10 @@ import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dt
 import { CheckoutOrderRequestDto, toGuestCustomer } from './dto/checkout-order-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
+import { PRINTING_SERVICE } from '../printing/printing.tokens';
 import type { CheckoutOrderService } from './checkout-order.service';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
+import type { PrintingService } from '../printing/printing.service';
 import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
@@ -34,6 +36,7 @@ export class CheckoutController {
     @Inject(CHECKOUT_REVALIDATION_SERVICE) private readonly revalidationService: CheckoutRevalidationService,
     @Inject(CHECKOUT_ORDER_SERVICE) private readonly orderService: CheckoutOrderService,
     @Inject(RequestContextService) private readonly requestContext: RequestContextService,
+    @Inject(PRINTING_SERVICE) private readonly printing: PrintingService,
   ) {}
 
   /**
@@ -96,6 +99,8 @@ export class CheckoutController {
       res.status(HttpStatus.CONFLICT);
       return result.revalidation;
     }
+
+    await this.printing.queueInitialOrderTicketIfActive(result.response.orderId);
 
     // Enfileira o cutuque de "pedido novo" — flush após o commit da criação
     // (OrderPublishInterceptor). version 0 = pedido recém-nascido.

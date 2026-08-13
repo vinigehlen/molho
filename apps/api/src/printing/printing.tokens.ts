@@ -1,0 +1,3 @@
+export const PRINTING_SERVICE = Symbol('PRINTING_SERVICE');
+export const PRINT_JOB_REPOSITORY = Symbol('PRINT_JOB_REPOSITORY');
+
