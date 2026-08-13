@@ -153,6 +153,7 @@ model Tenant {
   orderItems           OrderItem[]
   orderItemModifiers   OrderItemModifier[]
   orderStatusHistories OrderStatusHistory[]
+  printJobs            PrintJob[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -730,6 +731,7 @@ model Order {
   deliveryAddress Address?             @relation(fields: [deliveryAddressId], references: [id])
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
+  printJobs       PrintJob[]
 
   // FKs compostas (store_id/customer_id/delivery_address_id, tenant_id) →
   // stores/customers/addresses(id, tenant_id) na migration.
@@ -861,6 +863,68 @@ model OrderStatusHistory {
   // atribuição de autoria.
   @@index([tenantId, orderId, createdAt])
   @@map("order_status_history")
+}
+
+/// Épico 10 (impressão ESC/POS) — módulo consumidor em apps/api/src/printing/.
+enum PrintJobStatus {
+  queued
+  printing
+  printed
+  failed
+}
+
+/// Fila de impressão de comanda (Épico 10). O worker (fora deste pacote)
+/// reivindica um job com `SELECT ... FOR UPDATE SKIP LOCKED` (resolve QUEM
+/// pega o job — corrida de claim), e conclui com optimistic lock
+/// (`WHERE id = ? AND version = ? AND status = 'printing' AND leased_by = ?`
+/// — resolve um worker ZUMBI escrevendo depois que outro já reivindicou o
+/// mesmo job por lease expirado). As duas travas não são redundantes: cada
+/// uma fecha uma corrida diferente.
+model PrintJob {
+  id             String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  orderId        String         @map("order_id") @db.Uuid
+  /// Par com tenant_id no UNIQUE — reenvio do módulo consumidor (retry de
+  /// rede, reconexão do agente) não duplica o job.
+  idempotencyKey String         @map("idempotency_key")
+  status         PrintJobStatus @default(queued)
+  /// Conteúdo já renderizado (snapshot) — o job nunca recalcula nada do
+  /// pedido depois de criado, mesmo princípio de OrderItem.name.
+  ticketText     String         @map("ticket_text")
+  /// Largura da impressora em mm (58/80mm, docs/02 §6).
+  width          Int
+  /// Sem @default: decisão explícita de quem cria o job, nunca "cai" em
+  /// cortar (ou não) o papel por omissão.
+  cut            Boolean
+  attempts       Int            @default(0)
+  /// `NULL` = não leaseado. Setado/limpo junto com `leasedBy` — os dois
+  /// vivem e morrem juntos no ciclo de claim/release do worker.
+  leaseUntil     DateTime?      @map("lease_until")
+  /// Id do worker (opaco pro schema — só o módulo consumidor sabe o que é).
+  /// Usado no WHERE do update de conclusão pra barrar worker zumbi
+  /// pós-lease-expirado escrevendo por cima de quem reivindicou depois.
+  leasedBy       String?        @map("leased_by")
+  lastError      String?        @map("last_error")
+  /// Optimistic lock — ver comentário do model. `WHERE version = :esperado`
+  /// no update; 0 linhas = perdeu a corrida (mesma convenção do CLAUDE.md).
+  version        Int            @default(0)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  printedAt      DateTime?      @map("printed_at")
+  deletedAt      DateTime?      @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  // FK composta (order_id, tenant_id) → orders(id, tenant_id) na migration —
+  // mesmo guardrail de order_items: impede job apontar pra pedido de OUTRO
+  // tenant mesmo com bug de aplicação.
+  @@unique([tenantId, idempotencyKey])
+  // Índice parcial FIFO dos pendentes vive só na migration (SQL à mão,
+  // Prisma não expressa índice parcial) — ver CLAUDE.md § convenções de
+  // schema.
+  @@index([tenantId, orderId])
+  @@map("print_jobs")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────
