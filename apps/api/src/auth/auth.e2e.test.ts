@@ -76,20 +76,27 @@ beforeAll(async () => {
     data: { slug: testTenantSlug, name: 'E2E Test Tenant', timezone: 'America/Sao_Paulo' },
   });
   testTenantId = tenant.id;
-});
+}, 30_000);
 
 afterAll(async () => {
-  for (const id of [testTenantId, ...extraTenantIds]) {
-    await migratorPrisma.customer.deleteMany({ where: { tenantId: id } });
-    await migratorPrisma.tenant.delete({ where: { id } }).catch(() => {}); // já pode ter sido apagado
+  if (typeof migratorPrisma !== 'undefined') {
+    // beforeAll com timeout NÃO cancela a Promise. Se ele falhar antes de
+    // preencher testTenantId, nunca montar `where: { tenantId: undefined }`:
+    // Prisma omite undefined e transformaria o cleanup em deleteMany GLOBAL.
+    const tenantIds = [...extraTenantIds];
+    if (typeof testTenantId === 'string') tenantIds.unshift(testTenantId);
+    for (const id of tenantIds) {
+      await migratorPrisma.customer.deleteMany({ where: { tenantId: id } });
+      await migratorPrisma.tenant.delete({ where: { id } }).catch(() => {}); // já pode ter sido apagado
+    }
+    for (const hash of createdUserPhoneHashes) {
+      if (!hash) continue;
+      await migratorPrisma.user.deleteMany({ where: { phoneLookupHash: hash } });
+    }
+    await migratorPrisma.$disconnect();
   }
-  for (const hash of createdUserPhoneHashes) {
-    if (!hash) continue;
-    await migratorPrisma.user.deleteMany({ where: { phoneLookupHash: hash } });
-  }
-  await migratorPrisma.$disconnect();
-  await app.close();
-});
+  if (typeof app !== 'undefined') await app.close();
+}, 30_000);
 
 async function getLastSentCode(): Promise<string> {
   const mock = app.get<MockMessagingProvider>(MESSAGING_PROVIDER);

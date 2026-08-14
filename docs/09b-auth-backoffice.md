@@ -33,7 +33,8 @@ Status: implementado na branch `codex/epico-9b-login-staff`, aguardando revisão
 - Unitários backoffice: 76/76, incluindo sessão somente em memória, retry após `401` e deduplicação de refresh concorrente na aba/entre abas.
 - Build isolado do backoffice: verde; rota `/login` gerada.
 - Gate padrão raiz: `pnpm lint && pnpm test && pnpm build` verde.
-- E2E real de auth: duas rodadas bloqueadas pela flakiness conhecida do Neon (`P2028` ao iniciar/commit de transações). Na rodada completa, 11/13 falharam, inclusive testes antigos de customer; na rodada focada, os três casos novos falharam no `POST /otp/verify` antes de alcançar cookie/refresh/logout. Não marcar e2e real como verde até uma nova rodada conseguir falar de forma estável com o banco.
+- E2E real de auth: três rodadas funcionais bloqueadas pela flakiness conhecida do Neon (`P2028` ao iniciar/commit de transações). Na rodada completa, 11/13 falharam, inclusive testes antigos de customer; nas duas rodadas focadas, os três casos novos falharam no `POST /otp/verify` antes de alcançar cookie/refresh/logout. Uma tentativa adicional parou no `beforeAll` e revelou o risco de cleanup descrito abaixo. Não marcar e2e real como verde até uma nova rodada conseguir falar de forma estável com o banco.
+- Hardening do e2e: `beforeAll`/`afterAll` agora têm 30s e o cleanup só inclui `testTenantId` quando ele foi realmente atribuído. Antes, timeout do hook seguido por `deleteMany({ tenantId: undefined })` faria o Prisma omitir o filtro e tentar apagar todos os customers do ambiente; a FK de orders impediu o dano na rodada que revelou o bug.
 
 ## Antes do deploy
 
