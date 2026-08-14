@@ -13,8 +13,8 @@ interface Nudge {
 interface Handlers {
   /** Cutuque do stream: o board refaz o GET REST deste pedido (RLS). */
   onNudge: (nudge: Nudge) => void;
-  /** token_expired: sessão morta. No dev, redireciona pro login; o 9b faz refresh + re-arm AQUI. */
-  onExpired: () => void;
+  /** Renova a sessão; true reconecta e rearma o cookie, false encerra. */
+  onExpired: () => boolean | Promise<boolean>;
 }
 
 /**
@@ -83,9 +83,15 @@ export function useOrdersStream(tenantId: string | null, handlers: Handlers): St
         scheduleReconnect(true);
       });
       source.addEventListener('token_expired', () => {
-        stopped = true;
         source.close();
-        handlersRef.current.onExpired();
+        void Promise.resolve(handlersRef.current.onExpired()).then((renewed) => {
+          if (renewed) {
+            attempt = 0;
+            scheduleReconnect(true);
+          } else {
+            stopped = true;
+          }
+        });
       });
       source.onerror = () => {
         source.close();

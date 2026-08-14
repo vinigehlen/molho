@@ -1,7 +1,7 @@
 import { markReachable, markUnreachable } from './reachability';
 import { getStaffSession, type StaffSession } from './staff-session';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { refreshStaffSession } from './staff-auth';
+import { API_URL } from './api-config';
 
 /**
  * Headers de auth de staff: Bearer (escrita/leitura por header) + X-Tenant-Id.
@@ -25,11 +25,14 @@ export function authHeaders(session: StaffSession | null, base?: HeadersInit): H
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: authHeaders(getStaffSession(), init?.headers),
-      credentials: 'include',
-    });
+    const send = () =>
+      fetch(`${API_URL}${path}`, {
+        ...init,
+        headers: authHeaders(getStaffSession(), init?.headers),
+        credentials: 'include',
+      });
+    let res = await send();
+    if (res.status === 401 && getStaffSession() && (await refreshStaffSession())) res = await send();
     markReachable(); // respondeu (mesmo 4xx/5xx) = API alcançável
     return res;
   } catch (err) {

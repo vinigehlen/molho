@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
+import { logoutStaffSession, refreshStaffSession } from '../../lib/staff-auth';
 import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
@@ -14,6 +15,7 @@ import { useOrderQueue } from '../../lib/use-order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
+import { disarmStream } from '../../lib/api-client';
 import { PrintJobConsumer } from './print-job-consumer';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
@@ -34,6 +36,7 @@ export default function GestorPage() {
   const router = useRouter();
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState('');
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
@@ -67,11 +70,12 @@ export default function GestorPage() {
   useEffect(() => {
     const session = getStaffSession();
     if (!session) {
-      router.replace('/dev-login');
+      router.replace('/login');
       return;
     }
     setTenantId(session.tenantId);
     setUserId(session.userId);
+    setTenantName(session.tenantName);
     fetchActiveOrders()
       .then(setOrders)
       .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar.'));
@@ -83,7 +87,11 @@ export default function GestorPage() {
       const fetched = await fetchOrder(orderId).catch(() => null);
       setOrders((prev) => (prev ? applyOrderUpdate(prev, orderId, fetched) : prev));
     },
-    onExpired: () => router.replace('/dev-login'),
+    onExpired: async () => {
+      const session = await refreshStaffSession();
+      if (!session) router.replace('/login');
+      return session !== null;
+    },
   });
 
   // Mantém a tela do tablet acesa enquanto logado (re-pede ao voltar o foco).
@@ -94,7 +102,7 @@ export default function GestorPage() {
   const online = useReachability();
 
   // Fila offline: submit (online aplica / offline enfileira), sync na volta, conflitos.
-  const { pending, conflicts, autoApplied, submit, resolveConflict } = useOrderQueue(tenantId, userId, online);
+  const { pending, conflicts, autoApplied, submit, sync, resolveConflict } = useOrderQueue(tenantId, userId, online);
   const pendingIds = new Set(pending.map((i) => i.orderId));
 
   // Confirmação de pagamento (item 6). Refetch pós-confirm atualiza board+painel;
@@ -109,6 +117,38 @@ export default function GestorPage() {
   // Segunda via durável (Épico 10): o botão só enfileira. Quem imprime de fato
   // é o consumidor local da fila, via claim/printed/failed.
   const [printFeedback, setPrintFeedback] = useState<Record<string, { state: 'queueing' | 'queued' | 'failed'; message: string }>>({});
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function logout() {
+    if (pending.length > 0) {
+      if (!online) {
+        const confirmed = window.confirm(
+          `Há ${pending.length} ação(ões) ainda no aparelho. Elas ficam guardadas para o próximo login neste restaurante. Sair mesmo assim?`,
+        );
+        if (!confirmed) return;
+      } else {
+        const unresolved = await sync();
+        if (unresolved > 0) {
+          setError('Há ações pendentes que precisam da sua decisão antes de sair.');
+          return;
+        }
+      }
+    }
+
+    setLoggingOut(true);
+    setError(null);
+    try {
+      let disarmed = await disarmStream();
+      if (!disarmed.ok) disarmed = await disarmStream();
+      if (!disarmed.ok) throw new Error('Não foi possível encerrar o tempo real. Tente novamente.');
+      if (!(await logoutStaffSession())) throw new Error('Não foi possível encerrar sua sessão. Tente novamente.');
+      router.replace('/login');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível sair agora.');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   async function queuePrintCopy(order: AdminOrder) {
     setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queueing', message: 'Enfileirando…' } }));
@@ -148,7 +188,10 @@ export default function GestorPage() {
   return (
     <main className="min-h-screen bg-bg p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-text">Pedidos</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-text">Pedidos</h1>
+          {tenantName && <p className="text-xs text-text-muted">{tenantName}</p>}
+        </div>
         <div className="flex items-center gap-2">
           {!online ? (
             <span className="rounded-full bg-critical px-3 py-1 text-xs font-medium text-white">
@@ -175,6 +218,13 @@ export default function GestorPage() {
           <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/entrega">
             🛵 Entrega
           </Link>
+          <button
+            className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text disabled:opacity-50"
+            onClick={() => void logout()}
+            disabled={loggingOut}
+          >
+            {loggingOut ? 'Saindo…' : 'Sair'}
+          </button>
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>

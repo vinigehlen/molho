@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstTenantScopeId } from './jwt-tenant';
+import { subFromToken } from './jwt-tenant';
 
 /** Monta um JWT falso (header.payload.sig) com o payload dado — só o meio importa. */
 function jwt(payload: unknown): string {
@@ -7,27 +7,17 @@ function jwt(payload: unknown): string {
   return `h.${b64}.s`;
 }
 
-describe('firstTenantScopeId', () => {
-  it('pega o scopeId do primeiro scope de tenant', () => {
-    const token = jwt({
-      scopes: [
-        { scopeType: 'platform', scopeId: null },
-        { scopeType: 'tenant', scopeId: 'tenant-abc' },
-      ],
-    });
-    expect(firstTenantScopeId(token)).toBe('tenant-abc');
-  });
-
-  it('sem scope de tenant: null', () => {
-    expect(firstTenantScopeId(jwt({ scopes: [{ scopeType: 'platform', scopeId: null }] }))).toBeNull();
-  });
-
+describe('subFromToken', () => {
   it('token malformado: null, não lança', () => {
-    expect(firstTenantScopeId('nao-e-jwt')).toBeNull();
-    expect(firstTenantScopeId('')).toBeNull();
+    expect(subFromToken('nao-e-jwt')).toBeNull();
+    expect(subFromToken('')).toBeNull();
   });
 
-  it('payload sem scopes: null', () => {
-    expect(firstTenantScopeId(jwt({ sub: 'u1' }))).toBeNull();
+  it('extrai o userId do access token', () => {
+    expect(subFromToken(jwt({ sub: 'u1' }))).toBe('u1');
+  });
+
+  it('payload sem sub: null', () => {
+    expect(subFromToken(jwt({ roles: ['owner'] }))).toBeNull();
   });
 });

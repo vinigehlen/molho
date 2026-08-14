@@ -1,4 +1,3 @@
-import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
@@ -23,24 +22,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-
-  // Em produção, SUBSTITUI o módulo `dev-only-auth` (atalho de login só-dev,
-  // débito docs/07) por um stub vazio. O import dinâmico do Next emite o chunk
-  // pro disco mesmo com o call site morto — então dead-code no call site não
-  // basta pra tirar o código que obtém OTP/JWT do bundle. Esta substituição
-  // garante que o código real simplesmente NÃO É empacotado em prod. Removível
-  // junto com o stub quando o Épico 9b entrar.
-  webpack: (config, { dev, webpack }) => {
-    if (!dev) {
-      config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
-          /dev-only-auth$/,
-          path.resolve(__dirname, 'lib/dev-only-auth.prod-stub.ts'),
-        ),
-      );
-    }
-    return config;
   },
 };
 

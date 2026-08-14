@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearStaffSession, getStaffSession, setStaffSession } from './staff-session';
+import { clearStaffSession, getPreferredTenantId, getStaffSession, setStaffSession } from './staff-session';
 
-beforeEach(() => window.sessionStorage.clear());
+const SESSION = { accessToken: 'tok', tenantId: 'tenant-1', tenantName: 'Cabanhas BBQ', userId: 'u1' };
+
+beforeEach(() => {
+  clearStaffSession();
+  window.sessionStorage.clear();
+});
 
 describe('staff-session', () => {
   it('set → get devolve a sessão', () => {
-    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
-    expect(getStaffSession()).toEqual({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
+    setStaffSession(SESSION);
+    expect(getStaffSession()).toEqual(SESSION);
   });
 
   it('sem nada gravado: null', () => {
@@ -14,18 +19,19 @@ describe('staff-session', () => {
   });
 
   it('clear remove', () => {
-    setStaffSession({ accessToken: 'tok', tenantId: 'tenant-1', userId: 'u1' });
+    setStaffSession(SESSION);
     clearStaffSession();
     expect(getStaffSession()).toBeNull();
   });
 
-  it('storage corrompido (JSON inválido): null, não lança', () => {
-    window.sessionStorage.setItem('molho.staff-session', '{nao-e-json');
+  it('não recupera credencial do storage depois de limpar a memória', () => {
+    window.sessionStorage.setItem('molho.staff-session', JSON.stringify(SESSION));
     expect(getStaffSession()).toBeNull();
   });
 
-  it('storage sem os campos certos: null', () => {
-    window.sessionStorage.setItem('molho.staff-session', JSON.stringify({ accessToken: 'x' }));
-    expect(getStaffSession()).toBeNull();
+  it('persiste somente o tenant preferido', () => {
+    setStaffSession(SESSION);
+    expect(getPreferredTenantId()).toBe('tenant-1');
+    expect(window.sessionStorage.getItem('molho.staff-session')).toBeNull();
   });
 });

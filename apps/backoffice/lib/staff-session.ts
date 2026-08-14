@@ -1,9 +1,8 @@
 /**
- * Sessão de staff do backoffice: access token + tenant ativo. COMPARTILHADO —
- * o login real (Épico 9b) popula isto do mesmo jeito; o `dev-only-auth` é só um
- * atalho pra CHEGAR no token em dev. `sessionStorage` de propósito: some ao
- * fechar a aba (é ferramenta de balcão, não "lembrar de mim"; tablet
- * compartilhado entre turnos não deve carregar sessão de quem saiu).
+ * Sessão de staff do backoffice: access token curto + tenant ativo. O token
+ * fica SOMENTE em memória; reload recupera um novo access pelo refresh cookie
+ * httpOnly da API. sessionStorage guarda apenas a preferência de tenant, nunca
+ * credencial.
  */
 export interface StaffSession {
   accessToken: string;
@@ -11,31 +10,27 @@ export interface StaffSession {
   tenantId: string;
   /** userId (sub do JWT) — marca autoria dos intents da fila offline (tablet compartilhado). */
   userId: string;
+  tenantName: string;
 }
 
-const KEY = 'molho.staff-session';
+const TENANT_KEY = 'molho.staff-tenant';
+let currentSession: StaffSession | null = null;
 
 export function getStaffSession(): StaffSession | null {
-  if (typeof window === 'undefined') return null;
-  const raw = window.sessionStorage.getItem(KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<StaffSession>;
-    if (typeof parsed.accessToken === 'string' && typeof parsed.tenantId === 'string' && typeof parsed.userId === 'string') {
-      return { accessToken: parsed.accessToken, tenantId: parsed.tenantId, userId: parsed.userId };
-    }
-  } catch {
-    // storage corrompido — trata como sem sessão
-  }
-  return null;
+  return currentSession;
 }
 
 export function setStaffSession(session: StaffSession): void {
-  if (typeof window === 'undefined') return;
-  window.sessionStorage.setItem(KEY, JSON.stringify(session));
+  currentSession = session;
+  if (typeof window !== 'undefined') window.sessionStorage.setItem(TENANT_KEY, session.tenantId);
 }
 
 export function clearStaffSession(): void {
-  if (typeof window === 'undefined') return;
-  window.sessionStorage.removeItem(KEY);
+  currentSession = null;
+  if (typeof window !== 'undefined') window.sessionStorage.removeItem(TENANT_KEY);
+}
+
+export function getPreferredTenantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem(TENANT_KEY);
 }

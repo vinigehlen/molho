@@ -66,8 +66,9 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
     [tenantId, userId, online, refresh],
   );
 
-  const sync = useCallback(async () => {
-    if (!tenantId || !userId || syncing.current) return;
+  const sync = useCallback(async (): Promise<number> => {
+    if (!tenantId || !userId || syncing.current) return 0;
+    let unresolved = 0;
     syncing.current = true;
     try {
       for (const intent of loadQueue(tenantId)) {
@@ -76,6 +77,7 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
         if (ev.action === 'drop') {
           removeIntent(tenantId, intent.idempotencyKey);
         } else if (ev.action === 'conflict') {
+          unresolved += 1;
           removeIntent(tenantId, intent.idempotencyKey);
           setConflicts((c) => [...c, { intent, order, reason: ev.reason }]);
         } else if (order) {
@@ -83,10 +85,14 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
           const res = await transitionOrder(order.id, intent.toStatus, order.version, intent.reason, intent.idempotencyKey);
           removeIntent(tenantId, intent.idempotencyKey);
           if (res.ok) setAutoApplied((a) => [...a, { intent, at: Date.now() }]);
-          else setConflicts((c) => [...c, { intent, order, reason: `não aplicado (HTTP ${res.status})` }]);
+          else {
+            unresolved += 1;
+            setConflicts((c) => [...c, { intent, order, reason: `não aplicado (HTTP ${res.status})` }]);
+          }
         }
       }
       refresh();
+      return unresolved;
     } finally {
       syncing.current = false;
     }
@@ -109,5 +115,5 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
     if (fresh) await transitionOrder(fresh.id, target.intent.toStatus, fresh.version, target.intent.reason, crypto.randomUUID());
   }, []);
 
-  return { pending, conflicts, autoApplied, submit, resolveConflict };
+  return { pending, conflicts, autoApplied, submit, sync, resolveConflict };
 }
