@@ -25,6 +25,9 @@ export class PrismaStoreHoursAdminRepository implements StoreHoursAdminRepositor
     const tenantId = this.requestContext.getTenantId();
     const client = this.requestContext.getClient();
 
+    // getClient() é o TransactionClient aberto por RequestContextService.run()
+    // para o request inteiro. Se createMany falhar, a exceção sai do handler e
+    // o Prisma reverte também este soft-delete — nunca sobra uma semana vazia.
     await client.storeHours.updateMany({
       where: { storeId, deletedAt: null },
       data: { deletedAt: new Date(), version: { increment: 1 } },
