@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   CreateDeliveryZoneInput,
   DayOfWeek,
@@ -113,6 +113,11 @@ export default function EntregaPage() {
   const [loading, setLoading] = useState(false);
   const [savingZone, setSavingZone] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
+  const [zonePendingDelete, setZonePendingDelete] = useState<DeliveryZoneResponse | null>(null);
+  const [deletingZoneId, setDeletingZoneId] = useState<string | null>(null);
+
+  const storeReady = loadedStoreId !== '' && storeId.trim() === loadedStoreId;
+  const selectorDisabled = loading || savingZone || savingHours || deletingZoneId !== null;
 
   useEffect(() => {
     setStoreId(getSavedStoreId());
@@ -132,6 +137,8 @@ export default function EntregaPage() {
       setZones(loadedZones);
       setShifts(toEditableShifts(loadedHours.shifts));
       setLoadedStoreId(id);
+      setZonePendingDelete(null);
+      setZoneForm(EMPTY_ZONE_FORM);
       saveStoreId(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não deu pra carregar entrega.');
@@ -171,15 +178,20 @@ export default function EntregaPage() {
 
   async function removeZone(zone: DeliveryZoneResponse) {
     if (zone.kind === 'polygon') return;
+    setDeletingZoneId(zone.id);
     setError(null);
     setMessage(null);
-    await deleteDeliveryZone(zone.id)
-      .then(() => {
-        setZones((current) => current.filter((item) => item.id !== zone.id));
-        if (zoneForm.id === zone.id) setZoneForm(EMPTY_ZONE_FORM);
-        setMessage('Zona excluída.');
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Não deu pra excluir zona.'));
+    try {
+      await deleteDeliveryZone(zone.id);
+      setZones((current) => current.filter((item) => item.id !== zone.id));
+      if (zoneForm.id === zone.id) setZoneForm(EMPTY_ZONE_FORM);
+      setZonePendingDelete(null);
+      setMessage('Zona excluída.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não deu pra excluir zona.');
+    } finally {
+      setDeletingZoneId(null);
+    }
   }
 
   async function submitHours() {
@@ -205,7 +217,14 @@ export default function EntregaPage() {
     <main className="min-h-screen bg-bg p-4">
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <PageHeader />
-        <StoreSelector storeId={storeId} setStoreId={setStoreId} loading={loading} onLoad={() => void load()} />
+        <StoreSelector
+          storeId={storeId}
+          setStoreId={setStoreId}
+          loadedStoreId={loadedStoreId}
+          loading={loading}
+          disabled={selectorDisabled}
+          onLoad={() => void load()}
+        />
 
         {(error || message) && (
           <div
@@ -224,15 +243,19 @@ export default function EntregaPage() {
             form={zoneForm}
             setForm={setZoneForm}
             saving={savingZone}
-            disabled={!loadedStoreId}
+            disabled={!storeReady || savingZone || deletingZoneId !== null}
+            pendingDelete={zonePendingDelete}
+            deletingZoneId={deletingZoneId}
             onSubmit={() => void submitZone()}
-            onRemove={(zone) => void removeZone(zone)}
+            onRequestRemove={setZonePendingDelete}
+            onCancelRemove={() => setZonePendingDelete(null)}
+            onConfirmRemove={(zone) => void removeZone(zone)}
           />
           <HoursPanel
             shifts={shifts}
             setShifts={setShifts}
             saving={savingHours}
-            disabled={!loadedStoreId}
+            disabled={!storeReady || savingHours}
             onSubmit={() => void submitHours()}
           />
         </div>
@@ -261,14 +284,20 @@ function PageHeader() {
 function StoreSelector({
   storeId,
   setStoreId,
+  loadedStoreId,
   loading,
+  disabled,
   onLoad,
 }: {
   storeId: string;
   setStoreId: (value: string) => void;
+  loadedStoreId: string;
   loading: boolean;
+  disabled: boolean;
   onLoad: () => void;
 }) {
+  const storeChanged = loadedStoreId !== '' && storeId.trim() !== loadedStoreId;
+
   return (
     <section className="rounded-[20px] border border-border bg-bg-card p-4">
       <h2 className="text-base font-semibold text-text">Loja</h2>
@@ -282,15 +311,29 @@ function StoreSelector({
           onChange={(e) => setStoreId(e.target.value)}
           placeholder="UUID da loja"
           aria-label="ID da loja"
+          disabled={disabled}
         />
         <button
           className="rounded-[14px] bg-brand px-4 py-2 text-sm font-medium text-on-brand disabled:opacity-50"
           onClick={onLoad}
-          disabled={loading}
+          disabled={disabled}
         >
           {loading ? 'Carregando…' : 'Carregar'}
         </button>
       </div>
+      {loadedStoreId ? (
+        <div className="mt-3 rounded-[14px] border border-border bg-bg p-3" aria-label="Loja ativa">
+          <p className="text-xs font-medium text-text-muted">Loja ativa</p>
+          <code className="mt-1 block break-all text-sm text-text">{loadedStoreId}</code>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-text-muted">Nenhuma loja carregada.</p>
+      )}
+      {storeChanged && (
+        <p className="mt-2 text-sm text-caution" role="status">
+          O ID mudou. Carregue esta loja para liberar os editores.
+        </p>
+      )}
     </section>
   );
 }
@@ -301,16 +344,24 @@ function ZonesPanel({
   setForm,
   saving,
   disabled,
+  pendingDelete,
+  deletingZoneId,
   onSubmit,
-  onRemove,
+  onRequestRemove,
+  onCancelRemove,
+  onConfirmRemove,
 }: {
   zones: DeliveryZoneResponse[];
   form: ZoneForm;
   setForm: (form: ZoneForm) => void;
   saving: boolean;
   disabled: boolean;
+  pendingDelete: DeliveryZoneResponse | null;
+  deletingZoneId: string | null;
   onSubmit: () => void;
-  onRemove: (zone: DeliveryZoneResponse) => void;
+  onRequestRemove: (zone: DeliveryZoneResponse) => void;
+  onCancelRemove: () => void;
+  onConfirmRemove: (zone: DeliveryZoneResponse) => void;
 }) {
   const cityZones = zones.filter((zone) => zone.kind === 'city');
   const polygonZones = zones.filter((zone) => zone.kind === 'polygon');
@@ -322,7 +373,11 @@ function ZonesPanel({
           <p className="mt-1 text-sm text-text-muted">Uma cidade por loja. Duplicata volta como aviso claro, sem erro cru.</p>
         </div>
         {form.id && (
-          <button className="rounded-full border border-border px-3 py-1 text-xs text-text" onClick={() => setForm(EMPTY_ZONE_FORM)}>
+          <button
+            className="rounded-full border border-border px-3 py-1 text-xs text-text disabled:opacity-50"
+            onClick={() => setForm(EMPTY_ZONE_FORM)}
+            disabled={disabled}
+          >
             Nova zona
           </button>
         )}
@@ -418,12 +473,14 @@ function ZonesPanel({
                 <button
                   className="rounded-[10px] border border-border px-2 py-1 text-xs text-text"
                   onClick={() => setForm(zoneToForm(zone))}
+                  disabled={disabled}
                 >
                   Editar
                 </button>
                 <button
                   className="rounded-[10px] border border-critical px-2 py-1 text-xs text-critical"
-                  onClick={() => onRemove(zone)}
+                  onClick={() => onRequestRemove(zone)}
+                  disabled={disabled}
                 >
                   Excluir
                 </button>
@@ -431,6 +488,31 @@ function ZonesPanel({
             </div>
           </div>
         ))}
+
+        {pendingDelete?.kind === 'city' && (
+          <div className="rounded-[14px] border border-critical bg-bg p-3" role="alertdialog" aria-modal="true">
+            <h3 className="font-medium text-text">Excluir {pendingDelete.name}?</h3>
+            <p className="mt-1 text-sm text-text-muted">
+              A zona de {pendingDelete.city}/{pendingDelete.state} deixará de atender novos pedidos.
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                className="rounded-[10px] border border-border px-3 py-2 text-sm text-text disabled:opacity-50"
+                onClick={onCancelRemove}
+                disabled={deletingZoneId !== null}
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-[10px] border border-critical px-3 py-2 text-sm font-medium text-critical disabled:opacity-50"
+                onClick={() => onConfirmRemove(pendingDelete)}
+                disabled={deletingZoneId !== null}
+              >
+                {deletingZoneId === pendingDelete.id ? 'Excluindo…' : `Excluir ${pendingDelete.name}`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {polygonZones.map((zone) => (
           <div key={zone.id} className="rounded-[14px] border border-border bg-bg p-3">
