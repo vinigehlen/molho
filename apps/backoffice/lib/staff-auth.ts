@@ -23,31 +23,52 @@ interface LoginResult {
   tenants: StaffTenant[];
 }
 
+async function fetchForLogin(url: string, init: RequestInit | undefined, networkMessage: string): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new Error(networkMessage);
+  }
+}
+
 async function errorMessage(res: Response, fallback: string): Promise<string> {
   const body = (await res.json().catch(() => null)) as { message?: string } | null;
   return body?.message ?? fallback;
 }
 
 export async function fetchOtpChannel(): Promise<'email' | 'sms'> {
-  const res = await fetch(`${API_URL}/v1/auth/otp/config`);
+  const res = await fetchForLogin(
+    `${API_URL}/v1/auth/otp/config`,
+    undefined,
+    'Não foi possível carregar o login. Confira sua conexão.',
+  );
   if (!res.ok) throw new Error('Não foi possível carregar o login.');
-  const body = (await res.json()) as { channel: 'email' | 'sms' };
+  const body = (await res.json().catch(() => null)) as { channel?: unknown } | null;
+  if (body?.channel !== 'email' && body?.channel !== 'sms') {
+    throw new Error('A configuração do login veio inválida.');
+  }
   return body.channel;
 }
 
 export async function requestStaffOtp(channel: 'email' | 'sms', identifier: string): Promise<void> {
-  const res = await fetch(`${API_URL}/v1/auth/otp/request`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(channel === 'email' ? { email: identifier } : { phone: identifier }),
-  });
+  const res = await fetchForLogin(
+    `${API_URL}/v1/auth/otp/request`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(channel === 'email' ? { email: identifier } : { phone: identifier }),
+    },
+    'Não foi possível enviar o código. Confira sua conexão.',
+  );
   if (!res.ok) throw new Error(await errorMessage(res, 'Não foi possível enviar o código.'));
 }
 
 async function fetchTenants(accessToken: string): Promise<StaffTenant[]> {
-  const res = await fetch(`${API_URL}/v1/me/sessions/tenants`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const res = await fetchForLogin(
+    `${API_URL}/v1/me/sessions/tenants`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+    'Não foi possível carregar seus restaurantes. Confira sua conexão.',
+  );
   if (!res.ok) throw new Error('Não foi possível carregar seus restaurantes.');
   const body = (await res.json()) as { tenants: StaffTenant[] };
   return body.tenants;
@@ -58,12 +79,16 @@ export async function verifyStaffOtp(
   identifier: string,
   code: string,
 ): Promise<LoginResult> {
-  const res = await fetch(`${API_URL}/v1/auth/otp/verify`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(channel === 'email' ? { email: identifier, code } : { phone: identifier, code }),
-  });
+  const res = await fetchForLogin(
+    `${API_URL}/v1/auth/otp/verify`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(channel === 'email' ? { email: identifier, code } : { phone: identifier, code }),
+    },
+    'Não foi possível conferir o código. Confira sua conexão.',
+  );
   if (!res.ok) throw new Error(await errorMessage(res, 'Código inválido ou expirado.'));
   const body = (await res.json()) as Omit<LoginResult, 'tenants'>;
   return { ...body, tenants: await fetchTenants(body.accessToken) };

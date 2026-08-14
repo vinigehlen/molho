@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   activateStaffSession,
@@ -22,15 +22,23 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadChannel = useCallback(() => {
+    setError(null);
+    setChannel(null);
+    void fetchOtpChannel()
+      .then(setChannel)
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o login.');
+      });
+  }, []);
+
   useEffect(() => {
     if (getStaffSession()) {
       router.replace('/gestor');
       return;
     }
-    void fetchOtpChannel().then(setChannel).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o login.');
-    });
-  }, [router]);
+    loadChannel();
+  }, [loadChannel, router]);
 
   async function requestCode() {
     if (!channel || !identifier.trim()) return;
@@ -80,7 +88,7 @@ export default function LoginPage() {
         <h1 className="mt-1 text-2xl font-semibold text-text">Entre no seu restaurante</h1>
         <p className="mt-2 text-sm text-text-muted">Sem senha: a gente envia um código de 6 dígitos.</p>
 
-        {step === 'identifier' && (
+        {step === 'identifier' && channel && (
           <form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); void requestCode(); }}>
             <label className="block text-sm font-medium text-text" htmlFor="identifier">
               {isEmail ? 'E-mail' : 'Celular'}
@@ -99,6 +107,20 @@ export default function LoginPage() {
               {busy ? 'Enviando…' : 'Enviar código'}
             </button>
           </form>
+        )}
+
+        {step === 'identifier' && !channel && !error && (
+          <p className="mt-6 text-sm text-text-muted" role="status">Carregando login…</p>
+        )}
+
+        {step === 'identifier' && !channel && error && (
+          <button
+            type="button"
+            className="mt-4 w-full rounded-[14px] border border-border px-4 py-3 font-semibold text-text"
+            onClick={loadChannel}
+          >
+            Tentar novamente
+          </button>
         )}
 
         {step === 'code' && (

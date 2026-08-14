@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   activateStaffSession,
+  fetchOtpChannel,
   logoutStaffSession,
+  requestStaffOtp,
   refreshStaffSession,
   verifyStaffOtp,
   type StaffTenant,
@@ -35,6 +37,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('staff-auth', () => {
+  it('valida o canal recebido e traduz falha de rede sem expor Failed to fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')));
+
+    await expect(fetchOtpChannel()).rejects.toThrow('Não foi possível carregar o login. Confira sua conexão.');
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json({ channel: 'fax' })));
+    await expect(fetchOtpChannel()).rejects.toThrow('A configuração do login veio inválida.');
+  });
+
+  it('traduz falha de rede ao pedir o OTP', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')));
+
+    await expect(requestStaffOtp('email', 'dono@restaurante.com.br')).rejects.toThrow(
+      'Não foi possível enviar o código. Confira sua conexão.',
+    );
+  });
+
   it('verifica OTP com cookie e carrega somente os tenants permitidos', async () => {
     const accessToken = jwt('user-1');
     const fetchMock = vi.fn()
