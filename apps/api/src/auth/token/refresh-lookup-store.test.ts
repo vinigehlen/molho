@@ -18,30 +18,29 @@ describe('RedisRefreshLookupStore', () => {
     );
   });
 
-  it('consume usa SET...GET (atômico) e devolve "unknown" se a chave nunca existiu', async () => {
-    const set = vi.fn().mockResolvedValue(null);
-    const redis = { set } as unknown as Redis;
+  it('consume usa script atômico e devolve "unknown" se a chave nunca existiu', async () => {
+    const evalCommand = vi.fn().mockResolvedValue(null);
+    const redis = { eval: evalCommand } as unknown as Redis;
     const store = new RedisRefreshLookupStore(redis);
 
     const result = await store.consume('hash-desconhecido');
 
     expect(result).toEqual({ status: 'unknown' });
-    expect(set).toHaveBeenCalledWith(
+    expect(evalCommand).toHaveBeenCalledWith(
+      expect.stringContaining("value.reused = true"),
+      1,
       'refresh_lookup:hash-desconhecido',
-      expect.any(String),
-      'EX',
       expect.any(Number),
-      'GET',
     );
   });
 
-  it('consume devolve "valid" na 1ª vez e "reused" na 2ª (o valor antigo já vem marcado)', async () => {
+  it('consume devolve "valid" na 1ª vez e "reused" na 2ª com a identidade preservada', async () => {
     const values = [
       JSON.stringify({ userId: 'user-1', deviceId: 'device-1' }),
       JSON.stringify({ userId: 'user-1', deviceId: 'device-1', reused: true }),
     ];
-    const set = vi.fn().mockImplementation(() => Promise.resolve(values.shift() ?? null));
-    const redis = { set } as unknown as Redis;
+    const evalCommand = vi.fn().mockImplementation(() => Promise.resolve(values.shift() ?? null));
+    const redis = { eval: evalCommand } as unknown as Redis;
     const store = new RedisRefreshLookupStore(redis);
 
     expect(await store.consume('hash1')).toEqual({ status: 'valid', userId: 'user-1', deviceId: 'device-1' });

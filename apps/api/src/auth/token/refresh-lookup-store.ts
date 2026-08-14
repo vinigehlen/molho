@@ -2,6 +2,18 @@ import type Redis from 'ioredis';
 
 const TTL_SECONDS = 30 * 24 * 60 * 60; // mesmo TTL deslizante da sessão
 
+const CONSUME_REFRESH_SCRIPT = `
+local current = redis.call('GET', KEYS[1])
+if not current then
+  return nil
+end
+
+local value = cjson.decode(current)
+value.reused = true
+redis.call('SET', KEYS[1], cjson.encode(value), 'EX', ARGV[1])
+return current
+`;
+
 interface LookupValue {
   userId: string;
   deviceId: string;
@@ -18,8 +30,8 @@ export type RefreshLookupResult =
  * em si fica opaco (não carrega userId/deviceId embutido) — é só um blob
  * aleatório; é este índice que resolve "de quem é esse refresh".
  *
- * `consume` é ATÔMICO via um único comando Redis (`SET key value GET`, que
- * grava o novo valor e devolve o antigo numa side só) — sem isso, duas
+ * `consume` é ATÔMICO via script Lua no Redis, que lê o valor atual, preserva
+ * a identidade e grava o tombstone na mesma execução — sem isso, duas
  * chamadas concorrentes com o mesmo refresh teriam uma janela de corrida
  * entre "ler se já foi usado" e "marcar como usado". O valor antigo devolvido
  * já diz se essa chamada é a legítima (1ª) ou o reuso (2ª+) — nos dois casos
@@ -46,15 +58,12 @@ export class RedisRefreshLookupStore implements RefreshLookupStore {
   }
 
   async consume(refreshHash: string): Promise<RefreshLookupResult> {
-    const tombstone: LookupValue = { userId: '', deviceId: '', reused: true };
-    // SET ... GET: grava o valor novo (tombstone) e devolve o antigo — atômico.
-    const raw = await this.redis.set(
+    const raw = (await this.redis.eval(
+      CONSUME_REFRESH_SCRIPT,
+      1,
       key(refreshHash),
-      JSON.stringify(tombstone),
-      'EX',
       TTL_SECONDS,
-      'GET',
-    );
+    )) as string | null;
     if (raw === null) return { status: 'unknown' };
 
     const previous = JSON.parse(raw) as LookupValue;
