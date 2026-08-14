@@ -12,6 +12,7 @@ import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
+import { paymentGateReason } from '../../lib/order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
@@ -330,6 +331,7 @@ function OrderCard({
   printFeedback: { state: 'queueing' | 'queued' | 'failed'; message: string } | null;
 }) {
   const next = NEXT_ACTION[order.status];
+  const advanceBlockReason = next ? paymentGateReason(order, next.to) : null;
   const printDisabled = printFeedback?.state === 'queueing';
   return (
     <article className="rounded-[14px] border border-border bg-bg p-3">
@@ -354,6 +356,12 @@ function OrderCard({
       </ul>
 
       <PaymentPanel order={order} online={online} confirming={confirming} onMarkPaid={onMarkPaid} />
+
+      {advanceBlockReason && (
+        <p className="mt-2 text-xs font-medium text-caution" role="status">
+          {advanceBlockReason}
+        </p>
+      )}
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {pending ? (
@@ -393,8 +401,10 @@ function OrderCard({
         )}
         {next && (
           <button
-            className="rounded-[10px] bg-brand px-3 py-1 text-xs font-medium text-on-brand"
+            className="rounded-[10px] bg-brand px-3 py-1 text-xs font-medium text-on-brand disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={advanceBlockReason !== null}
             onClick={() => onAdvance(next.to)}
+            title={advanceBlockReason ?? undefined}
           >
             {next.label}
           </button>

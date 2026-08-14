@@ -6,6 +6,7 @@ import {
   enqueueIntent,
   evaluateIntent,
   loadQueue,
+  paymentGateReason,
   removeIntent,
 } from './order-queue';
 
@@ -56,7 +57,7 @@ describe('evaluateIntent — precondição semântica', () => {
 
   it('gate §5.5: PIX não confirmado → preparing bloqueia (conflito)', () => {
     const r = evaluateIntent(intent(), order('received', { paymentMethod: 'pix', paymentStatus: 'aguardando_confirmacao' }), 'u1', NOW);
-    expect(r).toEqual({ action: 'conflict', reason: 'o pagamento precisa ser confirmado antes desta etapa' });
+    expect(r).toEqual({ action: 'conflict', reason: 'Confirme o PIX antes de preparar.' });
   });
 
   it('gate §5.5: cash não confirmado → preparing NÃO bloqueia (apply)', () => {
@@ -67,6 +68,36 @@ describe('evaluateIntent — precondição semântica', () => {
   it('transição ilegal (received→ready) → conflito', () => {
     const r = evaluateIntent(intent({ toStatus: 'ready' }), order('received'), 'u1', NOW);
     expect(r.action).toBe('conflict');
+  });
+});
+
+describe('paymentGateReason', () => {
+  it('orienta confirmar o PIX antes de preparar', () => {
+    expect(
+      paymentGateReason(order('received', { paymentMethod: 'pix', paymentStatus: 'aguardando_confirmacao' }), 'preparing'),
+    ).toBe('Confirme o PIX antes de preparar.');
+  });
+
+  it('não bloqueia preparo de pedido pós-pago', () => {
+    expect(
+      paymentGateReason(
+        order('received', { paymentMethod: 'cash_on_delivery', paymentStatus: 'aguardando_confirmacao' }),
+        'preparing',
+      ),
+    ).toBeNull();
+  });
+
+  it('orienta confirmar o pós-pago antes de concluir', () => {
+    expect(
+      paymentGateReason(
+        order('in_transit', { paymentMethod: 'card_on_delivery', paymentStatus: 'aguardando_confirmacao' }),
+        'completed',
+      ),
+    ).toBe('Confirme o pagamento antes de concluir.');
+  });
+
+  it('não bloqueia nenhuma etapa depois da confirmação', () => {
+    expect(paymentGateReason(order('received'), 'preparing')).toBeNull();
   });
 });
 

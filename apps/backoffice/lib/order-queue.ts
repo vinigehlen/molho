@@ -32,12 +32,16 @@ function isLegal(from: AdminOrder['status'], to: AdminOrder['status']): boolean 
   return (LEGAL_NEXT[from] ?? []).includes(to);
 }
 
-/** Gate §5.5 client-side (espelha transitionRequiresConfirmedPayment do backend) — pra decidir auto-aplicar sem round-trip inútil. */
-function paymentGateBlocks(order: AdminOrder, to: AdminOrder['status']): boolean {
-  if (order.paymentStatus === 'confirmado') return false;
-  if (to === 'preparing') return order.paymentMethod === 'pix';
-  if (to === 'completed') return order.paymentMethod === 'cash_on_delivery' || order.paymentMethod === 'card_on_delivery';
-  return false;
+/** Gate §5.5 client-side (espelha transitionRequiresConfirmedPayment do backend). */
+export function paymentGateReason(order: AdminOrder, to: AdminOrder['status']): string | null {
+  if (order.paymentStatus === 'confirmado') return null;
+  if (to === 'preparing' && order.paymentMethod === 'pix') {
+    return 'Confirme o PIX antes de preparar.';
+  }
+  if (to === 'completed' && (order.paymentMethod === 'cash_on_delivery' || order.paymentMethod === 'card_on_delivery')) {
+    return 'Confirme o pagamento antes de concluir.';
+  }
+  return null;
 }
 
 export type IntentEvaluation =
@@ -78,8 +82,9 @@ export function evaluateIntent(
   if (!isLegal(intent.fromStatus, intent.toStatus)) {
     return { action: 'conflict', reason: 'a transição não é mais válida' };
   }
-  if (paymentGateBlocks(order, intent.toStatus)) {
-    return { action: 'conflict', reason: 'o pagamento precisa ser confirmado antes desta etapa' };
+  const paymentGate = paymentGateReason(order, intent.toStatus);
+  if (paymentGate) {
+    return { action: 'conflict', reason: paymentGate };
   }
   return { action: 'apply' };
 }
