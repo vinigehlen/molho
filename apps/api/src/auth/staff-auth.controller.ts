@@ -2,12 +2,16 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
   Post,
   Req,
   Res,
+  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { type EmailAddress, type PhoneNumber, parseEmail, parsePhoneNumber, phoneNumberToE164 } from '@molho/contracts';
 import type { Response } from 'express';
@@ -29,15 +33,50 @@ import { OtpRequestDto } from './dto/otp-request.dto';
 import { OtpVerifyDto } from './dto/otp-verify.dto';
 import { OtpRateLimitedError } from './otp/otp-errors';
 import { StaffIdentityRepository } from './staff-identity.repository';
+import { JwtAuthGuard, type RequestWithUser } from './guards/jwt-auth.guard';
+import { InvalidTokenError, ReusedRefreshError } from './token/token-errors';
 
 const SCOPE = 'staff';
+const REFRESH_COOKIE = '__Host-molho_refresh';
+const REFRESH_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const BACKOFFICE_CLIENT_HEADER = 'x-molho-client';
+
+function refreshCookieFrom(req: Request): string | null {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const [name, ...value] = part.trim().split('=');
+    if (name === REFRESH_COOKIE) return value.join('=') || null;
+  }
+  return null;
+}
+
+function setRefreshCookie(res: Response, token: string): void {
+  res.cookie(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: REFRESH_MAX_AGE_MS,
+  });
+}
+
+function clearRefreshCookie(res: Response): void {
+  res.clearCookie(REFRESH_COOKIE, { httpOnly: true, secure: true, sameSite: 'strict', path: '/' });
+}
+
+function requireBackofficeClient(req: Request): void {
+  if (req.headers[BACKOFFICE_CLIENT_HEADER] !== 'backoffice') {
+    throw new ForbiddenException('Cliente do backoffice não identificado.');
+  }
+}
 
 /**
  * Login do backoffice — sempre global, nunca preso a um :slug (staff pode
  * ter user_roles em vários tenants). Cria o User na 1ª verificação, SEM
  * nenhum user_role (ver nota em staff-identity.repository.ts).
  */
-@Controller('v1/auth/otp')
+@Controller('v1/auth')
 export class StaffAuthController {
   private readonly staffIdentity: StaffIdentityRepository;
 
@@ -75,7 +114,12 @@ export class StaffAuthController {
     return { channel: 'sms', phone: parsePhoneNumber(dto.phone) };
   }
 
-  @Post('request')
+  @Get('otp/config')
+  config(): { channel: 'email' | 'sms' } {
+    return { channel: otpChannelFor(SCOPE) };
+  }
+
+  @Post('otp/request')
   @HttpCode(HttpStatus.ACCEPTED)
   async request(
     @Body() dto: OtpRequestDto,
@@ -101,9 +145,13 @@ export class StaffAuthController {
     return {};
   }
 
-  @Post('verify')
+  @Post('otp/verify')
   @HttpCode(HttpStatus.OK)
-  async verify(@Body() dto: OtpVerifyDto, @Req() req: Request) {
+  async verify(
+    @Body() dto: OtpVerifyDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     let identifier;
     try {
       identifier = this.identifierFor(dto);
@@ -142,13 +190,52 @@ export class StaffAuthController {
           ip,
           userAgent: req.headers['user-agent'],
         });
+        setRefreshCookie(res, tokens.refreshToken);
 
         return {
           accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
           user: { id: identity.id, name: identity.name },
         };
       },
     );
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    requireBackofficeClient(req);
+    const refreshToken = refreshCookieFrom(req);
+    if (!refreshToken) throw new UnauthorizedException('Sessão expirada.');
+
+    try {
+      const tokens = await this.requestContext.run(
+        { tenantId: PLATFORM_CONTEXT_TENANT_ID, isPlatform: true },
+        () =>
+          this.tokenService.rotateTokens(refreshToken, {
+            ip: req.ip ?? '0.0.0.0',
+            userAgent: req.headers['user-agent'],
+          }),
+      );
+      setRefreshCookie(res, tokens.refreshToken);
+      return { accessToken: tokens.accessToken };
+    } catch (error) {
+      if (error instanceof InvalidTokenError || error instanceof ReusedRefreshError) {
+        clearRefreshCookie(res);
+        throw new UnauthorizedException('Sessão expirada.');
+      }
+      throw error;
+    }
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    requireBackofficeClient(req);
+    await this.tokenService.revokeSession(req.user.sub, req.user.deviceId);
+    clearRefreshCookie(res);
   }
 }

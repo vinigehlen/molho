@@ -35,6 +35,14 @@ function extractCode(message: string): string {
   return match[0];
 }
 
+function firstCookie(response: request.Response): string {
+  const raw = response.headers['set-cookie']?.[0];
+  if (!raw) throw new Error('resposta sem Set-Cookie');
+  const pair = raw.split(';')[0];
+  if (!pair) throw new Error('Set-Cookie malformado');
+  return pair;
+}
+
 let app: INestApplication;
 let migratorPrisma: PrismaClient;
 let testTenantId: string;
@@ -115,7 +123,7 @@ async function seedStaffUser(phone: string): Promise<string> {
 }
 
 describe('POST /v1/auth/otp (staff)', () => {
-  it('1º login (telefone novo, já com papel): devolve accessToken/refreshToken/user', async () => {
+  it('1º login: devolve access curto e guarda refresh somente em cookie httpOnly', async () => {
     const phone = randomPhone();
     const userId = await seedStaffUser(phone);
 
@@ -128,8 +136,80 @@ describe('POST /v1/auth/otp (staff)', () => {
       .expect(200);
 
     expect(res.body.accessToken).toBeTruthy();
-    expect(res.body.refreshToken).toBeTruthy();
+    expect(res.body.refreshToken).toBeUndefined();
     expect(res.body.user.id).toBe(userId);
+    const cookie = res.headers['set-cookie']?.[0] ?? '';
+    expect(cookie).toContain('__Host-molho_refresh=');
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Strict');
+    expect(cookie).toContain('Path=/');
+
+    const tenantContexts = await request(app.getHttpServer())
+      .get('/v1/me/sessions/tenants')
+      .set('Authorization', `Bearer ${res.body.accessToken as string}`)
+      .expect(200);
+    expect(tenantContexts.body.tenants).toEqual([
+      expect.objectContaining({ id: testTenantId, name: 'E2E Test Tenant' }),
+    ]);
+  });
+
+  it('rotaciona refresh uma vez, exige o cliente do backoffice e rejeita reuso', async () => {
+    const phone = randomPhone();
+    await seedStaffUser(phone);
+    await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
+    const code = await getLastSentCode();
+    const login = await request(app.getHttpServer())
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code })
+      .expect(200);
+    const originalCookie = firstCookie(login);
+
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .set('Cookie', originalCookie)
+      .expect(403);
+
+    const refreshed = await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .set('x-molho-client', 'backoffice')
+      .set('Cookie', originalCookie)
+      .expect(200);
+    expect(refreshed.body.accessToken).toBeTruthy();
+    expect(refreshed.headers['set-cookie']?.[0]).toContain('__Host-molho_refresh=');
+
+    const reused = await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .set('x-molho-client', 'backoffice')
+      .set('Cookie', originalCookie)
+      .expect(401);
+    expect(reused.headers['set-cookie']?.[0]).toContain('__Host-molho_refresh=;');
+  });
+
+  it('logout revoga o dispositivo atual e limpa o cookie', async () => {
+    const phone = randomPhone();
+    await seedStaffUser(phone);
+    await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
+    const code = await getLastSentCode();
+    const login = await request(app.getHttpServer())
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code })
+      .expect(200);
+    const cookie = firstCookie(login);
+
+    const logout = await request(app.getHttpServer())
+      .post('/v1/auth/logout')
+      .set('x-molho-client', 'backoffice')
+      .set('Authorization', `Bearer ${login.body.accessToken as string}`)
+      .set('Cookie', cookie)
+      .expect(204);
+    expect(logout.headers['set-cookie']?.[0]).toContain('__Host-molho_refresh=;');
+
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .set('x-molho-client', 'backoffice')
+      .set('Cookie', cookie)
+      .expect(401);
   });
 
   it('telefone sem user (nunca convidado): 400, mesma resposta de código inválido', async () => {

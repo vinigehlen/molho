@@ -55,6 +55,52 @@ export class SessionsController {
     });
   }
 
+  /**
+   * Contextos selecionáveis no backoffice. Os IDs vêm do JWT já verificado e
+   * entram explicitamente no WHERE: user_roles não tem RLS e nunca é lida em
+   * massa. Escopo de tenant enxerga todas as lojas dele; escopo de store só a
+   * loja atribuída.
+   */
+  @Get('tenants')
+  async tenants(@Req() req: RequestWithUser) {
+    return this.runAsPlatform(async () => {
+      const tenantScopeIds = req.user.scopes
+        .filter((scope) => scope.scopeType === 'tenant' && scope.scopeId !== null)
+        .map((scope) => scope.scopeId as string);
+      const storeScopeIds = req.user.scopes
+        .filter((scope) => scope.scopeType === 'store' && scope.scopeId !== null)
+        .map((scope) => scope.scopeId as string);
+
+      const stores = await this.requestContext.getClient().store.findMany({
+        where: {
+          deletedAt: null,
+          OR: [
+            ...(tenantScopeIds.length > 0 ? [{ tenantId: { in: tenantScopeIds } }] : []),
+            ...(storeScopeIds.length > 0 ? [{ id: { in: storeScopeIds } }] : []),
+          ],
+        },
+        select: { id: true, tenantId: true, name: true },
+        orderBy: { name: 'asc' },
+      });
+      const tenantIds = [...new Set([...tenantScopeIds, ...stores.map((store) => store.tenantId)])];
+      if (tenantIds.length === 0) return { tenants: [] };
+
+      const tenants = await this.requestContext.getClient().tenant.findMany({
+        where: { id: { in: tenantIds }, deletedAt: null },
+        select: { id: true, name: true, slug: true },
+        orderBy: { name: 'asc' },
+      });
+      return {
+        tenants: tenants.map((tenant) => ({
+          ...tenant,
+          stores: stores
+            .filter((store) => store.tenantId === tenant.id)
+            .map(({ id, name }) => ({ id, name })),
+        })),
+      };
+    });
+  }
+
   @Delete('all')
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeAll(@Req() req: RequestWithUser): Promise<void> {
