@@ -11,6 +11,7 @@ Status: implementado na branch `codex/epico-9b-login-staff`, aguardando revisão
 5. Resposta `401` de uma chamada autenticada tenta um único refresh e repete a chamada uma vez. Refreshes concorrentes compartilham a mesma Promise na aba e usam `navigator.locks` entre abas para não disparar a proteção de reutilização do token.
 6. Todo `/gestor/*` passa pelo layout autenticado. `/` redireciona para `/gestor`.
 7. Logout sincroniza/avisa sobre a fila offline, chama `stream/disarm`, revoga o dispositivo atual em `POST /v1/auth/logout`, limpa o cookie e só então apaga a sessão em memória.
+8. Logout local ou recebido de outra aba redireciona todas as abas do gestor para `/login`; o evento compartilhado não contém credenciais.
 
 ## Fronteiras de segurança
 
@@ -30,15 +31,16 @@ Status: implementado na branch `codex/epico-9b-login-staff`, aguardando revisão
 ## Verificação
 
 - Unitários API: 415/415, incluindo cookie, header anti-CSRF, rotação, reuso e logout.
-- Unitários backoffice: 76/76, incluindo sessão somente em memória, retry após `401` e deduplicação de refresh concorrente na aba/entre abas.
+- Unitários backoffice: 83/83, incluindo sessão somente em memória, retry após `401`, deduplicação de refresh concorrente na aba/entre abas, estados de carregamento/erro do login e propagação de logout entre abas.
 - Build isolado do backoffice: verde; rota `/login` gerada.
 - Gate padrão raiz: `pnpm lint && pnpm test && pnpm build` verde.
-- E2E real de auth: três rodadas funcionais bloqueadas pela flakiness conhecida do Neon (`P2028` ao iniciar/commit de transações). Na rodada completa, 11/13 falharam, inclusive testes antigos de customer; nas duas rodadas focadas, os três casos novos falharam no `POST /otp/verify` antes de alcançar cookie/refresh/logout. Uma tentativa adicional parou no `beforeAll` e revelou o risco de cleanup descrito abaixo. Não marcar e2e real como verde até uma nova rodada conseguir falar de forma estável com o banco.
+- E2E real completo: 79/80 passou inicialmente e revelou um defeito no tombstone Redis de refresh reutilizado. O `SET ... GET` gravava `userId`/`deviceId` vazios; a revogação recebia UUID vazio e respondia 500. A operação agora usa script Lua atômico, preserva a identidade no tombstone e mantém a detecção de corrida. Após a correção, o e2e focado de auth passou 13/13 e a suíte completa passou 80/80 em 10 arquivos, com 0 skipped.
 - Hardening do e2e: `beforeAll`/`afterAll` agora têm 30s e o cleanup só inclui `testTenantId` quando ele foi realmente atribuído. Antes, timeout do hook seguido por `deleteMany({ tenantId: undefined })` faria o Prisma omitir o filtro e tentar apagar todos os customers do ambiente; a FK de orders impediu o dano na rodada que revelou o bug.
 
 ## Antes do deploy
 
 1. Revisar a branch.
-2. Repetir `auth.e2e.test.ts` com Neon estável.
+2. Preservar o gate e2e já confirmado: 80/80, sem falhas nem skips.
 3. Rodar `pnpm lint && pnpm test && pnpm build` na raiz.
-4. Após deploy da API e do backoffice, validar no navegador: OTP real, reload, refresh aos 15 minutos, SSE rearmado, tenant correto e logout removendo os dois cookies.
+4. Incluir `https://staging-app.molho.live` na allowlist exata de CORS da API antes do deploy; a configuração histórica apontava para `https://staging.molho.live`.
+5. Após deploy da API e do backoffice, validar no navegador: OTP real, reload, refresh aos 15 minutos, SSE rearmado, tenant correto e logout removendo os dois cookies.

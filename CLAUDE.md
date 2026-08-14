@@ -156,10 +156,11 @@ Implementado na branch `codex/epico-9b-login-staff`, em revisão no PR #1. **Ain
 - `GET /v1/me/sessions/tenants` deriva tenants e lojas somente dos scopes do JWT verificado e usa IDs explícitos nas consultas.
 - Chamadas autenticadas tentam um refresh e um retry após `401`. Refreshes concorrentes compartilham uma Promise na aba e usam `navigator.locks` entre abas para não acionar falsamente a detecção de reutilização.
 - Todo `/gestor/*` passa pelo bootstrap autenticado; o stub `/dev-login` e seu replacement de build foram removidos. O SSE renova a sessão quando o token expira e rearma o stream.
-- O logout avisa e tenta sincronizar a fila offline, executa `stream/disarm`, revoga a sessão remota e só então limpa a sessão local. Se a revogação remota falhar, não finge logout local completo.
-- Gate padrão conferido: `pnpm lint`, `pnpm test` (API 415/415; backoffice 76/76) e `pnpm build` (6/6) verdes.
-- **E2E real ainda não está verde:** rodadas de auth foram bloqueadas pelo `P2028` conhecido do Neon antes dos novos asserts. O cleanup do teste foi endurecido para nunca transformar `tenantId: undefined` em `deleteMany` global. Repetir `pnpm --filter @molho/api run test:e2e` com Neon estável antes do merge/deploy.
-- Staging já possui as variáveis de OTP/e-mail/JWT/Redis/CORS na Fly e `NEXT_PUBLIC_API_URL=https://api.staging.molho.live` no backoffice. Depois do merge e deploy, validar no navegador OTP real, reload/refresh, tenant, SSE e remoção dos cookies no logout.
+- O logout avisa e tenta sincronizar a fila offline, executa `stream/disarm`, revoga a sessão remota e só então limpa a sessão local. Se a revogação remota falhar, não finge logout local completo. Logout local ou em outra aba redireciona todas as abas para `/login` sem compartilhar credenciais em storage.
+- O login não presume celular durante bootstrap: aguarda `/otp/config`, mostra erro pt-BR com retry em falha de rede e só então apresenta e-mail ou celular.
+- Gate padrão final conferido: `pnpm lint`, `pnpm test` (API 415/415; backoffice 83/83) e `pnpm build` (6/6) verdes.
+- E2E real completo chegou a 79/80 e encontrou um bug real no tombstone Redis de refresh; a identidade se perdia e o reuso retornava 500. Corrigido com script Lua atômico que preserva `userId`/`deviceId`; depois da correção, auth passou 13/13 e a suíte completa passou 80/80 em 10 arquivos, com 0 skipped. O cleanup segue protegido contra `tenantId: undefined` virar `deleteMany` global.
+- Staging já possui as variáveis de OTP/e-mail/JWT/Redis/CORS na Fly e `NEXT_PUBLIC_API_URL=https://api.staging.molho.live` no backoffice. Antes do deploy, a allowlist CORS da API precisa incluir `https://staging-app.molho.live`. Depois do merge e deploy, validar no navegador OTP real, reload/refresh, tenant, SSE e remoção dos cookies no logout.
 
 1. ✅ Scaffold + design system Tempero
 2. ✅ Schema Prisma + RLS + registry de módulos + RBAC + seed
