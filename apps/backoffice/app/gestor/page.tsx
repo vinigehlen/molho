@@ -29,8 +29,8 @@ const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status
 
 /**
  * Board do gestor de pedidos (Épico 9). Load inicial via GET /v1/admin/orders;
- * o consumidor SSE (próximo commit) passa a atualizar este estado em tempo real.
- * Sem sessão de staff → manda pro login (dev por enquanto, 9b real depois).
+ * o consumidor SSE atualiza este estado em tempo real. Sem sessão de staff,
+ * o layout autenticado do 9b manda para o login.
  */
 export default function GestorPage() {
   const router = useRouter();

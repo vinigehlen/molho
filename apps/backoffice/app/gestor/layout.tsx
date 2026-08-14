@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStaffSession } from '../../lib/staff-session';
+import { getStaffSession, subscribeStaffSessionClear } from '../../lib/staff-session';
 import { refreshStaffSession } from '../../lib/staff-auth';
 
 export default function GestorLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +23,15 @@ export default function GestorLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!getStaffSession()) restore();
   }, [restore]);
+
+  useEffect(
+    () =>
+      subscribeStaffSessionClear(() => {
+        setReady(false);
+        router.replace('/login');
+      }),
+    [router],
+  );
 
   if (!ready) {
     return (

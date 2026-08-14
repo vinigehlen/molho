@@ -25,7 +25,8 @@ interface Handlers {
  * - `order_new`/`order_status` → onNudge (board refaz o fetch).
  * - `server_shutdown` (rolling deploy) → reconecta JÁ, jittered (token ainda
  *   vale; migra pra outra máquina sem esperar timeout de TCP).
- * - `token_expired` → onExpired (sem refresh ainda — débito do 9b).
+ * - `token_expired` → onExpired renova a sessão; se conseguir, rearma o
+ *   cookie e reconecta com jitter.
  * - `onerror` (queda de rede) → backoff exponencial + full jitter.
  */
 export function useOrdersStream(tenantId: string | null, handlers: Handlers): StreamStatus {
