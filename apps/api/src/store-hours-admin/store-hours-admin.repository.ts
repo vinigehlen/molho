@@ -21,10 +21,13 @@ export class PrismaStoreHoursAdminRepository implements StoreHoursAdminRepositor
   }
 
   async replaceAll(storeId: string, input: PutStoreHoursInput): Promise<StoreHoursResponse> {
-    await this.assertStoreExists(storeId);
+    await this.lockStoreOrThrow(storeId);
     const tenantId = this.requestContext.getTenantId();
     const client = this.requestContext.getClient();
 
+    // getClient() é o TransactionClient aberto por RequestContextService.run()
+    // para o request inteiro. Se createMany falhar, a exceção sai do handler e
+    // o Prisma reverte também este soft-delete — nunca sobra uma semana vazia.
     await client.storeHours.updateMany({
       where: { storeId, deletedAt: null },
       data: { deletedAt: new Date(), version: { increment: 1 } },
@@ -43,6 +46,16 @@ export class PrismaStoreHoursAdminRepository implements StoreHoursAdminRepositor
     }
 
     return this.list(storeId);
+  }
+
+  private async lockStoreOrThrow(storeId: string): Promise<void> {
+    const rows = await this.requestContext.getClient().$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "stores"
+      WHERE "id" = ${storeId}::uuid AND "deleted_at" IS NULL
+      FOR UPDATE
+    `;
+    if (rows.length === 0) throw new StoreHoursStoreNotFoundError();
   }
 
   private async assertStoreExists(storeId: string): Promise<void> {

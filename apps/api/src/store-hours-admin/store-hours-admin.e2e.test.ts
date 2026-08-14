@@ -3,11 +3,14 @@ import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@molho/db';
+import type { PutStoreHoursInput } from '@molho/contracts';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module';
 import { currentJwtKeyVersion, loadJwtSecrets } from '../auth/token/token-payload';
+import { RequestContextService } from '../context/request-context.service';
+import { PrismaStoreHoursAdminRepository } from './store-hours-admin.repository';
 
 function mintAccessToken(userId: string, tenantId: string, role: 'owner' | 'courier' = 'owner') {
   const secrets = loadJwtSecrets();
@@ -160,6 +163,78 @@ describe('StoreHoursAdminController e2e', () => {
       .send({ shifts: [{ dayOfWeek: 'sunday', opensAtMinutes: 600, closesAtMinutes: 600 }] })
       .expect(400);
     expect(zero.body.message).toBe('Turno precisa ter abertura e fechamento diferentes.');
+  }, 20_000);
+
+  it('rejeita sobreposição no mesmo dia e na cauda de turno que cruza meia-noite', async () => {
+    const sameDay = await request(app.getHttpServer())
+      .put(`/v1/admin/stores/${storeId}/hours`)
+      .set(auth())
+      .send({
+        shifts: [
+          { dayOfWeek: 'monday', opensAtMinutes: 11 * 60, closesAtMinutes: 14 * 60 },
+          { dayOfWeek: 'monday', opensAtMinutes: 13 * 60, closesAtMinutes: 16 * 60 },
+        ],
+      })
+      .expect(400);
+    expect(sameDay.body.message).toBe('Turnos não podem se sobrepor, inclusive na virada do dia.');
+
+    const nextDay = await request(app.getHttpServer())
+      .put(`/v1/admin/stores/${storeId}/hours`)
+      .set(auth())
+      .send({
+        shifts: [
+          { dayOfWeek: 'friday', opensAtMinutes: 22 * 60, closesAtMinutes: 2 * 60 },
+          { dayOfWeek: 'saturday', opensAtMinutes: 60, closesAtMinutes: 3 * 60 },
+        ],
+      })
+      .expect(400);
+    expect(nextDay.body.message).toBe('Turnos não podem se sobrepor, inclusive na virada do dia.');
+  }, 20_000);
+
+  it('reverte o soft-delete se a inserção do novo conjunto falhar', async () => {
+    await prisma.storeHours.deleteMany({ where: { tenantId, storeId } });
+    await prisma.storeHours.create({
+      data: {
+        tenantId,
+        storeId,
+        dayOfWeek: 'thursday',
+        opensAtMinutes: 18 * 60,
+        closesAtMinutes: 23 * 60,
+      },
+    });
+
+    const requestContext = app.get(RequestContextService);
+    const repository = new PrismaStoreHoursAdminRepository(requestContext);
+    const invalidInput = {
+      shifts: [{ dayOfWeek: 'invalid-day', opensAtMinutes: 10 * 60, closesAtMinutes: 12 * 60 }],
+    } as unknown as PutStoreHoursInput;
+
+    await expect(
+      requestContext.run({ tenantId, isPlatform: false }, () => repository.replaceAll(storeId, invalidInput)),
+    ).rejects.toThrow();
+
+    const active = await prisma.storeHours.findMany({
+      where: { tenantId, storeId, deletedAt: null },
+      select: { dayOfWeek: true, opensAtMinutes: true, closesAtMinutes: true },
+    });
+    expect(active).toEqual([{ dayOfWeek: 'thursday', opensAtMinutes: 1080, closesAtMinutes: 1380 }]);
+  }, 20_000);
+
+  it('serializa dois PUTs concorrentes e persiste exatamente um conjunto completo', async () => {
+    const first = {
+      shifts: [{ dayOfWeek: 'tuesday', opensAtMinutes: 10 * 60, closesAtMinutes: 14 * 60 }],
+    };
+    const second = {
+      shifts: [{ dayOfWeek: 'wednesday', opensAtMinutes: 18 * 60, closesAtMinutes: 23 * 60 }],
+    };
+    const responses = await Promise.all([
+      request(app.getHttpServer()).put(`/v1/admin/stores/${storeId}/hours`).set(auth()).send(first),
+      request(app.getHttpServer()).put(`/v1/admin/stores/${storeId}/hours`).set(auth()).send(second),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+
+    const listed = await request(app.getHttpServer()).get(`/v1/admin/stores/${storeId}/hours`).set(auth()).expect(200);
+    expect([first, second]).toContainEqual(listed.body);
   }, 20_000);
 
   it('RLS/tenant header impede listar ou salvar horário de loja de outro tenant', async () => {
