@@ -220,6 +220,23 @@ describe('StoreHoursAdminController e2e', () => {
     expect(active).toEqual([{ dayOfWeek: 'thursday', opensAtMinutes: 1080, closesAtMinutes: 1380 }]);
   }, 20_000);
 
+  it('serializa dois PUTs concorrentes e persiste exatamente um conjunto completo', async () => {
+    const first = {
+      shifts: [{ dayOfWeek: 'tuesday', opensAtMinutes: 10 * 60, closesAtMinutes: 14 * 60 }],
+    };
+    const second = {
+      shifts: [{ dayOfWeek: 'wednesday', opensAtMinutes: 18 * 60, closesAtMinutes: 23 * 60 }],
+    };
+    const responses = await Promise.all([
+      request(app.getHttpServer()).put(`/v1/admin/stores/${storeId}/hours`).set(auth()).send(first),
+      request(app.getHttpServer()).put(`/v1/admin/stores/${storeId}/hours`).set(auth()).send(second),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+
+    const listed = await request(app.getHttpServer()).get(`/v1/admin/stores/${storeId}/hours`).set(auth()).expect(200);
+    expect([first, second]).toContainEqual(listed.body);
+  }, 20_000);
+
   it('RLS/tenant header impede listar ou salvar horário de loja de outro tenant', async () => {
     await request(app.getHttpServer())
       .get(`/v1/admin/stores/${otherStoreId}/hours`)
