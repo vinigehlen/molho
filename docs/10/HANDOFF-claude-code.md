@@ -365,8 +365,10 @@ operation not permitted 0.0.0.0`. Repetido fora do sandbox, passou:
 
 ## Proximos passos naturais
 
-1. Commitar a fatia em andamento, se ainda estiver uncommitted.
-2. Validar manualmente o `test-print` numa impressora real da loja piloto.
+1. Validar manualmente o `test-print` numa impressora real da loja piloto quando
+   o hardware estiver disponivel. Em 2026-08-13, Vinicius informou que nao esta
+   com a impressora, entao este teste fica documentado e pendente, sem bloquear
+   o restante do trabalho de software.
 3. Escolher hardware/modelo da termica e decidir codepage.
 4. Decidir como o agente sera mantido rodando no piloto:
    - terminal manual;
