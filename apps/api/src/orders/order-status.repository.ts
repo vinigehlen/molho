@@ -17,10 +17,10 @@ export interface RecordHistoryParams {
   orderId: string;
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
+  reason: string | null;
   actorId: string | null;
   actorRole: string | null;
   customerId: string | null;
-  reason: string | null;
   /** Chave da fila offline (Épico 9) — nula em ação online direta. */
   idempotencyKey?: string | null;
 }
@@ -31,6 +31,7 @@ export interface RecordAuditLogParams {
   actorRole: string;
   fromStatus: OrderStatus | null;
   toStatus: OrderStatus;
+  reason: string | null;
 }
 
 export interface OrderStatusRepository {
@@ -117,7 +118,7 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
         action: 'order.status_transition',
         entity: 'order',
         beforeJson: { status: params.fromStatus },
-        afterJson: { status: params.toStatus },
+        afterJson: { status: params.toStatus, reason: params.reason },
       },
     });
   }

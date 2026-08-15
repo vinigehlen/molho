@@ -147,6 +147,30 @@ describe('OrderStatusService.transition', () => {
     expect(repo.rows.get('order-1')!.status).toBe('canceled');
     expect(repo.history[0]!.reason).toBe('Item em falta');
   });
+
+  it.each([
+    ['preparing', 'received'],
+    ['ready', 'preparing'],
+    ['in_transit', 'ready'],
+  ] as const)('regressão %s → %s exige motivo e registra history + audit', async (fromStatus, toStatus) => {
+    const { repo, service } = setup();
+    repo.seed({ id: 'order-1', tenantId: 'tenant-1', status: fromStatus, version: 3 });
+
+    await expect(
+      service.transition({ orderId: 'order-1', expectedVersion: 3, toStatus, actor: STAFF, reason: '  ' }),
+    ).rejects.toThrow(MissingCancelReasonError);
+
+    await service.transition({
+      orderId: 'order-1',
+      expectedVersion: 3,
+      toStatus,
+      actor: STAFF,
+      reason: 'Correção operacional',
+    });
+
+    expect(repo.history[0]).toMatchObject({ fromStatus, toStatus, reason: 'Correção operacional' });
+    expect(repo.auditLogs[0]).toMatchObject({ fromStatus, toStatus, reason: 'Correção operacional' });
+  });
 });
 
 describe('OrderStatusService.transition — gate de pagamento (§5.5)', () => {

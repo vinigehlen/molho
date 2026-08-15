@@ -22,9 +22,12 @@ describe('isLegalOrderTransition — docs/02-definicoes-v1.md §5.1/§5.2', () =
     ['received', 'canceled'],
     ['received', 'auto_canceled'],
     ['preparing', 'ready'],
+    ['preparing', 'received'],
     ['preparing', 'canceled'],
     ['ready', 'in_transit'],
+    ['ready', 'preparing'],
     ['in_transit', 'completed'],
+    ['in_transit', 'ready'],
     ['in_transit', 'delivery_failed'],
   ];
 
@@ -64,15 +67,18 @@ describe('isLegalOrderTransition — docs/02-definicoes-v1.md §5.1/§5.2', () =
 });
 
 describe('orderTransitionRequiresReason', () => {
-  it('exige motivo pra canceled e delivery_failed', () => {
-    expect(orderTransitionRequiresReason('canceled')).toBe(true);
-    expect(orderTransitionRequiresReason('delivery_failed')).toBe(true);
+  it('exige motivo pra canceled, delivery_failed e regressões operacionais', () => {
+    expect(orderTransitionRequiresReason('received', 'canceled')).toBe(true);
+    expect(orderTransitionRequiresReason('in_transit', 'delivery_failed')).toBe(true);
+    expect(orderTransitionRequiresReason('preparing', 'received')).toBe(true);
+    expect(orderTransitionRequiresReason('ready', 'preparing')).toBe(true);
+    expect(orderTransitionRequiresReason('in_transit', 'ready')).toBe(true);
   });
 
-  it('não exige motivo pras demais transições', () => {
-    for (const status of ALL_STATUSES) {
-      if (status === 'canceled' || status === 'delivery_failed') continue;
-      expect(orderTransitionRequiresReason(status)).toBe(false);
-    }
+  it('não exige motivo nos avanços normais', () => {
+    expect(orderTransitionRequiresReason('received', 'preparing')).toBe(false);
+    expect(orderTransitionRequiresReason('preparing', 'ready')).toBe(false);
+    expect(orderTransitionRequiresReason('ready', 'in_transit')).toBe(false);
+    expect(orderTransitionRequiresReason('in_transit', 'completed')).toBe(false);
   });
 });
