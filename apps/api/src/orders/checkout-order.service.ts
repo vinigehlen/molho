@@ -1,4 +1,4 @@
-import { buildPixBrCode, parsePhoneNumber } from '@molho/contracts';
+import { buildPixBrCode, parsePhoneNumber, PICKUP_ETA_MAX_MINUTES } from '@molho/contracts';
 import type {
   CheckoutOrderPix,
   CheckoutOrderResponse,
@@ -70,6 +70,7 @@ export class CheckoutOrderService {
     private readonly moduleGate: PaymentMethodModuleGate,
     private readonly guestGate: CheckoutGuestGate,
     private readonly customerIdentity: CustomerIdentityRepository,
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   /**
@@ -170,6 +171,10 @@ export class CheckoutOrderService {
     // (retirada não tem CEP/número — nada pra gravar lá).
     const address = toDeliverySnapshot(request.address, resolved);
     const deliveryAddressId = address ? await this.repo.createAddress(customerId, address) : null;
+    const etaMaxMinutes = request.fulfillmentType === 'pickup' ? PICKUP_ETA_MAX_MINUTES : revalidation.etaMaxMinutes;
+    if (etaMaxMinutes === null) throw new Error('Checkout de entrega sem prazo máximo revalidado.');
+    const createdAt = this.now();
+    const fulfillmentDeadlineAt = new Date(createdAt.getTime() + etaMaxMinutes * 60_000);
     const orderId = await this.repo.createOrder({
       storeId: store.id,
       customerId,
@@ -180,11 +185,16 @@ export class CheckoutOrderService {
       paymentMethod: request.paymentMethod,
       changeForCents,
       customerVerified: verified,
+      createdAt,
+      fulfillmentDeadlineAt,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
 
-    return { ok: true, response: this.buildResponse(request, store, orderId, totalCents, changeForCents) };
+    return {
+      ok: true,
+      response: this.buildResponse(request, store, orderId, totalCents, changeForCents, fulfillmentDeadlineAt),
+    };
   }
 
   /** Espelha a union de `checkoutOrderResponseSchema` — cada branch monta só os campos que existem nela (nunca `pix` fora de `pix`, nunca `changeForCents` fora de `cash_on_delivery`). */
@@ -194,8 +204,16 @@ export class CheckoutOrderService {
     orderId: string,
     totalCents: number,
     changeForCents: number | null,
+    fulfillmentDeadlineAt: Date,
   ): CheckoutOrderResponse {
-    const base = { orderId, status: 'received' as const, paymentStatus: 'aguardando_confirmacao' as const, totalCents };
+    const base = {
+      orderId,
+      status: 'received' as const,
+      paymentStatus: 'aguardando_confirmacao' as const,
+      totalCents,
+      fulfillmentType: request.fulfillmentType,
+      fulfillmentDeadlineAt: fulfillmentDeadlineAt.toISOString(),
+    };
     if (request.paymentMethod === 'pix') {
       return { ...base, paymentMethod: 'pix', pix: buildOrderPix(store, orderId, totalCents) };
     }

@@ -5,6 +5,8 @@ import {
   type QueuedIntent,
   enqueueIntent,
   evaluateIntent,
+  isBackwardStaffTransition,
+  isLegalStaffTransition,
   loadQueue,
   paymentGateReason,
   removeIntent,
@@ -18,7 +20,7 @@ function order(status: AdminOrder['status'], over: Partial<AdminOrder> = {}): Ad
     paymentMethod: 'pix', paymentStatus: 'confirmado', changeForCents: null,
     subtotalCents: 100, deliveryFeeCents: 0, totalCents: 100, fulfillmentType: 'delivery',
     delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
-    items: [], ...over,
+    items: [], ...over, fulfillmentDeadlineAt: over.fulfillmentDeadlineAt ?? null,
   };
 }
 
@@ -68,6 +70,22 @@ describe('evaluateIntent — precondição semântica', () => {
   it('transição ilegal (received→ready) → conflito', () => {
     const r = evaluateIntent(intent({ toStatus: 'ready' }), order('received'), 'u1', NOW);
     expect(r.action).toBe('conflict');
+  });
+});
+
+describe('movimentação manual do gestor', () => {
+  it.each([
+    ['preparing', 'received'],
+    ['ready', 'preparing'],
+    ['in_transit', 'ready'],
+  ] as const)('aceita a regressão adjacente %s → %s e exige o fluxo de retorno', (from, to) => {
+    expect(isLegalStaffTransition(from, to)).toBe(true);
+    expect(isBackwardStaffTransition(from, to)).toBe(true);
+  });
+
+  it('rejeita salto de coluna e não classifica avanço como retorno', () => {
+    expect(isLegalStaffTransition('received', 'ready')).toBe(false);
+    expect(isBackwardStaffTransition('received', 'preparing')).toBe(false);
   });
 });
 

@@ -86,6 +86,9 @@ export const checkoutAddressInputSchema = z.object({
  */
 export const fulfillmentTypeSchema = z.enum(['delivery', 'pickup']);
 
+/** Prazo máximo fixo da retirada no balcão, em minutos. Fonte única pra checkout, API e UI. */
+export const PICKUP_ETA_MAX_MINUTES = 30;
+
 export const paymentMethodSchema = z.enum(['pix', 'cash_on_delivery', 'card_on_delivery']);
 
 /**
@@ -216,6 +219,9 @@ const checkoutOrderResponseBase = z.object({
   status: z.literal('received'),
   paymentStatus: z.literal('aguardando_confirmacao'),
   totalCents: centsSchema,
+  fulfillmentType: fulfillmentTypeSchema,
+  /** Snapshot congelado na criação; nunca é recalculado quando zona/horário mudam. */
+  fulfillmentDeadlineAt: z.iso.datetime(),
 });
 
 /** Mesma union de `checkoutRequestSchema`, mesmo racional — `pix` só existe no branch `pix`, `changeForCents` só no branch `cash_on_delivery`. */

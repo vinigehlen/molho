@@ -30,9 +30,9 @@ export type OrderStatus =
 const LEGAL_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   pending_payment: ['received', 'expired'],
   received: ['preparing', 'canceled', 'auto_canceled'],
-  preparing: ['ready', 'canceled'],
-  ready: ['in_transit'],
-  in_transit: ['completed', 'delivery_failed'],
+  preparing: ['received', 'ready', 'canceled'],
+  ready: ['preparing', 'in_transit'],
+  in_transit: ['ready', 'completed', 'delivery_failed'],
   completed: [],
   expired: [],
   auto_canceled: [],
@@ -63,7 +63,19 @@ export function transitionRequiresConfirmedPayment(to: OrderStatus, paymentMetho
   return false;
 }
 
-/** docs/02 §5.2: "loja cancela sempre com motivo obrigatório". Mesma exigência pra delivery_failed (motivo da falha de entrega). */
-export function orderTransitionRequiresReason(to: OrderStatus): boolean {
-  return to === 'canceled' || to === 'delivery_failed';
+/**
+ * Motivo obrigatório em saídas infelizes e em toda regressão operacional.
+ * Regressões são só entre etapas ativas adjacentes (definidas acima); o
+ * motivo deixa explícito no histórico por que a cozinha voltou o pedido.
+ */
+export function orderTransitionRequiresReason(from: OrderStatus, to: OrderStatus): boolean {
+  return to === 'canceled' || to === 'delivery_failed' || isBackwardActiveTransition(from, to);
+}
+
+export function isBackwardActiveTransition(from: OrderStatus, to: OrderStatus): boolean {
+  return (
+    (from === 'preparing' && to === 'received') ||
+    (from === 'ready' && to === 'preparing') ||
+    (from === 'in_transit' && to === 'ready')
+  );
 }

@@ -151,6 +151,7 @@ function setup() {
   const moduleGate = new FakeModuleGate();
   const guestGate = new FakeCheckoutGuestGate();
   const customerIdentity = new FakeCustomerIdentityRepository();
+  const now = new Date('2026-08-14T18:00:00.000Z');
   const service = new CheckoutOrderService(
     repo,
     revalidationService as never,
@@ -158,6 +159,7 @@ function setup() {
     moduleGate,
     guestGate,
     customerIdentity as never,
+    () => now,
   );
   return { repo, revalidationService, orderStatusService, moduleGate, guestGate, customerIdentity, service };
 }
@@ -235,8 +237,17 @@ describe('CheckoutOrderService.createOrder', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      response: { orderId: 'order-1', status: 'received', paymentStatus: 'aguardando_confirmacao', totalCents: 3690, paymentMethod: 'pix' },
+      response: {
+        orderId: 'order-1',
+        status: 'received',
+        paymentStatus: 'aguardando_confirmacao',
+        totalCents: 3690,
+        paymentMethod: 'pix',
+        fulfillmentType: 'delivery',
+        fulfillmentDeadlineAt: '2026-08-14T18:50:00.000Z',
+      },
     });
+    expect(repo.createOrderCalls[0]?.fulfillmentDeadlineAt.toISOString()).toBe('2026-08-14T18:50:00.000Z');
     if (result.ok && result.response.paymentMethod === 'pix') {
       expect(result.response.pix).toMatchObject({ key: 'loja@exemplo.com', keyType: 'email' });
       expect(result.response.pix.payload).toContain('540536.90'); // campo 54 (valor): TLV "54" + length "05" + "36.90"
@@ -464,5 +475,11 @@ describe('CheckoutOrderService.createOrder — retirada no balcão', () => {
     expect(result.ok).toBe(true);
     expect(repo.createAddressCalls).toHaveLength(0);
     expect(repo.createOrderCalls[0]).toMatchObject({ fulfillmentType: 'pickup', deliveryAddressId: null, address: null });
+    expect(repo.createOrderCalls[0]?.createdAt.toISOString()).toBe('2026-08-14T18:00:00.000Z');
+    expect(repo.createOrderCalls[0]?.fulfillmentDeadlineAt.toISOString()).toBe('2026-08-14T18:30:00.000Z');
+    if (result.ok) {
+      expect(result.response.fulfillmentDeadlineAt).toBe('2026-08-14T18:30:00.000Z');
+      expect(result.response.fulfillmentType).toBe('pickup');
+    }
   });
 });

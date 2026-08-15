@@ -238,7 +238,7 @@ describe('CartView — checkout (Épico 7)', () => {
     renderCartView();
 
     await user.click(await screen.findByRole('button', { name: 'Retirar no balcão' }));
-    expect(screen.getByText('Retira direto na loja — sem taxa de entrega.')).toBeInTheDocument();
+    expect(screen.getByText('Retira direto na loja em até 30 min — sem taxa de entrega.')).toBeInTheDocument();
     // Sem o botão de endereço nem o aviso de CEP — pickup não pede nenhum dos dois.
     expect(screen.queryByText('Adicionar endereço de entrega')).not.toBeInTheDocument();
 
@@ -321,6 +321,8 @@ describe('CartView — checkout (Épico 7)', () => {
       status: 'created',
       orderId: 'order-1',
       totalCents: 3690,
+      fulfillmentType: 'delivery',
+      fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',
       paymentMethod: 'pix',
       pix: { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' },
     });
@@ -353,6 +355,8 @@ describe('CartView — checkout (Épico 7)', () => {
       status: 'created',
       orderId: 'order-cash',
       totalCents: 3690,
+      fulfillmentType: 'delivery',
+      fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',
       paymentMethod: 'cash_on_delivery',
       changeForCents: 5000,
     });
@@ -436,6 +440,8 @@ describe('CartView — checkout (Épico 7)', () => {
       status: 'created',
       orderId: 'order-exato',
       totalCents: 3690,
+      fulfillmentType: 'delivery',
+      fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',
       paymentMethod: 'cash_on_delivery',
       changeForCents: 3690, // exatamente o total — pagamento exato, troco zero
     });

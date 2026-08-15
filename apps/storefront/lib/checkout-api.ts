@@ -119,10 +119,18 @@ export interface CheckoutOrderPix {
 }
 
 /** Espelha `checkoutOrderResponseSchema` (união discriminada por paymentMethod, Épico 8). */
+type CreatedOrderBase = {
+  status: 'created';
+  orderId: string;
+  totalCents: number;
+  fulfillmentType: FulfillmentType;
+  fulfillmentDeadlineAt: string;
+};
+
 export type CreateOrderResult =
-  | { status: 'created'; orderId: string; totalCents: number; paymentMethod: 'pix'; pix: CheckoutOrderPix }
-  | { status: 'created'; orderId: string; totalCents: number; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
-  | { status: 'created'; orderId: string; totalCents: number; paymentMethod: 'card_on_delivery' }
+  | (CreatedOrderBase & { paymentMethod: 'pix'; pix: CheckoutOrderPix })
+  | (CreatedOrderBase & { paymentMethod: 'cash_on_delivery'; changeForCents: number | null })
+  | (CreatedOrderBase & { paymentMethod: 'card_on_delivery' })
   /** 409 — a revalidação de dentro de `/checkout/orders` achou divergência desfavorável de novo; `review` já é o estado FRESCO, pronto pra mostrar de novo na tela de revisão. */
   | { status: 'divergent'; review: CheckoutReview }
   /** Token expirado/inválido — quem chama deve limpar o token guardado e pedir OTP de novo. */
@@ -174,17 +182,28 @@ export async function createOrder(
 function parseCreatedOrder(data: unknown): CreateOrderResult | null {
   if (typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
-  if (typeof d.orderId !== 'string' || typeof d.totalCents !== 'number') return null;
-  const { orderId, totalCents } = d;
+  if (
+    typeof d.orderId !== 'string' ||
+    typeof d.totalCents !== 'number' ||
+    (d.fulfillmentType !== 'delivery' && d.fulfillmentType !== 'pickup') ||
+    typeof d.fulfillmentDeadlineAt !== 'string'
+  ) return null;
+  const { orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt } = d as {
+    orderId: string;
+    totalCents: number;
+    fulfillmentType: FulfillmentType;
+    fulfillmentDeadlineAt: string;
+  };
+  const base = { status: 'created' as const, orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt };
 
   if (d.paymentMethod === 'pix' && isCheckoutOrderPix(d.pix)) {
-    return { status: 'created', orderId, totalCents, paymentMethod: 'pix', pix: d.pix };
+    return { ...base, paymentMethod: 'pix', pix: d.pix };
   }
   if (d.paymentMethod === 'cash_on_delivery' && (typeof d.changeForCents === 'number' || d.changeForCents === null)) {
-    return { status: 'created', orderId, totalCents, paymentMethod: 'cash_on_delivery', changeForCents: d.changeForCents };
+    return { ...base, paymentMethod: 'cash_on_delivery', changeForCents: d.changeForCents };
   }
   if (d.paymentMethod === 'card_on_delivery') {
-    return { status: 'created', orderId, totalCents, paymentMethod: 'card_on_delivery' };
+    return { ...base, paymentMethod: 'card_on_delivery' };
   }
   return null;
 }

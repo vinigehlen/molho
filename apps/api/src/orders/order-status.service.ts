@@ -50,10 +50,6 @@ export class OrderStatusService {
       return;
     }
 
-    if (orderTransitionRequiresReason(input.toStatus) && !input.reason?.trim()) {
-      throw new MissingCancelReasonError();
-    }
-
     const order = await this.repo.findForTransition(input.orderId);
     if (!order) throw new OrderNotFoundError();
 
@@ -61,6 +57,9 @@ export class OrderStatusService {
     // (ou, como o fake de teste, mutar) o mesmo objeto que ele próprio
     // atualiza — ler order.status depois da escrita já pegaria o valor NOVO.
     const fromStatus = order.status;
+    if (orderTransitionRequiresReason(fromStatus, input.toStatus) && !input.reason?.trim()) {
+      throw new MissingCancelReasonError();
+    }
     if (!isLegalOrderTransition(fromStatus, input.toStatus)) {
       throw new IllegalOrderTransitionError(fromStatus, input.toStatus);
     }
@@ -99,6 +98,7 @@ export class OrderStatusService {
         actorRole: input.actor.role,
         fromStatus,
         toStatus: input.toStatus,
+        reason: input.reason,
       });
     }
   }

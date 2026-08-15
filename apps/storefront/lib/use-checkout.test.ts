@@ -137,9 +137,10 @@ describe('useCheckout', () => {
   });
 
   const PIX = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
+  const TIMING = { fulfillmentType: 'delivery' as const, fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z' };
 
   it('5) verifyOtpCode ok: guarda o token, cria o pedido, vai pro sucesso (com pix)', async () => {
-    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
+    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-1', totalCents: 3690, ...TIMING, paymentMethod: 'pix', pix: PIX });
     const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
     await act(async () => result.current.startCheckout());
     act(() => result.current.confirmReview());
@@ -149,7 +150,7 @@ describe('useCheckout', () => {
     });
 
     expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), { accessToken: 'token-x' });
-    expect(result.current.step).toEqual({ kind: 'success', orderId: 'order-1', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
+    expect(result.current.step).toEqual({ kind: 'success', orderId: 'order-1', totalCents: 3690, ...TIMING, paymentMethod: 'pix', pix: PIX });
   });
 
   it('5b) setPaymentMethod/setChangeForCents (Épico 8): body enviado carrega o método escolhido, step de sucesso reflete cash_on_delivery', async () => {
@@ -157,6 +158,7 @@ describe('useCheckout', () => {
       status: 'created',
       orderId: 'order-cash',
       totalCents: 3690,
+      ...TIMING,
       paymentMethod: 'cash_on_delivery',
       changeForCents: 5000,
     });
@@ -182,6 +184,7 @@ describe('useCheckout', () => {
       kind: 'success',
       orderId: 'order-cash',
       totalCents: 3690,
+      ...TIMING,
       paymentMethod: 'cash_on_delivery',
       changeForCents: 5000,
     });
@@ -264,7 +267,7 @@ describe('useCheckout', () => {
   });
 
   it('12) sessão já persistida (token salvo de antes): confirmReview cria o pedido direto, sem abrir OTP', async () => {
-    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-2', totalCents: 3690, paymentMethod: 'pix', pix: PIX });
+    createOrder.mockResolvedValue({ status: 'created', orderId: 'order-2', totalCents: 3690, ...TIMING, paymentMethod: 'pix', pix: PIX });
 
     // Primeira montagem: loga e guarda o token.
     const primeira = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address()));
@@ -297,6 +300,7 @@ function enderecoSemCep(): CustomerAddress {
  */
 describe('useCheckout — checkout guest', () => {
   const PIX_GUEST = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
+  const TIMING = { fulfillmentType: 'delivery' as const, fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z' };
 
   it('sem sessão e com guestCheckout LIGADO: confirmReview abre o passo guest, não o de OTP', async () => {
     const { result } = renderHook(() => useCheckout(SLUG, cart(), 'delivery', address(), true));
@@ -322,6 +326,7 @@ describe('useCheckout — checkout guest', () => {
       status: 'created',
       orderId: 'order-guest',
       totalCents: 3690,
+      ...TIMING,
       paymentMethod: 'pix',
       pix: PIX_GUEST,
     });
@@ -340,6 +345,7 @@ describe('useCheckout — checkout guest', () => {
       kind: 'success',
       orderId: 'order-guest',
       totalCents: 3690,
+      ...TIMING,
       paymentMethod: 'pix',
       pix: PIX_GUEST,
     });

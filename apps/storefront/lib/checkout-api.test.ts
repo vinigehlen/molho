@@ -205,6 +205,7 @@ describe('revalidateCheckout', () => {
 
 describe('createOrder', () => {
   const body = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'pix', null);
+  const deadline = '2026-08-14T20:30:00.000Z';
 
   const pix = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' };
 
@@ -219,6 +220,8 @@ describe('createOrder', () => {
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,
+          fulfillmentType: 'delivery',
+          fulfillmentDeadlineAt: deadline,
           paymentMethod: 'pix',
           pix,
         }),
@@ -226,7 +229,7 @@ describe('createOrder', () => {
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, paymentMethod: 'pix', pix });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'pix', pix });
   });
 
   it('201 cash_on_delivery: devolve status created com changeForCents, sem pix', async () => {
@@ -240,6 +243,8 @@ describe('createOrder', () => {
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,
+          fulfillmentType: 'delivery',
+          fulfillmentDeadlineAt: deadline,
           paymentMethod: 'cash_on_delivery',
           changeForCents: 8000,
         }),
@@ -247,7 +252,7 @@ describe('createOrder', () => {
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-2', totalCents: 7380, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-2', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
   });
 
   it('201 card_on_delivery: devolve status created sem pix nem changeForCents', async () => {
@@ -261,13 +266,15 @@ describe('createOrder', () => {
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,
+          fulfillmentType: 'delivery',
+          fulfillmentDeadlineAt: deadline,
           paymentMethod: 'card_on_delivery',
         }),
       })),
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-3', totalCents: 7380, paymentMethod: 'card_on_delivery' });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-3', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'card_on_delivery' });
   });
 
   it('201 pix sem o campo pix no corpo: devolve status error (contrato exige QR pro cliente pagar)', async () => {

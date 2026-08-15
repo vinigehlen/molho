@@ -22,10 +22,10 @@ export class IllegalOrderTransitionError extends Error {
   }
 }
 
-/** `canceled`/`delivery_failed` exigem motivo (docs/02 §5.2) — CLAUDE.md regra 15. */
+/** `canceled`/`delivery_failed` e regressões operacionais exigem motivo. */
 export class MissingCancelReasonError extends Error {
   constructor() {
-    super('Motivo é obrigatório para cancelar ou registrar falha de entrega.');
+    super('Motivo é obrigatório para cancelar, registrar falha ou voltar uma etapa.');
     this.name = 'MissingCancelReasonError';
   }
 }

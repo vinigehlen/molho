@@ -7,6 +7,7 @@ const ROW: AdminOrderRow = {
   status: 'preparing',
   version: 2,
   createdAt: new Date('2026-07-26T18:30:00.000Z'),
+  fulfillmentDeadlineAt: new Date('2026-07-26T19:20:00.000Z'),
   paymentMethod: 'cash_on_delivery',
   paymentStatus: 'aguardando_confirmacao',
   customerVerified: true,
@@ -35,6 +36,7 @@ describe('toAdminOrder', () => {
 
     expect(order.customerName).toBe('Ana Souza');
     expect(order.createdAt).toBe('2026-07-26T18:30:00.000Z');
+    expect(order.fulfillmentDeadlineAt).toBe('2026-07-26T19:20:00.000Z');
     expect(order.delivery).toEqual({
       label: 'Casa',
       street: 'Rua das Flores',
@@ -51,6 +53,10 @@ describe('toAdminOrder', () => {
     expect(order.items).toEqual([{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }]);
     // Cinto-e-suspensório: o shape mapeado é válido pro schema que vai pela rede.
     expect(adminOrderSchema.safeParse(order).success).toBe(true);
+  });
+
+  it('pedido legado preserva prazo nulo em vez de recalcular com a zona atual', () => {
+    expect(toAdminOrder({ ...ROW, fulfillmentDeadlineAt: null }).fulfillmentDeadlineAt).toBeNull();
   });
 
   it('changeForCents null (pix/card) passa como null', () => {

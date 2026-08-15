@@ -23,13 +23,21 @@ export interface QueuedIntent {
 /** Transições que o gestor aciona (mesma máquina do backend, subconjunto do staff). */
 const LEGAL_NEXT: Record<string, readonly AdminOrder['status'][]> = {
   received: ['preparing', 'canceled'],
-  preparing: ['ready', 'canceled'],
-  ready: ['in_transit'],
-  in_transit: ['completed', 'delivery_failed'],
+  preparing: ['received', 'ready', 'canceled'],
+  ready: ['preparing', 'in_transit'],
+  in_transit: ['ready', 'completed', 'delivery_failed'],
 };
 
-function isLegal(from: AdminOrder['status'], to: AdminOrder['status']): boolean {
+export function isLegalStaffTransition(from: AdminOrder['status'], to: AdminOrder['status']): boolean {
   return (LEGAL_NEXT[from] ?? []).includes(to);
+}
+
+export function isBackwardStaffTransition(from: AdminOrder['status'], to: AdminOrder['status']): boolean {
+  return (
+    (from === 'preparing' && to === 'received') ||
+    (from === 'ready' && to === 'preparing') ||
+    (from === 'in_transit' && to === 'ready')
+  );
 }
 
 /** Gate §5.5 client-side (espelha transitionRequiresConfirmedPayment do backend). */
@@ -79,7 +87,7 @@ export function evaluateIntent(
   if (order.status !== intent.fromStatus) {
     return { action: 'conflict', reason: `o pedido mudou (está em "${order.status}", você agiu em "${intent.fromStatus}")` };
   }
-  if (!isLegal(intent.fromStatus, intent.toStatus)) {
+  if (!isLegalStaffTransition(intent.fromStatus, intent.toStatus)) {
     return { action: 'conflict', reason: 'a transição não é mais válida' };
   }
   const paymentGate = paymentGateReason(order, intent.toStatus);

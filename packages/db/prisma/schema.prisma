@@ -714,6 +714,10 @@ model Order {
   /// um writer futuro carimbar "verificado" por omissão.
   customerVerified           Boolean                           @map("customer_verified")
 
+  /// Prazo máximo prometido no momento da criação. Congelado: delivery usa
+  /// o etaMaxMinutes da zona; pickup usa 30 min. Nullable só para legado.
+  fulfillmentDeadlineAt DateTime? @map("fulfillment_deadline_at")
+
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
   /// papel de quem cancelou vivem no audit_log/order_status_history —
