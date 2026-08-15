@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AdminOrder } from '@molho/contracts';
@@ -12,9 +12,9 @@ import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
-import { paymentGateReason } from '../../lib/order-queue';
+import { isBackwardStaffTransition, isLegalStaffTransition, paymentGateReason } from '../../lib/order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
-import { centsToBRL, isoToTime } from '../../lib/format';
+import { centsToBRL, fulfillmentDeadline, isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
 import { disarmStream } from '../../lib/api-client';
 import { PrintJobConsumer } from './print-job-consumer';
@@ -27,6 +27,16 @@ const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status
   ready: { to: 'in_transit', label: 'Saiu p/ entrega' },
   in_transit: { to: 'completed', label: 'Concluir' },
 };
+
+const PREVIOUS_ACTION: Partial<Record<AdminOrder['status'], AdminOrder['status']>> = {
+  preparing: 'received',
+  ready: 'preparing',
+  in_transit: 'ready',
+};
+
+function statusLabel(status: AdminOrder['status']): string {
+  return status in COLUMN_LABEL ? COLUMN_LABEL[status as keyof typeof COLUMN_LABEL] : status;
+}
 
 /**
  * Board do gestor de pedidos (Épico 9). Load inicial via GET /v1/admin/orders;
@@ -119,6 +129,29 @@ export default function GestorPage() {
   // é o consumidor local da fila, via claim/printed/failed.
   const [printFeedback, setPrintFeedback] = useState<Record<string, { state: 'queueing' | 'queued' | 'failed'; message: string }>>({});
   const [loggingOut, setLoggingOut] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<AdminOrder['status'] | null>(null);
+  const [reversal, setReversal] = useState<{ order: AdminOrder; toStatus: AdminOrder['status'] } | null>(null);
+  const [reversalReason, setReversalReason] = useState('');
+
+  function requestTransition(order: AdminOrder, toStatus: AdminOrder['status']) {
+    if (!isLegalStaffTransition(order.status, toStatus)) return;
+    if (isBackwardStaffTransition(order.status, toStatus)) {
+      setReversal({ order, toStatus });
+      setReversalReason('');
+      return;
+    }
+    void submit(order, toStatus);
+  }
+
+  function dropOrder(event: DragEvent<HTMLElement>, toStatus: AdminOrder['status']) {
+    event.preventDefault();
+    const orderId = event.dataTransfer.getData('text/order-id') || draggingId;
+    const order = orders?.find((candidate) => candidate.id === orderId);
+    setDraggingId(null);
+    setDropTarget(null);
+    if (order) requestTransition(order, toStatus);
+  }
 
   async function logout() {
     if (pending.length > 0) {
@@ -231,7 +264,24 @@ export default function GestorPage() {
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {BOARD_COLUMNS.map((col) => (
-          <section key={col} className="rounded-[20px] bg-bg-card p-3">
+          <section
+            key={col}
+            className={`rounded-[20px] border-2 p-3 transition-colors ${
+              dropTarget === col ? 'border-brand bg-brand-faint' : 'border-transparent bg-bg-card'
+            }`}
+            onDragOver={(event) => {
+              const order = orders?.find((candidate) => candidate.id === draggingId);
+              if (!order || !isLegalStaffTransition(order.status, col)) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              setDropTarget(col);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
+            }}
+            onDrop={(event) => dropOrder(event, col)}
+            data-order-status={col}
+          >
             <h2 className="mb-3 px-1 text-sm font-semibold text-text-muted">
               {COLUMN_LABEL[col]} {groups && <span className="tabular-nums">({groups[col].length})</span>}
             </h2>
@@ -245,10 +295,21 @@ export default function GestorPage() {
                       online={online}
                       confirming={confirmingId === order.id}
                       onAdvance={(to) => void submit(order, to)}
+                      onMove={(to) => requestTransition(order, to)}
                       onMarkPaid={() => void markPaid(order)}
                       onNotify={() => setAvisando(order)}
                       onPrint={() => void queuePrintCopy(order)}
                       printFeedback={printFeedback[order.id] ?? null}
+                      dragging={draggingId === order.id}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData('text/order-id', order.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        setDraggingId(order.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setDropTarget(null);
+                      }}
                     />
                   ))
                 : // skeletons no load
@@ -305,6 +366,46 @@ export default function GestorPage() {
       )}
 
       {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} />}
+      {reversal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <section
+            className="w-full max-w-md rounded-[20px] bg-bg-card p-5 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reversal-title"
+          >
+            <h2 id="reversal-title" className="text-lg font-semibold text-text">Voltar uma etapa?</h2>
+            <p className="mt-2 text-sm text-text-muted">
+              {reversal.order.customerName} voltará de <strong>{statusLabel(reversal.order.status)}</strong> para{' '}
+              <strong>{statusLabel(reversal.toStatus)}</strong>. O motivo ficará no histórico.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-text" htmlFor="reversal-reason">Motivo</label>
+            <textarea
+              id="reversal-reason"
+              className="mt-1 min-h-24 w-full rounded-[14px] border border-border bg-bg p-3 text-sm text-text"
+              value={reversalReason}
+              onChange={(event) => setReversalReason(event.target.value)}
+              maxLength={280}
+              autoFocus
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="rounded-[10px] border border-border px-3 py-2 text-sm text-text" onClick={() => setReversal(null)}>
+                Manter etapa
+              </button>
+              <button
+                className="rounded-[10px] bg-brand px-3 py-2 text-sm font-medium text-on-brand disabled:opacity-50"
+                disabled={!reversalReason.trim()}
+                onClick={() => {
+                  void submit(reversal.order, reversal.toStatus, reversalReason.trim());
+                  setReversal(null);
+                }}
+              >
+                Confirmar retorno
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -315,45 +416,75 @@ function OrderCard({
   online,
   confirming,
   onAdvance,
+  onMove,
   onMarkPaid,
   onNotify,
   onPrint,
   printFeedback,
+  dragging,
+  onDragStart,
+  onDragEnd,
 }: {
   order: AdminOrder;
   pending: boolean;
   online: boolean;
   confirming: boolean;
   onAdvance: (to: AdminOrder['status']) => void;
+  onMove: (to: AdminOrder['status']) => void;
   onMarkPaid: () => void;
   onNotify: () => void;
   onPrint: () => void;
   printFeedback: { state: 'queueing' | 'queued' | 'failed'; message: string } | null;
+  dragging: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [renderedAt] = useState(() => Date.now());
   const next = NEXT_ACTION[order.status];
+  const previous = PREVIOUS_ACTION[order.status];
   const advanceBlockReason = next ? paymentGateReason(order, next.to) : null;
   const printDisabled = printFeedback?.state === 'queueing';
+  const deadline = fulfillmentDeadline(order, renderedAt);
   return (
-    <article className="rounded-[14px] border border-border bg-bg p-3">
+    <article
+      className={`rounded-[14px] border border-border bg-bg p-3 transition ${dragging ? 'opacity-50' : ''}`}
+      draggable={!pending}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
       {/* Nome + horário + valor: a TRÍADE de reconciliação do PIX estático (§5.5) —
           é o que o lojista casa com o extrato do banco (o txid não é confiável). */}
-      <div className="flex items-baseline justify-between">
-        <span className="font-medium text-text">{order.customerName}</span>
-        <span className="text-xs tabular-nums text-text-muted">{isoToTime(order.createdAt)}</span>
-      </div>
-      {order.fulfillmentType === 'pickup' && (
-        <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
-          Retirada no balcão
-        </span>
-      )}
-      <div className="mt-1 text-sm tabular-nums text-text">{centsToBRL(order.totalCents)}</div>
-      <ul className="mt-2 space-y-0.5 text-xs text-text-muted">
-        {order.items.map((item, i) => (
-          <li key={i} className="tabular-nums">
-            {item.quantity}× {item.name}
-          </li>
-        ))}
-      </ul>
+      <button
+        type="button"
+        className="w-full cursor-pointer text-left"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <span className="font-medium text-text">{order.customerName}</span>
+          <span className="shrink-0 text-right text-xs tabular-nums text-text-muted">
+            <span className="block">{isoToTime(order.createdAt)}</span>
+            <span className={`mt-0.5 block ${deadline.overdue ? 'font-semibold text-critical' : ''}`}>{deadline.text}</span>
+          </span>
+        </div>
+        {order.fulfillmentType === 'pickup' && (
+          <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
+            Retirada no balcão
+          </span>
+        )}
+        <div className="mt-1 flex items-center justify-between text-sm tabular-nums text-text">
+          <span>{centsToBRL(order.totalCents)}</span>
+          <span className="text-xs text-brand-strong">{expanded ? 'Ocultar detalhes ▲' : 'Ver detalhes ▼'}</span>
+        </div>
+        <ul className="mt-2 space-y-0.5 text-xs text-text-muted">
+          {order.items.map((item, i) => (
+            <li key={i} className="tabular-nums">{item.quantity}× {item.name}</li>
+          ))}
+        </ul>
+      </button>
+
+      {expanded && <OrderDetails order={order} />}
 
       <PaymentPanel order={order} online={online} confirming={confirming} onMarkPaid={onMarkPaid} />
 
@@ -409,8 +540,46 @@ function OrderCard({
             {next.label}
           </button>
         )}
+        {previous && !pending && (
+          <button
+            className="rounded-[10px] border border-brand px-3 py-1 text-xs font-medium text-brand-strong"
+            onClick={() => onMove(previous)}
+          >
+            Voltar etapa
+          </button>
+        )}
       </div>
     </article>
+  );
+}
+
+function OrderDetails({ order }: { order: AdminOrder }) {
+  return (
+    <div className="mt-3 space-y-3 border-t border-border pt-3 text-xs text-text-muted">
+      <div>
+        <p className="font-semibold text-text">Itens e observações</p>
+        <ul className="mt-1 space-y-2">
+          {order.items.map((item, index) => (
+            <li key={index}>
+              <span className="font-medium text-text">{item.quantity}× {item.name}</span>
+              {item.modifiers.length > 0 && <p>+ {item.modifiers.map((modifier) => modifier.name).join(', ')}</p>}
+              {item.notes && <p className="italic">Obs.: {item.notes}</p>}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {order.delivery && (
+        <div>
+          <p className="font-semibold text-text">Entrega</p>
+          <p>{order.delivery.street}, {order.delivery.number ?? 's/n'}{order.delivery.complement ? ` — ${order.delivery.complement}` : ''}</p>
+          <p>{order.delivery.neighborhood} — {order.delivery.city}/{order.delivery.state}</p>
+          {order.delivery.referencePoint && <p>Referência: {order.delivery.referencePoint}</p>}
+          {!order.delivery.postalCodeVerified && <p className="font-medium text-caution">Confira o endereço e a taxa antes de despachar.</p>}
+        </div>
+      )}
+      <div className="flex justify-between tabular-nums"><span>Subtotal</span><span>{centsToBRL(order.subtotalCents)}</span></div>
+      <div className="flex justify-between tabular-nums"><span>Taxa de entrega</span><span>{centsToBRL(order.deliveryFeeCents)}</span></div>
+    </div>
   );
 }
 
