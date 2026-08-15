@@ -71,6 +71,10 @@ export const PERMISSIONS = [
   'platform.flags.manage',
   'platform.impersonate.read',
   'platform.impersonate.write',
+  // Super-admin (Épico 14) — consumidas pelo provisionamento (14.3) e módulos (14.4)
+  'platform.tenant.read',
+  'platform.staff.provision',
+  'platform.module.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -85,6 +89,11 @@ export const ROLES = [
   'platform_support',
   'platform_finance',
   'platform_engineer',
+  /** Guarda de contexto-plataforma (Épico 14) — nome com ponto de propósito,
+   *  não é atalho de RBAC como os `platform_*` acima: é o papel que o
+   *  PlatformContextGuard exige pra sequer ENTRAR em contexto-plataforma
+   *  (bypass de RLS), separado do resto da matriz de permissões do lojista. */
+  'platform.superadmin',
   // Lojista
   'owner',
   'manager',
@@ -140,6 +149,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
   ],
   platform_finance: ['platform.billing.manage'],
   platform_engineer: ['platform.flags.manage'],
+  'platform.superadmin': ['platform.tenant.read', 'platform.staff.provision', 'platform.module.manage'],
 
   // ─── Lojista ────────────────────────────────────────────────────────────────
   owner: [

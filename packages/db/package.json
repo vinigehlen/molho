@@ -21,7 +21,8 @@
     "db:migrate:deploy": "dotenv -e ../../.env.local -- prisma migrate deploy",
     "db:migrate:status": "dotenv -e ../../.env.local -- prisma migrate status",
     "db:studio": "dotenv -e ../../.env.local -- prisma studio",
-    "db:seed": "dotenv -e ../../.env.local -- tsx prisma/seed/index.ts"
+    "db:seed": "dotenv -e ../../.env.local -- tsx prisma/seed/index.ts",
+    "db:seed:superadmin": "dotenv -e ../../.env.local -- tsx prisma/seed/superadmin.ts"
   },
   "dependencies": {
     "@molho/contracts": "workspace:*",
