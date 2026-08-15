@@ -48,6 +48,9 @@ export interface CreateOrderParams {
   changeForCents: number | null;
   /** Snapshot da procedência da identidade (Épico 9c): `false` = pedido guest, telefone auto-declarado. Ver o comentário do campo no schema. */
   customerVerified: boolean;
+  /** Mesmo instante-base usado no prazo, para não depender de dois relógios. */
+  createdAt: Date;
+  fulfillmentDeadlineAt: Date;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -163,6 +166,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       paymentMethod,
       changeForCents,
       customerVerified,
+      createdAt,
+      fulfillmentDeadlineAt,
     } = params;
     // `address`/`deliveryAddressId` nulos ⟺ pickup — o CHECK
     // `orders_delivery_requires_address_check` (migration) barra a
@@ -177,7 +182,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
-        "delivery_geo", "delivery_postal_code_verified", "customer_verified"
+        "delivery_geo", "delivery_postal_code_verified", "customer_verified",
+        "fulfillment_deadline_at", "created_at"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${fulfillmentType}::"FulfillmentType",
@@ -185,7 +191,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},
-        ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified}
+        ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified},
+        ${fulfillmentDeadlineAt}, ${createdAt}
       )
       RETURNING "id"
     `;

@@ -137,7 +137,14 @@ describe('revalidatedCheckoutSchema', () => {
 });
 
 const PIX_RESPONSE = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' as const };
-const RESPONSE_BASE = { orderId: UUID, status: 'received' as const, paymentStatus: 'aguardando_confirmacao' as const, totalCents: 3690 };
+const RESPONSE_BASE = {
+  orderId: UUID,
+  status: 'received' as const,
+  paymentStatus: 'aguardando_confirmacao' as const,
+  totalCents: 3690,
+  fulfillmentType: 'delivery' as const,
+  fulfillmentDeadlineAt: '2026-08-14T19:50:00.000Z',
+};
 
 describe('checkoutOrderResponseSchema', () => {
   it('pix: aceita com o campo pix (QR/copia-e-cola)', () => {

@@ -68,6 +68,8 @@ export const adminOrderSchema = z.object({
   status: orderStatusSchema,
   version: z.int().nonnegative(),
   createdAt: z.iso.datetime(),
+  /** Nulo só para pedidos antigos, criados antes do snapshot de prazo existir. */
+  fulfillmentDeadlineAt: z.iso.datetime().nullable(),
   customerName: z.string(),
   /**
    * Snapshot `orders.customer_verified` (Épico 9c): `false` = pedido guest,

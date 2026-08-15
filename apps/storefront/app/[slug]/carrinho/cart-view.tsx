@@ -4,7 +4,7 @@ import { MapPin, Store, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import type { CustomerAddress } from '@molho/contracts';
+import { PICKUP_ETA_MAX_MINUTES, type CustomerAddress } from '@molho/contracts';
 import {
   formatCents,
   MoAddressSheet,
@@ -128,6 +128,12 @@ export function CartView({
     return (
       <main className="flex min-h-screen flex-col items-center gap-6 p-6 text-center">
         <h1 className="text-title-lg text-text">Pedido feito! 🎉</h1>
+        <p className="text-body font-medium text-text">
+          {checkout.step.fulfillmentType === 'pickup' ? 'Retirar até' : 'Entregar até'}:{' '}
+          <span className="tabular-nums">
+            {new Date(checkout.step.fulfillmentDeadlineAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </p>
         <SuccessPaymentInfo step={checkout.step} />
         <MoButton variant="ghost" onClick={() => router.push(`/${slug}`)}>
           Voltar pro cardápio
@@ -203,7 +209,7 @@ export function CartView({
       {fulfillmentType === 'pickup' ? (
         <div className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-body text-text-muted">
           <Store className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
-          <span>Retira direto na loja — sem taxa de entrega.</span>
+          <span>Retira direto na loja em até {PICKUP_ETA_MAX_MINUTES} min — sem taxa de entrega.</span>
         </div>
       ) : (
         <>

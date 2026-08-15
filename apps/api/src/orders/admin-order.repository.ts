@@ -8,6 +8,7 @@ export interface AdminOrderRow {
   status: AdminOrder['status'];
   version: number;
   createdAt: Date;
+  fulfillmentDeadlineAt: Date | null;
   paymentMethod: AdminOrder['paymentMethod'];
   paymentStatus: AdminOrder['paymentStatus'];
   customerVerified: boolean;
@@ -44,6 +45,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
     status: row.status,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
+    fulfillmentDeadlineAt: row.fulfillmentDeadlineAt?.toISOString() ?? null,
     customerName: row.customer.name,
     customerVerified: row.customerVerified,
     paymentMethod: row.paymentMethod,
@@ -83,6 +85,7 @@ const SELECT = {
   status: true,
   version: true,
   createdAt: true,
+  fulfillmentDeadlineAt: true,
   paymentMethod: true,
   paymentStatus: true,
   customerVerified: true,

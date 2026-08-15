@@ -7,6 +7,7 @@ const ORDER: AdminOrder = {
   status: 'received',
   version: 0,
   createdAt: '2026-08-10T18:30:00.000Z',
+  fulfillmentDeadlineAt: null,
   customerName: 'Ana Souza',
   customerVerified: true,
   paymentMethod: 'pix',
