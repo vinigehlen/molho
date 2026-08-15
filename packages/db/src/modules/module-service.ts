@@ -18,6 +18,14 @@ function redisKey(tenantId: string, moduleKey: string): string {
   return `module:${tenantId}:${moduleKey}`;
 }
 
+/** Breakdown das 3 camadas (§5-B.1) — pro painel de admin, não só o booleano final. */
+export interface ModuleState {
+  entitled: boolean;
+  enabled: boolean;
+  released: boolean;
+  active: boolean;
+}
+
 /**
  * Responde "esse módulo está ativo pra esse tenant?" (entitled AND enabled
  * AND released, ver packages/contracts/modules.ts). Uma instância = um
@@ -49,6 +57,38 @@ export class ModuleService {
       this.requestCache.set(key, pending);
     }
     return pending;
+  }
+
+  /**
+   * Breakdown pro painel de super-admin: "por que não tá ativo" importa, não
+   * só o booleano final. `active` reusa o MESMO cálculo de `isModuleActive`
+   * (recursão de `requires`, cache incluso); entitled/enabled/released são
+   * lidos direto, sem cache — painel é baixo volume, quer o valor fresco
+   * logo depois de um PUT.
+   */
+  async getModuleState(tenantId: string, moduleKey: ModuleKey): Promise<ModuleState> {
+    const def = this.registry.moduleDef(moduleKey);
+    if (def.core) return { entitled: true, enabled: true, released: true, active: true };
+
+    const [active, entitlement, setting, flag] = await Promise.all([
+      this.isModuleActive(tenantId, moduleKey),
+      this.db.getEntitlement(tenantId, moduleKey),
+      this.db.getSetting(tenantId, moduleKey),
+      this.db.getFlag(moduleKey),
+    ]);
+    return {
+      entitled: entitlement !== null && entitlement.status !== 'suspended',
+      enabled: setting?.enabled === true,
+      released: !flag || flag.enabled,
+      active,
+    };
+  }
+
+  async getModuleStates(tenantId: string): Promise<Record<ModuleKey, ModuleState>> {
+    const entries = await Promise.all(
+      this.registry.MODULE_KEYS.map(async (key) => [key, await this.getModuleState(tenantId, key)] as const),
+    );
+    return Object.fromEntries(entries) as Record<ModuleKey, ModuleState>;
   }
 
   async listActiveModules(tenantId: string): Promise<ModuleKey[]> {

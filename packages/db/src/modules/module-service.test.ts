@@ -255,6 +255,63 @@ describe('ModuleService — invalidate', () => {
   });
 });
 
+describe('ModuleService — getModuleState/getModuleStates (breakdown pro painel)', () => {
+  it('core: entitled/enabled/released/active sempre true, sem tocar o banco', async () => {
+    const db = new FakeDataSource();
+    const svc = new ModuleService({ db, registry: registry({ [CORE]: { core: true } }) });
+
+    expect(await svc.getModuleState(TENANT, CORE)).toEqual({
+      entitled: true,
+      enabled: true,
+      released: true,
+      active: true,
+    });
+    expect(db.calls.entitlement).toBe(0);
+  });
+
+  it('entitled mas desligado pelo lojista: breakdown mostra ONDE parou', async () => {
+    const db = new FakeDataSource();
+    db.setEntitled(TENANT, PLAIN);
+    db.setEnabled(TENANT, PLAIN, false);
+    const svc = new ModuleService({ db, registry: registry({ [PLAIN]: { plans: ['pro'] } }) });
+
+    expect(await svc.getModuleState(TENANT, PLAIN)).toEqual({
+      entitled: true,
+      enabled: false,
+      released: true,
+      active: false,
+    });
+  });
+
+  it('sem nenhuma linha de entitlement: entitled=false, status nunca vira "sempre true por engano"', async () => {
+    const db = new FakeDataSource();
+    const svc = new ModuleService({ db, registry: registry({ [PLAIN]: { plans: ['pro'] } }) });
+
+    expect(await svc.getModuleState(TENANT, PLAIN)).toEqual({
+      entitled: false,
+      enabled: false,
+      released: true,
+      active: false,
+    });
+  });
+
+  it('getModuleStates: um estado por chave do registry', async () => {
+    const db = new FakeDataSource();
+    db.setEntitled(TENANT, A);
+    db.setEnabled(TENANT, A, true);
+    const svc = new ModuleService({
+      db,
+      registry: registry({ [CORE]: { core: true }, [A]: { plans: ['pro'] }, [PLAIN]: { plans: ['pro'] } }),
+    });
+
+    const states = await svc.getModuleStates(TENANT);
+
+    expect(Object.keys(states).sort()).toEqual([A, CORE, PLAIN].sort());
+    expect(states[A]).toEqual({ entitled: true, enabled: true, released: true, active: true });
+    expect(states[PLAIN]).toEqual({ entitled: false, enabled: false, released: true, active: false });
+  });
+});
+
 describe('noopModuleCache', () => {
   it('sempre é miss e nunca lança — usado quando Redis não está configurado', async () => {
     await expect(noopModuleCache.get('x')).resolves.toBeNull();
