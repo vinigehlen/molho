@@ -5,6 +5,7 @@ import { ModuleCheckModule } from '../modules/module-check.module';
 import { CustomerJwtAuthGuard } from './guards/customer-jwt-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalCustomerJwtAuthGuard } from './guards/optional-customer-jwt-auth.guard';
+import { PlatformContextGuard } from './guards/platform-context.guard';
 import { RequireModuleGuard } from './guards/require-module.guard';
 import { RequirePermissionGuard } from './guards/require-permission.guard';
 import { TenantContextInterceptor } from './guards/tenant-context.interceptor';
@@ -21,6 +22,7 @@ import { StaffAuthController } from './staff-auth.controller';
     JwtAuthGuard,
     CustomerJwtAuthGuard,
     OptionalCustomerJwtAuthGuard,
+    PlatformContextGuard,
     TenantContextInterceptor,
     RequireModuleGuard,
     RequirePermissionGuard,
@@ -29,6 +31,7 @@ import { StaffAuthController } from './staff-auth.controller';
     JwtAuthGuard,
     CustomerJwtAuthGuard,
     OptionalCustomerJwtAuthGuard,
+    PlatformContextGuard,
     TenantContextInterceptor,
     RequireModuleGuard,
     RequirePermissionGuard,

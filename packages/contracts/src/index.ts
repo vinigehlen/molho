@@ -11,5 +11,6 @@ export * from './permissions';
 export * from './phone-number';
 export * from './pix';
 export * from './postal-code';
+export * from './provision-staff';
 export * from './storefront';
 export * from './store-hours-admin';
