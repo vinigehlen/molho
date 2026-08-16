@@ -10,7 +10,7 @@ import type {
   UpdateDeliveryZoneInput,
 } from '@molho/contracts';
 import { centsToBRL } from '../../../lib/format';
-import { getSavedStoreId, saveStoreId } from '../../../lib/store-settings-store';
+import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
 import {
   createDeliveryZone,
   deleteDeliveryZone,
@@ -103,7 +103,9 @@ function formToZoneInput(form: ZoneForm): CreateDeliveryZoneInput | UpdateDelive
 }
 
 export default function EntregaPage() {
-  const [storeId, setStoreId] = useState('');
+  const [stores, setStores] = useState<StaffStore[]>([]);
+  const [storesLoading, setStoresLoading] = useState(true);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
   const [loadedStoreId, setLoadedStoreId] = useState('');
   const [zones, setZones] = useState<DeliveryZoneResponse[]>([]);
   const [shifts, setShifts] = useState<EditableShift[]>([]);
@@ -116,19 +118,40 @@ export default function EntregaPage() {
   const [zonePendingDelete, setZonePendingDelete] = useState<DeliveryZoneResponse | null>(null);
   const [deletingZoneId, setDeletingZoneId] = useState<string | null>(null);
 
-  const storeReady = loadedStoreId !== '' && storeId.trim() === loadedStoreId;
+  // storeReady também trava durante `loading`: troca de loja dispara load()
+  // na hora, e sem isso os painéis ficariam editáveis com a MASSA DE DADOS
+  // da loja anterior enquanto a da nova ainda está a caminho.
+  const storeReady = loadedStoreId !== '' && !loading;
   const selectorDisabled = loading || savingZone || savingHours || deletingZoneId !== null;
 
   useEffect(() => {
-    setStoreId(getSavedStoreId());
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchMyStores();
+        if (cancelled) return;
+        setStores(list);
+        // 1 loja só: pré-seleciona e carrega direto, sem exigir clique —
+        // é exatamente o caso mais comum (piloto é 1 loja por tenant).
+        if (list.length === 1 && list[0]) {
+          setSelectedStoreId(list[0].id);
+          void load(list[0].id);
+        } else if (list.length === 0) {
+          setError('Nenhuma loja disponível para esta conta.');
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Não deu pra carregar suas lojas.');
+      } finally {
+        if (!cancelled) setStoresLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  async function load() {
-    const id = storeId.trim();
-    if (!id) {
-      setError('Informe o ID da loja para carregar zonas e horários.');
-      return;
-    }
+  async function load(id: string) {
+    setSelectedStoreId(id);
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -139,7 +162,6 @@ export default function EntregaPage() {
       setLoadedStoreId(id);
       setZonePendingDelete(null);
       setZoneForm(EMPTY_ZONE_FORM);
-      saveStoreId(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não deu pra carregar entrega.');
     } finally {
@@ -218,12 +240,13 @@ export default function EntregaPage() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <PageHeader />
         <StoreSelector
-          storeId={storeId}
-          setStoreId={setStoreId}
+          stores={stores}
+          storesLoading={storesLoading}
+          selectedStoreId={selectedStoreId}
           loadedStoreId={loadedStoreId}
           loading={loading}
           disabled={selectorDisabled}
-          onLoad={() => void load()}
+          onSelect={(id) => void load(id)}
         />
 
         {(error || message) && (
@@ -282,57 +305,63 @@ function PageHeader() {
 }
 
 function StoreSelector({
-  storeId,
-  setStoreId,
+  stores,
+  storesLoading,
+  selectedStoreId,
   loadedStoreId,
   loading,
   disabled,
-  onLoad,
+  onSelect,
 }: {
-  storeId: string;
-  setStoreId: (value: string) => void;
+  stores: StaffStore[];
+  storesLoading: boolean;
+  selectedStoreId: string;
   loadedStoreId: string;
   loading: boolean;
   disabled: boolean;
-  onLoad: () => void;
+  onSelect: (storeId: string) => void;
 }) {
-  const storeChanged = loadedStoreId !== '' && storeId.trim() !== loadedStoreId;
+  const activeStore = stores.find((store) => store.id === loadedStoreId);
 
   return (
     <section className="rounded-[20px] border border-border bg-bg-card p-4">
       <h2 className="text-base font-semibold text-text">Loja</h2>
-      <p className="mt-1 text-sm text-text-muted">
-        Temporário até o backoffice ter seletor de loja: cole o <code className="rounded bg-bg px-1">storeId</code> da loja.
-      </p>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <input
-          className="min-w-0 flex-1 rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text"
-          value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
-          placeholder="UUID da loja"
-          aria-label="ID da loja"
-          disabled={disabled}
-        />
-        <button
-          className="rounded-[14px] bg-brand px-4 py-2 text-sm font-medium text-on-brand disabled:opacity-50"
-          onClick={onLoad}
-          disabled={disabled}
-        >
-          {loading ? 'Carregando…' : 'Carregar'}
-        </button>
-      </div>
-      {loadedStoreId ? (
+
+      {storesLoading ? (
+        <p className="mt-3 text-sm text-text-muted">Carregando suas lojas…</p>
+      ) : stores.length === 0 ? (
+        <p className="mt-3 text-sm text-text-muted">Nenhuma loja disponível para esta conta.</p>
+      ) : stores.length === 1 ? (
+        // Loja única: sem dropdown, nada a escolher — só mostra qual está ativa.
+        <p className="mt-1 text-sm text-text-muted">{stores[0]?.name}</p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-text-muted">Escolha a loja pra ver zonas e horários dela.</p>
+          <select
+            className="mt-3 w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text disabled:opacity-50"
+            aria-label="Loja"
+            value={selectedStoreId}
+            onChange={(e) => onSelect(e.target.value)}
+            disabled={disabled}
+          >
+            {stores.map((store) => (
+              <option key={store.id} value={store.id}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
+      {loading ? (
+        <p className="mt-3 text-sm text-text-muted">Carregando zonas e horários…</p>
+      ) : activeStore ? (
         <div className="mt-3 rounded-[14px] border border-border bg-bg p-3" aria-label="Loja ativa">
           <p className="text-xs font-medium text-text-muted">Loja ativa</p>
-          <code className="mt-1 block break-all text-sm text-text">{loadedStoreId}</code>
+          <p className="mt-1 text-sm text-text">{activeStore.name}</p>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-text-muted">Nenhuma loja carregada.</p>
-      )}
-      {storeChanged && (
-        <p className="mt-2 text-sm text-caution" role="status">
-          O ID mudou. Carregue esta loja para liberar os editores.
-        </p>
+        stores.length > 0 && <p className="mt-3 text-sm text-text-muted">Nenhuma loja carregada.</p>
       )}
     </section>
   );
