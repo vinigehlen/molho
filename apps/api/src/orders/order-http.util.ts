@@ -21,6 +21,12 @@ import {
   PaymentMethodNotAvailableError,
   PaymentNotConfirmedError,
 } from './order-errors';
+import {
+  CounterOrderProductNotFoundError,
+  CounterOrderStoreNotFoundError,
+  MissingIdempotencyKeyError,
+  WeighedPriceOutOfRangeError,
+} from './counter-order.errors';
 
 /**
  * Mesma ideia de `toCatalogHttpException`: erro desconhecido relança sem
@@ -41,5 +47,9 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof GuestCustomerNotAllowedError) return new BadRequestException(error.message);
   if (error instanceof GuestCustomerRequiredError) return new BadRequestException(error.message);
   if (error instanceof FulfillmentAddressMismatchError) return new BadRequestException(error.message);
+  if (error instanceof CounterOrderStoreNotFoundError) return new NotFoundException(error.message);
+  if (error instanceof CounterOrderProductNotFoundError) return new NotFoundException(error.message);
+  if (error instanceof WeighedPriceOutOfRangeError) return new BadRequestException(error.message);
+  if (error instanceof MissingIdempotencyKeyError) return new BadRequestException(error.message);
   throw error;
 }

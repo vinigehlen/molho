@@ -1,4 +1,4 @@
-import type { PaymentMethod } from '@molho/contracts';
+import type { AdminPaymentMethod } from '@molho/contracts';
 
 export type OrderStatus =
   | 'pending_payment'
@@ -57,7 +57,7 @@ export function isLegalOrderTransition(from: OrderStatus, to: OrderStatus): bool
  *   dinheiro/cartão nunca sai de `aguardando_confirmacao` sozinho). `pix` fica
  *   de fora: já foi barrado na entrada de `preparing`; se chegou aqui, pagou.
  */
-export function transitionRequiresConfirmedPayment(to: OrderStatus, paymentMethod: PaymentMethod): boolean {
+export function transitionRequiresConfirmedPayment(to: OrderStatus, paymentMethod: AdminPaymentMethod): boolean {
   if (to === 'preparing') return paymentMethod === 'pix';
   if (to === 'completed') return paymentMethod === 'cash_on_delivery' || paymentMethod === 'card_on_delivery';
   return false;

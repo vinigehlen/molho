@@ -168,6 +168,9 @@ export class PrismaAdminOrderRepository implements AdminOrderRepository {
       select: { customer: { select: { phoneCiphertext: true, phoneKeyVersion: true } } },
     });
     if (!row) return null;
+    // Cliente anônimo de balcão (Épico balcão) não tem telefone nenhum — nada
+    // pra chamar no WhatsApp, mesmo 404 do controller que "pedido não existe".
+    if (!row.customer.phoneCiphertext) return null;
     const e164 = decryptPhone(Buffer.from(row.customer.phoneCiphertext), row.customer.phoneKeyVersion);
     return e164.replace(/\D/g, ''); // "+5551992616964" → "5551992616964" (o wa.me recusa o "+")
   }

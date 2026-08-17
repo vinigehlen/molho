@@ -1,4 +1,4 @@
-import type { PaymentMethod, PaymentStatus } from '@molho/contracts';
+import type { AdminPaymentMethod, PaymentStatus } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import type { OrderStatus } from './order-status-machine';
 
@@ -7,8 +7,10 @@ export interface OrderStatusRecord {
   tenantId: string;
   status: OrderStatus;
   version: number;
-  /** §5.5: o gate de pagamento em transition() lê os dois — findForTransition seleciona junto. */
-  paymentMethod: PaymentMethod;
+  /** §5.5: o gate de pagamento em transition() lê os dois — findForTransition seleciona junto.
+   *  `AdminPaymentMethod` (não o `PaymentMethod` de checkout.ts): esta leitura vale pra QUALQUER
+   *  pedido, incluindo os de balcão (Épico balcão), que carregam cash_at_counter/card_at_counter. */
+  paymentMethod: AdminPaymentMethod;
   paymentStatus: PaymentStatus;
 }
 

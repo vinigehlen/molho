@@ -20,6 +20,9 @@ import { CheckoutController } from './checkout.controller';
 import { CheckoutOrderRateLimitMiddleware } from './checkout-order-rate-limit.middleware';
 import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
+import { CounterOrderController } from './counter-order.controller';
+import { PrismaCounterOrderRepository } from './counter-order.repository';
+import { CounterOrderService } from './counter-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
 import { PrismaAdminOrderRepository } from './admin-order.repository';
@@ -36,6 +39,7 @@ import {
   CHECKOUT_ORDER_RATE_LIMITER,
   CHECKOUT_ORDER_SERVICE,
   CHECKOUT_REVALIDATION_SERVICE,
+  COUNTER_ORDER_SERVICE,
   ORDER_EVENT_BUS,
   ORDER_STATUS_SERVICE,
   PAYMENT_CONFIRMATION_SERVICE,
@@ -58,11 +62,20 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule],
-  controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController],
+  controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController, CounterOrderController],
   providers: [
     StreamCookieAuthGuard,
     OrderPublishInterceptor,
     CheckoutOrderRateLimitMiddleware,
+    {
+      provide: COUNTER_ORDER_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): CounterOrderService =>
+        new CounterOrderService(
+          new PrismaCounterOrderRepository(requestContext),
+          new PrismaOrderStatusRepository(requestContext),
+        ),
+    },
     {
       // Mesmo padrão dos outros limitadores: sem REDIS_URL cai em memória (dev
       // de uma instância só); em produção com 2 instâncias só o Redis conta

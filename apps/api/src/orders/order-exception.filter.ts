@@ -16,6 +16,12 @@ import {
   PaymentMethodNotAvailableError,
   PaymentNotConfirmedError,
 } from './order-errors';
+import {
+  CounterOrderProductNotFoundError,
+  CounterOrderStoreNotFoundError,
+  MissingIdempotencyKeyError,
+  WeighedPriceOutOfRangeError,
+} from './counter-order.errors';
 import { toOrderHttpException } from './order-http.util';
 
 type OrderDomainError =
@@ -32,7 +38,11 @@ type OrderDomainError =
   | PaymentMethodNotAvailableError
   | PaymentNotConfirmedError
   | InvalidChangeAmountError
-  | FulfillmentAddressMismatchError;
+  | FulfillmentAddressMismatchError
+  | CounterOrderStoreNotFoundError
+  | CounterOrderProductNotFoundError
+  | WeighedPriceOutOfRangeError
+  | MissingIdempotencyKeyError;
 
 /** Traduz os erros de domínio de pedidos/checkout pra HTTP — mesmo padrão de CatalogExceptionFilter. */
 @Catch(
@@ -50,6 +60,10 @@ type OrderDomainError =
   PaymentNotConfirmedError,
   InvalidChangeAmountError,
   FulfillmentAddressMismatchError,
+  CounterOrderStoreNotFoundError,
+  CounterOrderProductNotFoundError,
+  WeighedPriceOutOfRangeError,
+  MissingIdempotencyKeyError,
 )
 export class OrderExceptionFilter implements ExceptionFilter {
   catch(error: OrderDomainError, host: ArgumentsHost): void {

@@ -227,10 +227,20 @@ model Customer {
   tenantId        String    @map("tenant_id") @db.Uuid
   name            String
   /// Mesmo padrão de users: cifra na aplicação, nunca em claro (LGPD).
-  phoneCiphertext Bytes     @map("phone_ciphertext")
+  ///
+  /// NULLABLE (Épico balcão): pedido de balcão cria um Customer anônimo,
+  /// sem telefone algum — não é "guest do checkout" (que sempre tem telefone
+  /// auto-declarado, Épico 9c), é venda no caixa sem coleta de contato. `null`
+  /// nunca vira seletor de busca (mesma regra de `users.phoneLookupHash` —
+  /// CLAUDE.md § Convenções de schema): todo `findFirst`/`findMany` por
+  /// telefone usa `hashPhoneForLookup()`, nunca lê a coluna de volta pra
+  /// filtrar. `phoneLookupHash` NULL não colide no índice único parcial
+  /// (`customers_active_phone_hash`) — Postgres nunca considera dois NULL
+  /// iguais, então N clientes de balcão convivem sem conflito.
+  phoneCiphertext Bytes?    @map("phone_ciphertext")
   /// Único só entre linhas vivas E só dentro do tenant — índice parcial
   /// composto criado à mão na migration (Prisma não expressa índice parcial).
-  phoneLookupHash String    @map("phone_lookup_hash")
+  phoneLookupHash String?   @map("phone_lookup_hash")
   phoneKeyVersion Int       @default(1) @map("phone_key_version")
   /// E-mail cifrado — APENAS canal de entrega do OTP durante o piloto (custo
   /// de SMS). A identidade do cliente CONTINUA sendo o telefone: de propósito
@@ -620,10 +630,18 @@ enum PaymentStatus {
 /// dinheiro e cartão na maquininha são operações diferentes na ponta
 /// (troco vs nada) pro Épico 9, mesmo os dois dependendo do mesmo módulo
 /// `payments.on_delivery`.
+///
+/// `cash_at_counter`/`card_at_counter` (Épico balcão): pedido de RETIRADA
+/// pago na hora, no balcão — mesma distinção dinheiro×cartão dos dois
+/// acima, mas fulfillment `pickup`, não `delivery`. PIX de balcão REUSA o
+/// valor `pix` (é o mesmo QR/confirmação manual, só muda onde o cliente
+/// está parado) — não precisa de um 4º valor.
 enum PaymentMethod {
   pix
   cash_on_delivery
   card_on_delivery
+  cash_at_counter
+  card_at_counter
 }
 
 /// Estorno é MANUAL no MVP (PIX estático — o lojista devolve por fora,
@@ -718,11 +736,29 @@ model Order {
   /// o etaMaxMinutes da zona; pickup usa 30 min. Nullable só para legado.
   fulfillmentDeadlineAt DateTime? @map("fulfillment_deadline_at")
 
+  /// Observação livre do pedido — nasce com o Épico balcão (`counterOrderSchema.notes`),
+  /// mas é campo do PEDIDO, não só do balcão: qualquer fluxo futuro pode
+  /// preencher. Nullable, sem tamanho na migration além do já validado no
+  /// zod (`.max(500)`).
+  notes String? @map("notes")
+
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
   /// papel de quem cancelou vivem no audit_log/order_status_history —
   /// não duplicados aqui.
   canceledReason String?   @map("canceled_reason")
+
+  /// Chave de idempotência da CRIAÇÃO do pedido (Épico balcão) — nula pro
+  /// checkout normal (que já tem seu próprio cap de escrita pública, ver
+  /// CheckoutOrderRateLimitMiddleware). POS/balcão manda o mesmo header
+  /// `Idempotency-Key` em todo retry de rede; a segunda tentativa acha a
+  /// linha pelo `@@unique` abaixo e devolve o MESMO pedido, nunca duplica.
+  /// Nullable + `@@unique` comum (não parcial): Postgres nunca considera
+  /// dois NULL iguais num índice único, então isto já se comporta como
+  /// "único só entre valores não-nulos" sem precisar de índice parcial
+  /// (diferente do caso de soft-delete, que precisa de WHERE — aqui o nulo
+  /// É o estado normal da maioria das linhas, não uma linha "apagada").
+  idempotencyKey String? @map("idempotency_key")
 
   version   Int       @default(0)
   createdAt DateTime  @default(now()) @map("created_at")
@@ -744,6 +780,7 @@ model Order {
   // por status, já ordenados por criação — sem sort adicional.
   @@index([tenantId, storeId, status, createdAt])
   @@index([tenantId, createdAt])
+  @@unique([tenantId, idempotencyKey])
   @@map("orders")
 }
 

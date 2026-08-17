@@ -1,7 +1,25 @@
 import { z } from 'zod';
-import { fulfillmentTypeSchema, paymentMethodSchema, paymentStatusSchema } from './checkout';
+import { fulfillmentTypeSchema, paymentStatusSchema } from './checkout';
 
 const centsSchema = z.int().nonnegative();
+
+/**
+ * TODOS os métodos que podem estar gravados em `orders.payment_method` — o
+ * gestor lê pedido de QUALQUER origem (checkout do cliente OU balcão,
+ * Épico balcão), então é mais largo que `paymentMethodSchema` (checkout.ts),
+ * que é só o que o CLIENTE pode escolher (nunca inclui `cash_at_counter`/
+ * `card_at_counter` — esses só nascem por `POST .../counter-orders`, staff-
+ * only). Duas listas de propósito: alargar `paymentMethodSchema` deixaria o
+ * checkout aceitar método de balcão sem querer.
+ */
+export const adminPaymentMethodSchema = z.enum([
+  'pix',
+  'cash_on_delivery',
+  'card_on_delivery',
+  'cash_at_counter',
+  'card_at_counter',
+]);
+export type AdminPaymentMethod = z.infer<typeof adminPaymentMethodSchema>;
 
 /**
  * Máquina de estados do pedido (docs/02 §5.1) — canônica aqui pro gestor
@@ -78,7 +96,7 @@ export const adminOrderSchema = z.object({
    * plausível, e o lojista precisa saber ANTES de contar com o aviso.
    */
   customerVerified: z.boolean(),
-  paymentMethod: paymentMethodSchema,
+  paymentMethod: adminPaymentMethodSchema,
   paymentStatus: paymentStatusSchema,
   changeForCents: centsSchema.nullable(),
   subtotalCents: centsSchema,
