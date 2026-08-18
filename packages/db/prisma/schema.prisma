@@ -153,6 +153,7 @@ model Tenant {
   orderItems           OrderItem[]
   orderItemModifiers   OrderItemModifier[]
   orderStatusHistories OrderStatusHistory[]
+  orderAdjustments     OrderAdjustment[]
   printJobs            PrintJob[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
@@ -334,6 +335,7 @@ model User {
   moduleAudits         ModuleAudit[]
   auditLogs            AuditLog[]
   orderStatusHistories OrderStatusHistory[]
+  orderAdjustments     OrderAdjustment[]
 
   @@map("users")
 }
@@ -696,6 +698,20 @@ model Order {
   /// de verdade, isso é um campo NOVO, não uma mudança de semântica deste.
   totalCents       Int @map("total_cents")
 
+  /// Total ATUAL do pedido, depois de ajustes do balcão (Épico balcão —
+  /// edição de pedido). `NULL` = pedido nunca sofreu ajuste, `subtotalCents`/
+  /// `totalCents` acima (congelados na criação) continuam valendo como
+  /// "o total" — quem lê usa fallback (`currentTotalCents ?? totalCents`),
+  /// nunca reescreve os campos originais. Uma vez setado, é
+  /// `subtotalCents original + Σ deltas de order_adjustments` — cada
+  /// ajuste RECALCULA a partir da soma, nunca aplica delta em cima do
+  /// valor atual anterior sem recontar (evita drift acumulado por bug de
+  /// arredondamento). CHECK `currentTotal = currentSubtotal + deliveryFee`
+  /// e "os dois nulos ou os dois setados" na migration (SQL à mão — mesma
+  /// convenção do CHECK de delivery).
+  currentSubtotalCents Int? @map("current_subtotal_cents")
+  currentTotalCents    Int? @map("current_total_cents")
+
   /// FK só rastreabilidade — o pedido NUNCA depende da linha em `addresses`
   /// continuar existindo. Snapshot completo abaixo é a fonte de verdade
   /// pra ESTE pedido, pro cliente poder editar o endereço salvo depois sem
@@ -771,6 +787,7 @@ model Order {
   deliveryAddress Address?             @relation(fields: [deliveryAddressId], references: [id])
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
+  adjustments     OrderAdjustment[]
   printJobs       PrintJob[]
 
   // FKs compostas (store_id/customer_id/delivery_address_id, tenant_id) →
@@ -806,10 +823,11 @@ model OrderItem {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order     Order               @relation(fields: [orderId], references: [id])
-  product   Product             @relation(fields: [productId], references: [id])
-  modifiers OrderItemModifier[]
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order       Order               @relation(fields: [orderId], references: [id])
+  product     Product             @relation(fields: [productId], references: [id])
+  modifiers   OrderItemModifier[]
+  adjustments OrderAdjustment[]
 
   // FKs compostas (order_id, tenant_id) → orders(id, tenant_id) e
   // (product_id, tenant_id) → products(id, tenant_id) na migration.
@@ -904,6 +922,70 @@ model OrderStatusHistory {
   // atribuição de autoria.
   @@index([tenantId, orderId, createdAt])
   @@map("order_status_history")
+}
+
+/// Épico balcão (edição de pedido) — as 3 operações que o gestor aceita
+/// sobre um pedido já criado. `change_qty` cobre tanto aumento quanto
+/// redução (o sinal de `quantityDelta` distingue).
+enum OrderAdjustmentKind {
+  add_item
+  remove_item
+  change_qty
+}
+
+/// Append-only — mesmo tratamento de OrderStatusHistory/audit_log: um
+/// ajuste nunca é editado nem apagado, só existe. Uma linha por chamada de
+/// `POST .../orders/:orderId/adjustments` (união discriminada por `kind`,
+/// não lote). `orderItemId` aponta pra QUAL item o ajuste afetou — pra
+/// `add_item`, é o item recém-criado (a linha de OrderItem nasce primeiro,
+/// o ajuste referencia ela); pra `remove_item`/`change_qty`, o item já
+/// existente. Sempre NOT NULL: as três operações têm um item-alvo, nenhuma
+/// mexe no pedido como um todo sem passar por um item.
+///
+/// `quantityDelta`/`subtotalDeltaCents` são os deltas SIGNED desta operação
+/// — `add_item` positivo, `remove_item` negativo (remoção é sempre
+/// integral, delta = -quantity original do item), `change_qty` positivo ou
+/// negativo (newQuantity - quantidade anterior). `Order.currentSubtotalCents`
+/// é `subtotalCents original + Σ` destes deltas — a soma é a fonte da
+/// verdade, este delta é o que cada linha CONTRIBUI pra ela, não um valor
+/// absoluto.
+model OrderAdjustment {
+  id          String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  orderId     String              @map("order_id") @db.Uuid
+  orderItemId String              @map("order_item_id") @db.Uuid
+  kind        OrderAdjustmentKind
+
+  quantityDelta      Int @map("quantity_delta")
+  subtotalDeltaCents Int @map("subtotal_delta_cents")
+
+  /// Sempre staff — este endpoint é staff-only (JwtAuthGuard), nunca cliente
+  /// nem sistema, então nunca nulo (diferente de OrderStatusHistory.actorId).
+  actorId   String @map("actor_id") @db.Uuid
+  actorRole String @map("actor_role")
+
+  /// Escrita idempotente (mesma infra do walk-in, Épico balcão) — retry de
+  /// rede com a MESMA chave não duplica o ajuste.
+  idempotencyKey String @map("idempotency_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [orderId], references: [id])
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  actor     User      @relation(fields: [actorId], references: [id])
+
+  // FKs compostas (order_id, tenant_id) → orders(id, tenant_id) e
+  // (order_item_id, tenant_id) → order_items(id, tenant_id) na migration —
+  // mesmo guardrail de tenant_id de PrintJob/OrderStatusHistory. actor_id →
+  // users(id) é FK SIMPLES (users não tem tenant_id, mesma exceção do
+  // CLAUDE.md).
+  @@index([tenantId, orderId])
+  // Idempotência escopada ao PEDIDO (não ao tenant inteiro, diferente de
+  // orders.idempotencyKey): a mesma chave em pedidos DIFERENTES não deve
+  // colidir — cada ajuste de balcão é uma ação sobre UM pedido específico.
+  @@unique([tenantId, orderId, idempotencyKey])
+  @@map("order_adjustments")
 }
 
 /// Épico 10 (impressão ESC/POS) — módulo consumidor em apps/api/src/printing/.

@@ -26,6 +26,9 @@ import { CounterOrderService } from './counter-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
 import { PrismaAdminOrderRepository } from './admin-order.repository';
+import { OrderAdjustmentController } from './order-adjustment.controller';
+import { PrismaOrderAdjustmentRepository } from './order-adjustment.repository';
+import { OrderAdjustmentService } from './order-adjustment.service';
 import { OrderAdminController } from './order-admin.controller';
 import { OrderPaymentController } from './order-payment.controller';
 import { PrismaOrderStatusRepository } from './order-status.repository';
@@ -40,6 +43,7 @@ import {
   CHECKOUT_ORDER_SERVICE,
   CHECKOUT_REVALIDATION_SERVICE,
   COUNTER_ORDER_SERVICE,
+  ORDER_ADJUSTMENT_SERVICE,
   ORDER_EVENT_BUS,
   ORDER_STATUS_SERVICE,
   PAYMENT_CONFIRMATION_SERVICE,
@@ -62,7 +66,14 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  */
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule],
-  controllers: [CheckoutController, OrderPaymentController, OrderStreamController, OrderAdminController, CounterOrderController],
+  controllers: [
+    CheckoutController,
+    OrderPaymentController,
+    OrderStreamController,
+    OrderAdminController,
+    CounterOrderController,
+    OrderAdjustmentController,
+  ],
   providers: [
     StreamCookieAuthGuard,
     OrderPublishInterceptor,
@@ -96,6 +107,12 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
       provide: ADMIN_ORDER_REPOSITORY,
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService) => new PrismaAdminOrderRepository(requestContext),
+    },
+    {
+      provide: ORDER_ADJUSTMENT_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): OrderAdjustmentService =>
+        new OrderAdjustmentService(new PrismaOrderAdjustmentRepository(requestContext)),
     },
     {
       // Singleton do processo: segura os subscribers SSE entre requests. Redis

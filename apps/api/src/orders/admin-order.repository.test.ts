@@ -15,6 +15,7 @@ const ROW: AdminOrderRow = {
   subtotalCents: 3200,
   deliveryFeeCents: 490,
   totalCents: 3690,
+  currentTotalCents: null,
   fulfillmentType: 'delivery',
   deliveryLabel: 'Casa',
   deliveryStreet: 'Rua das Flores',

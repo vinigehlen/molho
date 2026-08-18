@@ -102,6 +102,14 @@ export const adminOrderSchema = z.object({
   subtotalCents: centsSchema,
   deliveryFeeCents: centsSchema,
   totalCents: centsSchema,
+  /**
+   * Total ATUAL depois de ajustes do balcão (Épico balcão — edição de
+   * pedido) — `null` quando o pedido nunca foi ajustado. O gestor exibe
+   * `currentTotalCents ?? totalCents`, NUNCA soma os dois nem ignora este
+   * campo quando presente — `totalCents` acima continua congelado como
+   * "o que foi cobrado na criação".
+   */
+  currentTotalCents: centsSchema.nullable(),
   fulfillmentType: fulfillmentTypeSchema,
   /** `null` quando `fulfillmentType === 'pickup'` — retira no endereço da PRÓPRIA loja, que o lojista já sabe de cor. */
   delivery: adminOrderDeliverySchema.nullable(),

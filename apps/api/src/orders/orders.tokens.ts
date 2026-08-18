@@ -11,3 +11,5 @@ export const ADMIN_ORDER_REPOSITORY = Symbol('ADMIN_ORDER_REPOSITORY');
 export const CHECKOUT_ORDER_RATE_LIMITER = Symbol('CHECKOUT_ORDER_RATE_LIMITER');
 /** Pedido de balcão (walk-in create) — staff bate no caixa, sem checkout do cliente. */
 export const COUNTER_ORDER_SERVICE = Symbol('COUNTER_ORDER_SERVICE');
+/** Ajuste de itens de um pedido já criado (Épico balcão — order edit). */
+export const ORDER_ADJUSTMENT_SERVICE = Symbol('ORDER_ADJUSTMENT_SERVICE');

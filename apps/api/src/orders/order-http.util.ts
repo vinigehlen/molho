@@ -27,6 +27,7 @@ import {
   MissingIdempotencyKeyError,
   WeighedPriceOutOfRangeError,
 } from './counter-order.errors';
+import { OrderAdjustmentItemNotFoundError, OrderNotEditableError } from './order-adjustment.errors';
 
 /**
  * Mesma ideia de `toCatalogHttpException`: erro desconhecido relança sem
@@ -51,5 +52,7 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof CounterOrderProductNotFoundError) return new NotFoundException(error.message);
   if (error instanceof WeighedPriceOutOfRangeError) return new BadRequestException(error.message);
   if (error instanceof MissingIdempotencyKeyError) return new BadRequestException(error.message);
+  if (error instanceof OrderNotEditableError) return new ConflictException(error.message);
+  if (error instanceof OrderAdjustmentItemNotFoundError) return new NotFoundException(error.message);
   throw error;
 }

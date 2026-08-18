@@ -16,6 +16,7 @@ export interface AdminOrderRow {
   subtotalCents: number;
   deliveryFeeCents: number;
   totalCents: number;
+  currentTotalCents: number | null;
   fulfillmentType: AdminOrder['fulfillmentType'];
   /** Nulos juntos ⟺ pickup — CHECK do banco garante que `delivery` nunca tem só alguns. */
   deliveryLabel: string | null;
@@ -54,6 +55,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
     subtotalCents: row.subtotalCents,
     deliveryFeeCents: row.deliveryFeeCents,
     totalCents: row.totalCents,
+    currentTotalCents: row.currentTotalCents,
     fulfillmentType: row.fulfillmentType,
     delivery:
       row.fulfillmentType === 'pickup' || row.deliveryLabel === null
@@ -93,6 +95,7 @@ const SELECT = {
   subtotalCents: true,
   deliveryFeeCents: true,
   totalCents: true,
+  currentTotalCents: true,
   fulfillmentType: true,
   deliveryLabel: true,
   deliveryStreet: true,

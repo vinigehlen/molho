@@ -9,6 +9,7 @@ export * from './delivery-zone-admin';
 export * from './email-address';
 export * from './module-panel';
 export * from './modules';
+export * from './order-adjustment';
 export * from './permissions';
 export * from './phone-number';
 export * from './pix';

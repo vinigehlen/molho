@@ -36,6 +36,13 @@ export const PERMISSIONS = [
   'order.view',
   'order.create',
   'order.update_status',
+  /** Ajustar ITENS de um pedido já aberto (add/remove/change_qty — Épico
+   *  balcão, edição de pedido) — separada de update_status (que muda a
+   *  máquina de estados, não o conteúdo) e de manual_discount (que abate
+   *  valor sem mexer em item). Mexe em dinheiro já cobrado (§5-C.5), por
+   *  isso cashier fica com approval:true na matriz, igual manual_discount/
+   *  cancel_paid. */
+  'order.update',
   'order.manual_discount',
   'order.cancel_paid',
   // Pagamentos
@@ -164,6 +171,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'order.view',
     'order.create',
     'order.update_status',
+    'order.update',
     'order.manual_discount',
     'order.cancel_paid',
     'payment.confirm',
@@ -194,6 +202,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'order.view',
     'order.create',
     'order.update_status',
+    'order.update',
     'order.manual_discount',
     'order.cancel_paid',
     'payment.confirm',
@@ -213,6 +222,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'order.create',
     'order.update_status',
     'payment.confirm',
+    { permission: 'order.update', approval: true },
     { permission: 'order.manual_discount', approval: true },
     { permission: 'order.cancel_paid', approval: true },
     { permission: 'cash.open_close', selfOnly: true },
