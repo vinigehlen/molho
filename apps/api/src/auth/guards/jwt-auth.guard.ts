@@ -17,6 +17,13 @@ const BEARER_PREFIX = 'Bearer ';
  * inválido) viram 401 uniforme — não vaza QUAL dos três foi, pra não dar
  * dica a quem está tentando token roubado/forjado.
  *
+ * `InvalidTokenError` também cobre token de CUSTOMER numa rota staff-only:
+ * a assinatura verifica (staff e customer compartilham `MOLHO_JWT_SECRETS`),
+ * mas `PrismaUserAuthRepository.getTokenVersion` (chamada dentro de
+ * `verifyAccessToken`, ver user-version-repository.ts) não acha o `sub`
+ * (um customerId) em `users` e lança `InvalidTokenError` — cai no mesmo
+ * `catch` abaixo, 401, nunca 500 cru de Prisma.
+ *
  * verifyAccessToken às vezes precisa ler users.token_version do Postgres
  * (cache de 60s expirado) — Guards rodam ANTES de qualquer Interceptor
  * (TenantContextInterceptor incluso), então não dá pra contar com um

@@ -1,4 +1,5 @@
 import type { RequestContextService } from '../../context/request-context.service';
+import { InvalidTokenError } from './token-errors';
 import type { TokenScope } from './token-payload';
 
 /**
@@ -20,10 +21,23 @@ export interface UserAuthRepository {
 export class PrismaUserAuthRepository implements UserAuthRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
+  /**
+   * `findUnique`, NUNCA `findUniqueOrThrow` — `userId` vem do `sub` de um JWT
+   * já com assinatura válida, mas `verifyAccessToken` NÃO garante que o
+   * `sub` seja um staff: token de CUSTOMER usa o MESMO `MOLHO_JWT_SECRETS`
+   * (TokenService é agnóstico a quem assina, ver customer-auth-repository.ts),
+   * então um token de cliente contra uma rota staff-only chega aqui com um
+   * `customerId` que não existe em `users`. `findUniqueOrThrow` deixava esse
+   * caso vazar como `PrismaClientKnownRequestError` (P2025) cru — sem catch
+   * em `JwtAuthGuard` pra esse tipo, virava 500. `InvalidTokenError` é o
+   * mesmo erro que um `kid` desconhecido ou assinatura inválida já produzem
+   * — `JwtAuthGuard` já trata (401), então throw aqui basta, sem precisar
+   * mudar o guard nem `TokenService.verifyAccessToken` (nenhum try/catch
+   * envolve esta chamada lá, o erro sobe direto).
+   */
   async getTokenVersion(userId: string): Promise<number> {
-    const user = await this.requestContext
-      .getClient()
-      .user.findUniqueOrThrow({ where: { id: userId }, select: { tokenVersion: true } });
+    const user = await this.requestContext.getClient().user.findUnique({ where: { id: userId }, select: { tokenVersion: true } });
+    if (!user) throw new InvalidTokenError('usuário do token não encontrado');
     return user.tokenVersion;
   }
 

@@ -413,3 +413,66 @@ describe('POST /v1/store/:slug/auth/otp (customer)', () => {
     }
   }, 30_000);
 });
+
+/**
+ * `JwtAuthGuard` numa rota staff-only, genérico — não é "e2e do balcão",
+ * é o guard em si. Achado rodando o e2e do épico balcão (order edit): um
+ * token de CUSTOMER contra rota staff-only virava 500 cru, não 401 — a
+ * assinatura verifica (staff e customer compartilham `MOLHO_JWT_SECRETS`),
+ * mas `PrismaUserAuthRepository.getTokenVersion` fazia
+ * `users.findUniqueOrThrow({ id: sub })` com um `sub` que é `customerId`,
+ * não existe em `users`, e o Prisma `P2025` vazava sem catch. Vale pra
+ * TODO endpoint atrás de `JwtAuthGuard` (`OrderAdminController`,
+ * `CounterOrderController`, etc.) — fixado na raiz (user-version-repository.ts),
+ * coberto aqui de propósito pra nunca reaparecer silenciosamente atrás de
+ * uma feature específica.
+ */
+describe('JwtAuthGuard numa rota staff-only — token de CUSTOMER', () => {
+  // Cap de IP (20/hora) é COMPARTILHADO com o resto desta suíte (mesmo IP,
+  // mesmo header do comentário do topo do arquivo) — o beforeAll do arquivo
+  // só limpa UMA vez, no início; a suíte inteira facilmente passa de 20
+  // pedidos de OTP antes de chegar aqui (2 describes acima + o loop
+  // concorrente de 6). Limpa de novo, local a este describe, pra estes 2
+  // testes nunca dependerem de quantos pedidos os outros já gastaram.
+  beforeAll(async () => {
+    const redisCleanup = new Redis(process.env.REDIS_URL as string);
+    const ipKeys = await redisCleanup.keys('otp_rl:ip:*');
+    if (ipKeys.length) await redisCleanup.del(...ipKeys);
+    redisCleanup.disconnect();
+  });
+
+  it('token de CUSTOMER: 401 (antes do fix: 500 cru de Prisma)', async () => {
+    const phone = randomPhone();
+    await request(app.getHttpServer()).post(`/v1/store/${testTenantSlug}/auth/otp/request`).send({ phone }).expect(202);
+    const code = await getLastSentCode();
+    const customerLogin = await request(app.getHttpServer())
+      .post(`/v1/store/${testTenantSlug}/auth/otp/verify`)
+      .send({ phone, code })
+      .expect(200);
+    const customerToken = customerLogin.body.accessToken as string;
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/me/sessions/tenants')
+      .set('Authorization', `Bearer ${customerToken}`);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('staff LEGÍTIMO na mesma rota: continua 200 (prova que o fix não afrouxou o caminho feliz)', async () => {
+    const phone = randomPhone();
+    await seedStaffUser(phone);
+    await request(app.getHttpServer()).post('/v1/auth/otp/request').send({ phone }).expect(202);
+    const code = await getLastSentCode();
+    const staffLogin = await request(app.getHttpServer())
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code })
+      .expect(200);
+    const staffToken = staffLogin.body.accessToken as string;
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/me/sessions/tenants')
+      .set('Authorization', `Bearer ${staffToken}`);
+
+    expect(res.status).toBe(200);
+  });
+});
