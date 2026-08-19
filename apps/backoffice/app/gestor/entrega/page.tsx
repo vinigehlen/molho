@@ -15,6 +15,7 @@ import {
   createDeliveryZone,
   deleteDeliveryZone,
   DeliveryZoneDuplicateError,
+  DeliveryZoneStaleVersionError,
   fetchDeliveryZones,
   updateDeliveryZone,
 } from '../../../lib/delivery-zones-api';
@@ -34,6 +35,7 @@ const WEEKDAY_LABEL: Record<DayOfWeek, string> = {
 
 const EMPTY_ZONE_FORM = {
   id: null as string | null,
+  version: null as number | null,
   name: '',
   city: '',
   state: 'RS',
@@ -79,6 +81,7 @@ function inputToMinutes(value: string): number {
 function zoneToForm(zone: DeliveryZoneResponse): ZoneForm {
   return {
     id: zone.id,
+    version: zone.version,
     name: zone.name,
     city: zone.city ?? '',
     state: zone.state ?? 'RS',
@@ -181,9 +184,10 @@ export default function EntregaPage() {
       const input = formToZoneInput(zoneForm);
       if (input.feeCents < 0) throw new Error('Taxa precisa ser um valor em reais válido.');
       if (input.etaMinMinutes > input.etaMaxMinutes) throw new Error('ETA mínimo precisa ser menor ou igual ao máximo.');
-      const saved = zoneForm.id
-        ? await updateDeliveryZone(zoneForm.id, input)
-        : await createDeliveryZone(loadedStoreId, input);
+      const saved =
+        zoneForm.id && zoneForm.version !== null
+          ? await updateDeliveryZone(zoneForm.id, zoneForm.version, input)
+          : await createDeliveryZone(loadedStoreId, input);
       setZones((current) => {
         const without = current.filter((zone) => zone.id !== saved.id);
         return [...without, saved].sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
@@ -191,7 +195,11 @@ export default function EntregaPage() {
       setZoneForm(EMPTY_ZONE_FORM);
       setMessage(zoneForm.id ? 'Zona atualizada.' : 'Zona criada.');
     } catch (e) {
-      if (e instanceof DeliveryZoneDuplicateError) setError(e.message);
+      if (e instanceof DeliveryZoneStaleVersionError) {
+        setZoneForm(EMPTY_ZONE_FORM);
+        await load(loadedStoreId);
+        setError(e.message);
+      } else if (e instanceof DeliveryZoneDuplicateError) setError(e.message);
       else setError(e instanceof Error ? e.message : 'Não deu pra salvar zona.');
     } finally {
       setSavingZone(false);
@@ -204,13 +212,19 @@ export default function EntregaPage() {
     setError(null);
     setMessage(null);
     try {
-      await deleteDeliveryZone(zone.id);
+      await deleteDeliveryZone(zone.id, zone.version);
       setZones((current) => current.filter((item) => item.id !== zone.id));
       if (zoneForm.id === zone.id) setZoneForm(EMPTY_ZONE_FORM);
       setZonePendingDelete(null);
       setMessage('Zona excluída.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Não deu pra excluir zona.');
+      if (e instanceof DeliveryZoneStaleVersionError) {
+        setZonePendingDelete(null);
+        await load(loadedStoreId);
+        setError(e.message);
+      } else {
+        setError(e instanceof Error ? e.message : 'Não deu pra excluir zona.');
+      }
     } finally {
       setDeletingZoneId(null);
     }

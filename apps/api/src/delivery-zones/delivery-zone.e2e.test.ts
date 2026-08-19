@@ -141,6 +141,7 @@ describe('DeliveryZoneAdminController e2e', () => {
       etaMinMinutes: 30,
       etaMaxMinutes: 50,
       priority: 0,
+      version: 0,
     });
 
     const listed = await request(app.getHttpServer())
@@ -149,10 +150,12 @@ describe('DeliveryZoneAdminController e2e', () => {
       .expect(200);
     expect(listed.body).toHaveLength(1);
     expect(listed.body[0].id).toBe(created.body.id);
+    expect(listed.body[0].version).toBe(0);
 
     const updated = await request(app.getHttpServer())
       .patch(`/v1/admin/delivery-zones/${created.body.id}`)
       .set(auth())
+      .set('If-Match', String(created.body.version))
       .send({
         kind: 'city',
         name: 'Portão',
@@ -172,15 +175,93 @@ describe('DeliveryZoneAdminController e2e', () => {
       etaMinMinutes: 40,
       etaMaxMinutes: 60,
       priority: 2,
+      version: 1,
     });
 
-    await request(app.getHttpServer()).delete(`/v1/admin/delivery-zones/${created.body.id}`).set(auth()).expect(204);
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/delivery-zones/${created.body.id}`)
+      .set(auth())
+      .set('If-Match', String(updated.body.version))
+      .expect(204);
 
     const afterDelete = await request(app.getHttpServer())
       .get(`/v1/admin/stores/${storeId}/delivery-zones`)
       .set(auth())
       .expect(200);
     expect(afterDelete.body).toEqual([]);
+  }, 20_000);
+
+  it('optimistic locking: If-Match ausente/malformado é 428, version errada é 409, version certa incrementa e zona inexistente é 404', async () => {
+    const created = await request(app.getHttpServer())
+      .post(`/v1/admin/stores/${storeId}/delivery-zones`)
+      .set(auth())
+      .send({
+        kind: 'city',
+        name: 'Lock',
+        city: 'Lock',
+        state: 'RS',
+        feeCents: 900,
+        etaMinMinutes: 20,
+        etaMaxMinutes: 40,
+        priority: 0,
+      })
+      .expect(201);
+    const zoneId = created.body.id as string;
+
+    const payload = {
+      kind: 'city',
+      name: 'Lock editada',
+      city: 'Lock',
+      state: 'RS',
+      feeCents: 1000,
+      etaMinMinutes: 20,
+      etaMaxMinutes: 40,
+      priority: 0,
+    };
+
+    await request(app.getHttpServer()).patch(`/v1/admin/delivery-zones/${zoneId}`).set(auth()).send(payload).expect(428);
+    await request(app.getHttpServer())
+      .patch(`/v1/admin/delivery-zones/${zoneId}`)
+      .set(auth())
+      .set('If-Match', 'not-a-number')
+      .send(payload)
+      .expect(428);
+    await request(app.getHttpServer()).delete(`/v1/admin/delivery-zones/${zoneId}`).set(auth()).expect(428);
+
+    // duas mutações concorrentes com a MESMA version — a 2ª (que roda depois) recebe 409, não last-write-wins.
+    const firstWrite = await request(app.getHttpServer())
+      .patch(`/v1/admin/delivery-zones/${zoneId}`)
+      .set(auth())
+      .set('If-Match', '0')
+      .send(payload)
+      .expect(200);
+    expect(firstWrite.body.version).toBe(1);
+
+    const staleWrite = await request(app.getHttpServer())
+      .patch(`/v1/admin/delivery-zones/${zoneId}`)
+      .set(auth())
+      .set('If-Match', '0')
+      .send({ ...payload, name: 'Lock perdedora' })
+      .expect(409);
+    expect(staleWrite.body.message).toBe('Zona de entrega foi alterada por outra requisição — recarregue e tente de novo.');
+
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/delivery-zones/${zoneId}`)
+      .set(auth())
+      .set('If-Match', '0')
+      .expect(409);
+
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/delivery-zones/${randomUUID()}`)
+      .set(auth())
+      .set('If-Match', '0')
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/delivery-zones/${zoneId}`)
+      .set(auth())
+      .set('If-Match', String(firstWrite.body.version))
+      .expect(204);
   }, 20_000);
 
   it('duplicata por molho_city_key(city)+UF na mesma loja devolve 409 e soft-delete libera recriação', async () => {
@@ -208,7 +289,11 @@ describe('DeliveryZoneAdminController e2e', () => {
       .expect(409);
     expect(duplicate.body.message).toBe('Já existe uma zona para esta cidade e UF nesta loja.');
 
-    await request(app.getHttpServer()).delete(`/v1/admin/delivery-zones/${first.body.id}`).set(auth()).expect(204);
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/delivery-zones/${first.body.id}`)
+      .set(auth())
+      .set('If-Match', String(first.body.version))
+      .expect(204);
 
     await request(app.getHttpServer())
       .post(`/v1/admin/stores/${storeId}/delivery-zones`)
@@ -251,6 +336,7 @@ describe('DeliveryZoneAdminController e2e', () => {
     const duplicate = await request(app.getHttpServer())
       .patch(`/v1/admin/delivery-zones/${sapiranga.body.id}`)
       .set(auth())
+      .set('If-Match', String(sapiranga.body.version))
       .send({
         kind: 'city',
         name: 'Campo Bom duplicada',
@@ -295,6 +381,7 @@ describe('DeliveryZoneAdminController e2e', () => {
     const updated = await request(app.getHttpServer())
       .patch(`/v1/admin/delivery-zones/${created.body.id}`)
       .set(auth())
+      .set('If-Match', String(created.body.version))
       .send({
         kind: 'city',
         name: 'Ivoti',
@@ -367,6 +454,7 @@ describe('DeliveryZoneAdminController e2e', () => {
     await request(app.getHttpServer())
       .patch(`/v1/admin/delivery-zones/${otherZone.body.id}`)
       .set(auth(ownerToken, tenantId))
+      .set('If-Match', String(otherZone.body.version))
       .send({
         kind: 'city',
         name: 'Canoas editada',

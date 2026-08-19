@@ -13,13 +13,14 @@ type DeliveryZoneRow = {
   etaMinMinutes: number;
   etaMaxMinutes: number;
   priority: number;
+  version: number;
 };
 
 export interface DeliveryZoneRepository {
   listByStore(storeId: string): Promise<DeliveryZoneResponse[]>;
   create(storeId: string, input: DeliveryZoneInput): Promise<DeliveryZoneResponse>;
-  update(zoneId: string, input: DeliveryZoneInput): Promise<DeliveryZoneResponse>;
-  softDelete(zoneId: string): Promise<void>;
+  update(zoneId: string, expectedVersion: number, input: DeliveryZoneInput): Promise<DeliveryZoneResponse>;
+  softDelete(zoneId: string, expectedVersion: number): Promise<void>;
 }
 
 const SELECT = {
@@ -31,6 +32,7 @@ const SELECT = {
   etaMinMinutes: true,
   etaMaxMinutes: true,
   priority: true,
+  version: true,
 } as const;
 
 function toResponse(record: {
@@ -42,6 +44,7 @@ function toResponse(record: {
   etaMinMinutes: number;
   etaMaxMinutes: number;
   priority: number;
+  version: number;
 }): DeliveryZoneResponse {
   return {
     id: record.id,
@@ -53,6 +56,7 @@ function toResponse(record: {
     etaMinMinutes: record.etaMinMinutes,
     etaMaxMinutes: record.etaMaxMinutes,
     priority: record.priority,
+    version: record.version,
   };
 }
 
@@ -133,17 +137,17 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
     return this.createPolygon(storeId, input);
   }
 
-  async update(zoneId: string, input: DeliveryZoneInput): Promise<DeliveryZoneResponse> {
+  async update(zoneId: string, expectedVersion: number, input: DeliveryZoneInput): Promise<DeliveryZoneResponse> {
     if (input.kind === 'city') {
-      return this.updateCity(zoneId, input);
+      return this.updateCity(zoneId, expectedVersion, input);
     }
 
-    return this.updatePolygon(zoneId, input);
+    return this.updatePolygon(zoneId, expectedVersion, input);
   }
 
-  async softDelete(zoneId: string): Promise<void> {
+  async softDelete(zoneId: string, expectedVersion: number): Promise<void> {
     const result = await this.requestContext.getClient().deliveryZone.updateMany({
-      where: { id: zoneId, deletedAt: null },
+      where: { id: zoneId, deletedAt: null, version: expectedVersion },
       data: { deletedAt: new Date(), version: { increment: 1 } },
     });
     await this.assertUpdated(zoneId, result.count);
@@ -174,7 +178,8 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
           "fee_cents" AS "feeCents",
           "eta_min_minutes" AS "etaMinMinutes",
           "eta_max_minutes" AS "etaMaxMinutes",
-          "priority"
+          "priority",
+          "version"
       `;
       const row = rows[0];
       if (!row) throw new DeliveryZoneNotFoundError();
@@ -184,7 +189,11 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
     }
   }
 
-  private async updateCity(zoneId: string, input: DeliveryZoneInput & { kind: 'city' }): Promise<DeliveryZoneResponse> {
+  private async updateCity(
+    zoneId: string,
+    expectedVersion: number,
+    input: DeliveryZoneInput & { kind: 'city' },
+  ): Promise<DeliveryZoneResponse> {
     try {
       const rows = await this.requestContext.getClient().$queryRaw<DeliveryZoneRow[]>`
         UPDATE "delivery_zones"
@@ -199,7 +208,7 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
           "priority" = ${input.priority},
           "version" = "version" + 1,
           "updated_at" = now()
-        WHERE "id" = ${zoneId}::uuid AND "deleted_at" IS NULL
+        WHERE "id" = ${zoneId}::uuid AND "deleted_at" IS NULL AND "version" = ${expectedVersion}
         RETURNING
           "id",
           "name",
@@ -209,7 +218,8 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
           "fee_cents" AS "feeCents",
           "eta_min_minutes" AS "etaMinMinutes",
           "eta_max_minutes" AS "etaMaxMinutes",
-          "priority"
+          "priority",
+          "version"
       `;
       await this.assertUpdated(zoneId, rows.length);
       const row = rows[0];
@@ -220,7 +230,11 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
     }
   }
 
-  private async updatePolygon(zoneId: string, input: DeliveryZoneInput & { kind: 'polygon' }): Promise<DeliveryZoneResponse> {
+  private async updatePolygon(
+    zoneId: string,
+    expectedVersion: number,
+    input: DeliveryZoneInput & { kind: 'polygon' },
+  ): Promise<DeliveryZoneResponse> {
     try {
       const rows = await this.requestContext.getClient().$queryRaw<DeliveryZoneRow[]>`
         UPDATE "delivery_zones"
@@ -235,7 +249,7 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
           "priority" = ${input.priority},
           "version" = "version" + 1,
           "updated_at" = now()
-        WHERE "id" = ${zoneId}::uuid AND "deleted_at" IS NULL
+        WHERE "id" = ${zoneId}::uuid AND "deleted_at" IS NULL AND "version" = ${expectedVersion}
         RETURNING
           "id",
           "name",
@@ -245,7 +259,8 @@ export class PrismaDeliveryZoneRepository implements DeliveryZoneRepository {
           "fee_cents" AS "feeCents",
           "eta_min_minutes" AS "etaMinMinutes",
           "eta_max_minutes" AS "etaMaxMinutes",
-          "priority"
+          "priority",
+          "version"
       `;
       await this.assertUpdated(zoneId, rows.length);
       const row = rows[0];
