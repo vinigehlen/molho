@@ -81,7 +81,24 @@ describe('deliveryZoneResponseSchema', () => {
       etaMinMinutes: 20,
       etaMaxMinutes: 35,
       priority: 1,
+      version: 0,
     };
     expect(deliveryZoneResponseSchema.safeParse(resposta).success).toBe(true);
+  });
+
+  it('rejeita version negativa ou ausente', () => {
+    const base = {
+      id: '018f9f3e-1234-7890-abcd-000000000000',
+      name: 'Raio 3km',
+      kind: 'polygon',
+      city: null,
+      state: null,
+      feeCents: 500,
+      etaMinMinutes: 20,
+      etaMaxMinutes: 35,
+      priority: 1,
+    };
+    expect(deliveryZoneResponseSchema.safeParse(base).success).toBe(false);
+    expect(deliveryZoneResponseSchema.safeParse({ ...base, version: -1 }).success).toBe(false);
   });
 });

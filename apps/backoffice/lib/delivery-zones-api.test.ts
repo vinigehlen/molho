@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from './api-client';
 import {
   DeliveryZoneDuplicateError,
+  DeliveryZoneStaleVersionError,
   createDeliveryZone,
   deleteDeliveryZone,
   fetchDeliveryZones,
@@ -66,7 +67,7 @@ describe('delivery-zones-api', () => {
     );
 
     await expect(
-      updateDeliveryZone('zone-1', {
+      updateDeliveryZone('zone-1', 3, {
         kind: 'city',
         name: 'Portão',
         city: 'Portão',
@@ -77,12 +78,41 @@ describe('delivery-zones-api', () => {
         priority: 1,
       }),
     ).rejects.toBeInstanceOf(DeliveryZoneDuplicateError);
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      '/v1/admin/delivery-zones/zone-1',
+      expect.objectContaining({ headers: expect.objectContaining({ 'if-match': '3' }) }),
+    );
   });
 
-  it('soft-delete chama DELETE', async () => {
+  it('traduz 409 de version obsoleta em DeliveryZoneStaleVersionError', async () => {
+    apiFetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ message: 'Zona de entrega foi alterada por outra requisição — recarregue e tente de novo.' }),
+        { status: 409, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    await expect(
+      updateDeliveryZone('zone-1', 3, {
+        kind: 'city',
+        name: 'Portão',
+        city: 'Portão',
+        state: 'RS',
+        feeCents: 1500,
+        etaMinMinutes: 40,
+        etaMaxMinutes: 60,
+        priority: 1,
+      }),
+    ).rejects.toBeInstanceOf(DeliveryZoneStaleVersionError);
+  });
+
+  it('soft-delete chama DELETE com If-Match', async () => {
     apiFetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
-    await expect(deleteDeliveryZone('zone/1')).resolves.toBeUndefined();
-    expect(apiFetchMock).toHaveBeenCalledWith('/v1/admin/delivery-zones/zone%2F1', { method: 'DELETE' });
+    await expect(deleteDeliveryZone('zone/1', 2)).resolves.toBeUndefined();
+    expect(apiFetchMock).toHaveBeenCalledWith('/v1/admin/delivery-zones/zone%2F1', {
+      method: 'DELETE',
+      headers: { 'if-match': '2' },
+    });
   });
 });

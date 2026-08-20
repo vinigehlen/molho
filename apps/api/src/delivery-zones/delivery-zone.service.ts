@@ -16,13 +16,13 @@ export class DeliveryZoneAdminService {
     return this.repo.create(storeId, input);
   }
 
-  update(zoneId: string, input: UpdateDeliveryZoneInput): Promise<DeliveryZoneResponse> {
+  update(zoneId: string, expectedVersion: number, input: UpdateDeliveryZoneInput): Promise<DeliveryZoneResponse> {
     this.assertInvariants(input);
-    return this.repo.update(zoneId, input);
+    return this.repo.update(zoneId, expectedVersion, input);
   }
 
-  delete(zoneId: string): Promise<void> {
-    return this.repo.softDelete(zoneId);
+  delete(zoneId: string, expectedVersion: number): Promise<void> {
+    return this.repo.softDelete(zoneId, expectedVersion);
   }
 
   private assertInvariants(input: DeliveryZoneInput): void {

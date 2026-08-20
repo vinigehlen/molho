@@ -2,6 +2,7 @@ import React, { act, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { DeliveryZoneResponse } from '@molho/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeliveryZoneStaleVersionError } from '../../../lib/delivery-zones-api';
 import EntregaPage from './page';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -34,6 +35,7 @@ vi.mock('../../../lib/delivery-zones-api', () => ({
   deleteDeliveryZone: mocks.deleteDeliveryZone,
   fetchDeliveryZones: mocks.fetchDeliveryZones,
   DeliveryZoneDuplicateError: class DeliveryZoneDuplicateError extends Error {},
+  DeliveryZoneStaleVersionError: class DeliveryZoneStaleVersionError extends Error {},
 }));
 
 vi.mock('../../../lib/store-hours-api', () => ({
@@ -53,6 +55,7 @@ const ZONE: DeliveryZoneResponse = {
   etaMinMinutes: 30,
   etaMaxMinutes: 50,
   priority: 0,
+  version: 0,
 };
 
 let container: HTMLDivElement;
@@ -205,9 +208,34 @@ describe('EntregaPage — segurança operacional', () => {
     expect(container.querySelector('[role="alertdialog"]')?.textContent).toContain('Estância Velha/RS');
 
     await click(button('Excluir Centro'));
-    expect(mocks.deleteDeliveryZone).toHaveBeenCalledWith(ZONE.id);
+    expect(mocks.deleteDeliveryZone).toHaveBeenCalledWith(ZONE.id, ZONE.version);
     expect(container.textContent).toContain('Zona excluída.');
     expect(container.querySelector('[role="alertdialog"]')).toBeNull();
+  });
+
+  it('409 de version obsoleta ao salvar: recarrega a zona, não sobrescreve com o formulário velho', async () => {
+    mocks.fetchDeliveryZones.mockResolvedValueOnce([ZONE]);
+    await mount();
+
+    await click(button('Editar'));
+    await changeInput(input('Taxa'), '9,00');
+
+    const zoneFromServer = { ...ZONE, name: 'Centro renomeado pelo colega', version: 1 };
+    mocks.updateDeliveryZone.mockRejectedValueOnce(new DeliveryZoneStaleVersionError('Zona alterada por outra pessoa.'));
+    mocks.fetchDeliveryZones.mockResolvedValueOnce([zoneFromServer]);
+
+    await act(async () => {
+      button('Salvar zona').click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.updateDeliveryZone).toHaveBeenCalledWith(ZONE.id, ZONE.version, expect.anything());
+    expect(container.textContent).toContain('Zona alterada por outra pessoa.');
+    // recarregou a versão do servidor — não sobrescreveu com o formulário desatualizado.
+    expect(container.textContent).toContain('Centro renomeado pelo colega');
+    expect(container.textContent).not.toContain('9,00');
   });
 
   it('trava formulário e seletor enquanto salva uma zona', async () => {

@@ -25,3 +25,11 @@ export class DeliveryZoneValidationError extends Error {
     this.name = 'DeliveryZoneValidationError';
   }
 }
+
+/** Header `If-Match` ausente ou malformado — cliente precisa mandar a `version` esperada. */
+export class DeliveryZonePreconditionRequiredError extends Error {
+  constructor() {
+    super('Header If-Match com a versão da zona é obrigatório.');
+    this.name = 'DeliveryZonePreconditionRequiredError';
+  }
+}

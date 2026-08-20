@@ -72,6 +72,8 @@ export const deliveryZoneResponseSchema = z.object({
   etaMinMinutes: z.int().nonnegative(),
   etaMaxMinutes: z.int().nonnegative(),
   priority: z.int().nonnegative(),
+  /** Optimistic lock — cliente envia de volta via header `If-Match` no PATCH/DELETE. */
+  version: z.int().nonnegative(),
 });
 
 export type CreateDeliveryZoneInput = z.infer<typeof createDeliveryZoneSchema>;

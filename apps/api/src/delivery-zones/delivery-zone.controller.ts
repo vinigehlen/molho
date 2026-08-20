@@ -5,7 +5,9 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
   NotFoundException,
@@ -31,11 +33,18 @@ import {
   DeliveryZoneConflictError,
   DeliveryZoneDuplicateCityError,
   DeliveryZoneNotFoundError,
+  DeliveryZonePreconditionRequiredError,
   DeliveryZoneValidationError,
 } from './delivery-zone.errors';
 import { DELIVERY_ZONE_ADMIN_SERVICE } from './delivery-zone.tokens';
 import type { DeliveryZoneAdminService } from './delivery-zone.service';
 import { ZodValidationPipe } from './zod-validation.pipe';
+
+/** `If-Match` carrega a `version` esperada — ausente ou não-inteiro-não-negativo é 428. */
+function parseIfMatch(value: string | undefined): number {
+  if (value === undefined || !/^\d+$/.test(value.trim())) throw new DeliveryZonePreconditionRequiredError();
+  return Number(value.trim());
+}
 
 @Controller()
 @UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
@@ -63,16 +72,17 @@ export class DeliveryZoneAdminController {
   @RequirePermission('catalog.product.update')
   async update(
     @Param('zoneId') zoneId: string,
+    @Headers('if-match') ifMatch: string | undefined,
     @Body(new ZodValidationPipe(updateDeliveryZoneSchema)) dto: UpdateDeliveryZoneInput,
   ) {
-    return this.handle(() => this.zones.update(zoneId, dto));
+    return this.handle(() => this.zones.update(zoneId, parseIfMatch(ifMatch), dto));
   }
 
   @Delete('v1/admin/delivery-zones/:zoneId')
   @RequirePermission('catalog.product.update')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('zoneId') zoneId: string): Promise<void> {
-    await this.handle(() => this.zones.delete(zoneId));
+  async delete(@Param('zoneId') zoneId: string, @Headers('if-match') ifMatch: string | undefined): Promise<void> {
+    await this.handle(() => this.zones.delete(zoneId, parseIfMatch(ifMatch)));
   }
 
   private async handle<T>(fn: () => Promise<T>): Promise<T> {
@@ -84,6 +94,9 @@ export class DeliveryZoneAdminController {
         throw new ConflictException(error.message);
       }
       if (error instanceof DeliveryZoneValidationError) throw new BadRequestException(error.message);
+      if (error instanceof DeliveryZonePreconditionRequiredError) {
+        throw new HttpException(error.message, 428);
+      }
       throw error;
     }
   }
