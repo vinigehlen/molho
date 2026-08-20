@@ -10,6 +10,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
 import { PlatformModule } from './platform/platform.module';
+import { SignupModule } from './signup/signup.module';
 import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
 import { StorefrontModule } from './storefront/storefront.module';
 
@@ -25,6 +26,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     DeliveryZoneAdminModule,
     StoreHoursAdminModule,
     PlatformModule,
+    SignupModule,
   ],
   controllers: [HealthController],
 })

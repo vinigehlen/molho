@@ -23,9 +23,11 @@ export interface HomePlaceholderProps {
   title: string;
   description: string;
   ctaLabel: string;
+  signupLabel: string;
+  signupHref: string;
 }
 
-export function HomePlaceholder({ title, description, ctaLabel }: HomePlaceholderProps) {
+export function HomePlaceholder({ title, description, ctaLabel, signupLabel, signupHref }: HomePlaceholderProps) {
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <MoEmptyState
@@ -38,6 +40,9 @@ export function HomePlaceholder({ title, description, ctaLabel }: HomePlaceholde
           onClick: () => {},
         }}
       />
+      <a className="fixed bottom-6 text-sm font-semibold text-brand-strong" href={signupHref}>
+        {signupLabel}
+      </a>
     </main>
   );
 }

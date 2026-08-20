@@ -25,7 +25,7 @@ export class StaffProvisioningRepository {
    * perdedor (P2002) e cabe ao chamador tratar como corrida rara, não como
    * bug (mesmo racional do comentário em staff-identity.repository.ts).
    */
-  async findOrCreateUser(email: EmailAddress): Promise<ProvisionedIdentity> {
+  async findOrCreateUser(email: EmailAddress, name: string = email): Promise<ProvisionedIdentity> {
     const client = this.requestContext.getClient();
     const emailHash = hashEmailForLookup(email);
     const existing = await client.user.findFirst({
@@ -37,7 +37,7 @@ export class StaffProvisioningRepository {
     const { ciphertext, keyVersion } = encryptEmail(email);
     const user = await client.user.create({
       data: {
-        name: email,
+        name,
         emailCiphertext: new Uint8Array(ciphertext),
         emailLookupHash: emailHash,
         emailKeyVersion: keyVersion,
