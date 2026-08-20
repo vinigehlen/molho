@@ -2,6 +2,7 @@ import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from 
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ContextModule } from './context/context.module';
+import { CustomerProfileModule } from './customer-profile/customer-profile.module';
 import { DeliveryZoneAdminModule } from './delivery-zones/delivery-zone.module';
 import { GeoModule } from './geo/geo.module';
 import { GeocodeIpRateLimitMiddleware, GeocodeMiddleware } from './geo/geocode.middleware';
@@ -19,6 +20,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     ContextModule,
     MessagingModule,
     AuthModule,
+    CustomerProfileModule,
     CatalogModule,
     StorefrontModule,
     OrdersModule,

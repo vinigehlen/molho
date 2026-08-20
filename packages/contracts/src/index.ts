@@ -3,6 +3,7 @@ export * from './admin-order';
 export * from './cart';
 export * from './checkout';
 export * from './copy.pt-BR';
+export * from './customer-profile';
 export * from './counter-order';
 export * from './delivery-match';
 export * from './delivery-zone-admin';
