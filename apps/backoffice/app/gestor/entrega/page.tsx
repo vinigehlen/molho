@@ -120,6 +120,7 @@ export default function EntregaPage() {
   const [savingHours, setSavingHours] = useState(false);
   const [zonePendingDelete, setZonePendingDelete] = useState<DeliveryZoneResponse | null>(null);
   const [deletingZoneId, setDeletingZoneId] = useState<string | null>(null);
+  const [zonesAvailable, setZonesAvailable] = useState(true);
 
   // storeReady também trava durante `loading`: troca de loja dispara load()
   // na hora, e sem isso os painéis ficariam editáveis com a MASSA DE DADOS
@@ -159,9 +160,16 @@ export default function EntregaPage() {
     setError(null);
     setMessage(null);
     try {
-      const [loadedZones, loadedHours] = await Promise.all([fetchDeliveryZones(id), fetchStoreHours(id)]);
-      setZones(loadedZones);
-      setShifts(toEditableShifts(loadedHours.shifts));
+      const [zonesResult, hoursResult] = await Promise.allSettled([fetchDeliveryZones(id), fetchStoreHours(id)]);
+      if (hoursResult.status === 'rejected') throw hoursResult.reason;
+      if (zonesResult.status === 'fulfilled') {
+        setZones(zonesResult.value);
+        setZonesAvailable(true);
+      } else {
+        setZones([]);
+        setZonesAvailable(false);
+      }
+      setShifts(toEditableShifts(hoursResult.value.shifts));
       setLoadedStoreId(id);
       setZonePendingDelete(null);
       setZoneForm(EMPTY_ZONE_FORM);
@@ -277,6 +285,7 @@ export default function EntregaPage() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <ZonesPanel
             zones={zones}
+            zonesAvailable={zonesAvailable}
             form={zoneForm}
             setForm={setZoneForm}
             saving={savingZone}
@@ -383,6 +392,7 @@ function StoreSelector({
 
 function ZonesPanel({
   zones,
+  zonesAvailable,
   form,
   setForm,
   saving,
@@ -395,6 +405,7 @@ function ZonesPanel({
   onConfirmRemove,
 }: {
   zones: DeliveryZoneResponse[];
+  zonesAvailable: boolean;
   form: ZoneForm;
   setForm: (form: ZoneForm) => void;
   saving: boolean;
@@ -408,6 +419,18 @@ function ZonesPanel({
 }) {
   const cityZones = zones.filter((zone) => zone.kind === 'city');
   const polygonZones = zones.filter((zone) => zone.kind === 'polygon');
+
+  if (!zonesAvailable) {
+    return (
+      <section className="rounded-[20px] border border-border bg-bg-card p-4">
+        <h2 className="text-base font-semibold text-text">Zonas por cidade</h2>
+        <p className="mt-3 text-sm text-text-muted" role="status">
+          Módulo de zonas de entrega não está ativo para esta loja. Os horários seguem funcionando normalmente.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-[20px] border border-border bg-bg-card p-4">
       <div className="flex items-start justify-between gap-3">

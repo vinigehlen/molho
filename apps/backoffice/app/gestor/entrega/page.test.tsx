@@ -293,3 +293,24 @@ describe('EntregaPage — segurança operacional', () => {
     expect(container.textContent).toContain('Horários salvos.');
   });
 });
+
+describe('EntregaPage — módulo delivery.zones desligado (P1.4)', () => {
+  it('zonas rejeita 403, horário resolve: horário funciona e zonas mostra aviso', async () => {
+    mocks.fetchDeliveryZones.mockRejectedValueOnce(new Error('Módulo não ativo'));
+    mocks.fetchStoreHours.mockResolvedValueOnce({ shifts: [] });
+    await mount();
+
+    expect(container.textContent).toContain('Módulo de zonas de entrega não está ativo');
+    expect(button('Salvar horários').disabled).toBe(false);
+  });
+
+  it('ambos resolvem: os dois painéis renderizam normais', async () => {
+    mocks.fetchDeliveryZones.mockResolvedValueOnce([ZONE]);
+    mocks.fetchStoreHours.mockResolvedValueOnce({ shifts: [] });
+    await mount();
+
+    expect(container.textContent).not.toContain('Módulo de zonas de entrega não está ativo');
+    expect(container.textContent).toContain('Centro');
+    expect(button('Salvar horários').disabled).toBe(false);
+  });
+});
