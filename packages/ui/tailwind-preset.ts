@@ -23,6 +23,11 @@ const preset = {
         'on-brand': 'var(--on-brand)',
         // Tom escuro derivado da marca — ver comentário em tokens.css.
         'brasa-deep': 'var(--brasa-deep)',
+        // Fundo creme/bone — só a landing usa hoje. Ver comentário em tokens.css.
+        cream: {
+          DEFAULT: 'var(--cream)',
+          card: 'var(--cream-card)',
+        },
         // Branco também vem do token: `danger` e `pix` têm texto branco fixo, que
         // não acompanha o --on-brand do tema do lojista.
         white: 'var(--white)',
