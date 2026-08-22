@@ -100,9 +100,9 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 
 **Área de proteção:** altura do "o" da wordmark em todos os lados. **Tamanhos mínimos:** lockup 80px de largura (20mm impresso) · símbolo 24px.
 
-**Cores por fundo:** claro → símbolo roxo #820AD1 + texto ink #141216 · roxo/escuro → tudo branco · impressão 1 cor/fiscal → tudo preto. Nunca roxo sobre roxo.
+**Cores por fundo:** claro → símbolo vermelho #D63A1E + texto ink #141216 · vermelho/escuro → tudo branco · impressão 1 cor/fiscal → tudo preto. Nunca vermelho sobre vermelho.
 
-**Usos proibidos:** rotacionar, esticar, gradiente, sombra, contorno, recolorir fora da paleta, **separar o pingo do anel**, aplicar sobre foto sem overlay roxo 40%.
+**Usos proibidos:** rotacionar, esticar, gradiente, sombra, contorno, recolorir fora da paleta, **separar o pingo do anel**, aplicar sobre foto sem overlay vermelho 40%.
 
 **White-label:** o logo do Molho não é substituído por tenant. O restaurante usa o próprio logo no storefront; o Molho assina discretamente no rodapé ("feito com Molho").
 
@@ -110,16 +110,16 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 
 ### 3.2 Cores
 
-**Primária — Roxo Molho** (identidade da plataforma; nos storefronts white-label é o default substituível pelo tenant)
+**Primária — Vermelho Brasa** (identidade da plataforma; nos storefronts white-label é o default substituível pelo tenant)
 | Token | Hex | Uso |
 |---|---|---|
-| `purple-950` | #2D0A4E | Texto sobre lilás claro, sidebar backoffice |
-| `purple-900` | #4B0082 | Hover de primário, headers escuros |
-| `purple-700` | #6D0AAD | **Texto roxo acessível sobre branco (AA)** |
-| `purple-500` | #820AD1 | **Cor da marca.** Botões, links, símbolo |
-| `purple-300` | #B565F3 | Ilustrações, dataviz secundário |
-| `purple-100` | #EFE1FB | Fundos de destaque, chips selecionados |
-| `purple-050` | #F8F1FE | Fundos de seção |
+| `red-950` | #4D0D09 | Texto sobre coral claro, sidebar backoffice |
+| `red-900` | #7A150F | Hover de primário, headers escuros |
+| `red-700` | #A81E16 | **Texto vermelho acessível sobre branco (AA)** |
+| `red-500` | #D63A1E | **Cor da marca.** Botões, links, símbolo |
+| `red-300` | #F0846D | Ilustrações, dataviz secundário |
+| `red-100` | #FBDAD3 | Fundos de destaque, chips selecionados |
+| `red-050` | #FEF1EE | Fundos de seção |
 
 **Neutros**
 | Token | Hex | Uso |
@@ -141,16 +141,16 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 | `info-500` | #3D5AFE | Informativos neutros |
 | `pix` | #32BCAD | Exclusiva para elementos PIX (cor oficial do Banco Central) |
 
-> **Por que existe o `danger-700`** (medido no Chromium, não estimado): branco sobre `danger-500` dá **4,08:1** e `danger-500` como texto sobre fundo claro dá **3,75:1** — os dois reprovam o AA de 4,5:1. O `danger-700` entrega 5,4:1 nos dois papéis. É o mesmo padrão de `purple-500`/`purple-700`: **toda cor funcional tem um tom de fundo e um tom de texto, e eles não são o mesmo.**
+> **Por que existe o `danger-700`** (medido no Chromium, não estimado): branco sobre `danger-500` dá **4,08:1** e `danger-500` como texto sobre fundo claro dá **3,75:1** — os dois reprovam o AA de 4,5:1. O `danger-700` entrega 5,4:1 nos dois papéis. É o mesmo padrão de `red-500`/`red-700`: **toda cor funcional tem um tom de fundo e um tom de texto, e eles não são o mesmo.**
 >
 > **Texto sobre o teal do PIX é `ink-900`, nunca branco.** Branco sobre `#32BCAD` dá **2,35:1** — ilegível. Com ink: 7,9:1. A cor do Banco Central não se altera; o que muda é o texto sobre ela.
 
 **Cores de status de pedido (dataviz e timeline)**
-`received` #3D5AFE · `preparing` #F5A623 · `ready` #B565F3 · `in_transit` #820AD1 · `completed` #12A454 · `canceled` #8E8B9A
+`received` #3D5AFE · `preparing` #F5A623 · `ready` #F0846D · `in_transit` #D63A1E · `completed` #12A454 · `canceled` #8E8B9A
 
-**Regra 60-30-10:** 60% neutros claros, 30% ink, 10% roxo. O roxo é tempero, não prato principal — telas encharcadas de roxo são erro de marca.
+**Regra 60-30-10:** 60% neutros claros, 30% ink, 10% vermelho. O vermelho é tempero, não prato principal — telas encharcadas de vermelho são erro de marca.
 
-**Contraste (WCAG AA obrigatório):** texto roxo sobre branco usa `purple-700`+; texto branco sobre roxo exige `purple-500`+; nunca `purple-300` para texto.
+**Contraste (WCAG AA obrigatório):** texto vermelho sobre branco usa `red-700`+; texto branco sobre vermelho exige `red-500`+; nunca `red-300` para texto.
 
 ### 3.3 Tipografia
 - **Família única: Inter** (Google Fonts, variável) — humanista, excelente em números tabulares (essencial em PDV/dashboard). Fallback: system-ui.
@@ -169,23 +169,23 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 | `overline` | 11/16 | 600 caps +0.08em | Categorias, seções |
 
 ### 3.4 Iconografia, ilustração e foto
-- **Ícones:** Lucide, stroke 1.75px, tamanhos 16/20/24/32. Cor `ink-600` default, roxo apenas quando interativo/ativo. Nunca ícones sólidos misturados com outline na mesma tela.
-- **Ilustrações:** estilo flat com linha fina, paleta roxo + 1 acento; personagens diversos, cenas de cozinha/entrega reais do Brasil (marmita, moto, maquininha). Uso: onboarding, estados vazios, erros.
-- **Fotografia (marketing):** comida de verdade, luz natural, mãos em ação, bastidor de cozinha — nunca stock genérico americano. Overlay roxo 40% quando houver texto sobre foto.
-- **O símbolo da gota** pode virar elemento gráfico de apoio (padrões, splash, loading), sempre em roxo ou branco.
+- **Ícones:** Lucide, stroke 1.75px, tamanhos 16/20/24/32. Cor `ink-600` default, vermelho apenas quando interativo/ativo. Nunca ícones sólidos misturados com outline na mesma tela.
+- **Ilustrações:** estilo flat com linha fina, paleta vermelho + 1 acento; personagens diversos, cenas de cozinha/entrega reais do Brasil (marmita, moto, maquininha). Uso: onboarding, estados vazios, erros.
+- **Fotografia (marketing):** comida de verdade, luz natural, mãos em ação, bastidor de cozinha — nunca stock genérico americano. Overlay vermelho 40% quando houver texto sobre foto.
+- **O símbolo da gota** pode virar elemento gráfico de apoio (padrões, splash, loading), sempre em vermelho ou branco.
 
 ### 3.5 Motion
 - **Princípio:** rápido como cozinha em hora de pico. Nada acima de 300ms.
 - Curvas: `--ease-out: cubic-bezier(.2,.8,.2,1)` (entradas) · `--ease-in-out` (movimentos).
 - Durações: micro 120ms · padrão 180ms · sheets/modais 240ms · celebração 600ms (única exceção).
-- **Assinaturas:** (1) bottom sheets sobem com leve overshoot; (2) dot da timeline pulsa no status ativo; (3) confete roxo no primeiro pedido do dia e em recordes; (4) botão PIX "respira" enquanto aguarda pagamento.
+- **Assinaturas:** (1) bottom sheets sobem com leve overshoot; (2) dot da timeline pulsa no status ativo; (3) confete vermelho no primeiro pedido do dia e em recordes; (4) botão PIX "respira" enquanto aguarda pagamento.
 - Respeitar `prefers-reduced-motion` sempre.
 
 ### 3.6 Aplicações da marca
-- **App icon:** símbolo branco sobre roxo 500, cantos do sistema.
-- **Avatar WhatsApp do robô:** símbolo sobre roxo; nome do bot: "Molho | {Nome do Restaurante}".
+- **App icon:** símbolo branco sobre vermelho 500, cantos do sistema.
+- **Avatar WhatsApp do robô:** símbolo sobre vermelho; nome do bot: "Molho | {Nome do Restaurante}".
 - **Maquininha/QR de mesa (impressos):** QR sempre com moldura branca, símbolo ao centro, CTA "Peça pelo QR — rapidinho".
-- **E-mail:** header roxo com wordmark branca, corpo claro, botão primário roxo.
+- **E-mail:** header vermelho com wordmark branca, corpo claro, botão primário vermelho.
 
 ---
 
@@ -200,16 +200,16 @@ Tokens em três camadas: **primitivos** (valores brutos) → **semânticos** (in
 ```css
 :root {
   /* ── Primitivos: cor ── */
-  --purple-950:#2D0A4E; --purple-900:#4B0082; --purple-700:#6D0AAD;
-  --purple-500:#820AD1; --purple-300:#B565F3; --purple-100:#EFE1FB; --purple-050:#F8F1FE;
+  --red-950:#4D0D09; --red-900:#7A150F; --red-700:#A81E16;
+  --red-500:#D63A1E; --red-300:#F0846D; --red-100:#FBDAD3; --red-050:#FEF1EE;
   --ink-900:#141216; --ink-600:#585666; --ink-400:#8E8B9A;
   --white:#FFF; --surface:#F5F5F7; --line:#E9E7EE;
   --green-500:#12A454; --amber-500:#F5A623; --red-500:#E4404E; --red-700:#C62F3B;
   --blue-500:#3D5AFE; --pix:#32BCAD;
 
   /* ── Semânticos: cor (white-label troca só o bloco brand) ── */
-  --brand:var(--purple-500); --brand-strong:var(--purple-700);
-  --brand-subtle:var(--purple-100); --brand-faint:var(--purple-050);
+  --brand:var(--red-500); --brand-strong:var(--red-700);
+  --brand-subtle:var(--red-100); --brand-faint:var(--red-050);
   --on-brand:var(--white);
   --text:var(--ink-900); --text-muted:var(--ink-600); --text-disabled:var(--ink-400);
   --bg:var(--surface); --bg-card:var(--white); --border:var(--line);
@@ -312,7 +312,7 @@ Duas regras merecem explicação, porque contrariam o senso comum:
 > Este portão nasceu de um bug real: o `tailwind-merge` descartava a classe de cor do texto do botão primário, que herdava ink. Fonte correto, DOM íntegro, axe verde — e **1,00:1 no tema Grafite** (preto sobre preto). Só o pixel denuncia essa classe de erro.
 
 ### 6.2 White-label (storefront apenas) — 4 templates
-O lojista escolhe **1 entre 4 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Roxo** #820AD1 (padrão) · **Brasa** #D93025 · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre roxo Molho. Rodapé do storefront: "feito com Molho".
+O lojista escolhe **1 entre 4 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Roxo** #D63A1E (padrão) · **Brasa** #D63A1E · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre vermelho Molho. Rodapé do storefront: "feito com Molho".
 
 ### 6.3 Responsividade
 Breakpoints: 0–639 (mobile, prioridade 1), 640–1023 (tablet/PDV), 1024+ (desktop backoffice). Storefront é mobile-first estrito; backoffice é desktop-first com versão mobile funcional do gestor de pedidos.

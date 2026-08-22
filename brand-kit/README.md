@@ -19,11 +19,11 @@ O símbolo é o **"o" de molho** transformado em monograma: um anel espesso e pe
 | `10-diagramas/` | área de proteção | Referência para designers e parceiros |
 
 ## Regras de uso
-1. **Fundo claro** → lockup cor (símbolo #820AD1 + texto #141216). **Fundo roxo/escuro** → versão branca. Nunca roxo sobre roxo.
+1. **Fundo claro** → lockup cor (símbolo #D63A1E + texto #141216). **Fundo vermelho/escuro** → versão branca. Nunca vermelho sobre vermelho.
 2. **Área de proteção:** altura do "o" da wordmark em todos os lados (ver `10-diagramas/`).
 3. **Tamanhos mínimos:** lockup horizontal 80px de largura · símbolo 24px · abaixo disso, símbolo compacto.
 4. **Impressão 1 cor / fiscal / carimbo** → mono preto.
-5. **Nunca:** rotacionar, esticar, aplicar gradiente/sombra/contorno, recolorir fora da paleta, separar o pingo do anel, colocar sobre foto sem overlay roxo 40%.
+5. **Nunca:** rotacionar, esticar, aplicar gradiente/sombra/contorno, recolorir fora da paleta, separar o pingo do anel, colocar sobre foto sem overlay vermelho 40%.
 6. **White-label:** o logo do Molho **não** é substituído por tenant. O restaurante usa o próprio logo no storefront; o Molho assina discretamente no rodapé ("feito com Molho").
 
 ## Snippets
@@ -34,7 +34,7 @@ O símbolo é o **"o" de molho** transformado em monograma: um anel espesso e pe
 <link rel="icon" href="/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/app-icon-180.png">
 <meta property="og:image" content="/og-image-1200x630.png">
-<meta name="theme-color" content="#820AD1">
+<meta name="theme-color" content="#D63A1E">
 ```
 
 **PWA manifest**
@@ -42,7 +42,7 @@ O símbolo é o **"o" de molho** transformado em monograma: um anel espesso e pe
 {
   "name": "Molho",
   "short_name": "Molho",
-  "theme_color": "#820AD1",
+  "theme_color": "#D63A1E",
   "background_color": "#FFFFFF",
   "icons": [
     { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png" },

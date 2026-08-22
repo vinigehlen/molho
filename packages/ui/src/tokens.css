@@ -21,13 +21,13 @@
   scrollbar-gutter: stable;
 
   /* ── Primitivos: cor ── */
-  --purple-950: #2d0a4e;
-  --purple-900: #4b0082;
-  --purple-700: #6d0aad;
-  --purple-500: #820ad1;
-  --purple-300: #b565f3;
-  --purple-100: #efe1fb;
-  --purple-050: #f8f1fe;
+  --red-950: #4d0d09;
+  --red-900: #7a150f;
+  --red-700: #a81e16;
+  --red-500: #d63a1e;
+  --red-300: #f0846d;
+  --red-100: #fbdad3;
+  --red-050: #fef1ee;
   --ink-900: #141216;
   --ink-600: #585666;
   --ink-400: #8e8b9a;
@@ -36,20 +36,20 @@
   --line: #e9e7ee;
   --green-500: #12a454;
   --amber-500: #f5a623;
-  --red-500: #e4404e;
   /* Vermelho escuro para TEXTO e para o preenchimento do botão de perigo.
-     O red-500 tem só 4.08:1 com branco e 3.75:1 como texto sobre fundo claro —
-     reprova AA nos dois papéis. Mesmo padrão de purple-500/purple-700. */
-  --red-700: #c62f3b;
+     O critical-500 tem só 4.08:1 com branco e 3.75:1 como texto sobre fundo
+     claro — reprova AA nos dois papéis. Mesmo padrão de red-500/red-700. */
+  --critical-500: #e4404e;
+  --critical-700: #c62f3b;
   --blue-500: #3d5afe;
   --pix: #32bcad;
 
   /* ── Semânticos: cor (white-label troca só o bloco brand) ── */
-  --brand: var(--purple-500);
-  --brand-strong: var(--purple-700);
-  --brand-subtle: var(--purple-100);
-  --brand-faint: var(--purple-050);
-  --brand-accent: var(--purple-300);
+  --brand: var(--red-500);
+  --brand-strong: var(--red-700);
+  --brand-subtle: var(--red-100);
+  --brand-faint: var(--red-050);
+  --brand-accent: var(--red-300);
   --on-brand: var(--white);
   --text: var(--ink-900);
   --text-muted: var(--ink-600);
@@ -63,8 +63,8 @@
   --border-strong: var(--ink-400);
   --positive: var(--green-500);
   --caution: var(--amber-500);
-  --critical: var(--red-500);
-  --critical-strong: var(--red-700);
+  --critical: var(--critical-500);
+  --critical-strong: var(--critical-700);
   --info: var(--blue-500);
 
   /* Estado desabilitado.
@@ -77,16 +77,16 @@
   /* ── Status de pedido (timeline e dataviz) — §3.2 ──
      Cada status tem um par: a cor (fundo do selo, dot da timeline) e o texto
      que vai SOBRE ela. O texto não é branco por padrão — medido no Chromium,
-     branco sobre o âmbar dá 2.03:1, sobre o verde 3.25:1 e sobre o lilás
-     3.43:1. Onde o branco reprova, o texto é ink. */
+     branco sobre o âmbar dá 2.03:1, sobre o verde 3.25:1 e sobre o coral
+     dá ~2.9:1. Onde o branco reprova, o texto é ink. */
   --status-received: var(--blue-500);
   --status-received-on: var(--white); /* 5.13:1 */
   --status-preparing: var(--amber-500);
   --status-preparing-on: var(--ink-900); /* 9.19:1 */
-  --status-ready: var(--purple-300);
-  --status-ready-on: var(--ink-900); /* 5.43:1 */
-  --status-in-transit: var(--purple-500);
-  --status-in-transit-on: var(--white); /* 7.21:1 */
+  --status-ready: var(--red-300);
+  --status-ready-on: var(--ink-900); /* 7.75:1 */
+  --status-in-transit: var(--red-500);
+  --status-in-transit-on: var(--white); /* 4.69:1 */
   --status-completed: var(--green-500);
   --status-completed-on: var(--ink-900); /* 5.73:1 */
   --status-canceled: var(--ink-400);

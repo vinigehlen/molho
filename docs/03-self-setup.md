@@ -58,8 +58,8 @@ Em vez de um seletor de cor livre (que exige rampa OKLCH, validação de contras
 
 | Template | Cor | Personalidade | Para quem |
 |---|---|---|---|
-| **1. Roxo** (padrão) | Roxo Molho `#820AD1` | Moderno, fintech, confiável | Quem não quer decidir. É o default |
-| **2. Brasa** | Vermelho-tijolo `#D93025` | Apetitoso, quente, urgente | Hamburgueria, pizzaria, churrasco |
+| **1. Roxo** (padrão) | Vermelho Brasa `#D63A1E` | Moderno, fintech, confiável | Quem não quer decidir. É o default |
+| **2. Brasa** | Vermelho Brasa `#D63A1E` | Apetitoso, quente, urgente | Hamburgueria, pizzaria, churrasco |
 | **3. Folha** | Verde-profundo `#0F8A5F` | Fresco, natural, saudável | Saudável, natural, açaí, sucos |
 | **4. Grafite** | Preto `#141216` + acento âmbar | Sofisticado, minimalista | Alta gastronomia, cafés, autoral |
 

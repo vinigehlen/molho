@@ -5,8 +5,9 @@
  * runtime, sem validação de contraste dinâmica, sem "ajustamos seu tom".
  * Cada template é só um bloco de --brand-* aplicado sobre os tokens.
  *
- * Backoffice, KDS e apps operacionais são SEMPRE roxo Molho — o tema é uma
- * propriedade do storefront do tenant, não da plataforma.
+ * Backoffice, KDS e apps operacionais são SEMPRE a cor da marca Molho (agora
+ * vermelho Brasa #D63A1E, era roxo #820AD1) — o tema é uma propriedade do
+ * storefront do tenant, não da plataforma.
  */
 
 export type ThemeKey = 'roxo' | 'brasa' | 'folha' | 'grafite';
@@ -36,18 +37,23 @@ export const THEMES: Record<ThemeKey, Theme> = {
     key: 'roxo',
     name: 'Roxo',
     personality: 'Moderno, fintech, confiável. É o padrão — para quem não quer decidir.',
-    brand: '#820AD1',
-    brandStrong: '#6D0AAD',
-    brandSubtle: '#EFE1FB',
-    brandFaint: '#F8F1FE',
-    brandAccent: '#B565F3',
+    // TROCA DE MARCA: cor da marca Molho passou de roxo (#820AD1) para
+    // vermelho Brasa (#D63A1E) — este template herda os mesmos tons do
+    // template "brasa" logo abaixo. Ficam DOIS templates com cor idêntica;
+    // é resíduo esperado da troca, não bug — decisão de manter/renomear/
+    // remover um dos dois fica para o PM revisar na branch.
+    brand: '#D63A1E',
+    brandStrong: '#A81E16',
+    brandSubtle: '#FBDAD3',
+    brandFaint: '#FEF1EE',
+    brandAccent: '#F0846D',
     onBrand: '#FFFFFF',
   },
   brasa: {
     key: 'brasa',
     name: 'Brasa',
     personality: 'Apetitoso, quente, urgente. Hamburgueria, pizzaria, churrasco.',
-    brand: '#D93025',
+    brand: '#D63A1E',
     brandStrong: '#A81E16',
     brandSubtle: '#FBE3E1',
     brandFaint: '#FEF5F4',

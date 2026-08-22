@@ -11,7 +11,7 @@ describe('temas do storefront', () => {
 
   it('usa Roxo como padrão', () => {
     expect(DEFAULT_THEME).toBe('roxo');
-    expect(THEMES.roxo.brand).toBe('#820AD1');
+    expect(THEMES.roxo.brand).toBe('#D63A1E');
   });
 
   it('cai no padrão quando o tenant não escolheu (ou escolheu lixo)', () => {
@@ -22,7 +22,7 @@ describe('temas do storefront', () => {
 
   it('vira um bloco --brand-* pronto para o <html> do tenant', () => {
     expect(themeToCssVars(THEMES.brasa)).toEqual({
-      '--brand': '#D93025',
+      '--brand': '#D63A1E',
       '--brand-strong': '#A81E16',
       '--brand-subtle': '#FBE3E1',
       '--brand-faint': '#FEF5F4',

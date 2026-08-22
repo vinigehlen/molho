@@ -4,7 +4,7 @@ import type { Config } from 'tailwindcss';
  * Preset Tempero — consumido por packages/ui e pelos dois fronts.
  *
  * Expõe APENAS tokens semânticos (doc de marca §4): um componente escreve
- * `bg-brand`, nunca `bg-[#820AD1]`. Os primitivos ficam em tokens.css e não
+ * `bg-brand`, nunca `bg-[#D63A1E]`. Os primitivos ficam em tokens.css e não
  * viram utilitário de propósito — é o que permite o white-label trocar o tema
  * em runtime sem rebuild, e o que a regra de lint do hex protege.
  */

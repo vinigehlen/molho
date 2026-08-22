@@ -477,7 +477,7 @@ Princípios do design Nubank a aplicar: **roxo como identidade, tipografia grand
 ```css
 :root {
   /* Cores */
-  --brand-900:#4B0082; --brand-700:#6200A3; --brand-500:#820AD1; /* primária */
+  --brand-900:#7A150F; --brand-700:#A81E16; --brand-500:#D63A1E; /* primária */
   --brand-300:#B565F3; --brand-100:#EFE1FB; --brand-050:#F8F1FE;
   --ink-900:#111111; --ink-600:#585666; --ink-400:#8E8B9A;
   --bg:#FFFFFF; --surface:#F5F5F7; --line:#E9E7EE;
@@ -612,7 +612,7 @@ escolhe domínio e publica SOZINHO. Nenhum passo depende de humano do Molho.
 - Domínio: SEMPRE E APENAS {slug}.molho.app. Sem domínio próprio, sem CNAME, sem TLS
   on-demand. Wildcard TLS *.molho.app. SEO por loja: OG com a capa, JSON-LD
   Restaurant/Menu, favicon e PWA manifest.
-- Tema: o lojista escolhe 1 de 4 TEMPLATES prontos (Roxo #820AD1 padrão, Brasa #D93025,
+- Tema: o lojista escolhe 1 de 4 TEMPLATES prontos (Roxo #D63A1E padrão, Brasa #D63A1E,
   Folha #0F8A5F, Grafite #141216+âmbar) — constantes em packages/ui/themes.ts, todos AA
   por construção. Ele também envia logo, capa e descrição. NÃO existe seletor de cor
   livre. Tipografia, raios, espaçamento e cores funcionais não são customizáveis.
@@ -651,7 +651,7 @@ número normal dele. NÃO usar Cloud API nem API não-oficial (Baileys/Evolution
   vem com testes.
 
 ## Design system "Tempero" — estilo Nubank (fonte da verdade: molho-brand-design-system.md, incluir no repo em docs/)
-- Primária roxo #820AD1 (tons 050–900), superfícies claras #F5F5F7, texto #111.
+- Primária vermelho Brasa #D63A1E (tons 050–900), superfícies claras #F5F5F7, texto #111.
 - Font Inter; títulos grandes e amigáveis; radius 20px em cards e 14px em botões;
   sombras suaves; espaçamento generoso (escala de 4px); ícones lucide outline.
 - Padrões: bottom sheets para detalhes de produto; barra de carrinho fixa em pill;
