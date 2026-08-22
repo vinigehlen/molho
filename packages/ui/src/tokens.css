@@ -34,6 +34,14 @@
   --white: #fff;
   --surface: #f5f5f7;
   --line: #e9e7ee;
+  /* Fundo creme/bone — não existe no restante do produto (que é frio,
+     --surface/--bg-card), mas a landing precisa de um "quente" pra combinar
+     com a narrativa de fachada/prato (docs/13-landing-site.md §4). AA medido:
+     ink 15.96:1, brand-strong 6.29:1. `--brand` puro (4.02:1) e mostarda
+     (1.68:1) reprovam texto normal sobre creme — usar --brand-strong pra
+     texto de marca aqui, e mostarda só decorativo (seta, borda), nunca texto. */
+  --cream: #f4eddd;
+  --cream-card: #f1e9d6;
   --green-500: #12a454;
   --amber-500: #f5a623;
   /* Vermelho escuro para TEXTO e para o preenchimento do botão de perigo.
@@ -51,6 +59,10 @@
   --brand-faint: var(--red-050);
   --brand-accent: var(--red-300);
   --on-brand: var(--white);
+  /* Tom escuro derivado da marca — fundo de seção que precisa de "momento
+     vermelho" sem competir com um painel --brand grande na mesma tela
+     (landing, faixa antes/depois). AA medido: creme 9.43:1, mostarda 5.34:1. */
+  --brasa-deep: var(--red-900);
   --text: var(--ink-900);
   --text-muted: var(--ink-600);
   --text-disabled: var(--ink-400);
