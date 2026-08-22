@@ -21,6 +21,8 @@ const preset = {
           accent: 'var(--brand-accent)',
         },
         'on-brand': 'var(--on-brand)',
+        // Tom escuro derivado da marca — ver comentário em tokens.css.
+        'brasa-deep': 'var(--brasa-deep)',
         // Branco também vem do token: `danger` e `pix` têm texto branco fixo, que
         // não acompanha o --on-brand do tema do lojista.
         white: 'var(--white)',

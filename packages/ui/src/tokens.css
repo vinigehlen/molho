@@ -51,6 +51,10 @@
   --brand-faint: var(--red-050);
   --brand-accent: var(--red-300);
   --on-brand: var(--white);
+  /* Tom escuro derivado da marca — fundo de seção que precisa de "momento
+     vermelho" sem competir com um painel --brand grande na mesma tela
+     (landing, faixa antes/depois). AA medido: creme 9.43:1, mostarda 5.34:1. */
+  --brasa-deep: var(--red-900);
   --text: var(--ink-900);
   --text-muted: var(--ink-600);
   --text-disabled: var(--ink-400);
