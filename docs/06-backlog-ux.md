@@ -84,6 +84,33 @@ Diferente dos itens B1–B5 (UX/comparação de mercado), isto é uma fragilidad
 
 ---
 
+## Features de conversão + redesenho do gestor (handoff 2026-08-22)
+
+Registrado a partir de `docs/handoff-features-conversao-gestor.md`. Numeração `C` pra não colidir com B1–B5 acima (assunto diferente: conversão/gestor, não comparação com iFood).
+
+### C1. Múltiplas fotos por produto — não iniciado
+Tabela `product_images` (position, FK composta com tenant_id), migra a foto única existente pra `position=0`, contrato `productResponseSchema.images[]`, CRUD no admin. Fatia A (schema+contrato), gate de review.
+
+### C2. Cupom de desconto v1 — não iniciado
+Só percentual/fixo + valor mínimo + validade + limite de usos. Fora do v1: limite por cliente, primeira-compra. Nova coluna `discount_cents` em `orders`, ajusta CHECK `orders_total_equals_sum`. Fatia A, gate de review — toca caminho de dinheiro.
+
+### C3. Agendamento de pedido — não iniciado
+`Order.scheduled_for` nullable, config de slot/teto por loja em cima de `store_hours`. Fatia A, gate de review.
+
+### C4. Redesenho dos botões de ação do gestor — não iniciado
+Uma ação primária por card (Brasa), utilitárias viram ícone (imprimir) e menu overflow (voltar etapa, cancelar). Fatia B. **Bloqueado:** `apps/backoffice/app/gestor/page.tsx` em edição por outra frente (balcão/analytics) no momento do handoff — aguardando essa janela fechar pra não colidir.
+
+### C5. Colunas configuráveis do kanban — não iniciado
+Ordem das colunas de status persistida por loja; não mexe na máquina de estados. Fatia B. Mesmo bloqueio de arquivo que C4.
+
+### C6. Badge de promoção no card do storefront — não iniciado
+Depende do dado de desconto existir (C2) — construir a UI antes seria especulativo (sem dado real pra consumir). Fatia B, mas represado atrás de C2.
+
+### C7. Faxina de emoji + regra no CLAUDE.md — em andamento
+Regra dura adicionada ao `CLAUDE.md` e `docs/04-brand-design-system.md` §2.4 corrigido (permitia 1 emoji/mensagem, agora zero). Emoji removido de `copy.pt-BR.ts`, `tenant-menu.tsx`, `cart-view.tsx` e testes. **Falta:** `apps/backoffice/app/gestor/page.tsx` (🔔🖨️🛵💬 + ✓), mesmo bloqueio de arquivo de C4/C5.
+
+---
+
 ## Referência
 
 Ver `docs/01-plano-produto.md` §8 (tabela de épicos) — nota apontando pra este arquivo, para não se perder entre sessões.
