@@ -17,15 +17,11 @@ const FEATURES = [
   },
   {
     titulo: 'Gestor de pedidos',
-    // ⚠️ TEXTO PENDENTE — brief (docs/13-landing-site.md §5) cortou este
-    // texto no print original e proibiu inventar o final. Aguardando
-    // Vinicius colar o texto verbatim antes de publicar esta seção.
-    desc: 'Som e push a cada pedido novo, fila offline se a internet… [AGUARDANDO TEXTO ORIGINAL]',
+    desc: 'Som e push a cada pedido novo, fila offline se a internet cair — nada se perde entre o salão e a cozinha.',
   },
   {
     titulo: 'Status no WhatsApp',
-    // ⚠️ TEXTO PENDENTE — mesmo motivo do item acima.
-    desc: 'Um toque, mensagem pronta, pelo seu número de… [AGUARDANDO TEXTO ORIGINAL]',
+    desc: 'Um toque, mensagem pronta, pelo seu número de sempre — o cliente sabe que o pedido saiu sem você digitar nada.',
   },
 ];
 
