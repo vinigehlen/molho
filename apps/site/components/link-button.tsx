@@ -13,7 +13,9 @@ const VARIANTS = {
   primary: 'bg-brand text-on-brand hover:brightness-95',
   mustard: 'bg-caution text-text hover:brightness-95',
   outline: 'border-2 border-current bg-transparent hover:bg-cream-card',
-  'outline-cream': 'border-2 border-cream text-cream bg-transparent hover:bg-white/10',
+  // text-cream sobre bg-brand só dá 4.01:1 (reprova AA 4.5) — medido pelo
+  // Lighthouse. text-on-brand (branco) dá 4.68:1, passa. Borda continua creme.
+  'outline-cream': 'border-2 border-cream text-on-brand bg-transparent hover:bg-white/10',
 } as const;
 
 const SIZES = {
