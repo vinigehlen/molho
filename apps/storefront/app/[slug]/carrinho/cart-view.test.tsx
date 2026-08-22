@@ -343,7 +343,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.type(screen.getByLabelText('Código'), '123456');
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
-    expect(await screen.findByText('Pedido feito! 🎉')).toBeInTheDocument();
+    expect(await screen.findByText('Pedido feito!')).toBeInTheDocument();
     expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), { accessToken: 'token-x' });
 
     const salvo = JSON.parse(localStorage.getItem(cartStorageKey(SLUG)) ?? '{}');
@@ -415,7 +415,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
     await screen.findByText('Revisa seu pedido');
-    expect(screen.queryByText('Pedido feito! 🎉')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pedido feito!')).not.toBeInTheDocument();
     expect(screen.getByText('R$ 35,00')).toBeInTheDocument();
   });
 

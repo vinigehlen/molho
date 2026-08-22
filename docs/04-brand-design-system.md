@@ -71,7 +71,7 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 
 ### 2.4 Regras de escrita
 - Sempre pt-BR informal ("você"), sem gerundismo ("vamos estar enviando" ❌).
-- Emojis: máximo 1 por mensagem; nunca em erros críticos, valores financeiros ou telas fiscais.
+- Nenhum emoji em UI ou copy de produto (CLAUDE.md, sem exceção) — ícones vêm da biblioteca de ícones do design system.
 - Números financeiros sempre com R$ e duas casas; datas "12 de julho", nunca "12/07" em copy conversacional.
 - Nunca prometer ("entrega em 30 min garantidos" ❌ → "previsão: 30–40 min" ✅).
 

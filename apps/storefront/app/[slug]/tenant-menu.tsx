@@ -28,7 +28,7 @@ import { lookupPostalCode } from '../../lib/viacep';
  * importa @molho/contracts sem o risco do Fast Refresh (mesma razão de
  * cart-storage.ts) — chega pronta via prop `closedMessage`.
  */
-const COPY_FORA_DA_AREA = 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!';
+const COPY_FORA_DA_AREA = 'Ainda não chegamos aí. Mas dá pra retirar no balcão!';
 const COPY_PEDIDO_MINIMO = 'Faltam {valor} pra fechar o pedido mínimo da casa.';
 
 function interpolarCopy(template: string, vars: Record<string, string>): string {
