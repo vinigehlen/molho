@@ -48,12 +48,29 @@ export interface CheckoutCouponRecord {
   active: boolean;
 }
 
+/** Recorte de StoreSchedulingSlot que o checkout precisa (Épico conversão, C3) — nunca a linha inteira. */
+export interface CheckoutSchedulingSlotRecord {
+  dayOfWeek: Weekday;
+  startsAtMinutes: number;
+  endsAtMinutes: number;
+  maxOrders: number;
+}
+
 export interface CheckoutRepository {
   findStore(): Promise<CheckoutStoreRecord | null>;
   listStoreHours(): Promise<CheckoutStoreHoursRecord[]>;
   findProductsByIds(productIds: readonly string[]): Promise<CheckoutProductRecord[]>;
   /** `mode: 'insensitive'` — mesma comparação do índice único parcial em upper(code) (packages/db). */
   findCoupon(code: string): Promise<CheckoutCouponRecord | null>;
+  listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]>;
+  /**
+   * Contagem OTIMISTA (leitura, sem lock) de pedidos já agendados na
+   * ocorrência [start, end) — mesmo racional de `isCouponUsable` ler
+   * `usesCount < maxUses` sem travar: só fecha a corrida de verdade o
+   * incremento atômico em `CheckoutOrderRepository.claimSchedulingSlot`, no
+   * momento de criar o pedido.
+   */
+  countScheduledOrders(start: Date, end: Date): Promise<number>;
 }
 
 /**
@@ -103,6 +120,19 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       available: row.available,
       modifiers: row.modifierGroups.flatMap((group) => group.modifiers),
     }));
+  }
+
+  async listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]> {
+    return this.requestContext.getClient().storeSchedulingSlot.findMany({
+      where: { deletedAt: null },
+      select: { dayOfWeek: true, startsAtMinutes: true, endsAtMinutes: true, maxOrders: true },
+    });
+  }
+
+  async countScheduledOrders(start: Date, end: Date): Promise<number> {
+    return this.requestContext.getClient().order.count({
+      where: { scheduledFor: { gte: start, lt: end } },
+    });
   }
 
   async findCoupon(code: string): Promise<CheckoutCouponRecord | null> {

@@ -110,6 +110,8 @@ describe('revalidatedCheckoutSchema', () => {
       couponCode: null,
       couponValid: false,
       discountCents: 0,
+      scheduledFor: null,
+      scheduledForValid: false,
       totalCents: 3690,
       hasUnfavorableDivergence: false,
       canSubmit: true,
@@ -147,6 +149,7 @@ const RESPONSE_BASE = {
   totalCents: 3690,
   discountCents: 0,
   couponCode: null,
+  scheduledFor: null,
   fulfillmentType: 'delivery' as const,
   fulfillmentDeadlineAt: '2026-08-14T19:50:00.000Z',
 };

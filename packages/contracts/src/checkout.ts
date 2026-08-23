@@ -131,6 +131,14 @@ const checkoutRequestBase = z.object({
    * um código" como prova de que ele é válido.
    */
   couponCode: z.string().trim().min(1).optional(),
+  /**
+   * Agendamento (Épico conversão, C3). Ausente/omitido = "o quanto antes" —
+   * comportamento ATUAL, intacto. Igual `couponCode`: o servidor SEMPRE
+   * revalida (cai num slot definido, dentro do horário de funcionamento,
+   * slot ainda tem vaga na OCORRÊNCIA pedida) — nunca confia que uma data
+   * escolhida na UI ainda é válida quando o pedido é criado.
+   */
+  scheduledFor: z.iso.datetime().optional(),
 });
 
 /**
@@ -209,6 +217,16 @@ export const revalidatedCheckoutSchema = z.object({
   couponValid: z.boolean(),
   /** Sempre `0` sem cupom válido. Descontado só do subtotal, nunca da taxa de entrega. */
   discountCents: centsSchema,
+  /**
+   * Agendamento (Épico conversão, C3). `scheduledFor` ecoa o que o cliente
+   * mandou (`null` = "o quanto antes", nunca confundir com "agendamento
+   * inválido"). `scheduledForValid` só é relevante quando `scheduledFor` não
+   * é `null` — mesmo racional de `couponValid`: um horário que cabia no
+   * slot no `/revalidate` e deixa de caber no `/checkout/orders` (slot
+   * lotou, fechou a loja) é `hasUnfavorableDivergence`, não campo separado.
+   */
+  scheduledFor: z.iso.datetime().nullable(),
+  scheduledForValid: z.boolean(),
   /** `null` quando `withinZone: false`. Já contabiliza `discountCents` (subtotal + fee - discount). */
   totalCents: centsSchema.nullable(),
   /**
@@ -244,6 +262,8 @@ const checkoutOrderResponseBase = z.object({
   /** Cupom (Épico conversão, C2) — 0/null quando o pedido não usou cupom. */
   discountCents: centsSchema,
   couponCode: z.string().nullable(),
+  /** Agendamento (Épico conversão, C3) — `null` = "o quanto antes". */
+  scheduledFor: z.iso.datetime().nullable(),
   fulfillmentType: fulfillmentTypeSchema,
   /** Snapshot congelado na criação; nunca é recalculado quando zona/horário mudam. */
   fulfillmentDeadlineAt: z.iso.datetime(),

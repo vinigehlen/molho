@@ -178,6 +178,22 @@ export class CheckoutOrderService {
     }
     const discountCents = couponId ? revalidation.discountCents : 0;
 
+    // Épico conversão (C3). Mesmo racional do cupom acima: scheduledForValid
+    // aqui já passou pelas checagens de leitura (horário, slot, teto
+    // aparente) — só `claimSchedulingSlot` (advisory lock + contagem fresca)
+    // fecha a corrida de verdade. Perder a corrida revalida de novo e
+    // devolve pro cliente confirmar, nunca cria o pedido fingindo que o
+    // horário ainda tem vaga.
+    let scheduledFor: Date | null = null;
+    if (revalidation.scheduledFor && revalidation.scheduledForValid) {
+      const claimed = await this.repo.claimSchedulingSlot(store.id, store.timezone, new Date(revalidation.scheduledFor));
+      if (!claimed) {
+        const fresh = await this.revalidationService.revalidate(request, resolved);
+        return { ok: false, revalidation: fresh };
+      }
+      scheduledFor = new Date(revalidation.scheduledFor);
+    }
+
     // Só dá pra validar DEPOIS da revalidação — antes disso não existe
     // totalCents real (docs/02 §5.5: pedir troco pra menos que o total é
     // request inválido).
@@ -211,6 +227,7 @@ export class CheckoutOrderService {
       couponId,
       couponCodeSnapshot,
       discountCents,
+      scheduledFor,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
@@ -226,6 +243,7 @@ export class CheckoutOrderService {
         fulfillmentDeadlineAt,
         discountCents,
         couponCodeSnapshot,
+        scheduledFor,
       ),
     };
   }
@@ -240,6 +258,7 @@ export class CheckoutOrderService {
     fulfillmentDeadlineAt: Date,
     discountCents: number,
     couponCodeSnapshot: string | null,
+    scheduledFor: Date | null,
   ): CheckoutOrderResponse {
     const base = {
       orderId,
@@ -248,6 +267,7 @@ export class CheckoutOrderService {
       totalCents,
       discountCents,
       couponCode: couponCodeSnapshot,
+      scheduledFor: scheduledFor?.toISOString() ?? null,
       fulfillmentType: request.fulfillmentType,
       fulfillmentDeadlineAt: fulfillmentDeadlineAt.toISOString(),
     };

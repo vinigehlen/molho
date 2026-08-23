@@ -76,6 +76,8 @@ function happyRevalidation(overrides: Partial<RevalidatedCheckout> = {}): Revali
     couponCode: null,
     couponValid: false,
     discountCents: 0,
+    scheduledFor: null,
+    scheduledForValid: false,
     totalCents: 3690,
     hasUnfavorableDivergence: false,
     canSubmit: true,
@@ -91,6 +93,7 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
     pixKeyType: 'email',
     pixMerchantCity: 'Sao Paulo',
     name: 'Loja Teste',
+    timezone: 'America/Sao_Paulo',
   };
   createOrderCalls: CreateOrderParams[] = [];
   createOrderItemsCalls: unknown[] = [];
@@ -110,6 +113,12 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   async claimCoupon(code: string) {
     this.claimCouponCalls.push(code);
     return this.claimCouponResult;
+  }
+  claimSchedulingSlotResult = true;
+  claimSchedulingSlotCalls: { storeId: string; timezone: string; scheduledFor: Date }[] = [];
+  async claimSchedulingSlot(storeId: string, timezone: string, scheduledFor: Date) {
+    this.claimSchedulingSlotCalls.push({ storeId, timezone, scheduledFor });
+    return this.claimSchedulingSlotResult;
   }
   createAddressCalls: DeliveryAddressSnapshot[] = [];
   async createAddress(_customerId: string, address: DeliveryAddressSnapshot) {
@@ -554,6 +563,72 @@ describe('CheckoutOrderService.createOrder — cupom de desconto', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.revalidation.couponValid).toBe(false);
+    }
+  });
+});
+
+/** Épico conversão (C3) — docs/handoff-features-conversao-gestor.md A3. */
+describe('CheckoutOrderService.createOrder — agendamento de pedido', () => {
+  const SCHEDULED_FOR = '2026-08-15T21:00:00.000Z';
+
+  it('1) scheduledFor válido: claimSchedulingSlot é chamado, horário entra no pedido e na resposta', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate.mockResolvedValue(
+      happyRevalidation({ scheduledFor: SCHEDULED_FOR, scheduledForValid: true }),
+    );
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, scheduledFor: SCHEDULED_FOR }, RESOLVED);
+
+    expect(repo.claimSchedulingSlotCalls).toEqual([
+      { storeId: 'store-1', timezone: 'America/Sao_Paulo', scheduledFor: new Date(SCHEDULED_FOR) },
+    ]);
+    expect(repo.createOrderCalls[0]?.scheduledFor).toEqual(new Date(SCHEDULED_FOR));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.response.scheduledFor).toBe(SCHEDULED_FOR);
+    }
+  });
+
+  it('2) sem scheduledFor: NUNCA chama claimSchedulingSlot, pedido nasce "o quanto antes"', async () => {
+    const { repo, service } = setup();
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(repo.claimSchedulingSlotCalls).toHaveLength(0);
+    expect(repo.createOrderCalls[0]?.scheduledFor).toBeNull();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.response.scheduledFor).toBeNull();
+    }
+  });
+
+  it('3) scheduledForValid false na revalidação: NUNCA chama claimSchedulingSlot — hasUnfavorableDivergence já barrou antes', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate.mockResolvedValue(
+      happyRevalidation({ scheduledFor: SCHEDULED_FOR, scheduledForValid: false, hasUnfavorableDivergence: true }),
+    );
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, scheduledFor: SCHEDULED_FOR }, RESOLVED);
+
+    expect(result.ok).toBe(false);
+    expect(repo.claimSchedulingSlotCalls).toHaveLength(0);
+  });
+
+  it('4) claimSchedulingSlot perde a corrida (slot lotou entre revalidar e criar): revalida de novo, ok:false, NUNCA cria o pedido fingindo vaga', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate
+      .mockResolvedValueOnce(happyRevalidation({ scheduledFor: SCHEDULED_FOR, scheduledForValid: true }))
+      .mockResolvedValueOnce(happyRevalidation({ scheduledFor: SCHEDULED_FOR, scheduledForValid: false, hasUnfavorableDivergence: true }));
+    repo.claimSchedulingSlotResult = false;
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, scheduledFor: SCHEDULED_FOR }, RESOLVED);
+
+    expect(repo.claimSchedulingSlotCalls).toHaveLength(1);
+    expect(revalidationService.revalidate).toHaveBeenCalledTimes(2);
+    expect(repo.createOrderCalls).toHaveLength(0);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.revalidation.scheduledForValid).toBe(false);
     }
   });
 });
