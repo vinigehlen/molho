@@ -157,6 +157,27 @@ export class CheckoutOrderService {
     // canSubmit true garante withinZone true garante totalCents não-nulo (ver revalidatedCheckoutSchema).
     const totalCents = revalidation.totalCents as number;
 
+    // Épico conversão (C2). couponValid=true aqui já passou pelas 4
+    // checagens de leitura (ativo/validade/mínimo/uso aparente) — mas só o
+    // INCREMENTO ATÔMICO abaixo fecha a corrida de verdade (docs/handoff
+    // A2, mesmo padrão do optimistic lock de zona). Perder a corrida não é
+    // um erro — é o mesmo "divergência desfavorável" de qualquer outra
+    // mudança entre revalidar e criar: revalida de novo (fresco, já vê o
+    // cupom esgotado) e devolve pro cliente confirmar, nunca cria o pedido
+    // fingindo que o desconto ainda vale.
+    let couponId: string | null = null;
+    let couponCodeSnapshot: string | null = null;
+    if (revalidation.couponCode && revalidation.couponValid) {
+      const claim = await this.repo.claimCoupon(revalidation.couponCode);
+      if (!claim) {
+        const fresh = await this.revalidationService.revalidate(request, resolved);
+        return { ok: false, revalidation: fresh };
+      }
+      couponId = claim.couponId;
+      couponCodeSnapshot = claim.couponCodeSnapshot;
+    }
+    const discountCents = couponId ? revalidation.discountCents : 0;
+
     // Só dá pra validar DEPOIS da revalidação — antes disso não existe
     // totalCents real (docs/02 §5.5: pedir troco pra menos que o total é
     // request inválido).
@@ -187,13 +208,25 @@ export class CheckoutOrderService {
       customerVerified: verified,
       createdAt,
       fulfillmentDeadlineAt,
+      couponId,
+      couponCodeSnapshot,
+      discountCents,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
 
     return {
       ok: true,
-      response: this.buildResponse(request, store, orderId, totalCents, changeForCents, fulfillmentDeadlineAt),
+      response: this.buildResponse(
+        request,
+        store,
+        orderId,
+        totalCents,
+        changeForCents,
+        fulfillmentDeadlineAt,
+        discountCents,
+        couponCodeSnapshot,
+      ),
     };
   }
 
@@ -205,12 +238,16 @@ export class CheckoutOrderService {
     totalCents: number,
     changeForCents: number | null,
     fulfillmentDeadlineAt: Date,
+    discountCents: number,
+    couponCodeSnapshot: string | null,
   ): CheckoutOrderResponse {
     const base = {
       orderId,
       status: 'received' as const,
       paymentStatus: 'aguardando_confirmacao' as const,
       totalCents,
+      discountCents,
+      couponCode: couponCodeSnapshot,
       fulfillmentType: request.fulfillmentType,
       fulfillmentDeadlineAt: fulfillmentDeadlineAt.toISOString(),
     };

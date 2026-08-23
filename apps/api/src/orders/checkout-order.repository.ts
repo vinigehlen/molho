@@ -51,6 +51,16 @@ export interface CreateOrderParams {
   /** Mesmo instante-base usado no prazo, para não depender de dois relógios. */
   createdAt: Date;
   fulfillmentDeadlineAt: Date;
+  /**
+   * Cupom (Épico conversão, C2) — `null`/`0` nos três juntos, ou os três
+   * preenchidos juntos (mesmo CHECK `orders_discount_coupon_consistency_check`
+   * no banco). Vem do resultado de `claimCoupon()`, nunca montado à mão por
+   * quem chama `createOrder` — só depois do incremento atômico de
+   * `uses_count` ter sido bem-sucedido é que o desconto é real.
+   */
+  couponId: string | null;
+  couponCodeSnapshot: string | null;
+  discountCents: number;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -83,6 +93,15 @@ export interface CheckoutOrderRepository {
    * de propósito, como débito tolerável sob READ COMMITTED).
    */
   lockProductsForUpdate(productIds: readonly string[]): Promise<void>;
+  /**
+   * Incremento ATÔMICO de `uses_count` (Épico conversão, C2, docs/handoff
+   * A2) — `UPDATE ... WHERE uses_count < max_uses`, mesmo padrão do
+   * optimistic lock de zona (P1.2). `null` = perdeu a corrida (outro pedido
+   * esgotou o cupom nos milissegundos entre a revalidação e aqui) — quem
+   * chama trata como divergência, nunca aplica desconto sem o claim ter
+   * confirmado uso disponível de verdade.
+   */
+  claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null>;
   /** Grava o endereço do localStorage como linha real, vinculada ao customer autenticado (CLAUDE.md regra 13). */
   createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string>;
   createOrder(params: CreateOrderParams): Promise<string>;
@@ -136,6 +155,21 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     `;
   }
 
+  async claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null> {
+    const tenantId = this.requestContext.getTenantId();
+    const rows = await this.requestContext.getClient().$queryRaw<{ id: string; code: string }[]>`
+      UPDATE "coupons"
+      SET "uses_count" = "uses_count" + 1, "version" = "version" + 1
+      WHERE "tenant_id" = ${tenantId}::uuid
+        AND upper("code") = upper(${code})
+        AND "deleted_at" IS NULL
+        AND "uses_count" < "max_uses"
+      RETURNING "id", "code"
+    `;
+    const row = rows[0];
+    return row ? { couponId: row.id, couponCodeSnapshot: row.code } : null;
+  }
+
   async createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string> {
     const tenantId = this.requestContext.getTenantId();
     const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
@@ -168,6 +202,9 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       customerVerified,
       createdAt,
       fulfillmentDeadlineAt,
+      couponId,
+      couponCodeSnapshot,
+      discountCents,
     } = params;
     // `address`/`deliveryAddressId` nulos ⟺ pickup — o CHECK
     // `orders_delivery_requires_address_check` (migration) barra a
@@ -180,6 +217,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "fulfillment_type",
         "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
+        "discount_cents", "coupon_id", "coupon_code_snapshot",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
         "delivery_geo", "delivery_postal_code_verified", "customer_verified",
@@ -189,6 +227,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${fulfillmentType}::"FulfillmentType",
         ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
+        ${discountCents}, ${couponId}::uuid, ${couponCodeSnapshot},
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},
         ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified},
