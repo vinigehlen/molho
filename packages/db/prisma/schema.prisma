@@ -144,6 +144,7 @@ model Tenant {
   auditLogs            AuditLog[]
   categories           Category[]
   products             Product[]
+  productImages        ProductImage[]
   modifierGroups       ModifierGroup[]
   modifiers            Modifier[]
   addresses            Address[]
@@ -401,6 +402,10 @@ model Product {
   /// à mão na migration (Prisma não expressa CHECK no DSL).
   basePriceCents Int       @map("base_price_cents")
   /// Chave do objeto no R2 — nasce nula, preenchida pelo upload (commit 6).
+  /// Épico conversão (C1): vira DERIVADO da foto de `position=0` em
+  /// `ProductImage` assim que o produto tiver pelo menos uma linha lá — a
+  /// coluna em si continua existindo (compat de quem ainda lê `imageKey`
+  /// direto), mas o storefront/admin escrevem em `ProductImage`, não aqui.
   imageKey       String?   @map("image_key")
   /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
   available      Boolean   @default(true)
@@ -414,12 +419,40 @@ model Product {
   category       Category        @relation(fields: [categoryId], references: [id])
   modifierGroups ModifierGroup[]
   orderItems     OrderItem[]
+  images         ProductImage[]
 
   // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
   // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
   // de uma relação simples; ver migration.
   @@index([tenantId, categoryId, sortOrder])
   @@map("products")
+}
+
+/// N fotos por produto (Épico conversão, C1) — tabela em vez de array de URL
+/// no Product pra ordenar (`position`) sem inflar a row do produto. `position
+/// = 0` é a CAPA: é o que `Product.imageKey`/`storefrontProductSchema.imageUrl`
+/// expõem pra quem ainda lê a foto única (compat), até o storefront consumir
+/// a galeria inteira.
+model ProductImage {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  productId String    @map("product_id") @db.Uuid
+  /// Chave do objeto no R2 — mesmo fluxo de upload presignado do Product.imageKey.
+  imageKey  String    @map("image_key")
+  /// 0 = capa. Reordenar é um PATCH por linha (mesmo padrão de sort_order em
+  /// Category/Product — não existe endpoint de reorder em lote no catálogo).
+  position  Int       @default(0)
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  // FK composta (product_id, tenant_id) → products(id, tenant_id) na migration.
+  @@index([tenantId, productId, position])
+  @@map("product_images")
 }
 
 model ModifierGroup {

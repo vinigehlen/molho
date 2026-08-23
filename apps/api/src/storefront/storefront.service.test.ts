@@ -89,6 +89,7 @@ function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): Storefron
         description: 'Pão brioche, blend 180g.',
         basePriceCents: 2890,
         imageKey: 'produtos/x-burger.jpg',
+        images: [],
         available: true,
         modifierGroups: [
           {
