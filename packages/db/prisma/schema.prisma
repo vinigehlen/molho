@@ -150,6 +150,7 @@ model Tenant {
   addresses            Address[]
   deliveryZones        DeliveryZone[]
   storeHours           StoreHours[]
+  storeSchedulingSlots StoreSchedulingSlot[]
   orders               Order[]
   orderItems           OrderItem[]
   orderItemModifiers   OrderItemModifier[]
@@ -202,10 +203,11 @@ model Store {
   updatedAt      DateTime                               @updatedAt @map("updated_at")
   deletedAt      DateTime?                              @map("deleted_at")
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  deliveryZones DeliveryZone[]
-  storeHours    StoreHours[]
-  orders        Order[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryZones        DeliveryZone[]
+  storeHours           StoreHours[]
+  storeSchedulingSlots StoreSchedulingSlot[]
+  orders               Order[]
 
   // Alvo de FK composta (delivery_zones.store_id, store_hours.store_id) —
   // índice único (id, tenant_id) à mão na migration (Épico 6).
@@ -635,6 +637,37 @@ model StoreHours {
   @@map("store_hours")
 }
 
+/// Slot agendável (Épico conversão, C3) — camada EM CIMA de StoreHours, não
+/// substituta: "quando a loja abre" (StoreHours) e "quais janelas dentro
+/// disso aceitam pedido AGENDADO, com teto de quantos" (aqui) são perguntas
+/// diferentes. Recorrente por dia da semana (mesmo padrão de StoreHours),
+/// não por data — o teto (`maxOrders`) é por OCORRÊNCIA do slot (uma
+/// sexta-feira específica), nunca somado entre semanas; quem conta os
+/// pedidos já agendados numa ocorrência é o serviço de checkout (fora do
+/// escopo deste commit — ver docs/handoff-features-conversao-gestor.md A3).
+model StoreSchedulingSlot {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  storeId         String    @map("store_id") @db.Uuid
+  dayOfWeek       DayOfWeek @map("day_of_week")
+  /// Minutos desde meia-noite (0–1439) — mesmo racional de StoreHours.
+  startsAtMinutes Int       @map("starts_at_minutes")
+  endsAtMinutes   Int       @map("ends_at_minutes")
+  /// Teto de pedidos agendados NESTA ocorrência do slot (CHECK > 0 na migration).
+  maxOrders Int @map("max_orders")
+  version   Int @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  // FK composta (store_id, tenant_id) → stores(id, tenant_id) na migration.
+  @@index([tenantId, storeId, dayOfWeek])
+  @@map("store_scheduling_slots")
+}
+
 // ─── Pedidos (Épico 7) ────────────────────────────────────────────────────────
 //
 // DÉBITO ADIADO (registrar no CLAUDE.md ao fechar o épico): retirada no
@@ -720,6 +753,11 @@ model Order {
   /// Só quando paymentMethod = cash_on_delivery — "troco pra quanto" (o valor
   /// que o cliente vai entregar, não o troco em si). docs/02 §5.5.
   changeForCents Int? @map("change_for_cents")
+  /// Agendamento (Épico conversão, C3). `null` = "o quanto antes" — o
+  /// comportamento ATUAL, preservado por default. Setado = cliente escolheu
+  /// data/horário no checkout; validar contra StoreSchedulingSlot (horário +
+  /// teto) é trabalho do serviço de checkout, fora do escopo deste commit.
+  scheduledFor DateTime? @map("scheduled_for")
 
   subtotalCents    Int @map("subtotal_cents")
   deliveryFeeCents Int @map("delivery_fee_cents")
