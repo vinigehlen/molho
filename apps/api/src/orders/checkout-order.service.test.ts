@@ -73,6 +73,9 @@ function happyRevalidation(overrides: Partial<RevalidatedCheckout> = {}): Revali
     isOpenNow: true,
     nextOpensAt: null,
     minOrderCents: 1000,
+    couponCode: null,
+    couponValid: false,
+    discountCents: 0,
     totalCents: 3690,
     hasUnfavorableDivergence: false,
     canSubmit: true,
@@ -101,6 +104,12 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   }
   async lockProductsForUpdate(productIds: readonly string[]) {
     this.lockProductsForUpdateCalls.push([...productIds]);
+  }
+  claimCouponResult: { couponId: string; couponCodeSnapshot: string } | null = { couponId: 'coupon-1', couponCodeSnapshot: 'PROMO10' };
+  claimCouponCalls: string[] = [];
+  async claimCoupon(code: string) {
+    this.claimCouponCalls.push(code);
+    return this.claimCouponResult;
   }
   createAddressCalls: DeliveryAddressSnapshot[] = [];
   async createAddress(_customerId: string, address: DeliveryAddressSnapshot) {
@@ -480,6 +489,71 @@ describe('CheckoutOrderService.createOrder — retirada no balcão', () => {
     if (result.ok) {
       expect(result.response.fulfillmentDeadlineAt).toBe('2026-08-14T18:30:00.000Z');
       expect(result.response.fulfillmentType).toBe('pickup');
+    }
+  });
+});
+
+/** Épico conversão (C2) — docs/handoff-features-conversao-gestor.md A2. */
+describe('CheckoutOrderService.createOrder — cupom de desconto', () => {
+  it('1) cupom válido: claimCoupon é chamado, desconto/cupom entram no pedido e na resposta', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate.mockResolvedValue(
+      happyRevalidation({ couponCode: 'PROMO10', couponValid: true, discountCents: 339, totalCents: 3851 }),
+    );
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, couponCode: 'PROMO10' }, RESOLVED);
+
+    expect(repo.claimCouponCalls).toEqual(['PROMO10']);
+    expect(repo.createOrderCalls[0]).toMatchObject({ couponId: 'coupon-1', couponCodeSnapshot: 'PROMO10', discountCents: 339 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.response.discountCents).toBe(339);
+      expect(result.response.couponCode).toBe('PROMO10');
+      expect(result.response.totalCents).toBe(3851);
+    }
+  });
+
+  it('2) sem couponCode: NUNCA chama claimCoupon, pedido nasce sem desconto', async () => {
+    const { repo, service } = setup();
+
+    const result = await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(repo.claimCouponCalls).toHaveLength(0);
+    expect(repo.createOrderCalls[0]).toMatchObject({ couponId: null, couponCodeSnapshot: null, discountCents: 0 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.response.discountCents).toBe(0);
+      expect(result.response.couponCode).toBeNull();
+    }
+  });
+
+  it('3) couponValid false na revalidação (já reprovado lá): NUNCA chama claimCoupon — hasUnfavorableDivergence já barrou antes', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate.mockResolvedValue(
+      happyRevalidation({ couponCode: 'ESGOTADO', couponValid: false, hasUnfavorableDivergence: true }),
+    );
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, couponCode: 'ESGOTADO' }, RESOLVED);
+
+    expect(result.ok).toBe(false);
+    expect(repo.claimCouponCalls).toHaveLength(0);
+  });
+
+  it('4) claimCoupon perde a corrida (outro pedido esgotou nos milissegundos entre revalidar e criar): revalida de novo, ok:false, NUNCA cria o pedido fingindo desconto', async () => {
+    const { repo, revalidationService, service } = setup();
+    revalidationService.revalidate
+      .mockResolvedValueOnce(happyRevalidation({ couponCode: 'PROMO10', couponValid: true, discountCents: 339, totalCents: 3851 }))
+      .mockResolvedValueOnce(happyRevalidation({ couponCode: 'PROMO10', couponValid: false, hasUnfavorableDivergence: true }));
+    repo.claimCouponResult = null;
+
+    const result = await service.createOrder('tenant-1', 'customer-1', { ...REQUEST, couponCode: 'PROMO10' }, RESOLVED);
+
+    expect(repo.claimCouponCalls).toEqual(['PROMO10']);
+    expect(revalidationService.revalidate).toHaveBeenCalledTimes(2);
+    expect(repo.createOrderCalls).toHaveLength(0);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.revalidation.couponValid).toBe(false);
     }
   });
 });

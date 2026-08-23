@@ -3,7 +3,13 @@ import type { ResolvedAddress } from '../geo/resolve-address';
 import type { CheckoutRequest } from '@molho/contracts';
 import type { DeliveryLocation, DeliveryZoneMatch, DeliveryMatchRepository } from '../storefront/delivery-match.repository';
 import type { Weekday } from '../storefront/store-hours';
-import type { CheckoutProductRecord, CheckoutRepository, CheckoutStoreHoursRecord, CheckoutStoreRecord } from './checkout-revalidation.repository';
+import type {
+  CheckoutCouponRecord,
+  CheckoutProductRecord,
+  CheckoutRepository,
+  CheckoutStoreHoursRecord,
+  CheckoutStoreRecord,
+} from './checkout-revalidation.repository';
 import { CheckoutRevalidationService } from './checkout-revalidation.service';
 
 const WEEKDAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -38,6 +44,10 @@ class FakeCheckoutRepository implements CheckoutRepository {
   async findProductsByIds(productIds: readonly string[]) {
     return this.products.filter((p) => productIds.includes(p.id));
   }
+  coupon: CheckoutCouponRecord | null = null;
+  async findCoupon(_code: string) {
+    return this.coupon;
+  }
 }
 
 class FakeDeliveryMatchRepository implements DeliveryMatchRepository {
@@ -67,7 +77,9 @@ const RESOLVED: ResolvedAddress = {
   postalCodeVerified: true,
 };
 
-function baseRequest(overrides: Partial<Pick<CheckoutRequest, 'items' | 'address' | 'fulfillmentType'>> = {}): CheckoutRequest {
+function baseRequest(
+  overrides: Partial<Pick<CheckoutRequest, 'items' | 'address' | 'fulfillmentType' | 'couponCode'>> = {},
+): CheckoutRequest {
   return {
     items: [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [{ modifierId: 'mod-bacon', priceDeltaCents: 500 }], quantity: 1, notes: null }],
     fulfillmentType: 'delivery',
@@ -321,5 +333,113 @@ describe('CheckoutRevalidationService — retirada no balcão', () => {
     expect(result.isOpenNow).toBe(false);
     expect(result.hasUnfavorableDivergence).toBe(true);
     expect(result.canSubmit).toBe(false);
+  });
+});
+
+/** Épico conversão (C2) — docs/handoff-features-conversao-gestor.md A2. */
+describe('CheckoutRevalidationService — cupom de desconto', () => {
+  const PERCENT_COUPON: CheckoutCouponRecord = {
+    discountType: 'percent',
+    discountPercent: 10,
+    discountValueCents: null,
+    minOrderCents: 0,
+    startsAt: new Date('2026-01-01T00:00:00Z'),
+    endsAt: new Date('2026-12-31T23:59:59Z'),
+    maxUses: 100,
+    usesCount: 0,
+    active: true,
+  };
+
+  it('1) sem couponCode: sem cupom, sem divergência — não é "perdeu algo", é "nunca pediu nada"', async () => {
+    const { service } = setup();
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.couponCode).toBeNull();
+    expect(result.couponValid).toBe(false);
+    expect(result.discountCents).toBe(0);
+    expect(result.hasUnfavorableDivergence).toBe(false);
+  });
+
+  it('2) cupom percent válido: desconta do SUBTOTAL, nunca da taxa', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = PERCENT_COUPON;
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO10' }), RESOLVED);
+
+    expect(result.couponValid).toBe(true);
+    expect(result.discountCents).toBe(339); // 10% de 3390
+    expect(result.totalCents).toBe(3390 + 800 - 339);
+    expect(result.hasUnfavorableDivergence).toBe(false);
+  });
+
+  it('3) cupom fixed válido', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, discountType: 'fixed', discountPercent: null, discountValueCents: 500 };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO500' }), RESOLVED);
+
+    expect(result.discountCents).toBe(500);
+    expect(result.totalCents).toBe(3390 + 800 - 500);
+  });
+
+  it('4) desconto fixed nunca excede o subtotal — nunca total negativo', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, discountType: 'fixed', discountPercent: null, discountValueCents: 999_999 };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMOGIGANTE' }), RESOLVED);
+
+    expect(result.discountCents).toBe(3390); // capado no subtotal
+    expect(result.totalCents).toBe(800); // só a taxa sobra
+  });
+
+  it('5) cupom não encontrado: couponValid false, divergência desfavorável (código digitado não é confiável até o servidor confirmar)', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = null;
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'NAOEXISTE' }), RESOLVED);
+
+    expect(result.couponValid).toBe(false);
+    expect(result.discountCents).toBe(0);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('6) cupom inativo: couponValid false, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, active: false };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO10' }), RESOLVED);
+
+    expect(result.couponValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('7) cupom fora da validade (expirado): couponValid false, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, endsAt: new Date('2026-01-31T23:59:59Z') };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO10' }), RESOLVED);
+
+    expect(result.couponValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('8) subtotal abaixo do mínimo do cupom: couponValid false, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, minOrderCents: 10_000 };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO10' }), RESOLVED);
+
+    expect(result.couponValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('9) cupom esgotado (usesCount >= maxUses): couponValid false, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.coupon = { ...PERCENT_COUPON, usesCount: 100, maxUses: 100 };
+
+    const result = await service.revalidate(baseRequest({ couponCode: 'PROMO10' }), RESOLVED);
+
+    expect(result.couponValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
   });
 });

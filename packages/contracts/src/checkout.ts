@@ -122,6 +122,15 @@ const checkoutRequestBase = z.object({
    * endereço, ou `pickup` COM endereço, são os dois request malformado.
    */
   address: checkoutAddressInputSchema.nullable(),
+  /**
+   * Cupom de desconto (Épico conversão, C2). Opcional, fora da union de
+   * paymentMethod — não é sobre COMO pagar, é sobre QUANTO pagar, igual
+   * `items`/`address`. Ausente/omitido = sem cupom, comportamento atual
+   * intacto. O servidor SEMPRE revalida (existe/ativo/dentro da validade/
+   * atingiu o mínimo/ainda tem uso) — nunca confia em "o cliente digitou
+   * um código" como prova de que ele é válido.
+   */
+  couponCode: z.string().trim().min(1).optional(),
 });
 
 /**
@@ -187,7 +196,20 @@ export const revalidatedCheckoutSchema = z.object({
   isOpenNow: z.boolean(),
   nextOpensAt: z.iso.datetime({ offset: true }).nullable(),
   minOrderCents: centsSchema,
-  /** `null` quando `withinZone: false` (não dá pra somar taxa que não existe). */
+  /**
+   * Cupom (Épico conversão, C2). `couponCode` ecoa o que o cliente mandou
+   * (`null` se não mandou nada — nunca confundir "sem cupom" com "cupom
+   * inválido"). `couponValid` só é relevante quando `couponCode` não é
+   * `null`; um código válido no `/revalidate` que deixa de valer até o
+   * `/checkout/orders` (esgotou, expirou) é a MESMA categoria de
+   * "divergência desfavorável" de item que ficou indisponível — entra em
+   * `hasUnfavorableDivergence` abaixo, não é campo separado pra UI checar.
+   */
+  couponCode: z.string().nullable(),
+  couponValid: z.boolean(),
+  /** Sempre `0` sem cupom válido. Descontado só do subtotal, nunca da taxa de entrega. */
+  discountCents: centsSchema,
+  /** `null` quando `withinZone: false`. Já contabiliza `discountCents` (subtotal + fee - discount). */
   totalCents: centsSchema.nullable(),
   /**
    * `true` se QUALQUER item ficou indisponível, ou algum preço/taxa SUBIU,
@@ -219,6 +241,9 @@ const checkoutOrderResponseBase = z.object({
   status: z.literal('received'),
   paymentStatus: z.literal('aguardando_confirmacao'),
   totalCents: centsSchema,
+  /** Cupom (Épico conversão, C2) — 0/null quando o pedido não usou cupom. */
+  discountCents: centsSchema,
+  couponCode: z.string().nullable(),
   fulfillmentType: fulfillmentTypeSchema,
   /** Snapshot congelado na criação; nunca é recalculado quando zona/horário mudam. */
   fulfillmentDeadlineAt: z.iso.datetime(),

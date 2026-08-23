@@ -107,6 +107,9 @@ describe('revalidatedCheckoutSchema', () => {
       isOpenNow: true,
       nextOpensAt: null,
       minOrderCents: 3000,
+      couponCode: null,
+      couponValid: false,
+      discountCents: 0,
       totalCents: 3690,
       hasUnfavorableDivergence: false,
       canSubmit: true,
@@ -142,6 +145,8 @@ const RESPONSE_BASE = {
   status: 'received' as const,
   paymentStatus: 'aguardando_confirmacao' as const,
   totalCents: 3690,
+  discountCents: 0,
+  couponCode: null,
   fulfillmentType: 'delivery' as const,
   fulfillmentDeadlineAt: '2026-08-14T19:50:00.000Z',
 };

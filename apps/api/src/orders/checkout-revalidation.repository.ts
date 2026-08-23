@@ -35,10 +35,25 @@ export interface CheckoutProductRecord {
   modifiers: CheckoutModifierRecord[];
 }
 
+/** Recorte de Coupon que o checkout precisa pra decidir aplicabilidade (Épico conversão, C2) — nunca o Coupon inteiro. */
+export interface CheckoutCouponRecord {
+  discountType: 'percent' | 'fixed';
+  discountPercent: number | null;
+  discountValueCents: number | null;
+  minOrderCents: number;
+  startsAt: Date;
+  endsAt: Date;
+  maxUses: number;
+  usesCount: number;
+  active: boolean;
+}
+
 export interface CheckoutRepository {
   findStore(): Promise<CheckoutStoreRecord | null>;
   listStoreHours(): Promise<CheckoutStoreHoursRecord[]>;
   findProductsByIds(productIds: readonly string[]): Promise<CheckoutProductRecord[]>;
+  /** `mode: 'insensitive'` — mesma comparação do índice único parcial em upper(code) (packages/db). */
+  findCoupon(code: string): Promise<CheckoutCouponRecord | null>;
 }
 
 /**
@@ -88,5 +103,22 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       available: row.available,
       modifiers: row.modifierGroups.flatMap((group) => group.modifiers),
     }));
+  }
+
+  async findCoupon(code: string): Promise<CheckoutCouponRecord | null> {
+    return this.requestContext.getClient().coupon.findFirst({
+      where: { code: { equals: code, mode: 'insensitive' }, deletedAt: null },
+      select: {
+        discountType: true,
+        discountPercent: true,
+        discountValueCents: true,
+        minOrderCents: true,
+        startsAt: true,
+        endsAt: true,
+        maxUses: true,
+        usesCount: true,
+        active: true,
+      },
+    });
   }
 }
