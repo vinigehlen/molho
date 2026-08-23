@@ -29,6 +29,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
             description: 'Pão brioche, blend 180g, queijo e salada.',
             basePriceCents: 2890,
             imageUrl: null,
+            images: [],
             available: true,
             modifierGroups: [
               {
@@ -108,6 +109,7 @@ describe('storefrontProductSchema — dinheiro', () => {
       description: null,
       basePriceCents: 2890,
       imageUrl: null,
+      images: [],
       available: true,
       modifierGroups: [],
       ...overrides,

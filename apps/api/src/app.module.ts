@@ -2,6 +2,7 @@ import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from 
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ContextModule } from './context/context.module';
+import { CouponsModule } from './coupons/coupons.module';
 import { CustomerProfileModule } from './customer-profile/customer-profile.module';
 import { DeliveryZoneAdminModule } from './delivery-zones/delivery-zone.module';
 import { GeoModule } from './geo/geo.module';
@@ -11,6 +12,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
 import { PlatformModule } from './platform/platform.module';
+import { SchedulingSlotAdminModule } from './scheduling-slots/scheduling-slot-admin.module';
 import { SignupModule } from './signup/signup.module';
 import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
 import { StorefrontModule } from './storefront/storefront.module';
@@ -22,11 +24,13 @@ import { StorefrontModule } from './storefront/storefront.module';
     AuthModule,
     CustomerProfileModule,
     CatalogModule,
+    CouponsModule,
     StorefrontModule,
     OrdersModule,
     GeoModule,
     DeliveryZoneAdminModule,
     StoreHoursAdminModule,
+    SchedulingSlotAdminModule,
     PlatformModule,
     SignupModule,
   ],

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ALLOWED_IMAGE_CONTENT_TYPES } from '../../storage/storage-provider.port';
 
 /** Lido uma vez, no load do módulo — dotenv já rodou antes do Nest bootstrap (mesmo padrão de MOLHO_JWT_SECRETS). */
@@ -19,4 +19,31 @@ export class CreateImageUploadUrlDto {
   @Min(1)
   @Max(MAX_IMAGE_BYTES)
   contentLength!: number;
+}
+
+/** Confirma uma foto na galeria depois do PUT direto no R2 (mesmo fluxo de CreateImageUploadUrlDto). */
+export class AddProductImageDto {
+  @IsString()
+  @IsNotEmpty()
+  imageKey!: string;
+
+  /** Omitido = entra no fim da galeria (ProductImageService.add). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  position?: number;
+}
+
+export class UpdateProductImageDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  version!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  position?: number;
 }

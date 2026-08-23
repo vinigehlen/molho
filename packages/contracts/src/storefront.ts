@@ -55,6 +55,13 @@ export const storefrontProductSchema = z.object({
    * configurada), e o card cai no placeholder do tema.
    */
   imageUrl: z.url().nullable(),
+  /**
+   * Galeria completa (Épico conversão, C1), em ordem — `imageUrl` acima é
+   * sempre `images[0]?.url ?? null`, nunca uma fonte independente. Card de
+   * produto que só sabe de foto única continua funcionando lendo só
+   * `imageUrl`; quem quiser carrossel usa este array.
+   */
+  images: z.array(z.object({ url: z.url() })),
   /** "Esgotado manual" (definicoes-v1 §5.4): item aparece no cardápio, mas não entra no carrinho. */
   available: z.boolean(),
   modifierGroups: z.array(storefrontModifierGroupSchema),

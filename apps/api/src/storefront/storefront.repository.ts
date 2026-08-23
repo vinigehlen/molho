@@ -46,6 +46,12 @@ export interface StorefrontProductRecord {
   description: string | null;
   basePriceCents: number;
   imageKey: string | null;
+  /**
+   * Galeria (Épico conversão, C1), já em ordem de `position`. Pode vir vazia
+   * num produto que nunca migrou pra `ProductImage` — `imageKey` acima
+   * continua sendo o fallback de capa nesse caso (StorefrontService resolve).
+   */
+  images: { imageKey: string }[];
   available: boolean;
   modifierGroups: StorefrontModifierGroupRecord[];
 }
@@ -145,6 +151,11 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
             description: true,
             basePriceCents: true,
             imageKey: true,
+            images: {
+              where: { deletedAt: null },
+              orderBy: { position: 'asc' },
+              select: { imageKey: true },
+            },
             available: true,
             modifierGroups: {
               where: { deletedAt: null },
