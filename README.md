@@ -12,12 +12,19 @@ Toda decisão de produto está em [`docs/`](./docs). Leia nesta ordem:
 
 | # | Documento | O que contém |
 |---|---|---|
+| 0 | [`00-contexto-agentes.md`](./docs/00-contexto-agentes.md) | Mapa rápido para agentes e colaboradores: fonte oficial, apps, ambientes, validação e o que não versionar |
 | 1 | [`01-plano-produto.md`](./docs/01-plano-produto.md) | Fonte da verdade: arquitetura, módulos, RBAC, pagamentos, roadmap, épicos e prompt do Claude Code |
 | 2 | [`02-definicoes-v1.md`](./docs/02-definicoes-v1.md) | ICP, escopo do MVP, planos, regras de negócio, estrutura do contrato |
 | 3 | [`03-self-setup.md`](./docs/03-self-setup.md) | Onboarding self-service, 4 templates de tema, billing |
 | 4 | [`04-brand-design-system.md`](./docs/04-brand-design-system.md) | Marca, tom de voz, design system Tempero |
+| 5 | [`07-aprendizados.md`](./docs/07-aprendizados.md) | Armadilhas de tooling, migrations, build e testes |
 
 Assets da marca em [`brand-kit/`](./brand-kit) — logo Pingo no O, ícones de app, favicons, OG, loader animado.
+
+Operação e publicação:
+
+- [`docs/deploy-site.md`](./docs/deploy-site.md) — deploy e DNS do site institucional.
+- [`docs/release-checklist.md`](./docs/release-checklist.md) — checklist antes de publicar branch/PR.
 
 ## Stack
 
