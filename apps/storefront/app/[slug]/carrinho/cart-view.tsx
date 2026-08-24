@@ -184,6 +184,10 @@ export function CartView({
   // CEP + número são o que o checkout exige agora — o servidor deriva o
   // resto. Pickup nunca exige endereço: retira no balcão, sem CEP nenhum.
   const enderecoConfirmado = fulfillmentType === 'pickup' || (address !== null && !!address.postalCode && !!address.number);
+  const checkoutBlockReason =
+    fulfillmentType === 'delivery' && !enderecoConfirmado
+      ? 'Complete o CEP e o número do endereço para fazer o pedido.'
+      : null;
 
   return (
     <div className="flex min-h-screen flex-col pb-44">
@@ -239,7 +243,7 @@ export function CartView({
                 {/* Mesmo padrão visual do card de produto (rounded-md, bg-brand-faint, ícone de fallback) — ver MoProductCard. */}
                 <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md bg-brand-faint">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <img src={item.imageUrl} alt={`Foto de ${item.name}`} loading="lazy" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
                       <UtensilsCrossed className="h-6 w-6 text-brand-strong" aria-hidden="true" />
@@ -289,9 +293,19 @@ export function CartView({
           <span className="tnum">{formatCents(cart.subtotalCents)}</span>
         </div>
         <div className="mx-auto w-full max-w-md">
-          <MoButton fullWidth disabled={!enderecoConfirmado} onClick={() => void checkout.startCheckout()}>
+          <MoButton
+            fullWidth
+            disabled={!enderecoConfirmado}
+            aria-describedby={checkoutBlockReason ? 'checkout-block-reason' : undefined}
+            onClick={() => void checkout.startCheckout()}
+          >
             Fazer pedido
           </MoButton>
+          {checkoutBlockReason ? (
+            <p id="checkout-block-reason" className="mt-2 text-center text-caption text-critical-strong">
+              {checkoutBlockReason}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -59,11 +59,9 @@ export function MoProductCard({
       )}
     >
       {imageUrl ? (
-        // Decorativa (alt=""): o nome do produto já está no texto ao lado,
-        // duplicar no alt faria o leitor de tela repetir a mesma informação.
         <img
           src={imageUrl}
-          alt=""
+          alt={`Foto de ${name}`}
           loading="lazy"
           className={cn('h-full w-full object-cover', !available && 'grayscale')}
         />

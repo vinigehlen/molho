@@ -167,9 +167,7 @@ describe('CartView', () => {
     renderCartView();
 
     expect(await screen.findByText('180g, queijo prato, alface, tomate')).toBeInTheDocument();
-    // alt="" (decorativa, ver comentário em MoProductCard) tira a <img> do role "img" da árvore
-    // de acessibilidade — busca no DOM direto, não por role.
-    const foto = document.querySelector('img');
+    const foto = screen.getByRole('img', { name: 'Foto de X-Burger' });
     expect(foto).toHaveAttribute('src', 'https://pub-example.r2.dev/products/x/foto.jpg');
   });
 

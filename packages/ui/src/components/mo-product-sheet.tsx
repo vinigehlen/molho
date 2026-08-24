@@ -138,7 +138,7 @@ export function MoProductSheet({ open, onOpenChange, product, onAddToCart, class
       {product.imageUrl ? (
         <img
           src={product.imageUrl}
-          alt=""
+          alt={`Foto de ${product.name}`}
           className="-mx-6 mb-4 aspect-video w-[calc(100%+3rem)] object-cover"
         />
       ) : null}
