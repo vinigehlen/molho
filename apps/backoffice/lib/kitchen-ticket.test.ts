@@ -16,7 +16,9 @@ const ORDER: AdminOrder = {
   subtotalCents: 3200,
   deliveryFeeCents: 490,
   totalCents: 3690,
+  currentTotalCents: null,
   fulfillmentType: 'delivery',
+  destination: 'delivery',
   delivery: {
     label: 'Casa',
     street: 'Rua das Flores',
@@ -44,6 +46,6 @@ describe('fulfillmentLabel', () => {
   });
 
   it('pickup: "Retirada no balcão" — nunca o endereço da loja', () => {
-    expect(fulfillmentLabel({ ...ORDER, fulfillmentType: 'pickup', delivery: null })).toBe('Retirada no balcão');
+    expect(fulfillmentLabel({ ...ORDER, fulfillmentType: 'pickup', destination: 'pickup', delivery: null })).toBe('Retirada no balcão');
   });
 });

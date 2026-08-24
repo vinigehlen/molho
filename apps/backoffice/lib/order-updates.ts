@@ -8,7 +8,7 @@ function isActive(status: AdminOrder['status']): status is BoardColumn {
 /**
  * Aplica ao board o resultado de um refetch disparado por um cutuque do stream.
  * `fetched === null` = o pedido sumiu (soft-delete/RLS) → remove. Se o pedido
- * saiu dos status ativos (completed/cancelado) → remove do board. Senão,
+ * saiu dos status visíveis (cancelado/expirado/falha) → remove do board. Senão,
  * upsert preservando a posição (não reordena um card que só mudou de status).
  * Puro e testável — a ordenação FIFO do load inicial é mantida.
  */

@@ -17,13 +17,20 @@ export class Beeper {
   private ctx: AudioContext | null = null;
 
   /** No 1º gesto do usuário: destrava o áudio (AudioContext só inicia sob gesto). */
-  unlock(): void {
+  unlock(): boolean {
     if (this.ctx) {
       void this.ctx.resume();
-      return;
+      return true;
     }
+    if (typeof window === 'undefined') return false;
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (Ctor) this.ctx = new Ctor();
+    if (!Ctor) return false;
+    this.ctx = new Ctor();
+    void this.ctx.resume();
+
+    // Alguns navegadores só liberam o áudio se um nó tocar durante o gesto do clique.
+    this.tone(0.01, 1);
+    return true;
   }
 
   get unlocked(): boolean {
@@ -32,12 +39,18 @@ export class Beeper {
 
   beep(): void {
     if (!this.ctx) return; // ainda não destravado — silêncio, não erro
+    void this.ctx.resume();
+    this.tone(0.15, 0.2);
+  }
+
+  private tone(volume: number, durationSeconds: number): void {
+    if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.frequency.value = 880;
-    gain.gain.value = 0.15;
+    gain.gain.value = volume;
     osc.connect(gain).connect(this.ctx.destination);
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.2);
+    osc.stop(this.ctx.currentTime + durationSeconds);
   }
 }

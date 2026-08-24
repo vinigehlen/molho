@@ -81,6 +81,11 @@ export default function LoginPage() {
   }
 
   const isEmail = channel === 'email';
+  const identifierErrorId = 'login-identifier-error';
+  const codeErrorId = 'login-code-error';
+  const identifierHasError = step === 'identifier' && error !== null;
+  const codeHasError = step === 'code' && error !== null;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-6">
       <section className="w-full max-w-md rounded-[20px] border border-border bg-bg-card p-6 shadow-sm">
@@ -97,6 +102,8 @@ export default function LoginPage() {
               id="identifier"
               type={isEmail ? 'email' : 'tel'}
               autoComplete={isEmail ? 'email' : 'tel'}
+              aria-invalid={identifierHasError}
+              aria-describedby={identifierHasError ? identifierErrorId : undefined}
               className="w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-text outline-none focus:border-brand"
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
@@ -132,6 +139,8 @@ export default function LoginPage() {
               autoComplete="one-time-code"
               pattern="[0-9]{6}"
               maxLength={6}
+              aria-invalid={codeHasError}
+              aria-describedby={codeHasError ? codeErrorId : undefined}
               className="w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-center text-2xl tracking-[0.35em] text-text outline-none focus:border-brand"
               value={code}
               onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -158,7 +167,15 @@ export default function LoginPage() {
           </div>
         )}
 
-        {error && <p className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical" role="alert">{error}</p>}
+        {error && (
+          <p
+            id={step === 'code' ? codeErrorId : identifierErrorId}
+            className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
       </section>
     </main>
   );

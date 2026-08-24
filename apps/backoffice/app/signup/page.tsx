@@ -14,6 +14,10 @@ export default function SignupPage() {
   const [restaurantName, setRestaurantName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const emailErrorId = 'signup-email-error';
+  const detailsErrorId = 'signup-details-error';
+  const emailHasError = step === 'email' && error !== null;
+  const detailsHasError = step === 'details' && error !== null;
 
   async function sendCode() {
     if (!email.trim()) return;
@@ -46,7 +50,7 @@ export default function SignupPage() {
         slug: result.tenant.slug,
         stores: [result.store],
       });
-      router.replace('/gestor');
+      router.replace('/gestor/configuracao');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível criar sua loja.');
     } finally {
@@ -68,6 +72,8 @@ export default function SignupPage() {
               id="email"
               type="email"
               autoComplete="email"
+              aria-invalid={emailHasError}
+              aria-describedby={emailHasError ? emailErrorId : undefined}
               className="w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-text outline-none focus:border-brand"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -90,6 +96,8 @@ export default function SignupPage() {
                 autoComplete="one-time-code"
                 pattern="[0-9]{6}"
                 maxLength={6}
+                aria-invalid={detailsHasError}
+                aria-describedby={detailsHasError ? detailsErrorId : undefined}
                 className="mt-2 w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-center text-2xl tracking-[0.35em] text-text outline-none focus:border-brand"
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -127,7 +135,15 @@ export default function SignupPage() {
           </form>
         )}
 
-        {error && <p className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical" role="alert">{error}</p>}
+        {error && (
+          <p
+            id={step === 'email' ? emailErrorId : detailsErrorId}
+            className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
       </section>
     </main>
   );

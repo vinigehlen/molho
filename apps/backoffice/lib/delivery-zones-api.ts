@@ -1,6 +1,8 @@
 import type { CreateDeliveryZoneInput, DeliveryZoneResponse, UpdateDeliveryZoneInput } from '@molho/contracts';
 import { apiFetch } from './api-client';
 
+export type { DeliveryZoneResponse };
+
 export class DeliveryZoneDuplicateError extends Error {
   constructor(message = 'Já existe uma zona para esta cidade e UF nesta loja.') {
     super(message);

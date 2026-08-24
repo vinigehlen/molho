@@ -17,7 +17,9 @@ function order(id: string, status: AdminOrder['status'], version = 0): AdminOrde
     subtotalCents: 100,
     deliveryFeeCents: 0,
     totalCents: 100,
+    currentTotalCents: null,
     fulfillmentType: 'delivery',
+    destination: 'delivery',
     delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
     items: [],
   };
@@ -36,9 +38,10 @@ describe('applyOrderUpdate', () => {
     expect(next[0]?.version).toBe(1);
   });
 
-  it('pedido que saiu dos ativos (completed) é removido do board', () => {
+  it('pedido finalizado permanece no board na coluna completed', () => {
     const next = applyOrderUpdate([order('a', 'in_transit'), order('b', 'received')], 'a', order('a', 'completed'));
-    expect(next.map((o) => o.id)).toEqual(['b']);
+    expect(next.map((o) => o.id)).toEqual(['a', 'b']);
+    expect(next[0]?.status).toBe('completed');
   });
 
   it('fetch null (sumiu/RLS) remove do board', () => {

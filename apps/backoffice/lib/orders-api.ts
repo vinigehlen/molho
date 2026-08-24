@@ -9,7 +9,7 @@ import { apiFetch } from './api-client';
  * (`AdminOrder`) é importado, e tipo é apagado no build. Se a máquina de
  * estados mudar, este array acompanha (teste cravaria a divergência se houver).
  */
-export const BOARD_COLUMNS = ['received', 'preparing', 'ready', 'in_transit'] as const;
+export const BOARD_COLUMNS = ['received', 'preparing', 'ready', 'in_transit', 'completed'] as const;
 export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
 export const COLUMN_LABEL: Record<BoardColumn, string> = {
@@ -17,6 +17,7 @@ export const COLUMN_LABEL: Record<BoardColumn, string> = {
   preparing: 'Preparando',
   ready: 'Prontos',
   in_transit: 'Saíram',
+  completed: 'Finalizados',
 };
 
 export async function fetchActiveOrders(): Promise<AdminOrder[]> {
@@ -80,7 +81,7 @@ export async function fetchCustomerPhone(id: string): Promise<string | null> {
 
 /** Agrupa pedidos por coluna do board, preservando a ordem de chegada (FIFO). Puro, testável. */
 export function groupByColumn(orders: AdminOrder[]): Record<BoardColumn, AdminOrder[]> {
-  const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [] };
+  const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [], completed: [] };
   for (const order of orders) {
     if (order.status in groups) groups[order.status as BoardColumn].push(order);
   }

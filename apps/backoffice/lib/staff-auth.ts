@@ -97,7 +97,7 @@ export async function verifyStaffOtp(
 export function activateStaffSession(accessToken: string, tenant: StaffTenant): StaffSession {
   const userId = subFromToken(accessToken);
   if (!userId) throw new Error('Sessão inválida. Entre novamente.');
-  const session = { accessToken, tenantId: tenant.id, tenantName: tenant.name, userId };
+  const session = { accessToken, tenantId: tenant.id, tenantName: tenant.name, tenantSlug: tenant.slug, userId };
   setStaffSession(session);
   return session;
 }

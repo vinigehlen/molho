@@ -93,6 +93,7 @@ describe('staff-auth', () => {
       accessToken,
       tenantId: TENANT.id,
       tenantName: TENANT.name,
+      tenantSlug: TENANT.slug,
       userId: 'user-2',
     });
   });

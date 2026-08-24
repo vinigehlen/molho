@@ -24,7 +24,6 @@ import { WhatsAppSheet } from './whatsapp-sheet';
 const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status']; label: string }>> = {
   received: { to: 'preparing', label: 'Preparar' },
   preparing: { to: 'ready', label: 'Pronto' },
-  ready: { to: 'in_transit', label: 'Saiu p/ entrega' },
   in_transit: { to: 'completed', label: 'Concluir' },
 };
 
@@ -36,6 +35,21 @@ const PREVIOUS_ACTION: Partial<Record<AdminOrder['status'], AdminOrder['status']
 
 function statusLabel(status: AdminOrder['status']): string {
   return status in COLUMN_LABEL ? COLUMN_LABEL[status as keyof typeof COLUMN_LABEL] : status;
+}
+
+function destinationLabel(order: AdminOrder): string {
+  if (order.destination === 'delivery') return 'Delivery';
+  if (order.destination === 'balcao') return 'Balcão';
+  return 'Retirada';
+}
+
+function nextAction(order: AdminOrder): { to: AdminOrder['status']; label: string } | undefined {
+  if (order.status === 'ready') {
+    return order.destination === 'delivery'
+      ? { to: 'in_transit', label: 'Saiu p/ entrega' }
+      : { to: 'completed', label: 'Pronto p/ Retirar' };
+  }
+  return NEXT_ACTION[order.status];
 }
 
 /**
@@ -74,8 +88,7 @@ export default function GestorPage() {
 
   function ativarSom() {
     beeperRef.current ??= new Beeper();
-    beeperRef.current.unlock();
-    setSoundOn(true);
+    setSoundOn(beeperRef.current.unlock());
   }
 
   useEffect(() => {
@@ -243,14 +256,23 @@ export default function GestorPage() {
               className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text"
               onClick={ativarSom}
             >
-              🔔 Ativar som
+              Ativar som
             </button>
           )}
+          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/configuracao">
+            Configuração
+          </Link>
           <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/impressao">
-            🖨️ Impressão
+            Impressão
           </Link>
           <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/entrega">
-            🛵 Entrega
+            Entrega
+          </Link>
+          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/balcao">
+            Balcão
+          </Link>
+          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/analytics">
+            Analytics
           </Link>
           <button
             className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text disabled:opacity-50"
@@ -262,63 +284,65 @@ export default function GestorPage() {
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {BOARD_COLUMNS.map((col) => (
-          <section
-            key={col}
-            className={`rounded-[20px] border-2 p-3 transition-colors ${
-              dropTarget === col ? 'border-brand bg-brand-faint' : 'border-transparent bg-bg-card'
-            }`}
-            onDragOver={(event) => {
-              const order = orders?.find((candidate) => candidate.id === draggingId);
-              if (!order || !isLegalStaffTransition(order.status, col)) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = 'move';
-              setDropTarget(col);
-            }}
-            onDragLeave={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
-            }}
-            onDrop={(event) => dropOrder(event, col)}
-            data-order-status={col}
-          >
-            <h2 className="mb-3 px-1 text-sm font-semibold text-text-muted">
-              {COLUMN_LABEL[col]} {groups && <span className="tabular-nums">({groups[col].length})</span>}
-            </h2>
-            <div className="space-y-3">
-              {groups
-                ? groups[col].map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      pending={pendingIds.has(order.id)}
-                      online={online}
-                      confirming={confirmingId === order.id}
-                      onAdvance={(to) => void submit(order, to)}
-                      onMove={(to) => requestTransition(order, to)}
-                      onMarkPaid={() => void markPaid(order)}
-                      onNotify={() => setAvisando(order)}
-                      onPrint={() => void queuePrintCopy(order)}
-                      printFeedback={printFeedback[order.id] ?? null}
-                      dragging={draggingId === order.id}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData('text/order-id', order.id);
-                        event.dataTransfer.effectAllowed = 'move';
-                        setDraggingId(order.id);
-                      }}
-                      onDragEnd={() => {
-                        setDraggingId(null);
-                        setDropTarget(null);
-                      }}
-                    />
-                  ))
-                : // skeletons no load
-                  Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="h-24 animate-pulse rounded-[14px] bg-bg" />
-                  ))}
-            </div>
-          </section>
-        ))}
+      <div className="overflow-x-auto pb-3">
+        <div className="grid min-w-[1520px] grid-cols-5 gap-4">
+          {BOARD_COLUMNS.map((col) => (
+            <section
+              key={col}
+              className={`min-w-0 rounded-[20px] border-2 p-3 transition-colors ${
+                dropTarget === col ? 'border-brand bg-brand-faint' : 'border-transparent bg-bg-card'
+              }`}
+              onDragOver={(event) => {
+                const order = orders?.find((candidate) => candidate.id === draggingId);
+                if (!order || !isLegalStaffTransition(order.status, col)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropTarget(col);
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
+              }}
+              onDrop={(event) => dropOrder(event, col)}
+              data-order-status={col}
+            >
+              <h2 className="mb-3 px-1 text-sm font-semibold text-text-muted">
+                {COLUMN_LABEL[col]} {groups && <span className="tabular-nums">({groups[col].length})</span>}
+              </h2>
+              <div className="space-y-3">
+                {groups
+                  ? groups[col].map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        pending={pendingIds.has(order.id)}
+                        online={online}
+                        confirming={confirmingId === order.id}
+                        onAdvance={(to) => void submit(order, to)}
+                        onMove={(to) => requestTransition(order, to)}
+                        onMarkPaid={() => void markPaid(order)}
+                        onNotify={() => setAvisando(order)}
+                        onPrint={() => void queuePrintCopy(order)}
+                        printFeedback={printFeedback[order.id] ?? null}
+                        dragging={draggingId === order.id}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('text/order-id', order.id);
+                          event.dataTransfer.effectAllowed = 'move';
+                          setDraggingId(order.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          setDropTarget(null);
+                        }}
+                      />
+                    ))
+                  : // skeletons no load
+                    Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="h-24 animate-pulse rounded-[14px] bg-bg" />
+                    ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
 
       {conflicts.length > 0 && (
@@ -441,7 +465,7 @@ function OrderCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [renderedAt] = useState(() => Date.now());
-  const next = NEXT_ACTION[order.status];
+  const next = nextAction(order);
   const previous = PREVIOUS_ACTION[order.status];
   const advanceBlockReason = next ? paymentGateReason(order, next.to) : null;
   const printDisabled = printFeedback?.state === 'queueing';
@@ -468,11 +492,9 @@ function OrderCard({
             <span className={`mt-0.5 block ${deadline.overdue ? 'font-semibold text-critical' : ''}`}>{deadline.text}</span>
           </span>
         </div>
-        {order.fulfillmentType === 'pickup' && (
-          <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
-            Retirada no balcão
-          </span>
-        )}
+        <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
+          {destinationLabel(order)}
+        </span>
         <div className="mt-1 flex items-center justify-between text-sm tabular-nums text-text">
           <span>{centsToBRL(order.totalCents)}</span>
           <span className="text-xs text-brand-strong">{expanded ? 'Ocultar detalhes ▲' : 'Ver detalhes ▼'}</span>
