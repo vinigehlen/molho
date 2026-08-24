@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import { THEMES } from '@molho/ui';
+import { CookieConsent } from '../components/cookie-consent';
+import { SiteAnalytics } from '../components/site-analytics';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -29,6 +31,12 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Molho — cardápio digital, PIX e delivery sem comissão',
+    description: DESCRICAO,
+    images: ['/og-image-1200x630.png'],
+  },
 };
 
 // Sourced do token único (packages/ui/themes.ts), nunca hex à mão — o lint de
@@ -40,7 +48,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${display.variable} ${mono.variable}`}>
-      <body className="bg-cream [font-family:var(--font-inter)] text-text antialiased">{children}</body>
+      <body className="bg-cream [font-family:var(--font-inter)] text-text antialiased">
+        {children}
+        <SiteAnalytics />
+        <CookieConsent />
+      </body>
     </html>
   );
 }
