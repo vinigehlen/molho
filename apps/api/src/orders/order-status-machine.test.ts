@@ -25,6 +25,7 @@ describe('isLegalOrderTransition — docs/02-definicoes-v1.md §5.1/§5.2', () =
     ['preparing', 'received'],
     ['preparing', 'canceled'],
     ['ready', 'in_transit'],
+    ['ready', 'completed'],
     ['ready', 'preparing'],
     ['in_transit', 'completed'],
     ['in_transit', 'ready'],
@@ -79,6 +80,7 @@ describe('orderTransitionRequiresReason', () => {
     expect(orderTransitionRequiresReason('received', 'preparing')).toBe(false);
     expect(orderTransitionRequiresReason('preparing', 'ready')).toBe(false);
     expect(orderTransitionRequiresReason('ready', 'in_transit')).toBe(false);
+    expect(orderTransitionRequiresReason('ready', 'completed')).toBe(false);
     expect(orderTransitionRequiresReason('in_transit', 'completed')).toBe(false);
   });
 });

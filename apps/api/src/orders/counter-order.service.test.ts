@@ -142,7 +142,7 @@ describe('CounterOrderService.createOrder', () => {
     const repo = makeRepo({
       findOrderByIdempotencyKey: vi
         .fn()
-        .mockResolvedValue({ id: 'order-1', paymentMethod: 'pix', subtotalCents: 1600, totalCents: 1600 }),
+        .mockResolvedValue({ id: 'order-1', status: 'received', paymentMethod: 'pix', subtotalCents: 1600, totalCents: 1600 }),
     });
     const service = new CounterOrderService(repo, makeOrderStatusRepo());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
@@ -151,7 +151,7 @@ describe('CounterOrderService.createOrder', () => {
 
     expect(result).toEqual({
       orderId: 'order-1',
-      status: 'completed',
+      status: 'received',
       paymentStatus: 'confirmado',
       paymentMethod: 'pix',
       subtotalCents: 1600,
@@ -159,6 +159,20 @@ describe('CounterOrderService.createOrder', () => {
     });
     expect(repo.createAnonymousCustomer).not.toHaveBeenCalled();
     expect(repo.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('pedido novo nasce received para aparecer no gestor, mas pagamento ja confirmado', async () => {
+    const orderStatusRepo = makeOrderStatusRepo();
+    const repo = makeRepo();
+    const service = new CounterOrderService(repo, orderStatusRepo);
+    const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
+
+    const result = await service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR);
+
+    expect(result.status).toBe('received');
+    expect(result.paymentStatus).toBe('confirmado');
+    expect(orderStatusRepo.recordHistory).toHaveBeenCalledWith(expect.objectContaining({ toStatus: 'received' }));
+    expect(orderStatusRepo.recordAuditLog).toHaveBeenCalledWith(expect.objectContaining({ toStatus: 'received' }));
   });
 
   it('grava history/audit_log só quando GANHA a corrida do ON CONFLICT (created=true)', async () => {

@@ -58,6 +58,8 @@ export const PERMISSIONS = [
   // Relatórios
   'report.revenue.view',
   'report.margin.view',
+  'analytics.read',
+  'analytics.customers.read',
   // Fiscal
   'invoice.issue',
   // Crescimento
@@ -182,6 +184,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'delivery.update_status',
     'report.revenue.view',
     'report.margin.view',
+    'analytics.read',
+    'analytics.customers.read',
     'invoice.issue',
     'growth.manage',
     'campaign.send',
@@ -212,6 +216,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     'delivery.dispatch',
     'delivery.update_status',
     'report.revenue.view',
+    'analytics.read',
+    'analytics.customers.read',
     'invoice.issue',
     'growth.manage',
     { permission: 'team.manage', subordinatesOnly: true },
@@ -229,6 +235,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Grant[]> = {
     { permission: 'cash.withdraw', approval: true },
     'delivery.dispatch',
     'invoice.issue',
+    'analytics.read',
   ],
   waiter: ['order.view', 'order.create', 'order.update_status'],
   kitchen: ['order.view', 'order.update_status'],

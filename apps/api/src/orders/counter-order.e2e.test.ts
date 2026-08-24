@@ -159,7 +159,7 @@ afterAll(async () => {
 }, 30_000);
 
 describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
-  it('unit+weighed: completed, confirmado, totais certos (unit do CATÁLOGO, weighed do valor mandado)', async () => {
+  it('unit+weighed: received, confirmado, totais certos (unit do CATÁLOGO, weighed do valor mandado)', async () => {
     const token = await cashierToken();
 
     const res = await post(token, randomUUID(), {
@@ -172,7 +172,7 @@ describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      status: 'completed',
+      status: 'received',
       paymentStatus: 'confirmado',
       paymentMethod: 'pix',
       subtotalCents: 2400 + 4200,
@@ -180,12 +180,31 @@ describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
     });
 
     const order = await migratorPrisma.order.findUniqueOrThrow({ where: { id: res.body.orderId } });
-    expect(order.status).toBe('completed');
+    expect(order.status).toBe('received');
     expect(order.paymentStatus).toBe('confirmado');
     expect(order.fulfillmentType).toBe('pickup');
     expect(order.changeForCents).toBeNull();
     expect(order.deliveryFeeCents).toBe(0);
   }, 15_000);
+
+  it('pedido de balcão entra na listagem ativa do gestor', async () => {
+    const token = await cashierToken();
+    const res = await post(token, randomUUID(), {
+      items: [{ kind: 'unit', productId, quantity: 1 }],
+      paymentMethod: 'card_at_counter',
+    });
+
+    expect(res.status).toBe(201);
+    const board = await request(app.getHttpServer())
+      .get('/v1/admin/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId);
+
+    expect(board.status).toBe(200);
+    expect(board.body.some((order: { id: string; status: string }) => order.id === res.body.orderId && order.status === 'received')).toBe(
+      true,
+    );
+  });
 
   it('preço do item unit vem do CATÁLOGO — um lineTotalCents mandado no body é ignorado', async () => {
     const token = await cashierToken();

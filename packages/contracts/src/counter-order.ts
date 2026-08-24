@@ -15,6 +15,7 @@
  */
 
 import { z } from 'zod';
+import { orderStatusSchema } from './admin-order';
 
 export const counterUnitItemSchema = z.object({
   kind: z.literal('unit'),
@@ -52,7 +53,7 @@ export type CounterOrderInput = z.infer<typeof counterOrderSchema>;
 
 export const counterOrderResponseSchema = z.object({
   orderId: z.uuid(),
-  status: z.literal('completed'),
+  status: orderStatusSchema,
   paymentStatus: z.literal('confirmado'),
   paymentMethod: counterOrderPaymentMethodSchema,
   subtotalCents: z.int(),

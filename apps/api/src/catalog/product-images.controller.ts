@@ -26,6 +26,11 @@ import { PRODUCT_IMAGE_SERVICE } from './catalog.tokens';
 import { VersionQueryDto } from './dto/category.dto';
 import { AddProductImageDto, UpdateProductImageDto } from './dto/product-image.dto';
 import type { ProductImageService } from './product-image.service';
+import { resolvePublicImageUrl } from '../storage/public-url';
+
+function withPublicImageUrl<T extends { imageKey: string }>(image: T) {
+  return { ...image, imageUrl: resolvePublicImageUrl(image.imageKey, process.env.S3_PUBLIC_URL) };
+}
 
 /**
  * Galeria de fotos do produto (Épico conversão, C1). Aninhado em
@@ -46,14 +51,15 @@ export class ProductImagesController {
   constructor(@Inject(PRODUCT_IMAGE_SERVICE) private readonly images: ProductImageService) {}
 
   @Get()
-  list(@Param('productId') productId: string) {
-    return this.images.listByProduct(productId);
+  async list(@Param('productId') productId: string) {
+    const records = await this.images.listByProduct(productId);
+    return records.map(withPublicImageUrl);
   }
 
   @Post()
   @RequirePermission('catalog.product.update')
-  create(@Param('productId') productId: string, @Body() dto: AddProductImageDto) {
-    return this.images.add({ productId, imageKey: dto.imageKey, position: dto.position });
+  async create(@Param('productId') productId: string, @Body() dto: AddProductImageDto) {
+    return withPublicImageUrl(await this.images.add({ productId, imageKey: dto.imageKey, position: dto.position }));
   }
 
   /**
@@ -63,16 +69,16 @@ export class ProductImagesController {
    */
   @Patch(':id')
   @RequirePermission('catalog.product.update')
-  reorder(@Param('id') id: string, @Body() dto: UpdateProductImageDto) {
+  async reorder(@Param('id') id: string, @Body() dto: UpdateProductImageDto) {
     const { version, ...input } = dto;
-    return this.images.reorder(id, version, input);
+    return withPublicImageUrl(await this.images.reorder(id, version, input));
   }
 
   @Get(':id')
   async get(@Param('id') id: string) {
     const record = await this.images.get(id);
     if (!record) throw new NotFoundException('Foto do produto não encontrada.');
-    return record;
+    return withPublicImageUrl(record);
   }
 
   @Delete(':id')

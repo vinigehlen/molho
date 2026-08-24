@@ -40,8 +40,11 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
-/** Statuses ATIVOS que o gestor mostra no board (não-terminais). Terminais (completed/cancelados/expired/delivery_failed) saem do board. */
-export const ACTIVE_ORDER_STATUSES = ['received', 'preparing', 'ready', 'in_transit'] as const;
+/** Statuses que o gestor mostra no board. Terminais infelizes (cancelados/expired/delivery_failed) saem do board. */
+export const ACTIVE_ORDER_STATUSES = ['received', 'preparing', 'ready', 'in_transit', 'completed'] as const;
+
+export const orderDestinationSchema = z.enum(['delivery', 'pickup', 'balcao']);
+export type OrderDestination = z.infer<typeof orderDestinationSchema>;
 
 const adminOrderItemSchema = z.object({
   name: z.string(),
@@ -111,6 +114,7 @@ export const adminOrderSchema = z.object({
    */
   currentTotalCents: centsSchema.nullable(),
   fulfillmentType: fulfillmentTypeSchema,
+  destination: orderDestinationSchema,
   /** `null` quando `fulfillmentType === 'pickup'` — retira no endereço da PRÓPRIA loja, que o lojista já sabe de cor. */
   delivery: adminOrderDeliverySchema.nullable(),
   items: z.array(adminOrderItemSchema),

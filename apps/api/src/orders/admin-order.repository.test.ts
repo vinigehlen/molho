@@ -27,7 +27,7 @@ const ROW: AdminOrderRow = {
   deliveryPostalCode: '90000-000',
   deliveryReferencePoint: 'Perto da praça',
   deliveryPostalCodeVerified: true,
-  customer: { name: 'Ana Souza' },
+  customer: { name: 'Ana Souza', phoneCiphertext: Buffer.from('phone') },
   items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }],
 };
 
@@ -36,6 +36,7 @@ describe('toAdminOrder', () => {
     const order = toAdminOrder(ROW);
 
     expect(order.customerName).toBe('Ana Souza');
+    expect(order.destination).toBe('delivery');
     expect(order.createdAt).toBe('2026-07-26T18:30:00.000Z');
     expect(order.fulfillmentDeadlineAt).toBe('2026-07-26T19:20:00.000Z');
     expect(order.delivery).toEqual({
@@ -102,7 +103,15 @@ describe('toAdminOrder', () => {
     });
 
     expect(pickup.fulfillmentType).toBe('pickup');
+    expect(pickup.destination).toBe('pickup');
     expect(pickup.delivery).toBeNull();
     expect(adminOrderSchema.safeParse(pickup).success).toBe(true);
+  });
+
+  it('pedido de balcão chega com destination balcao', () => {
+    expect(toAdminOrder({ ...ROW, fulfillmentType: 'pickup', paymentMethod: 'card_at_counter' }).destination).toBe('balcao');
+    expect(toAdminOrder({ ...ROW, fulfillmentType: 'pickup', customer: { name: 'Balcão', phoneCiphertext: null } }).destination).toBe(
+      'balcao',
+    );
   });
 });

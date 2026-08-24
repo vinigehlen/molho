@@ -23,6 +23,7 @@ import type { CounterOrderService } from './counter-order.service';
 import { COUNTER_ORDER_SERVICE } from './orders.tokens';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { ZodValidationPipe } from './zod-validation.pipe';
+import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
  * Pedido de BALCÃO (walk-in create) — staff bate direto no caixa, já pago e
@@ -34,7 +35,7 @@ import { ZodValidationPipe } from './zod-validation.pipe';
  */
 @Controller('v1/admin/stores/:storeId/counter-orders')
 @UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
-@UseInterceptors(TenantContextInterceptor)
+@UseInterceptors(OrderPublishInterceptor, TenantContextInterceptor)
 @UseFilters(OrderExceptionFilter)
 @RequireModule('orders')
 export class CounterOrderController {
@@ -50,7 +51,9 @@ export class CounterOrderController {
   ): Promise<CounterOrderResponse> {
     const tenantId = requireTenantIdHeader(req);
     const role = resolveActorRole(req, tenantId);
-    return this.counterOrders.createOrder(tenantId, storeId, dto, idempotencyKey, { id: req.user.sub, role });
+    const result = await this.counterOrders.createOrder(tenantId, storeId, dto, idempotencyKey, { id: req.user.sub, role });
+    queueOrderPublish(req, tenantId, { orderId: result.orderId, event: 'new', version: 0 });
+    return result;
   }
 }
 

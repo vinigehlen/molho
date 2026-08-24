@@ -29,7 +29,7 @@ export interface AdminOrderRow {
   deliveryPostalCode: string | null;
   deliveryReferencePoint: string | null;
   deliveryPostalCodeVerified: boolean;
-  customer: { name: string };
+  customer: { name: string; phoneCiphertext: Uint8Array | Buffer | null };
   items: {
     name: string;
     quantity: number;
@@ -57,6 +57,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
     totalCents: row.totalCents,
     currentTotalCents: row.currentTotalCents,
     fulfillmentType: row.fulfillmentType,
+    destination: orderDestination(row),
     delivery:
       row.fulfillmentType === 'pickup' || row.deliveryLabel === null
         ? null
@@ -107,7 +108,7 @@ const SELECT = {
   deliveryPostalCode: true,
   deliveryReferencePoint: true,
   deliveryPostalCodeVerified: true,
-  customer: { select: { name: true } },
+  customer: { select: { name: true, phoneCiphertext: true } },
   items: {
     select: {
       name: true,
@@ -118,6 +119,14 @@ const SELECT = {
     },
   },
 } as const;
+
+function orderDestination(row: AdminOrderRow): AdminOrder['destination'] {
+  if (row.fulfillmentType === 'delivery') return 'delivery';
+  if (row.paymentMethod === 'cash_at_counter' || row.paymentMethod === 'card_at_counter' || !row.customer.phoneCiphertext) {
+    return 'balcao';
+  }
+  return 'pickup';
+}
 
 export interface AdminOrderRepository {
   /** Pedidos ATIVOS (não-terminais) do tenant, mais antigos primeiro (FIFO da cozinha). RLS filtra o tenant. */

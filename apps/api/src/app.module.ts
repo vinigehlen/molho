@@ -15,6 +15,7 @@ import { PlatformModule } from './platform/platform.module';
 import { SchedulingSlotAdminModule } from './scheduling-slots/scheduling-slot-admin.module';
 import { SignupModule } from './signup/signup.module';
 import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
+import { StoreSetupModule } from './store-setup/store-setup.module';
 import { StorefrontModule } from './storefront/storefront.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     GeoModule,
     DeliveryZoneAdminModule,
     StoreHoursAdminModule,
+    StoreSetupModule,
     SchedulingSlotAdminModule,
     PlatformModule,
     SignupModule,
