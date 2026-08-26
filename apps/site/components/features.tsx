@@ -28,9 +28,9 @@ const FEATURES = [
 export function Features() {
   return (
     <section className="mx-auto max-w-6xl px-6 py-16 sm:px-10">
-      <h2 className="[font-family:var(--font-display)] text-display uppercase text-brand-strong">O que entra no cardápio digital</h2>
+      <h2 className="[font-family:var(--font-display)] text-display uppercase text-brand-strong">O que vem no seu cardápio digital</h2>
       <p className="mt-3 max-w-2xl text-body-lg text-text-muted">
-        Só o essencial pra rodar uma sexta-feira de pico sem depender do letreiro da fachada.
+        Só o essencial pra dar conta de uma sexta-feira de pico sem anotar pedido no WhatsApp.
       </p>
 
       <div className="mt-10 grid gap-8 sm:grid-cols-2">
