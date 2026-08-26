@@ -471,18 +471,18 @@ Durante todo o desenvolvimento, o sistema roda com o **`MockPaymentProvider`** (
 
 ## 6. Design System — estilo Nubank
 
-Princípios do design Nubank a aplicar: **roxo como identidade, tipografia grande e amigável, cards com cantos bem arredondados, muito espaço em branco, ícones outline, microinterações suaves, tom de voz humano e direto.**
+Princípios do design Nubank a aplicar: **vermelho Brasa como identidade, tipografia grande e amigável, cards com cantos bem arredondados, muito espaço em branco, ícones outline, microinterações suaves, tom de voz humano e direto.**
 
 ### 6.1 Tokens
 ```css
 :root {
   /* Cores */
   --brand-900:#7A150F; --brand-700:#A81E16; --brand-500:#D63A1E; /* primária */
-  --brand-300:#B565F3; --brand-100:#EFE1FB; --brand-050:#F8F1FE;
+  --brand-300:#F0846D; --brand-100:#FBDAD3; --brand-050:#FEF1EE;
   --ink-900:#111111; --ink-600:#585666; --ink-400:#8E8B9A;
   --bg:#FFFFFF; --surface:#F5F5F7; --line:#E9E7EE;
   --success:#12A454; --warning:#F5A623; --danger:#E4404E; --pix:#32BCAD;
-  /* Nota: por ser white-label, --brand-* é sobrescrito por tenant; roxo é o default da plataforma */
+  /* Nota: por ser white-label, --brand-* é sobrescrito por tenant; vermelho Brasa é o default da plataforma */
 
   /* Tipografia (alternativas abertas à Graphik, fonte do Nubank) */
   --font-sans:"Inter","Plus Jakarta Sans",system-ui;
@@ -499,15 +499,15 @@ Princípios do design Nubank a aplicar: **roxo como identidade, tipografia grand
 ```
 
 ### 6.2 Padrões de componente
-- **Home do cardápio:** header roxo com saudação ("Oi, {nome} 👋"), busca em pill branca, chips de categoria horizontais, cards de produto com foto 1:1 arredondada, preço em destaque, botão "+" circular roxo.
-- **Botão primário:** roxo sólido, texto branco semibold, altura 52px, radius 14px, estado pressed escurece 8%.
+- **Home do cardápio:** header vermelho Brasa com saudação ("Oi, {nome} 👋"), busca em pill branca, chips de categoria horizontais, cards de produto com foto 1:1 arredondada, preço em destaque, botão "+" circular vermelho Brasa.
+- **Botão primário:** vermelho Brasa sólido, texto branco semibold, altura 52px, radius 14px, estado pressed escurece 8%.
 - **Bottom sheet** para detalhes do produto e modificadores (padrão Nubank de camadas), com stepper de quantidade grande.
-- **Carrinho:** barra fixa inferior estilo "pill" roxa com contador + total, expandindo em sheet.
+- **Carrinho:** barra fixa inferior estilo "pill" vermelha com contador + total, expandindo em sheet.
 - **Status do pedido:** timeline vertical com dots animados (como o acompanhamento de cartão do Nubank), cor por etapa.
 - **PIX:** tela dedicada com QR central, botão "copiar código" gigante, countdown de expiração, cor de apoio --pix.
-- **Backoffice:** sidebar escura roxo-profundo, cards de métrica com números grandes, gráficos minimalistas (sem grid pesado), skeleton loading em tudo.
+- **Backoffice:** sidebar escura vermelho-profundo, cards de métrica com números grandes, gráficos minimalistas (sem grid pesado), skeleton loading em tudo.
 - **Vazios e erros:** ilustrações simples + microcopy amigável ("Nada por aqui ainda. Que tal criar seu primeiro produto?").
-- **Acessibilidade:** contraste AA no roxo (usar --brand-700 para texto), alvos de toque ≥44px, dark mode na fase 2.
+- **Acessibilidade:** contraste AA no vermelho Brasa (usar --brand-700 para texto), alvos de toque ≥44px, dark mode na fase 2.
 
 ---
 
@@ -557,7 +557,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 11 | **WhatsApp de status via click-to-chat** + `notification_log` | 1 | Um toque envia o status pelo número do próprio lojista |
 | 12 | Página de acompanhamento do pedido (timeline) | 1 | Cliente vê status em tempo real |
 | 13 | **Onboarding self-service + wizard de 7 passos** | 1 | Signup OTP → loja publicada em <30min, sem humano do Molho |
-| 13b | **Tema: 4 templates** (Roxo, Brasa, Folha, Grafite) + logo/capa | 1 | Lojista escolhe 1 dos 4; toda loja fica bonita e AA |
+| 13b | **Tema: 3 templates** (Brasa, Folha, Grafite) + logo/capa | 1 | Lojista escolhe 1 dos 3; toda loja fica bonita e AA |
 | 13d | **Assinatura e billing** (trial, planos, dunning, suspensão) | 1 | Cobrança recorrente + cancelamento em 2 cliques |
 | 14 | Super-admin: provisionamento, módulos, entitlements, impersonation | 1 | Painel interno completo |
 | 10 | **Impressão ESC/POS** + agente local + wizard de impressora | 1 | Cupom de teste sai no papel no onboarding |
@@ -612,7 +612,7 @@ escolhe domínio e publica SOZINHO. Nenhum passo depende de humano do Molho.
 - Domínio: SEMPRE E APENAS {slug}.molho.app. Sem domínio próprio, sem CNAME, sem TLS
   on-demand. Wildcard TLS *.molho.app. SEO por loja: OG com a capa, JSON-LD
   Restaurant/Menu, favicon e PWA manifest.
-- Tema: o lojista escolhe 1 de 4 TEMPLATES prontos (Roxo #D63A1E padrão, Brasa #D63A1E,
+- Tema: o lojista escolhe 1 de 3 TEMPLATES prontos (Brasa #D63A1E padrão,
   Folha #0F8A5F, Grafite #141216+âmbar) — constantes em packages/ui/themes.ts, todos AA
   por construção. Ele também envia logo, capa e descrição. NÃO existe seletor de cor
   livre. Tipografia, raios, espaçamento e cores funcionais não são customizáveis.
@@ -658,7 +658,7 @@ número normal dele. NÃO usar Cloud API nem API não-oficial (Baileys/Evolution
   timeline de status com dots animados; tela PIX com QR central e botão gigante
   "copiar código"; skeletons em todo loading; microcopy humano em pt-BR
   ("Oi, {nome} 👋", "Nada por aqui ainda…").
-- White-label: --brand-* sobrescrevível por tenant via theme_json; roxo é o default.
+- White-label: --brand-* sobrescrevível por tenant via theme_json; Brasa é o default.
 - Acessibilidade AA; alvos de toque ≥44px; mobile-first no storefront.
 
 ## Modelo de dados (núcleo — expandir conforme necessário)

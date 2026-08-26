@@ -124,7 +124,7 @@ O único ponto que roda antes do `run()` é **Middleware** (Middleware → Guard
 
 ## Design system "Tempero"
 
-- Vermelho Brasa `#D63A1E` (primária). No storefront white-label, o lojista escolhe **1 de 4 templates** (Roxo, Brasa `#D63A1E`, Folha `#0F8A5F`, Grafite `#141216`) — constantes em `packages/ui/themes.ts`, todos AA por construção. NÃO existe seletor de cor livre.
+- Vermelho Brasa `#D63A1E` (primária). No storefront white-label, o lojista escolhe **1 de 3 templates** (Brasa `#D63A1E` — padrão, Folha `#0F8A5F`, Grafite `#141216`) — constantes em `packages/ui/themes.ts`, todos AA por construção. NÃO existe seletor de cor livre.
 - Inter para tudo. Números tabulares (`tnum`) em PDV, caixa e dashboard.
 - Radius 20px em cards, 14px em botões. Espaçamento em escala 4pt.
 - Bottom sheets para modais mobile. Timeline vertical com dots animados para status. Skeletons em todo loading.

@@ -89,7 +89,7 @@ Para restaurantes, lanchonetes e deliverys que perdem margem para marketplaces, 
 | Lockup horizontal | `01-lockup-horizontal/` | **Principal.** Site, e-mail, docs, apresentações |
 | Lockup vertical | `02-lockup-vertical/` | Quadrados, embalagem, splash, QR de mesa |
 | Símbolo | `03-simbolo/` | Isolado: app, avatar, padrões |
-| Símbolo compacto | `03-simbolo/simbolo-compacto-roxo.svg` | **Obrigatório abaixo de 24px** (anel mais grosso, pingo maior) |
+| Símbolo compacto | `03-simbolo/simbolo-compacto-cor.svg` | **Obrigatório abaixo de 24px** (anel mais grosso, pingo maior) |
 | Wordmark | `04-wordmark/` | Quando o símbolo já está presente no contexto |
 | App / avatar / maskable | `05-app/` | Lojas, PWA manifest, robô de WhatsApp |
 | Favicon | `06-favicon/` | SVG + PNG 16/32/48 |
@@ -311,8 +311,8 @@ Duas regras merecem explicação, porque contrariam o senso comum:
 
 > Este portão nasceu de um bug real: o `tailwind-merge` descartava a classe de cor do texto do botão primário, que herdava ink. Fonte correto, DOM íntegro, axe verde — e **1,00:1 no tema Grafite** (preto sobre preto). Só o pixel denuncia essa classe de erro.
 
-### 6.2 White-label (storefront apenas) — 4 templates
-O lojista escolhe **1 entre 4 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Roxo** #D63A1E (padrão) · **Brasa** #D63A1E · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre vermelho Molho. Rodapé do storefront: "feito com Molho".
+### 6.2 White-label (storefront apenas) — 3 templates
+O lojista escolhe **1 entre 3 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Brasa** #D63A1E (padrão) · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre vermelho Molho. Rodapé do storefront: "feito com Molho".
 
 ### 6.3 Responsividade
 Breakpoints: 0–639 (mobile, prioridade 1), 640–1023 (tablet/PDV), 1024+ (desktop backoffice). Storefront é mobile-first estrito; backoffice é desktop-first com versão mobile funcional do gestor de pedidos.
