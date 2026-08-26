@@ -24,7 +24,7 @@ export async function requestOtp(slug: string, phone: string, email?: string): P
   }
 
   if (response.status === 202) return { ok: true };
-  if (response.status === 429) return { ok: false, message: 'Muitos pedidos de código — espera um pouco e tenta de novo.' };
+  if (response.status === 429) return { ok: false, message: 'Muitos pedidos de código. Espera um pouco e tenta de novo.' };
   return { ok: false, message: 'Não deu pra enviar o código agora. Confere o número e tenta de novo.' };
 }
 

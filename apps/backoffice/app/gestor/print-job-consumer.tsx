@@ -61,7 +61,7 @@ export function PrintJobConsumer({ active }: { active: boolean }) {
   useEffect(() => {
     stoppedRef.current = false;
     if (!active) {
-      setStatus({ state: 'offline', message: 'Impressão pausada — sem conexão' });
+      setStatus({ state: 'offline', message: 'Impressão pausada, sem conexão' });
       return;
     }
 

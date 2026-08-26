@@ -77,7 +77,7 @@ export function MoPixPayment({ payload, totalCents, className }: MoPixPaymentPro
               className="flex h-[240px] w-[240px] flex-col items-center justify-center gap-2 rounded-md bg-critical/10 p-4 text-center text-body text-critical-strong"
             >
               <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden="true" />
-              <p>Não deu pra gerar o QR agora — usa o código copia-e-cola abaixo.</p>
+              <p>Não deu pra gerar o QR agora, usa o código copia-e-cola abaixo.</p>
             </div>
           ) : (
             <MoSkeleton width={240} height={240} rounded="md" label="Gerando QR Code do PIX" />
@@ -94,7 +94,7 @@ export function MoPixPayment({ payload, totalCents, className }: MoPixPaymentPro
         </MoButton>
 
         <p className="text-caption text-text-muted">
-          Abre o app do seu banco, escolhe pagar com PIX (câmera ou copia e cola) e pronto — a loja confirma assim que
+          Abre o app do seu banco, escolhe pagar com PIX (câmera ou copia e cola) e pronto. A loja confirma assim que
           o pagamento cair.
         </p>
       </MoCardContent>

@@ -113,6 +113,10 @@ function renderCartView(
   );
 }
 
+async function aceitarTermos(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('checkbox', { name: /Li e aceito/ }));
+}
+
 beforeEach(() => {
   localStorage.clear();
   push.mockClear();
@@ -236,7 +240,7 @@ describe('CartView — checkout (Épico 7)', () => {
     renderCartView();
 
     await user.click(await screen.findByRole('button', { name: 'Retirar no balcão' }));
-    expect(screen.getByText('Retira direto na loja em até 30 min — sem taxa de entrega.')).toBeInTheDocument();
+    expect(screen.getByText('Retira direto na loja em até 30 min, sem taxa de entrega.')).toBeInTheDocument();
     // Sem o botão de endereço nem o aviso de CEP — pickup não pede nenhum dos dois.
     expect(screen.queryByText('Adicionar endereço de entrega')).not.toBeInTheDocument();
 
@@ -309,6 +313,8 @@ describe('CartView — checkout (Épico 7)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
     await screen.findByText('Revisa seu pedido');
+    expect(screen.getByRole('button', { name: 'Confirmar pedido' })).toBeDisabled();
+    await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
 
     expect(await screen.findByText('Confirma seu telefone')).toBeInTheDocument();
@@ -331,6 +337,7 @@ describe('CartView — checkout (Épico 7)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
     await screen.findByText('Revisa seu pedido');
+    await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
 
@@ -375,6 +382,7 @@ describe('CartView — checkout (Épico 7)', () => {
     // digitação em si (essa já tem cobertura própria em mo-input.test.tsx).
     fireEvent.change(screen.getByLabelText('Troco pra quanto?'), { target: { value: '5000' } });
 
+    await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
@@ -404,6 +412,7 @@ describe('CartView — checkout (Épico 7)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Fazer pedido' }));
     await screen.findByText('Revisa seu pedido');
+    await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
@@ -453,6 +462,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(screen.getByRole('button', { name: 'Dinheiro na entrega' }));
     await user.click(screen.getByLabelText('Não preciso de troco')); // desmarca, abre o campo
     fireEvent.change(screen.getByLabelText('Troco pra quanto?'), { target: { value: '3690' } });
+    await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Molho — Painel', template: '%s · Painel Molho' },
+  title: { default: 'Molho · Painel', template: '%s · Painel Molho' },
   description: 'Painel do lojista e super-admin do Molho.',
   icons: {
     icon: [
@@ -21,7 +21,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // (§6.2: white-label é só do storefront). tokens.css entra puro, sem
     // nenhum override de --brand-*.
     <html lang="pt-BR">
-      <body className="bg-bg font-sans text-text antialiased">{children}</body>
+      <body className="bg-bg font-sans text-text antialiased">
+        {children}
+        <footer className="border-t border-border px-4 py-4 text-center text-sm text-text-muted">
+          Molho ·{' '}
+          <a href="https://molho.live/termos" className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+            Termos
+          </a>{' '}
+          ·{' '}
+          <a href="https://molho.live/privacidade" className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+            Privacidade
+          </a>
+        </footer>
+      </body>
     </html>
   );
 }

@@ -590,7 +590,7 @@ function ZonesPanel({
                 </p>
               </div>
               <span className="rounded-full bg-brand-faint px-3 py-1 text-xs font-medium text-brand-strong">
-                zona por raio — editar via suporte
+                zona por raio, editar via suporte
               </span>
             </div>
           </div>

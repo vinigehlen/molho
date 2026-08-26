@@ -6,7 +6,7 @@ export function Footer() {
       <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <p className="font-mono text-caption uppercase tracking-wide text-cream/80">
-            Molho — o ingrediente que transforma
+            Molho · o ingrediente que transforma
           </p>
           <p className="mt-3 max-w-md text-body text-cream/70">
             Cardápio digital, PIX e gestor de pedidos para restaurante vender direto, sem comissão por venda.

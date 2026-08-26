@@ -20,6 +20,9 @@ import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
 import { lookupPostalCode } from '../../lib/viacep';
 
+const LEGAL_TERMS_HREF = 'https://molho.live/termos';
+const LEGAL_PRIVACY_HREF = 'https://molho.live/privacidade';
+
 /**
  * Espelhado de packages/contracts/src/copy.pt-BR.ts (COPY.storefront) — só
  * as 2 mensagens que dependem de estado do CLIENTE (fora da zona, pedido
@@ -177,7 +180,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
       >
         <MapPin className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
         <span className="truncate">
-          {address ? `${address.label} — ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
+          {address ? `${address.label}: ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
         </span>
       </button>
 
@@ -249,6 +252,17 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         totalCents={cart.subtotalCents}
         onClick={() => router.push(`/${slug}/carrinho`)}
       />
+
+      <footer className="px-4 pb-8 pt-2 text-center text-caption text-text-muted">
+        Feito com Molho ·{' '}
+        <a href={LEGAL_TERMS_HREF} className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+          Termos
+        </a>{' '}
+        ·{' '}
+        <a href={LEGAL_PRIVACY_HREF} className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+          Privacidade
+        </a>
+      </footer>
     </div>
   );
 }

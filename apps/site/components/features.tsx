@@ -13,15 +13,15 @@ const FEATURES = [
   },
   {
     titulo: 'Comanda impressa',
-    desc: 'Sai sozinha na impressora ESC/POS da cozinha — sem reescrever nada.',
+    desc: 'Sai sozinha na impressora ESC/POS da cozinha, sem reescrever nada.',
   },
   {
     titulo: 'Gestor de pedidos',
-    desc: 'Som e push a cada pedido novo, fila offline se a internet cair — nada se perde entre o salão e a cozinha.',
+    desc: 'Som e push a cada pedido novo, fila offline se a internet cair. Nada se perde entre o salão e a cozinha.',
   },
   {
     titulo: 'Status no WhatsApp',
-    desc: 'Um toque, mensagem pronta, pelo seu número de sempre — o cliente sabe que o pedido saiu sem você digitar nada.',
+    desc: 'Um toque, mensagem pronta, pelo seu número de sempre. O cliente sabe que o pedido saiu sem você digitar nada.',
   },
 ];
 

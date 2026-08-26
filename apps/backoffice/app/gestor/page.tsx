@@ -246,12 +246,12 @@ export default function GestorPage() {
         <div className="flex items-center gap-2">
           {!online ? (
             <span className="rounded-full bg-critical-strong px-3 py-1 text-xs font-medium text-white">
-              Sem conexão — pedidos podem estar desatualizados
+              Sem conexão, pedidos podem estar desatualizados
             </span>
           ) : (
             streamStatus !== 'open' && (
               <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-text">
-                Sem tempo real — reconectando…
+                Sem tempo real, reconectando…
               </span>
             )
           )}
@@ -374,7 +374,7 @@ export default function GestorPage() {
       {conflicts.length > 0 && (
         <section className="mt-6 rounded-[20px] border border-critical bg-bg-card p-4">
           <h2 className="mb-2 text-sm font-semibold text-critical">
-            Ações não aplicadas — precisam da sua decisão ({conflicts.length})
+            Ações não aplicadas, precisam da sua decisão ({conflicts.length})
           </h2>
           <ul className="space-y-2">
             {conflicts.map((c) => (
@@ -408,7 +408,7 @@ export default function GestorPage() {
           <ul className="space-y-1 text-xs text-text-muted">
             {autoApplied.map((a) => (
               <li key={a.intent.idempotencyKey} className="tabular-nums">
-                {isoToTime(new Date(a.at).toISOString())} — pedido {a.intent.orderId.slice(0, 8)} → {a.intent.toStatus}
+                {isoToTime(new Date(a.at).toISOString())}: pedido {a.intent.orderId.slice(0, 8)} → {a.intent.toStatus}
               </li>
             ))}
           </ul>
@@ -642,8 +642,8 @@ function OrderDetails({ order }: { order: AdminOrder }) {
       {order.delivery && (
         <div>
           <p className="font-semibold text-text">Entrega</p>
-          <p>{order.delivery.street}, {order.delivery.number ?? 's/n'}{order.delivery.complement ? ` — ${order.delivery.complement}` : ''}</p>
-          <p>{order.delivery.neighborhood} — {order.delivery.city}/{order.delivery.state}</p>
+          <p>{order.delivery.street}, {order.delivery.number ?? 's/n'}{order.delivery.complement ? `, ${order.delivery.complement}` : ''}</p>
+          <p>{order.delivery.neighborhood}, {order.delivery.city}/{order.delivery.state}</p>
           {order.delivery.referencePoint && <p>Referência: {order.delivery.referencePoint}</p>}
           {!order.delivery.postalCodeVerified && <p className="font-medium text-caution">Confira o endereço e a taxa antes de despachar.</p>}
         </div>
@@ -697,7 +697,7 @@ function PaymentPanel({
         )}
       </div>
       {confirmavel && !online && (
-        <span className="text-[11px] text-text-muted">Sem conexão com o sistema — reconecte pra confirmar o pagamento.</span>
+        <span className="text-[11px] text-text-muted">Sem conexão com o sistema. Reconecte pra confirmar o pagamento.</span>
       )}
     </div>
   );

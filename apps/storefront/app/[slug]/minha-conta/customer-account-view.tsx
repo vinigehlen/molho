@@ -214,7 +214,7 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
                 <div className="min-w-0 flex-1">
                   <p className="text-body-strong text-text">{address.label}</p>
                   <p className="text-body text-text-muted">
-                    {address.street}, {address.number ?? 's/n'} — {address.neighborhood}
+                    {address.street}, {address.number ?? 's/n'}, {address.neighborhood}
                   </p>
                   <p className="text-caption text-text-muted">
                     {address.city}/{address.state}

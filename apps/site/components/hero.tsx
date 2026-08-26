@@ -22,7 +22,7 @@ export function Hero() {
         </h1>
 
         <p className="mt-4 text-body-lg text-on-brand">
-          Cardápio digital, pedido com PIX e um painel pra cozinha ver tudo em tempo real — pronto
+          Cardápio digital, pedido com PIX e um painel pra cozinha ver tudo em tempo real, pronto
           pra rodar a sexta-feira de pico sem digitar nada no WhatsApp. Mensalidade fixa, sem
           comissão por venda.
         </p>

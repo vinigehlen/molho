@@ -10,11 +10,11 @@ const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display', 
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 const DESCRICAO =
-  'Cardápio digital, pedido com PIX e gestor de pedidos pro seu delivery ou restaurante — sem comissão por venda. Chega de anotar pedido no WhatsApp.';
+  'Cardápio digital, pedido com PIX e gestor de pedidos pro seu delivery ou restaurante, sem comissão por venda. Chega de anotar pedido no WhatsApp.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://molho.live'),
-  title: 'Molho — cardápio digital, PIX e delivery sem comissão',
+  title: 'Molho: cardápio digital, PIX e delivery sem comissão',
   description: DESCRICAO,
   icons: {
     icon: [
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Molho — cardápio digital, PIX e delivery sem comissão',
+    title: 'Molho: cardápio digital, PIX e delivery sem comissão',
     description: DESCRICAO,
     images: ['/og-image-1200x630.png'],
   },

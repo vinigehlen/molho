@@ -58,7 +58,7 @@ const VALOR_VAZIO: MoAddressSheetValue = {
 };
 
 const MENSAGEM: Partial<Record<EstadoBusca['kind'], string>> = {
-  nao_encontrado: 'Não encontrei esse CEP — confere o número. Se estiver certo, preenche o endereço à mão.',
+  nao_encontrado: 'Não encontrei esse CEP. Confere o número. Se estiver certo, preenche o endereço à mão.',
   indisponivel: 'Não deu pra buscar o CEP agora. Preenche o endereço à mão que a gente confirma na hora do pedido.',
 };
 

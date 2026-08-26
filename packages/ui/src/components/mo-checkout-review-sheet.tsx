@@ -78,6 +78,10 @@ export interface MoCheckoutReviewSheetProps {
   /** Só relevante quando `paymentMethod === 'cash_on_delivery'` — "troco pra quanto", não o troco em si. `null` = não precisa. */
   changeForCents: number | null;
   onChangeForCentsChange: (cents: number | null) => void;
+  legalAccepted?: boolean;
+  onLegalAcceptedChange?: (accepted: boolean) => void;
+  termsHref?: string;
+  privacyHref?: string;
 }
 
 /**
@@ -104,6 +108,10 @@ export function MoCheckoutReviewSheet({
   onPaymentMethodChange,
   changeForCents,
   onChangeForCentsChange,
+  legalAccepted = true,
+  onLegalAcceptedChange,
+  termsHref = '/termos',
+  privacyHref = '/privacidade',
 }: MoCheckoutReviewSheetProps) {
   // Corrige o método selecionado sempre que a lista de disponíveis não bate
   // com ele — sozinho se sobrar só 1 (pré-seleção), ou se o método atual
@@ -167,12 +175,32 @@ export function MoCheckoutReviewSheet({
             />
 
             <MoButton
-              disabled={!review.canSubmit || availablePaymentMethods.length === 0}
+              disabled={!review.canSubmit || availablePaymentMethods.length === 0 || !legalAccepted}
               loading={confirmLoading}
               onClick={onConfirm}
             >
               Confirmar pedido
             </MoButton>
+
+            <label className="flex items-start gap-2 rounded-md border border-border bg-bg-card p-3 text-caption text-text-muted">
+              <input
+                type="checkbox"
+                checked={legalAccepted}
+                onChange={(event) => onLegalAcceptedChange?.(event.currentTarget.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-border"
+              />
+              <span>
+                Li e aceito os{' '}
+                <a href={termsHref} target="_blank" rel="noreferrer" className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+                  termos de uso
+                </a>{' '}
+                e a{' '}
+                <a href={privacyHref} target="_blank" rel="noreferrer" className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+                  política de privacidade
+                </a>
+                .
+              </span>
+            </label>
           </>
         ) : null}
       </div>
@@ -277,7 +305,7 @@ function PaymentMethodPicker({
 function ReviewBanners({ review }: { review: MoCheckoutReviewData }) {
   const avisos: string[] = [];
   if (!review.withinZone) avisos.push('Esse endereço está fora da nossa área de entrega.');
-  if (review.withinZone && !review.isOpenNow) avisos.push('A loja está fechada agora — não dá pra confirmar o pedido.');
+  if (review.withinZone && !review.isOpenNow) avisos.push('A loja está fechada agora, não dá pra confirmar o pedido.');
   if (review.subtotalCents < review.minOrderCents) {
     avisos.push(`Falta ${formatCents(review.minOrderCents - review.subtotalCents)} pro pedido mínimo de ${formatCents(review.minOrderCents)}.`);
   }
@@ -308,7 +336,7 @@ function ReviewItemRow({ item }: { item: MoCheckoutReviewItem }) {
             <span className="text-caption text-text-muted">{item.modifiers.map((m) => m.name).join(', ')}</span>
           ) : null}
           {item.notes ? <span className="text-caption text-text-muted">"{item.notes}"</span> : null}
-          {!item.available ? <span className="text-caption font-semibold text-critical-strong">Esgotou — removido do pedido</span> : null}
+          {!item.available ? <span className="text-caption font-semibold text-critical-strong">Esgotou, removido do pedido</span> : null}
           {item.available && item.priceChanged ? (
             <span className="text-caption font-semibold text-critical-strong">O preço deste item mudou desde que você montou o carrinho.</span>
           ) : null}
