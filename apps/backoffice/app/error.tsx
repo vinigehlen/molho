@@ -1,8 +1,14 @@
 'use client';
 
 import { ClipboardList } from 'lucide-react';
+import type { ReactElement } from 'react';
 
-export default function Error({ reset }: { error: globalThis.Error & { digest?: string }; reset: () => void }) {
+export default function Error({
+  reset,
+}: {
+  error: globalThis.Error & { digest?: string };
+  reset: () => void;
+}): ReactElement {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg px-6 py-16 text-center">
       <section className="flex max-w-md flex-col items-center rounded-[20px] border border-border bg-bg-card p-6 shadow-sm">

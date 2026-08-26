@@ -1,6 +1,13 @@
 'use client';
 
-export default function Error({ reset }: { error: globalThis.Error & { digest?: string }; reset: () => void }) {
+import type { ReactElement } from 'react';
+
+export default function Error({
+  reset,
+}: {
+  error: globalThis.Error & { digest?: string };
+  reset: () => void;
+}): ReactElement {
   return (
     <main className="flex min-h-screen items-center justify-center bg-cream px-6 py-16 text-center">
       <section className="max-w-xl">

@@ -1,9 +1,15 @@
 'use client';
 
 import { UtensilsCrossed } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { MoButton } from '@molho/ui';
 
-export default function Error({ reset }: { error: globalThis.Error & { digest?: string }; reset: () => void }) {
+export default function Error({
+  reset,
+}: {
+  error: globalThis.Error & { digest?: string };
+  reset: () => void;
+}): ReactElement {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg px-6 py-16 text-center">
       <section className="flex max-w-md flex-col items-center">
