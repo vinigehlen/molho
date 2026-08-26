@@ -35,12 +35,15 @@ export function HomePlaceholder({ title, description, ctaLabel, signupLabel, sig
         description={description}
         action={{
           label: ctaLabel,
-          // Sem destino real ainda — o cardápio nasce no Épico 5. O slot de
-          // ação já existe; o clique ganha função quando o menu existir.
-          onClick: () => {},
+          // Sem cardápio próprio ainda pra abrir daqui (nasce no Épico 5) —
+          // o clique real disponível hoje é o mesmo do link de baixo: criar
+          // a loja. Nunca um botão clicável que não faz nada.
+          onClick: () => {
+            window.location.href = signupHref;
+          },
         }}
       />
-      <a className="fixed bottom-6 text-sm font-semibold text-brand-strong" href={signupHref}>
+      <a className="fixed bottom-6 text-caption font-semibold text-brand-strong" href={signupHref}>
         {signupLabel}
       </a>
     </main>

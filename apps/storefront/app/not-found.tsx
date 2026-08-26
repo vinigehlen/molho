@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { UtensilsCrossed } from 'lucide-react';
+import { buttonVariants, cn } from '@molho/ui';
 
 export default function NotFound() {
   return (
@@ -12,10 +13,7 @@ export default function NotFound() {
         <p className="mt-3 text-body text-text-muted">
           O link pode ter mudado, ou a loja pode estar fora do ar por enquanto.
         </p>
-        <Link
-          href="/"
-          className="mt-8 inline-flex h-[52px] items-center justify-center rounded-md bg-brand px-6 text-body-strong text-on-brand transition duration-base ease-out hover:brightness-95"
-        >
+        <Link href="/" className={cn(buttonVariants(), 'mt-8')}>
           Ir para o Molho
         </Link>
       </section>

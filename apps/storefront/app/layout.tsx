@@ -36,7 +36,7 @@ export const metadata: Metadata = {
  * partir da URL (`middleware.ts` é a única peça que sabe como uma
  * requisição vira tenant).
  *
- * Sem slug (rota global, ex.: a Home bare `/`), cai no tema Roxo padrão —
+ * Sem slug (rota global, ex.: a Home bare `/`), cai no tema Brasa padrão —
  * `getTheme(undefined)` já resolve isso sozinho. `getStorefront` é
  * `React.cache()`-ado, então chamar isto duas vezes por requisição (viewport
  * + layout) não dobra o round-trip pra API.

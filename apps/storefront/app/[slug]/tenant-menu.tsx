@@ -164,7 +164,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const foraDaArea = deliveryMatch?.withinZone === false;
 
   return (
-    <div className="pb-24">
+    <div className="mx-auto max-w-2xl pb-24">
       <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
         <h1 className="text-title-lg">{storeName}</h1>
         <p className="text-body opacity-90">{greeting}</p>

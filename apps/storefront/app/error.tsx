@@ -1,6 +1,7 @@
 'use client';
 
 import { UtensilsCrossed } from 'lucide-react';
+import { MoButton } from '@molho/ui';
 
 export default function Error({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
@@ -13,13 +14,9 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
         <p className="mt-3 text-body text-text-muted">
           Pode ser uma instabilidade rápida. Tenta novamente para voltar para a cozinha da casa.
         </p>
-        <button
-          type="button"
-          className="mt-8 inline-flex h-[52px] items-center justify-center rounded-md bg-brand px-6 text-body-strong text-on-brand transition duration-base ease-out hover:brightness-95"
-          onClick={reset}
-        >
+        <MoButton className="mt-8" onClick={reset}>
           Tentar novamente
-        </button>
+        </MoButton>
       </section>
     </main>
   );

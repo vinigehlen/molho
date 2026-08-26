@@ -1,35 +1,36 @@
 import { UtensilsCrossed } from 'lucide-react';
+import { MoSkeleton } from '@molho/ui';
 
 export default function Loading() {
   return (
     <main className="min-h-screen bg-bg pb-24" aria-busy="true">
       <header className="bg-brand px-4 py-6 text-on-brand">
-        <div className="h-7 w-40 rounded-pill bg-white/30" />
-        <div className="mt-3 h-5 w-56 rounded-pill bg-white/25" />
+        <MoSkeleton className="bg-white/30" rounded="pill" height={28} width={160} />
+        <MoSkeleton className="mt-3 bg-white/25" rounded="pill" height={20} width={224} />
       </header>
       <div className="border-b border-border px-4 py-3">
-        <div className="h-5 w-64 rounded-pill bg-border" />
+        <MoSkeleton rounded="pill" height={20} width={256} />
       </div>
       <div className="flex gap-2 overflow-hidden px-4 py-3">
-        <div className="h-9 w-24 shrink-0 rounded-pill bg-border" />
-        <div className="h-9 w-28 shrink-0 rounded-pill bg-border" />
-        <div className="h-9 w-20 shrink-0 rounded-pill bg-border" />
+        <MoSkeleton className="shrink-0" rounded="pill" height={36} width={96} />
+        <MoSkeleton className="shrink-0" rounded="pill" height={36} width={112} />
+        <MoSkeleton className="shrink-0" rounded="pill" height={36} width={80} />
       </div>
       <section className="p-4">
-        <div className="mb-3 h-6 w-32 rounded-pill bg-border" />
-        <div className="grid grid-cols-2 gap-4">
+        <MoSkeleton className="mb-3" rounded="pill" height={24} width={128} />
+        <div className="grid grid-cols-2 gap-4" role="status">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="rounded-md bg-bg-card p-3">
               <div className="flex aspect-square items-center justify-center rounded-md bg-brand-faint">
                 <UtensilsCrossed className="h-7 w-7 text-brand-strong" aria-hidden="true" />
               </div>
-              <div className="mt-3 h-5 rounded-pill bg-border" />
-              <div className="mt-2 h-4 w-2/3 rounded-pill bg-border" />
+              <MoSkeleton className="mt-3" rounded="pill" height={20} />
+              <MoSkeleton className="mt-2 w-2/3" rounded="pill" height={16} />
             </div>
           ))}
+          <span className="sr-only">Carregando cardápio.</span>
         </div>
       </section>
-      <span className="sr-only">Carregando cardápio.</span>
     </main>
   );
 }

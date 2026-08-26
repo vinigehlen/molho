@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Store, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, MapPin, Store, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -190,10 +190,14 @@ export function CartView({
       : null;
 
   return (
-    <div className="flex min-h-screen flex-col pb-44">
+    <div className="mx-auto flex min-h-screen max-w-2xl flex-col pb-44">
       <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
-        <Link href={`/${slug}`} className="text-caption underline-offset-2 hover:underline">
-          ← Voltar pro cardápio
+        <Link
+          href={`/${slug}`}
+          className="-m-2 inline-flex w-fit items-center gap-1 p-2 text-caption underline-offset-2 hover:underline"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          Voltar pro cardápio
         </Link>
         <h1 className="text-title-lg">Seu carrinho</h1>
         <p className="text-body opacity-90">{storeName}</p>
@@ -243,7 +247,7 @@ export function CartView({
                 {/* Mesmo padrão visual do card de produto (rounded-md, bg-brand-faint, ícone de fallback) — ver MoProductCard. */}
                 <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md bg-brand-faint">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={`Foto de ${item.name}`} loading="lazy" className="h-full w-full object-cover" />
+                    <img src={item.imageUrl} alt={`Foto de ${item.name}`} loading="lazy" width={72} height={72} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
                       <UtensilsCrossed className="h-6 w-6 text-brand-strong" aria-hidden="true" />
@@ -268,7 +272,7 @@ export function CartView({
               <button
                 type="button"
                 onClick={() => cart.removeItem(item.lineId)}
-                className="shrink-0 text-caption font-semibold text-critical-strong underline-offset-2 hover:underline"
+                className="-m-2 shrink-0 p-2 text-caption font-semibold text-critical-strong underline-offset-2 hover:underline"
               >
                 Remover
               </button>
