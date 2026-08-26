@@ -93,6 +93,11 @@ export default function AnalyticsPage() {
   const [storeId, setStoreId] = useState('');
   const [filters, setFilters] = useState(defaultFilters);
   const [topSort, setTopSort] = useState<AnalyticsTopItemsSort>('qty');
+  // "Atualizar" refaz o fetch com os MESMOS filtros — precisa de um sinal
+  // próprio na dependência do efeito; `setFilters({ ...filters })` fingindo
+  // objeto novo pra disparar o efeito era implícito e quebraria silenciosamente
+  // se `filters` virasse algo comparado por valor em vez de referência.
+  const [refreshToken, setRefreshToken] = useState(0);
   const [data, setData] = useState<DataState>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +152,7 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [filters, storeId, topSort]);
+  }, [filters, storeId, topSort, refreshToken]);
 
   const heatMax = useMemo(() => Math.max(1, ...data.peakHours.map((point) => point.pedidos)), [data.peakHours]);
   const heatGrid = useMemo(() => {
@@ -168,7 +173,7 @@ export default function AnalyticsPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="text-xs font-semibold text-text-muted">
               Loja
-              <select className="mt-1 h-10 w-full rounded-md border border-border bg-bg-card px-3 text-sm text-text" value={storeId} onChange={(event) => setStoreId(event.target.value)}>
+              <select className="mt-1 h-10 w-full rounded-[14px] border border-border bg-bg-card px-3 text-sm text-text" value={storeId} onChange={(event) => setStoreId(event.target.value)}>
                 {stores.map((store) => (
                   <option key={store.id} value={store.id}>
                     {store.name}
@@ -181,7 +186,7 @@ export default function AnalyticsPage() {
             <label className="text-xs font-semibold text-text-muted">
               Canal
               <select
-                className="mt-1 h-10 w-full rounded-md border border-border bg-bg-card px-3 text-sm text-text"
+                className="mt-1 h-10 w-full rounded-[14px] border border-border bg-bg-card px-3 text-sm text-text"
                 value={filters.fulfillment ?? 'all'}
                 onChange={(event) => setFilters((current) => ({ ...current, fulfillment: event.target.value as AnalyticsFilters['fulfillment'] }))}
               >
@@ -192,16 +197,20 @@ export default function AnalyticsPage() {
               </select>
             </label>
             <button
-              className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-on-brand disabled:opacity-60 sm:mt-5"
+              className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-[14px] bg-brand px-4 text-sm font-semibold text-on-brand disabled:opacity-60 sm:mt-5"
               disabled={loading}
-              onClick={() => setFilters({ ...filters })}
+              onClick={() => setRefreshToken((token) => token + 1)}
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Atualizar
             </button>
           </div>
         </header>
 
-        {error ? <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{error}</div> : null}
+        {error ? (
+          <div role="alert" className="rounded-[20px] border border-critical bg-bg-card px-4 py-3 text-sm font-medium text-critical">
+            {error}
+          </div>
+        ) : null}
 
         <section className="grid gap-4 md:grid-cols-4">
           <Kpi title="Faturamento realizado" value={centsToBRL(data.overview?.realizado.faturamentoCents ?? 0)} icon={<TrendingUp size={18} />} />
@@ -253,7 +262,7 @@ export default function AnalyticsPage() {
           <Panel
             title="Itens mais vendidos"
             action={
-              <select className="h-9 rounded-md border border-border bg-bg-card px-2 text-xs font-semibold" value={topSort} onChange={(event) => setTopSort(event.target.value as AnalyticsTopItemsSort)}>
+              <select className="h-9 rounded-[14px] border border-border bg-bg-card px-2 text-xs font-semibold" value={topSort} onChange={(event) => setTopSort(event.target.value as AnalyticsTopItemsSort)}>
                 <option value="qty">Unidades</option>
                 <option value="revenue">Receita</option>
               </select>
@@ -286,7 +295,9 @@ export default function AnalyticsPage() {
                     {row.hours.map((point) => (
                       <div
                         key={`${point.dow}-${point.hour}`}
-                        className="h-6 rounded-[4px]"
+                        tabIndex={0}
+                        aria-label={`${row.label} ${point.hour}h: ${point.pedidos} pedidos`}
+                        className="h-6 rounded-[4px] focus-visible:outline-none focus-visible:shadow-focus"
                         title={`${row.label} ${point.hour}h: ${point.pedidos} pedidos`}
                         style={{ backgroundColor: `rgba(214, 58, 30, ${0.08 + (point.pedidos / heatMax) * 0.82})` }}
                       />
@@ -299,7 +310,7 @@ export default function AnalyticsPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-3">
-          <TablePanel title="Clientes" rows={data.customers} forbiddenText="Disponível para owner e manager.">
+          <TablePanel title="Clientes" columns={['Cliente', 'Telefone', 'Faturamento']} rows={data.customers} forbiddenText="Disponível para owner e manager.">
             {(row: AnalyticsCustomer) => (
               <tr key={row.customerId}>
                 <td className="py-3 pr-3">{row.nomeMascarado ?? 'Cliente'}</td>
@@ -308,7 +319,7 @@ export default function AnalyticsPage() {
               </tr>
             )}
           </TablePanel>
-          <TablePanel title="Regiões" rows={data.regions}>
+          <TablePanel title="Regiões" columns={['Cidade', 'UF', 'Faturamento']} rows={data.regions}>
             {(row: AnalyticsRegion) => (
               <tr key={row.cityKey ?? 'sem-regiao'}>
                 <td className="py-3 pr-3">{row.cidade}</td>
@@ -317,7 +328,7 @@ export default function AnalyticsPage() {
               </tr>
             )}
           </TablePanel>
-          <TablePanel title="Itens sem venda" rows={data.idleItems}>
+          <TablePanel title="Itens sem venda" columns={['Item', 'Categoria', 'Vendas']} rows={data.idleItems}>
             {(row: AnalyticsIdleItem) => (
               <tr key={row.productId}>
                 <td className="py-3 pr-3">{row.nome}</td>
@@ -336,14 +347,14 @@ function DateInput({ label, value, onChange }: { label: string; value: string; o
   return (
     <label className="text-xs font-semibold text-text-muted">
       {label}
-      <input className="mt-1 h-10 w-full rounded-md border border-border bg-bg-card px-3 text-sm text-text" type="date" value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="mt-1 h-10 w-full rounded-[14px] border border-border bg-bg-card px-3 text-sm text-text" type="date" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
 
 function Kpi({ title, value, detail, icon }: { title: string; value: string; detail?: string; icon: React.ReactNode }) {
   return (
-    <article className="rounded-md border border-border bg-bg-card p-4">
+    <article className="rounded-[20px] border border-border bg-bg-card p-4">
       <div className="flex items-center justify-between text-text-muted">
         <span className="text-xs font-semibold uppercase tracking-wide">{title}</span>
         {icon}
@@ -356,7 +367,7 @@ function Kpi({ title, value, detail, icon }: { title: string; value: string; det
 
 function Panel({ title, action, loading, children }: { title: string; action?: React.ReactNode; loading?: boolean; children: React.ReactNode }) {
   return (
-    <section className="rounded-md border border-border bg-bg-card p-4">
+    <section className="rounded-[20px] border border-border bg-bg-card p-4">
       <div className="mb-4 flex min-h-9 items-center justify-between gap-3">
         <h2 className="text-base font-bold text-text">{title}</h2>
         {action}
@@ -366,9 +377,22 @@ function Panel({ title, action, loading, children }: { title: string; action?: R
   );
 }
 
-function TablePanel<T>({ title, rows, forbiddenText, children }: { title: string; rows: T[] | null; forbiddenText?: string; children: (row: T) => React.ReactNode }) {
+function TablePanel<T>({
+  title,
+  columns,
+  rows,
+  forbiddenText,
+  children,
+}: {
+  title: string;
+  /** Rótulos das colunas — sem isso a tabela não tem `<th>` nenhum pro leitor de tela. */
+  columns: string[];
+  rows: T[] | null;
+  forbiddenText?: string;
+  children: (row: T) => React.ReactNode;
+}) {
   return (
-    <section className="rounded-md border border-border bg-bg-card p-4">
+    <section className="rounded-[20px] border border-border bg-bg-card p-4">
       <h2 className="text-base font-bold text-text">{title}</h2>
       {rows === null ? (
         <p className="mt-4 text-sm text-text-muted">{forbiddenText ?? 'Sem acesso.'}</p>
@@ -377,6 +401,19 @@ function TablePanel<T>({ title, rows, forbiddenText, children }: { title: string
       ) : (
         <div className="mt-3 max-h-80 overflow-auto">
           <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-text-muted">
+                {columns.map((column, i) => (
+                  <th
+                    key={column}
+                    scope="col"
+                    className={i === columns.length - 1 ? 'py-2 text-right font-semibold' : 'py-2 pr-3 font-semibold'}
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody className="divide-y divide-border">{rows.map((row) => children(row))}</tbody>
           </table>
         </div>

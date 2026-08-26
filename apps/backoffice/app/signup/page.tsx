@@ -81,7 +81,7 @@ export default function SignupPage() {
               required
             />
             <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || !email.trim()}>
-              {busy ? 'Enviando...' : 'Enviar código'}
+              {busy ? 'Enviando…' : 'Enviar código'}
             </button>
           </form>
         )}
@@ -127,7 +127,7 @@ export default function SignupPage() {
               />
             </div>
             <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6 || !ownerName.trim() || !restaurantName.trim()}>
-              {busy ? 'Criando...' : 'Criar minha loja'}
+              {busy ? 'Criando…' : 'Criar minha loja'}
             </button>
             <button type="button" className="w-full text-sm font-medium text-brand-strong" onClick={() => { setStep('email'); setCode(''); setError(null); }}>
               Usar outro e-mail

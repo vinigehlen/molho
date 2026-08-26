@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Backoffice é sempre roxo Molho — não existe seletor de tema aqui
+    // Backoffice é sempre vermelho Brasa Molho — não existe seletor de tema aqui
     // (§6.2: white-label é só do storefront). tokens.css entra puro, sem
     // nenhum override de --brand-*.
     <html lang="pt-BR">

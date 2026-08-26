@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
 import { getStaffSession } from '../../../lib/staff-session';
+import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
 import { fetchStoreSetup, saveStoreSetup } from '../../../lib/store-setup-api';
 import { fetchStoreHours, saveStoreHours } from '../../../lib/store-hours-api';
@@ -52,10 +53,6 @@ const EMPTY_HOURS: HoursDraft = {
   saturday: [],
   sunday: [],
 };
-
-function centsToBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 function brlToCents(value: string): number {
   const normalized = value.replace(/[^\d,]/g, '').replace(',', '.');
@@ -524,13 +521,13 @@ export default function ConfiguracaoPage() {
                 <Link href="/gestor" className="rounded-[14px] border border-white/20 px-4 py-3 text-sm font-semibold text-white">Ir para pedidos</Link>
               </div>
             </div>
-            <aside className="rounded-[20px] bg-white p-5 text-text">
+            <aside className="rounded-[20px] bg-bg-card p-5 text-text">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-text-muted">Publicação</p>
                   <p className="mt-1 text-3xl font-semibold">{completedSteps}/{totalSteps}</p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${publishable ? 'bg-green-50 text-green-700' : 'bg-brand-faint text-brand-strong'}`}>
+                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${publishable ? 'bg-positive/10 text-positive' : 'bg-brand-faint text-brand-strong'}`}>
                   {publishable ? 'Pronta' : 'Em preparo'}
                 </span>
               </div>
@@ -543,7 +540,7 @@ export default function ConfiguracaoPage() {
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {Object.entries(checklist).map(([key, ok]) => (
                   <a key={key} href={`#${key === 'pagamento' ? 'loja' : key}`} className="rounded-[14px] border border-border px-3 py-2 text-sm">
-                    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${ok ? 'bg-green-600' : 'bg-brand'}`} />
+                    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${ok ? 'bg-positive' : 'bg-brand'}`} />
                     {stepLabel(key)}
                   </a>
                 ))}
@@ -554,13 +551,13 @@ export default function ConfiguracaoPage() {
                 <p className="mt-1 text-sm text-text-muted">{storeForm.addressText || 'Endereço, horários e entrega aparecem aqui no cardápio.'}</p>
                 <div className="mt-3 space-y-2">
                   {products.slice(0, 3).map((product) => (
-                    <div key={product.id} className="flex items-center justify-between rounded-[12px] bg-white px-3 py-2 text-sm">
+                    <div key={product.id} className="flex items-center justify-between rounded-[12px] bg-bg-card px-3 py-2 text-sm">
                       <span className="font-medium">{product.name}</span>
-                      <span className="text-text-muted">R$ {(product.basePriceCents / 100).toFixed(2).replace('.', ',')}</span>
+                      <span className="text-text-muted">{centsToBRL(product.basePriceCents)}</span>
                     </div>
                   ))}
                   {products.length === 0 && (
-                    <div className="rounded-[12px] bg-white px-3 py-3 text-sm text-text-muted">Cadastre o primeiro item para o preview ganhar vida.</div>
+                    <div className="rounded-[12px] bg-bg-card px-3 py-3 text-sm text-text-muted">Cadastre o primeiro item para o preview ganhar vida.</div>
                   )}
                 </div>
               </div>
@@ -569,7 +566,10 @@ export default function ConfiguracaoPage() {
         </header>
 
         {(error || message) && (
-          <div className={`rounded-[14px] border p-4 text-sm ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+          <div
+            role={error ? 'alert' : 'status'}
+            className={`rounded-[14px] border p-4 text-sm ${error ? 'border-critical bg-bg-card text-critical' : 'border-positive bg-bg-card text-positive'}`}
+          >
             {error ?? message}
           </div>
         )}
@@ -589,7 +589,7 @@ export default function ConfiguracaoPage() {
               <h2 className="text-2xl font-semibold">Sua loja</h2>
               <p className="mt-1 text-sm text-text-muted">Esses dados aparecem no cardápio, no checkout e na cobrança PIX.</p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${checklist.loja && checklist.pagamento ? 'bg-green-50 text-green-700' : 'bg-brand-faint text-brand-strong'}`}>
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${checklist.loja && checklist.pagamento ? 'bg-positive/10 text-positive' : 'bg-brand-faint text-brand-strong'}`}>
               {checklist.loja && checklist.pagamento ? 'Dados completos' : 'Complete antes de publicar'}
             </span>
           </div>
@@ -655,9 +655,9 @@ export default function ConfiguracaoPage() {
             ))}
           </div>
           <button className="mt-5 rounded-[14px] bg-brand px-5 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy === 'hours'} onClick={() => void saveHours()}>
-            {busy === 'hours' ? 'Salvando...' : 'Salvar horários'}
+            {busy === 'hours' ? 'Salvando…' : 'Salvar horários'}
           </button>
-          {hoursMessage && <p className="mt-3 rounded-[14px] border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{hoursMessage}</p>}
+          {hoursMessage && <p role="status" className="mt-3 rounded-[14px] border border-positive bg-bg-card px-4 py-3 text-sm font-semibold text-positive">{hoursMessage}</p>}
         </section>
 
         <section id="cardapio" className="rounded-[20px] border border-border bg-bg-card p-5">
@@ -701,7 +701,7 @@ export default function ConfiguracaoPage() {
                   <h3 className="font-semibold">Produtos cadastrados</h3>
                   <span className="text-sm text-text-muted">{products.filter((product) => product.available).length} vendável(is)</span>
                 </div>
-                {catalogMessage && <p className="mt-3 rounded-[14px] border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{catalogMessage}</p>}
+                {catalogMessage && <p role="status" className="mt-3 rounded-[14px] border border-positive bg-bg-card px-4 py-3 text-sm font-semibold text-positive">{catalogMessage}</p>}
                 <div className="mt-3 grid gap-2">
                   {products.length === 0 && (
                     <div className="rounded-[14px] border border-dashed border-border bg-bg-card p-5">
@@ -712,22 +712,22 @@ export default function ConfiguracaoPage() {
                   {products.map((product) => {
                     const expanded = selectedProductId === product.id && selectedProduct?.id === product.id;
                     return (
-                      <div key={product.id} className={`rounded-[14px] border ${expanded ? 'border-brand bg-red-50' : 'border-border bg-bg-card'}`}>
+                      <div key={product.id} className={`rounded-[14px] border ${expanded ? 'border-brand bg-brand-faint' : 'border-border bg-bg-card'}`}>
                         <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
                           <button className="flex-1 text-left" onClick={() => setSelectedProductId(expanded ? '' : product.id)}>
                             <span className="font-semibold">{product.name}</span>
                             <span className="ml-2 text-sm text-text-muted">{centsToBRL(product.basePriceCents)}</span>
-                            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${product.available ? 'bg-green-50 text-green-700' : 'bg-bg text-text-muted'}`}>
+                            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${product.available ? 'bg-positive/10 text-positive' : 'bg-bg text-text-muted'}`}>
                               {product.available ? 'ativo' : 'esgotado'}
                             </span>
                           </button>
                           <div className="flex gap-2">
                             <button className="rounded-[14px] border border-border px-3 py-2 text-sm font-semibold" onClick={() => setSelectedProductId(expanded ? '' : product.id)}>{expanded ? 'Fechar' : 'Editar'}</button>
-                            <button className="rounded-[14px] border border-red-200 px-3 py-2 text-sm font-semibold text-brand-strong" onClick={() => { setSelectedProductId(product.id); void removeProduct(product); }}>Remover</button>
+                            <button className="rounded-[14px] border border-critical px-3 py-2 text-sm font-semibold text-critical" onClick={() => { setSelectedProductId(product.id); void removeProduct(product); }}>Remover</button>
                           </div>
                         </div>
                         {expanded && (
-                          <div className="border-t border-red-100 p-4">
+                          <div className="border-t border-border p-4">
                             <div className="grid gap-3 md:grid-cols-2">
                               <select className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.categoryId} onChange={(event) => setEditDraft((prev) => ({ ...prev, categoryId: event.target.value }))}>
                                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
@@ -741,7 +741,7 @@ export default function ConfiguracaoPage() {
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand disabled:opacity-50" disabled={busy === 'product-edit'} onClick={() => void saveSelectedProduct()}>
-                                {busy === 'product-edit' ? 'Salvando...' : 'Salvar item'}
+                                {busy === 'product-edit' ? 'Salvando…' : 'Salvar item'}
                               </button>
                               <button className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={busy === 'pizza-template'} onClick={() => void applyPizzaTemplate()}>
                                 Montar como pizza
@@ -752,7 +752,7 @@ export default function ConfiguracaoPage() {
                               <div className="mt-2 flex flex-wrap gap-3">
                                 {images.map((image) => (
                                   <div key={image.id} className="h-24 w-24 overflow-hidden rounded-[14px] border border-border bg-bg">
-                                    {image.imageUrl ? <img src={image.imageUrl} alt={`Foto de ${selectedProduct.name}`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">Foto salva</div>}
+                                    {image.imageUrl ? <img src={image.imageUrl} alt={`Foto de ${selectedProduct.name}`} width={96} height={96} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">Foto salva</div>}
                                   </div>
                                 ))}
                                 {images.length === 0 && <div className="flex h-24 min-w-44 items-center rounded-[14px] border border-dashed border-border px-3 text-sm text-text-muted">Nenhuma foto cadastrada.</div>}
@@ -760,7 +760,7 @@ export default function ConfiguracaoPage() {
                               <div className="mt-3 flex flex-col gap-2 md:flex-row">
                                 <input type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg p-3" onChange={(event) => setEditPhoto(event.target.files?.[0] ?? null)} />
                                 <button className="rounded-[14px] border border-border px-4 py-2 font-semibold disabled:opacity-50" disabled={!editPhoto || busy === 'product-photo'} onClick={() => void uploadSelectedProductPhoto()}>
-                                  {busy === 'product-photo' ? 'Enviando...' : 'Adicionar foto'}
+                                  {busy === 'product-photo' ? 'Enviando…' : 'Adicionar foto'}
                                 </button>
                               </div>
                             </div>

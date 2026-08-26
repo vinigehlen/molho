@@ -126,9 +126,13 @@ export default function BalcaoPage() {
         </div>
       </div>
 
-      {error && <div className="mb-4 rounded-[14px] border border-critical/30 bg-critical/5 p-4 font-medium text-critical">{error}</div>}
+      {error && (
+        <div role="alert" className="mb-4 rounded-[14px] border border-critical/30 bg-critical/5 p-4 font-medium text-critical">
+          {error}
+        </div>
+      )}
       {success && (
-        <div className="mb-4 rounded-[14px] border border-positive/30 bg-positive/10 p-4 font-medium text-positive">
+        <div role="status" className="mb-4 rounded-[14px] border border-positive/30 bg-positive/10 p-4 font-medium text-positive">
           Pedido {success.orderId.slice(0, 8)} criado: {centsToBRL(success.totalCents)}
         </div>
       )}
@@ -168,7 +172,7 @@ export default function BalcaoPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-[16px] border border-border bg-bg-card p-8 text-text-muted">Carregando produtos...</div>
+            <div className="rounded-[16px] border border-border bg-bg-card p-8 text-text-muted">Carregando produtos…</div>
           ) : filteredProducts.length === 0 ? (
             <div className="rounded-[16px] border border-border bg-bg-card p-8 text-text-muted">Nenhum produto disponível.</div>
           ) : (
@@ -181,7 +185,7 @@ export default function BalcaoPage() {
                 >
                   <span className="block text-base font-semibold text-text">{product.name}</span>
                   {product.description && <span className="mt-1 block text-sm text-text-muted">{product.description}</span>}
-                  <span className="mt-3 block text-lg font-bold text-brand">{centsToBRL(product.basePriceCents)}</span>
+                  <span className="mt-3 block text-lg font-bold tabular-nums text-brand">{centsToBRL(product.basePriceCents)}</span>
                 </button>
               ))}
             </div>
@@ -199,19 +203,31 @@ export default function BalcaoPage() {
                   <div className="flex justify-between gap-3">
                     <div>
                       <p className="font-semibold text-text">{line.product.name}</p>
-                      <p className="text-sm text-text-muted">{centsToBRL(line.product.basePriceCents)}</p>
+                      <p className="text-sm tabular-nums text-text-muted">{centsToBRL(line.product.basePriceCents)}</p>
                     </div>
-                    <p className="font-bold text-text">{centsToBRL(line.product.basePriceCents * line.quantity)}</p>
+                    <p className="font-bold tabular-nums text-text">{centsToBRL(line.product.basePriceCents * line.quantity)}</p>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    <button className="rounded-full border border-border p-2 text-text" onClick={() => updateQuantity(line.product.id, -1)}>
+                    <button
+                      aria-label={`Diminuir quantidade de ${line.product.name}`}
+                      className="rounded-full border border-border p-2 text-text"
+                      onClick={() => updateQuantity(line.product.id, -1)}
+                    >
                       <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-8 text-center font-semibold text-text">{line.quantity}</span>
-                    <button className="rounded-full border border-border p-2 text-text" onClick={() => updateQuantity(line.product.id, 1)}>
+                    <span className="w-8 text-center font-semibold tabular-nums text-text">{line.quantity}</span>
+                    <button
+                      aria-label={`Aumentar quantidade de ${line.product.name}`}
+                      className="rounded-full border border-border p-2 text-text"
+                      onClick={() => updateQuantity(line.product.id, 1)}
+                    >
                       <Plus className="h-4 w-4" />
                     </button>
-                    <button className="ml-auto rounded-full border border-border p-2 text-critical" onClick={() => updateQuantity(line.product.id, -line.quantity)}>
+                    <button
+                      aria-label={`Remover ${line.product.name}`}
+                      className="ml-auto rounded-full border border-border p-2 text-critical"
+                      onClick={() => updateQuantity(line.product.id, -line.quantity)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -240,12 +256,14 @@ export default function BalcaoPage() {
             />
           </label>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Forma de pagamento">
             {(Object.keys(PAYMENT_LABEL) as CounterOrderPaymentMethod[]).map((method) => (
               <button
                 key={method}
+                role="radio"
+                aria-checked={paymentMethod === method}
                 className={`rounded-[12px] border px-3 py-2 text-sm font-semibold ${
-                  paymentMethod === method ? 'border-brand bg-brand text-white' : 'border-border bg-bg text-text'
+                  paymentMethod === method ? 'border-brand bg-brand text-on-brand' : 'border-border bg-bg text-text'
                 }`}
                 onClick={() => setPaymentMethod(method)}
               >
@@ -256,14 +274,14 @@ export default function BalcaoPage() {
 
           <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
             <span className="text-sm font-medium text-text-muted">Total</span>
-            <span className="text-2xl font-bold text-text">{centsToBRL(totalCents)}</span>
+            <span className="text-2xl font-bold tabular-nums text-text">{centsToBRL(totalCents)}</span>
           </div>
           <button
-            className="mt-4 w-full rounded-[14px] bg-brand px-4 py-3 text-base font-bold text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-[14px] bg-brand px-4 py-3 text-base font-bold text-on-brand disabled:opacity-50"
             disabled={submitting || cart.length === 0 || !storeId}
             onClick={() => void submitOrder()}
           >
-            {submitting ? 'Finalizando...' : 'Finalizar pedido'}
+            {submitting ? 'Finalizando…' : 'Finalizar pedido'}
           </button>
         </aside>
       </div>

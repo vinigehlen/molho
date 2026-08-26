@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { memo, useEffect, useRef, useState, type DragEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronUp, CircleCheck, MessageCircle, Printer } from 'lucide-react';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { logoutStaffSession, refreshStaffSession } from '../../lib/staff-auth';
-import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn } from '../../lib/orders-api';
+import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn, type BoardColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
@@ -65,6 +66,9 @@ export default function GestorPage() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  // Board mobile-funcional (CLAUDE.md §6.3): abaixo de md, uma coluna de
+  // cada vez com seletor por aba, não o grid desktop com scroll horizontal.
+  const [mobileColumn, setMobileColumn] = useState<BoardColumn>(BOARD_COLUMNS[0]);
   const beeperRef = useRef<Beeper | null>(null);
   const seenIdsRef = useRef<Set<string> | null>(null); // null = load inicial ainda não semeado
 
@@ -241,12 +245,12 @@ export default function GestorPage() {
         </div>
         <div className="flex items-center gap-2">
           {!online ? (
-            <span className="rounded-full bg-critical px-3 py-1 text-xs font-medium text-white">
+            <span className="rounded-full bg-critical-strong px-3 py-1 text-xs font-medium text-white">
               Sem conexão — pedidos podem estar desatualizados
             </span>
           ) : (
             streamStatus !== 'open' && (
-              <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-white">
+              <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-text">
                 Sem tempo real — reconectando…
               </span>
             )
@@ -284,12 +288,34 @@ export default function GestorPage() {
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>
-      <div className="overflow-x-auto pb-3">
-        <div className="grid min-w-[1520px] grid-cols-5 gap-4">
+      {/* Abaixo de md: abas de coluna — cada uma tem contagem própria, então o
+          staff vê "tem pedido em Pronto" sem precisar estar olhando pra ela. */}
+      {/* role="radiogroup", não tablist: em md+ as 5 colunas ficam TODAS
+          visíveis ao mesmo tempo (grid), então não existe um único "painel
+          selecionado" pra combinar com semântica de aba — é mais perto de um
+          filtro de rádio de single-select mesmo (mesmo padrão do seletor de
+          pagamento do balcão). */}
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 md:hidden" role="radiogroup" aria-label="Coluna do board">
+        {BOARD_COLUMNS.map((col) => (
+          <button
+            key={col}
+            role="radio"
+            aria-checked={mobileColumn === col}
+            onClick={() => setMobileColumn(col)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium tabular-nums transition-colors ${
+              mobileColumn === col ? 'border-brand bg-brand text-on-brand' : 'border-border text-text-muted'
+            }`}
+          >
+            {COLUMN_LABEL[col]} {groups && `(${groups[col].length})`}
+          </button>
+        ))}
+      </div>
+      <div className="md:overflow-x-auto md:pb-3">
+        <div className="grid grid-cols-1 gap-4 md:min-w-[1520px] md:grid-cols-5">
           {BOARD_COLUMNS.map((col) => (
             <section
               key={col}
-              className={`min-w-0 rounded-[20px] border-2 p-3 transition-colors ${
+              className={`min-w-0 rounded-[20px] border-2 p-3 transition-colors ${col === mobileColumn ? 'block' : 'hidden'} md:block ${
                 dropTarget === col ? 'border-brand bg-brand-faint' : 'border-transparent bg-bg-card'
               }`}
               onDragOver={(event) => {
@@ -434,21 +460,7 @@ export default function GestorPage() {
   );
 }
 
-function OrderCard({
-  order,
-  pending,
-  online,
-  confirming,
-  onAdvance,
-  onMove,
-  onMarkPaid,
-  onNotify,
-  onPrint,
-  printFeedback,
-  dragging,
-  onDragStart,
-  onDragEnd,
-}: {
+interface OrderCardProps {
   order: AdminOrder;
   pending: boolean;
   online: boolean;
@@ -462,7 +474,32 @@ function OrderCard({
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
-}) {
+}
+
+/**
+ * Memoizado com comparador próprio: os callbacks (onAdvance, onMove…) são
+ * closures novas a cada render do board — comparação rasa padrão do memo()
+ * nunca bateria neles, então o memo não pegaria nada. `applyOrderUpdate`
+ * (order-updates.ts) já preserva a referência de `order` pra pedido que não
+ * mudou; comparar só o que carrega estado real (order, flags, printFeedback)
+ * é o que faz um nudge do SSE re-renderizar só o card afetado, não a coluna
+ * inteira.
+ */
+const OrderCard = memo(function OrderCard({
+  order,
+  pending,
+  online,
+  confirming,
+  onAdvance,
+  onMove,
+  onMarkPaid,
+  onNotify,
+  onPrint,
+  printFeedback,
+  dragging,
+  onDragStart,
+  onDragEnd,
+}: OrderCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [renderedAt] = useState(() => Date.now());
   const next = nextAction(order);
@@ -497,7 +534,10 @@ function OrderCard({
         </span>
         <div className="mt-1 flex items-center justify-between text-sm tabular-nums text-text">
           <span>{centsToBRL(order.totalCents)}</span>
-          <span className="text-xs text-brand-strong">{expanded ? 'Ocultar detalhes ▲' : 'Ver detalhes ▼'}</span>
+          <span className="inline-flex items-center gap-1 text-xs text-brand-strong">
+            {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </span>
         </div>
         <ul className="mt-2 space-y-0.5 text-xs text-text-muted">
           {order.items.map((item, i) => (
@@ -518,18 +558,19 @@ function OrderCard({
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {pending ? (
-          <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">ação pendente…</span>
+          <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-text">ação pendente…</span>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             {/* Segunda via durável (Épico 10): cria `print_job`; o agente local
                 imprime depois pelo claim da fila. Não muda estado do pedido. */}
             <button
-              className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
               disabled={printDisabled}
               onClick={onPrint}
               aria-label="Imprimir comanda"
             >
-              {printDisabled ? 'Enfileirando…' : '🖨️ Imprimir'}
+              <Printer className="h-3.5 w-3.5" />
+              {printDisabled ? 'Enfileirando…' : 'Imprimir'}
             </button>
             {printFeedback && printFeedback.state !== 'queueing' && (
               <span
@@ -545,10 +586,11 @@ function OrderCard({
                 (busca o telefone), então não é gateado por `online` como o
                 "Marcar pago". */}
             <button
-              className="rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
               onClick={onNotify}
             >
-              💬 Avisar cliente
+              <MessageCircle className="h-3.5 w-3.5" />
+              Avisar cliente
             </button>
           </div>
         )}
@@ -573,7 +615,14 @@ function OrderCard({
       </div>
     </article>
   );
-}
+},
+(prev, next) =>
+  prev.order === next.order &&
+  prev.pending === next.pending &&
+  prev.online === next.online &&
+  prev.confirming === next.confirming &&
+  prev.printFeedback === next.printFeedback &&
+  prev.dragging === next.dragging);
 
 function OrderDetails({ order }: { order: AdminOrder }) {
   return (
@@ -624,7 +673,11 @@ function PaymentPanel({
   onMarkPaid: () => void;
 }) {
   if (order.paymentStatus === 'confirmado') {
-    return <div className="mt-2 text-xs font-medium text-positive">✓ Pago</div>;
+    return (
+      <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-positive">
+        <CircleCheck className="h-3.5 w-3.5" /> Pago
+      </div>
+    );
   }
   // Pós-pago só faz sentido confirmar a partir da saída pra entrega (recebe na
   // ponta). PIX pode ser confirmado assim que o dinheiro cai, ainda em Recebidos.
@@ -632,10 +685,10 @@ function PaymentPanel({
   return (
     <div className="mt-2 flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-white">Aguardando pagamento</span>
+        <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-text">Aguardando pagamento</span>
         {confirmavel && (
           <button
-            className="rounded-[10px] bg-positive px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded-[10px] bg-positive px-3 py-1 text-xs font-medium text-text disabled:opacity-50"
             disabled={!online || confirming}
             onClick={onMarkPaid}
           >
