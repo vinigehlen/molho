@@ -1,16 +1,16 @@
 /**
- * Os 4 templates de tema do storefront (docs/03-self-setup.md §5).
+ * Os 3 templates de tema do storefront (docs/03-self-setup.md §5).
  *
- * O lojista escolhe 1 entre 4. NÃO existe seletor de cor livre — sem rampa em
+ * O lojista escolhe 1 entre 3. NÃO existe seletor de cor livre — sem rampa em
  * runtime, sem validação de contraste dinâmica, sem "ajustamos seu tom".
  * Cada template é só um bloco de --brand-* aplicado sobre os tokens.
  *
- * Backoffice, KDS e apps operacionais são SEMPRE a cor da marca Molho (agora
- * vermelho Brasa #D63A1E, era roxo #820AD1) — o tema é uma propriedade do
- * storefront do tenant, não da plataforma.
+ * Backoffice, KDS e apps operacionais são SEMPRE a cor da marca Molho
+ * (vermelho Brasa #D63A1E) — o tema é uma propriedade do storefront do
+ * tenant, não da plataforma.
  */
 
-export type ThemeKey = 'roxo' | 'brasa' | 'folha' | 'grafite';
+export type ThemeKey = 'brasa' | 'folha' | 'grafite';
 
 export interface Theme {
   key: ThemeKey;
@@ -33,26 +33,13 @@ export interface Theme {
 }
 
 export const THEMES: Record<ThemeKey, Theme> = {
-  roxo: {
-    key: 'roxo',
-    name: 'Roxo',
-    personality: 'Moderno, fintech, confiável. É o padrão — para quem não quer decidir.',
-    // TROCA DE MARCA: cor da marca Molho passou de roxo (#820AD1) para
-    // vermelho Brasa (#D63A1E) — este template herda os mesmos tons do
-    // template "brasa" logo abaixo. Ficam DOIS templates com cor idêntica;
-    // é resíduo esperado da troca, não bug — decisão de manter/renomear/
-    // remover um dos dois fica para o PM revisar na branch.
-    brand: '#D63A1E',
-    brandStrong: '#A81E16',
-    brandSubtle: '#FBDAD3',
-    brandFaint: '#FEF1EE',
-    brandAccent: '#F0846D',
-    onBrand: '#FFFFFF',
-  },
   brasa: {
     key: 'brasa',
     name: 'Brasa',
-    personality: 'Apetitoso, quente, urgente. Hamburgueria, pizzaria, churrasco.',
+    // Também o padrão — para quem não quer decidir (era o papel do extinto
+    // template "Roxo", removido por ser byte-idêntico a este depois da troca
+    // de marca de roxo #820AD1 pra vermelho Brasa #D63A1E; ver git history).
+    personality: 'Apetitoso, quente, urgente. Hamburgueria, pizzaria, churrasco. É o padrão.',
     brand: '#D63A1E',
     brandStrong: '#A81E16',
     brandSubtle: '#FBE3E1',
@@ -92,7 +79,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 
 export const THEME_KEYS = Object.keys(THEMES) as ThemeKey[];
 
-export const DEFAULT_THEME: ThemeKey = 'roxo';
+export const DEFAULT_THEME: ThemeKey = 'brasa';
 
 export function getTheme(key: string | null | undefined): Theme {
   const theme = key ? THEMES[key as ThemeKey] : undefined;

@@ -50,6 +50,13 @@ export function MoProductCard({
   const grid = variant === 'grid';
   const podeSelecionar = available && Boolean(onSelect);
   const podeAdicionar = available && Boolean(onQuickAdd);
+  // URL assinada do R2 pode expirar/quebrar depois do card já montado — sem
+  // isso, o consumidor via o ícone de imagem quebrada do navegador em vez do
+  // placeholder que já existe pra "sem foto".
+  const [imagemQuebrada, setImagemQuebrada] = React.useState(false);
+  React.useEffect(() => {
+    setImagemQuebrada(false);
+  }, [imageUrl]);
 
   const foto = (
     <div
@@ -58,11 +65,12 @@ export function MoProductCard({
         grid ? 'aspect-square w-full' : 'h-[88px] w-[88px]',
       )}
     >
-      {imageUrl ? (
+      {imageUrl && !imagemQuebrada ? (
         <img
           src={imageUrl}
           alt={`Foto de ${name}`}
           loading="lazy"
+          onError={() => setImagemQuebrada(true)}
           className={cn('h-full w-full object-cover', !available && 'grayscale')}
         />
       ) : (

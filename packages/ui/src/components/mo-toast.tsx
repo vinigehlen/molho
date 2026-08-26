@@ -22,15 +22,24 @@ export interface MoToastProps {
  * texto obsoleto quando reaparecer com uma mensagem nova.
  */
 export function MoToast({ open, onOpenChange, message, durationMs = 4000, className }: MoToastProps) {
+  // Pausa no hover/focus: ler a mensagem não pode ser uma corrida contra o
+  // timer. Sem botão de fechar de propósito — o toast é só informativo, nunca
+  // exige ação (regra 14), então não ganha uma affordance que sugere o contrário.
+  const [pausado, setPausado] = React.useState(false);
+
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || pausado) return;
     const id = setTimeout(() => onOpenChange(false), durationMs);
     return () => clearTimeout(id);
-  }, [open, durationMs, onOpenChange]);
+  }, [open, pausado, durationMs, onOpenChange]);
 
   return (
     <div
       aria-hidden={!open}
+      onMouseEnter={() => setPausado(true)}
+      onMouseLeave={() => setPausado(false)}
+      onFocus={() => setPausado(true)}
+      onBlur={() => setPausado(false)}
       className={cn(
         'fixed inset-x-4 bottom-24 z-50 sm:inset-x-auto sm:right-4 sm:max-w-sm',
         'transition duration-base ease-out',

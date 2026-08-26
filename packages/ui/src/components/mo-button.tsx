@@ -12,7 +12,14 @@ import { cn } from '../lib/cn';
  * desktop. `pix` é variante própria porque a cor do PIX é do Banco Central e
  * nunca acompanha o tema do lojista.
  */
-const buttonVariants = cva(
+/**
+ * Exportado pra quem precisa do visual de `MoButton` num elemento que NÃO é
+ * `<button>` (ex.: `<Link>` de navegação) — `MoButton` só renderiza
+ * `<button>` de propósito (semântica de ação, não de link). Composição
+ * direta com a variante em vez de props polimórficas tipo `asChild`: menos
+ * API de superfície, mesmo resultado visual, sem depender de Radix Slot.
+ */
+export const buttonVariants = cva(
   [
     'relative inline-flex items-center justify-center gap-2',
     'rounded-md font-semibold',

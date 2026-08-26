@@ -8,7 +8,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * Sem isto ele não reconhece esses nomes como tamanho de fonte, assume que são
  * COR e, ao encontrar `text-on-brand` no mesmo elemento, descarta um dos dois
  * como conflito. O botão primário perdia a cor do texto e herdava o ink do
- * container: 2.58:1 no Roxo e 1:1 no Grafite — preto sobre preto.
+ * container: 2.58:1 no Brasa e 1:1 no Grafite — preto sobre preto.
  *
  * Regressão coberta em cn.test.ts. Todo token `text-*` novo entra aqui.
  */

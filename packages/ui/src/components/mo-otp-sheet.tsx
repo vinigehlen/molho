@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { isPlausiblePhoneDigits } from '../lib/masks';
 import { MoButton } from './mo-button';
 import { MoInput } from './mo-input';
 import { MoSheet } from './mo-sheet';
@@ -67,11 +68,10 @@ export function MoOtpSheet({
   if (!open) return null;
 
   const porEmail = channel === 'email';
-  const digitos = phone.replace(/\D/g, '');
   // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — fixo (10 dígitos)
   // nunca recebe SMS. Mesma exigência de parsePhoneNumber (@molho/contracts),
   // que rejeitaria um fixo de qualquer forma.
-  const telefoneValido = digitos.length === 11;
+  const telefoneValido = isPlausiblePhoneDigits(phone);
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const contatoValido = telefoneValido && (!porEmail || emailValido);
   const codigoValido = code.replace(/\D/g, '').length === 6;

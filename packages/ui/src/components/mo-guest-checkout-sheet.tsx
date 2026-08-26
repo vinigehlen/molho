@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { isPlausiblePhoneDigits } from '../lib/masks';
 import { MoButton } from './mo-button';
 import { MoInput } from './mo-input';
 import { MoSheet } from './mo-sheet';
@@ -50,7 +51,7 @@ export function MoGuestCheckoutSheet({ open, onOpenChange, onSubmit, className }
 
   // Celular (DDD + nono dígito + 8) — mesma exigência do MoOtpSheet e do
   // parsePhoneNumber: o lojista liga pra confirmar, e fixo não recebe torpedo.
-  const telefoneValido = phone.replace(/\D/g, '').length === 11;
+  const telefoneValido = isPlausiblePhoneDigits(phone);
   const nomeValido = name.trim().length >= 2;
   const podeEnviar = telefoneValido && nomeValido;
 
