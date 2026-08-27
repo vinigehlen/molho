@@ -167,7 +167,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const foraDaArea = deliveryMatch?.withinZone === false;
 
   return (
-    <div className="mx-auto max-w-2xl pb-24">
+    <div className="mx-auto max-w-6xl pb-24">
       <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
         <h1 className="text-title-lg">{storeName}</h1>
         <p className="text-body opacity-90">{greeting}</p>
@@ -192,40 +192,71 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         </div>
       ) : null}
 
+      {/* Abaixo de md: chips horizontais rolando (mesmo padrão de sempre).
+          md+: coluna fixa de categorias à esquerda — mesma ideia da sidebar
+          do gestor, só que sem colapsar (cardápio não precisa disso) e sem
+          ícone (categoria não tem um natural). */}
       <MoCategoryChips
+        className="md:hidden"
         categories={categories.map((categoria) => ({ id: categoria.id, name: categoria.name }))}
         activeId={categoriaAtiva}
         onSelect={irParaCategoria}
       />
 
-      <div className="flex flex-col gap-8 p-4">
-        {categories.map((categoria) => (
-          <section
-            key={categoria.id}
-            id={categoria.id}
-            ref={(elemento) => {
-              if (elemento) secoesRef.current.set(categoria.id, elemento);
-              else secoesRef.current.delete(categoria.id);
-            }}
-            className="scroll-mt-16"
-          >
-            <h2 className="mb-3 text-title text-text">{categoria.name}</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {categoria.products.map((produto) => (
-                <MoProductCard
-                  key={produto.id}
-                  name={produto.name}
-                  description={produto.description}
-                  priceCents={produto.basePriceCents}
-                  imageUrl={produto.imageUrl}
-                  available={produto.available}
-                  onSelect={() => setProdutoSelecionado(produto)}
-                  onQuickAdd={podeAdicionarRapido(produto) ? () => adicaoRapida(produto) : undefined}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+      <div className="md:grid md:grid-cols-[220px_1fr] md:gap-8 md:px-4 md:pt-4">
+        <nav
+          className="sticky top-4 hidden h-fit flex-col gap-1 self-start md:flex"
+          aria-label="Categorias do cardápio"
+        >
+          {categories.map((categoria) => (
+            <button
+              key={categoria.id}
+              type="button"
+              onClick={() => irParaCategoria(categoria.id)}
+              aria-current={categoria.id === categoriaAtiva ? 'true' : undefined}
+              className={`rounded-[14px] px-3 py-2.5 text-left text-body-strong transition-colors ${
+                categoria.id === categoriaAtiva ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              {categoria.name}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex flex-col gap-6 p-4 md:p-0">
+          {categories.map((categoria) => (
+            <section
+              key={categoria.id}
+              id={categoria.id}
+              ref={(elemento) => {
+                if (elemento) secoesRef.current.set(categoria.id, elemento);
+                else secoesRef.current.delete(categoria.id);
+              }}
+              className="scroll-mt-16"
+            >
+              <h2 className="mb-3 text-title text-text md:hidden">{categoria.name}</h2>
+              {/* Lista, não grid: itens menores, mais por tela (o mesmo
+                  MoProductCard, variante list — foto pequena, texto e preço
+                  na linha, já existia no design system, só não estava em uso
+                  aqui). */}
+              <div className="flex flex-col gap-2">
+                {categoria.products.map((produto) => (
+                  <MoProductCard
+                    key={produto.id}
+                    variant="list"
+                    name={produto.name}
+                    description={produto.description}
+                    priceCents={produto.basePriceCents}
+                    imageUrl={produto.imageUrl}
+                    available={produto.available}
+                    onSelect={() => setProdutoSelecionado(produto)}
+                    onQuickAdd={podeAdicionarRapido(produto) ? () => adicaoRapida(produto) : undefined}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
 
       <MoProductSheet
