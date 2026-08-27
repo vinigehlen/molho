@@ -139,9 +139,22 @@ export function CartView({
           </span>
         </p>
         <SuccessPaymentInfo step={checkout.step} />
-        <MoButton variant="ghost" onClick={() => router.push(`/${slug}`)}>
-          Voltar pro cardápio
-        </MoButton>
+        {/* Sem isso, o pico emocional ("consegui pedir") não tinha onde
+            pousar: o cliente ficava só com "Voltar pro cardápio" depois de
+            pagar, sem número do pedido nem caminho pro histórico que
+            /minha-conta já lista. Épico 12 (acompanhamento) ainda não
+            existe — este é o reasseguramento possível até lá. */}
+        <p className="text-caption text-text-muted">
+          Pedido <span className="font-mono">#{checkout.step.orderId.slice(0, 8)}</span>
+        </p>
+        <div className="flex flex-col gap-2">
+          <Link href={`/${slug}/minha-conta`} className="text-body-strong text-brand-strong underline-offset-2 hover:underline">
+            Ver meus pedidos
+          </Link>
+          <MoButton variant="ghost" onClick={() => router.push(`/${slug}`)}>
+            Voltar pro cardápio
+          </MoButton>
+        </div>
       </main>
     );
   }

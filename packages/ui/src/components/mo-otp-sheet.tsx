@@ -29,6 +29,11 @@ export interface MoOtpSheetProps {
 
 type Step = 'phone' | 'code';
 
+/** Espelha o cooldown de 60s do `OtpService` (CLAUDE.md, seção Segurança) —
+ * sem contador visível, "Reenviar código" parecia clicável e o cliente
+ * (Riley-tipo) clicava várias vezes sem entender por que nada mudava. */
+const REENVIO_COOLDOWN_SEGUNDOS = 60;
+
 /**
  * MoOtpSheet — login por OTP do cliente final, único ponto do storefront que
  * pede telefone (CLAUDE.md regra 13: só no "Fazer pedido" final, nunca antes).
@@ -54,6 +59,7 @@ export function MoOtpSheet({
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [cooldown, setCooldown] = React.useState(0);
 
   React.useEffect(() => {
     if (!open) return;
@@ -63,7 +69,16 @@ export function MoOtpSheet({
     setCode('');
     setError(null);
     setLoading(false);
+    setCooldown(0);
   }, [open]);
+
+  // Conta 1 em 1s até zerar; recomeça toda vez que `cooldown` é setado de
+  // novo pra 60 (envio inicial e cada reenvio).
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
 
   if (!open) return null;
 
@@ -87,6 +102,7 @@ export function MoOtpSheet({
       return;
     }
     setStep('code');
+    setCooldown(REENVIO_COOLDOWN_SEGUNDOS);
   }
 
   async function enviarCodigo() {
@@ -109,11 +125,16 @@ export function MoOtpSheet({
   }
 
   async function reenviarCodigo() {
+    if (cooldown > 0 || loading) return;
     setError(null);
     setLoading(true);
     const resultado = await onRequestCode(phone, porEmail ? email.trim() : undefined);
     setLoading(false);
-    if (!resultado.ok) setError(resultado.message);
+    if (!resultado.ok) {
+      setError(resultado.message);
+      return;
+    }
+    setCooldown(REENVIO_COOLDOWN_SEGUNDOS);
   }
 
   return (
@@ -179,8 +200,13 @@ export function MoOtpSheet({
               <button type="button" onClick={trocarNumero} className="text-brand-strong underline-offset-2 hover:underline">
                 Trocar número
               </button>
-              <button type="button" onClick={reenviarCodigo} className="text-brand-strong underline-offset-2 hover:underline">
-                Reenviar código
+              <button
+                type="button"
+                onClick={reenviarCodigo}
+                disabled={cooldown > 0}
+                className="text-brand-strong underline-offset-2 hover:underline disabled:text-text-muted disabled:no-underline"
+              >
+                {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar código'}
               </button>
             </div>
           </>

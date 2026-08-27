@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { LayoutGrid, List, MapPin } from 'lucide-react';
+import { LayoutGrid, List, MapPin, User } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
 import {
@@ -18,6 +19,7 @@ import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
 import { fetchDeliveryMatch } from '../../lib/delivery-match-api';
 import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
+import { useCustomerToken } from '../../lib/use-customer-token';
 import { lookupPostalCode } from '../../lib/viacep';
 
 const LEGAL_TERMS_HREF = 'https://molho.live/termos';
@@ -33,6 +35,10 @@ const LEGAL_PRIVACY_HREF = 'https://molho.live/privacidade';
  */
 const COPY_FORA_DA_AREA = 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!';
 const COPY_PEDIDO_MINIMO = 'Faltam {valor} pra fechar o pedido mínimo da casa.';
+/** Cliente que já verificou o telefone nesta loja (pediu antes) ganha uma
+ * saudação mais quente — sem round-trip pro nome: o token de sessão em
+ * localStorage já entrega essa informação de graça. */
+const COPY_SAUDACAO_RECORRENTE = 'Que bom te ver de novo 👋 Bateu a fome?';
 
 function interpolarCopy(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (bruto, chave: string) => vars[chave] ?? bruto);
@@ -83,6 +89,8 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
   const cart = useCart(slug);
+  const customerSession = useCustomerToken(slug);
+  const saudacao = customerSession.token ? COPY_SAUDACAO_RECORRENTE : greeting;
   const { address, setAddress } = useAddress(slug);
   const router = useRouter();
 
@@ -183,9 +191,23 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
 
   return (
     <div className="mx-auto max-w-6xl pb-24">
-      <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
-        <h1 className="text-title-lg">{storeName}</h1>
-        <p className="text-body opacity-90">{greeting}</p>
+      <header className="flex items-start justify-between gap-2 bg-brand px-4 py-6 text-on-brand">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-title-lg">{storeName}</h1>
+          <p className="text-body opacity-90">{saudacao}</p>
+        </div>
+        {/* Sem link nenhum pro cardápio, /minha-conta (já com histórico de
+            pedidos pronto) ficava só alcançável digitando a URL na mão —
+            achado do critique de consumidor. Aparece sempre, mesmo sem
+            sessão: a própria página trata o caso "sem pedido ainda" com uma
+            mensagem, nunca um formulário de login morto. */}
+        <Link
+          href={`/${slug}/minha-conta`}
+          aria-label="Minha conta"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
+        >
+          <User className="h-5 w-5" aria-hidden="true" />
+        </Link>
       </header>
 
       <button
