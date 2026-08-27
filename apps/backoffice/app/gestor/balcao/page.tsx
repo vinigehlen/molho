@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CounterOrderPaymentMethod, CounterOrderResponse } from '@molho/contracts';
 import { Minus, Plus, ReceiptText, RefreshCw, Trash2 } from 'lucide-react';
-import Link from 'next/link';
 import { createCounterOrder, fetchCounterCatalog, type CounterCategory, type CounterProduct } from '../../../lib/counter-pos-api';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
@@ -112,9 +111,6 @@ export default function BalcaoPage() {
           <h1 className="mt-2 text-2xl font-semibold text-text">PDV de balcão</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link className="rounded-full border border-border px-3 py-1 text-sm font-medium text-text" href="/gestor">
-            Pedidos
-          </Link>
           <button
             className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-sm font-medium text-text disabled:opacity-50"
             onClick={() => void loadInitialData()}

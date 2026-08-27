@@ -1,12 +1,11 @@
 'use client';
 
 import { memo, useEffect, useRef, useState, type DragEvent } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp, CircleCheck, MessageCircle, Printer } from 'lucide-react';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
-import { logoutStaffSession, refreshStaffSession } from '../../lib/staff-auth';
+import { refreshStaffSession } from '../../lib/staff-auth';
 import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn, type BoardColumn } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
@@ -17,7 +16,6 @@ import { isBackwardStaffTransition, isLegalStaffTransition, paymentGateReason } 
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { centsToBRL, fulfillmentDeadline, isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
-import { disarmStream } from '../../lib/api-client';
 import { PrintJobConsumer } from './print-job-consumer';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
@@ -130,7 +128,7 @@ export default function GestorPage() {
   const online = useReachability();
 
   // Fila offline: submit (online aplica / offline enfileira), sync na volta, conflitos.
-  const { pending, conflicts, autoApplied, submit, sync, resolveConflict } = useOrderQueue(tenantId, userId, online);
+  const { pending, conflicts, autoApplied, submit, resolveConflict } = useOrderQueue(tenantId, userId, online);
   const pendingIds = new Set(pending.map((i) => i.orderId));
 
   // Confirmação de pagamento (item 6). Refetch pós-confirm atualiza board+painel;
@@ -145,7 +143,6 @@ export default function GestorPage() {
   // Segunda via durável (Épico 10): o botão só enfileira. Quem imprime de fato
   // é o consumidor local da fila, via claim/printed/failed.
   const [printFeedback, setPrintFeedback] = useState<Record<string, { state: 'queueing' | 'queued' | 'failed'; message: string }>>({});
-  const [loggingOut, setLoggingOut] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<AdminOrder['status'] | null>(null);
   const [reversal, setReversal] = useState<{ order: AdminOrder; toStatus: AdminOrder['status'] } | null>(null);
@@ -168,37 +165,6 @@ export default function GestorPage() {
     setDraggingId(null);
     setDropTarget(null);
     if (order) requestTransition(order, toStatus);
-  }
-
-  async function logout() {
-    if (pending.length > 0) {
-      if (!online) {
-        const confirmed = window.confirm(
-          `Há ${pending.length} ação(ões) ainda no aparelho. Elas ficam guardadas para o próximo login neste restaurante. Sair mesmo assim?`,
-        );
-        if (!confirmed) return;
-      } else {
-        const unresolved = await sync();
-        if (unresolved > 0) {
-          setError('Há ações pendentes que precisam da sua decisão antes de sair.');
-          return;
-        }
-      }
-    }
-
-    setLoggingOut(true);
-    setError(null);
-    try {
-      let disarmed = await disarmStream();
-      if (!disarmed.ok) disarmed = await disarmStream();
-      if (!disarmed.ok) throw new Error('Não foi possível encerrar o tempo real. Tente novamente.');
-      if (!(await logoutStaffSession())) throw new Error('Não foi possível encerrar sua sessão. Tente novamente.');
-      router.replace('/login');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível sair agora.');
-    } finally {
-      setLoggingOut(false);
-    }
   }
 
   async function queuePrintCopy(order: AdminOrder) {
@@ -263,28 +229,6 @@ export default function GestorPage() {
               Ativar som
             </button>
           )}
-          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/configuracao">
-            Configuração
-          </Link>
-          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/impressao">
-            Impressão
-          </Link>
-          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/entrega">
-            Entrega
-          </Link>
-          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/balcao">
-            Balcão
-          </Link>
-          <Link className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text" href="/gestor/analytics">
-            Analytics
-          </Link>
-          <button
-            className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text disabled:opacity-50"
-            onClick={() => void logout()}
-            disabled={loggingOut}
-          >
-            {loggingOut ? 'Saindo…' : 'Sair'}
-          </button>
           {tenantId && <PrintJobConsumer active={online} />}
         </div>
       </div>

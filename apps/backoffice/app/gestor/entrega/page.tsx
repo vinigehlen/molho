@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
   CreateDeliveryZoneInput,
@@ -312,17 +311,12 @@ export default function EntregaPage() {
 
 function PageHeader() {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <p className="text-sm font-medium text-brand-strong">Entrega</p>
-        <h1 className="text-2xl font-semibold text-text">Zonas e horários</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Configure cidades atendidas, taxa, prazo e a grade semanal da loja.
-        </p>
-      </div>
-      <Link className="rounded-full border border-border px-3 py-1 text-sm font-medium text-text" href="/gestor">
-        Voltar aos pedidos
-      </Link>
+    <div>
+      <p className="text-sm font-medium text-brand-strong">Entrega</p>
+      <h1 className="text-2xl font-semibold text-text">Zonas e horários</h1>
+      <p className="mt-1 text-sm text-text-muted">
+        Configure cidades atendidas, taxa, prazo e a grade semanal da loja.
+      </p>
     </div>
   );
 }
