@@ -77,9 +77,13 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
 export function Sidebar({ tenantName, collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onLogout, loggingOut }: SidebarProps) {
   return (
     <>
-      {/* Desktop: rail fixo, sempre no fluxo. */}
+      {/* Desktop: rail gruda no topo da viewport (sticky + h-screen) — sem
+          isso ele só tinha min-h-screen herdado do wrapper flex e rolava
+          junto com o conteúdo da página (Configuração é bem mais alta que a
+          tela). Nav já é overflow-y-auto próprio, então cresce internamente
+          e o Sair no rodapé nunca sai da vista. */}
       <aside
-        className={`hidden shrink-0 flex-col border-r border-border bg-bg-card transition-[width] duration-base ease-out md:flex ${
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border bg-bg-card transition-[width] duration-base ease-out md:flex ${
           collapsed ? 'w-16' : 'w-60'
         }`}
       >
