@@ -119,7 +119,12 @@ export function MoProductCard({
           'flex w-full gap-3 rounded-lg text-left',
           'transition duration-base ease-out',
           'focus-visible:outline-none focus-visible:shadow-focus',
-          grid ? 'flex-col' : 'flex-row-reverse items-start',
+          // list: sem isso o hover/foco desenhava a caixa colada no texto
+          // (padding zero), então o texto parecia "vazar" pra fora dela. O
+          // `-m-2` cancela o `p-2` no fluxo (linhas não crescem, não
+          // desalinham com a coluna de categorias) e só sobra o respiro
+          // visual dentro da caixa de hover.
+          grid ? 'flex-col' : 'flex-row-reverse items-start p-2 -m-2',
           podeSelecionar ? 'cursor-pointer hover:shadow-2' : 'cursor-default',
         )}
       >

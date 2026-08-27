@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { MapPin } from 'lucide-react';
+import { LayoutGrid, List, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
 import {
@@ -66,8 +66,18 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
   return produto.modifierGroups.every((grupo) => grupo.min === 0);
 }
 
+const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
+
+/** Lazy init: lê a preferência salva só na primeira renderização (evita
+ * "piscar" list→grid depois do mount) — mesmo padrão de `use-sidebar-state`. */
+function lerVisualizacaoSalva(): 'list' | 'grid' {
+  if (typeof window === 'undefined') return 'list';
+  return window.localStorage.getItem(VISUALIZACAO_STORAGE_KEY) === 'grid' ? 'grid' : 'list';
+}
+
 export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
+  const [visualizacao, setVisualizacao] = React.useState<'list' | 'grid'>(lerVisualizacaoSalva);
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
   const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
@@ -117,6 +127,11 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
     for (const secao of secoes) observer.observe(secao);
     return () => observer.disconnect();
   }, [categories]);
+
+  function trocarVisualizacao(valor: 'list' | 'grid') {
+    setVisualizacao(valor);
+    window.localStorage.setItem(VISUALIZACAO_STORAGE_KEY, valor);
+  }
 
   function irParaCategoria(id: string) {
     setCategoriaAtiva(id);
@@ -224,6 +239,34 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         </nav>
 
         <div className="flex flex-col gap-6 p-4 md:p-0">
+          {/* Alternância lista/grade: preferência do CLIENTE, não do
+              lojista — por isso vive só no localStorage do navegador (mesma
+              ideia do `use-sidebar-state` do gestor), nunca no backend. */}
+          <div className="flex justify-end gap-1" role="group" aria-label="Visualização do cardápio">
+            <button
+              type="button"
+              onClick={() => trocarVisualizacao('list')}
+              aria-pressed={visualizacao === 'list'}
+              aria-label="Ver em lista"
+              className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                visualizacao === 'list' ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              <List className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => trocarVisualizacao('grid')}
+              aria-pressed={visualizacao === 'grid'}
+              aria-label="Ver em grade"
+              className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                visualizacao === 'grid' ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
           {categories.map((categoria) => (
             <section
               key={categoria.id}
@@ -235,15 +278,11 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
               className="scroll-mt-16"
             >
               <h2 className="mb-3 text-title text-text md:hidden">{categoria.name}</h2>
-              {/* Lista, não grid: itens menores, mais por tela (o mesmo
-                  MoProductCard, variante list — foto pequena, texto e preço
-                  na linha, já existia no design system, só não estava em uso
-                  aqui). */}
-              <div className="flex flex-col gap-2">
+              <div className={visualizacao === 'grid' ? 'grid grid-cols-2 gap-4' : 'flex flex-col gap-2'}>
                 {categoria.products.map((produto) => (
                   <MoProductCard
                     key={produto.id}
-                    variant="list"
+                    variant={visualizacao}
                     name={produto.name}
                     description={produto.description}
                     priceCents={produto.basePriceCents}
