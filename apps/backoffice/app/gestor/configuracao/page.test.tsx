@@ -218,6 +218,56 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
   });
 });
 
+describe('ConfiguracaoPage — modal de horários (estilo iFood)', () => {
+  it('abre pelo botão, liga um dia pelo círculo, e "Concluir" salva e fecha', async () => {
+    mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
+    mocks.saveStoreHours.mockImplementation(async (_storeId: string, body: { shifts: unknown[] }) => body);
+    await mount();
+
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Editar horários')?.click();
+    });
+    // MoSheet monta em portal (document.body), fora de `container`.
+    expect(document.body.textContent).toContain('Nenhum dia ligado ainda');
+
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('[aria-label^="Segunda:"]')?.click();
+    });
+    expect(document.body.textContent).toContain('Segunda-feira');
+
+    await act(async () => {
+      [...document.body.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Concluir')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.saveStoreHours).toHaveBeenCalledWith(
+      STORE.id,
+      expect.objectContaining({ shifts: expect.arrayContaining([expect.objectContaining({ dayOfWeek: 'monday', opensAtMinutes: 18 * 60, closesAtMinutes: 23 * 60 })]) }),
+    );
+    // sheet fecha depois de salvar
+    expect(document.body.textContent).not.toContain('Nenhum dia ligado ainda');
+  });
+
+  it('clicar de novo no círculo desliga o dia (limpa os turnos)', async () => {
+    mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
+    await mount();
+
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Editar horários')?.click();
+    });
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('[aria-label^="Segunda:"]')?.click();
+    });
+    expect(document.body.textContent).toContain('Segunda-feira');
+
+    await act(async () => {
+      document.body.querySelector<HTMLButtonElement>('[aria-label^="Segunda:"]')?.click();
+    });
+    expect(document.body.textContent).not.toContain('Segunda-feira');
+  });
+});
+
 describe('ConfiguracaoPage — galeria de fotos do produto', () => {
   const IMG_A = { id: 'img-a', productId: 'prod-1', imageKey: 'a.jpg', imageUrl: 'https://cdn/a.jpg', position: 0, version: 0 };
   const IMG_B = { id: 'img-b', productId: 'prod-1', imageKey: 'b.jpg', imageUrl: 'https://cdn/b.jpg', position: 1, version: 0 };

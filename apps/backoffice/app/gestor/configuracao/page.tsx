@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, CheckCircle2, CircleDashed, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
+import { MoButton, MoSheet } from '@molho/ui';
 import { getStaffSession, setStaffSession } from '../../../lib/staff-session';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
@@ -44,6 +45,29 @@ const DAYS: Array<{ key: DayOfWeek; label: string }> = [
   { key: 'saturday', label: 'Sáb' },
   { key: 'sunday', label: 'Dom' },
 ];
+
+/** Domingo primeiro, uma letra só — mesma ordem/formato do seletor de dias
+ * do iFood ("D S T Q Q S S"), só pro círculo de atalho do modal. A lista
+ * detalhada abaixo continua Seg→Dom (DAYS), que é a ordem operacional real. */
+const DAY_CIRCLES: Array<{ key: DayOfWeek; letter: string; label: string }> = [
+  { key: 'sunday', letter: 'D', label: 'Domingo' },
+  { key: 'monday', letter: 'S', label: 'Segunda' },
+  { key: 'tuesday', letter: 'T', label: 'Terça' },
+  { key: 'wednesday', letter: 'Q', label: 'Quarta' },
+  { key: 'thursday', letter: 'Q', label: 'Quinta' },
+  { key: 'friday', letter: 'S', label: 'Sexta' },
+  { key: 'saturday', letter: 'S', label: 'Sábado' },
+];
+
+/** Opções de horário do modal (a cada 30min) — troca o `<input type="time">`
+ * nativo (cada navegador desenha o próprio, inconsistente) por um `<select>`
+ * com a MESMA cara em qualquer lugar, batendo com o visual de dropdown do
+ * iFood. */
+const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2).toString().padStart(2, '0');
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${h}:${m}`;
+});
 
 type HoursDraft = Record<DayOfWeek, Array<{ opens: string; closes: string }>>;
 
@@ -144,6 +168,8 @@ export default function ConfiguracaoPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [hoursMessage, setHoursMessage] = useState<string | null>(null);
+  const [horariosModalAberto, setHorariosModalAberto] = useState(false);
+  const [diasRecolhidos, setDiasRecolhidos] = useState<Set<DayOfWeek>>(new Set());
   const [catalogMessage, setCatalogMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -307,6 +333,7 @@ export default function ConfiguracaoPage() {
       setHours(shiftsToDraft(saved.shifts));
       setHoursMessage('Horários salvos com sucesso.');
       setMessage('Horários salvos.');
+      setHorariosModalAberto(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar horários.');
     } finally {
@@ -700,68 +727,150 @@ export default function ConfiguracaoPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold">Horários</h2>
-              <p className="mt-1 text-sm text-text-muted">Configure a semana como a cozinha trabalha. Turno que fecha depois da meia-noite também vale.</p>
+              <p className="mt-1 text-sm text-text-muted">
+                {DAYS.some(({ key }) => hours[key].length > 0)
+                  ? `Aberto ${DAYS.filter(({ key }) => hours[key].length > 0).map(({ label }) => label).join(', ')}.`
+                  : 'Nenhum dia aberto ainda.'}
+              </p>
             </div>
-            <button className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold" onClick={() => setHours((prev) => ({ ...prev, monday: [{ opens: '18:00', closes: '23:00' }], tuesday: [{ opens: '18:00', closes: '23:00' }], wednesday: [{ opens: '18:00', closes: '23:00' }], thursday: [{ opens: '18:00', closes: '23:00' }], friday: [{ opens: '18:00', closes: '23:00' }], saturday: [{ opens: '18:00', closes: '23:00' }] }))}>Usar 18h-23h, seg a sáb</button>
+            <MoButton variant="secondary" onClick={() => setHorariosModalAberto(true)}>
+              Editar horários
+            </MoButton>
           </div>
-          {/* Linha por dia, não card por dia: a versão anterior gastava
-              ~140px de altura por dia (card com borda própria, "Adicionar
-              turno" e turnos empilhados) pra mostrar quase sempre 0 ou 1
-              turno — 7 dias virava uma rolagem enorme só pra configurar
-              horário. Compacta pra ~40px por dia (uma linha), turno extra
-              cresce inline em vez de empilhar. */}
-          <div className="mt-4 divide-y divide-border overflow-hidden rounded-[14px] border border-border">
-            {DAYS.map(({ key, label }) => (
-              <div key={key} className="flex flex-wrap items-center gap-2 bg-bg px-3 py-2">
-                <span className="w-9 shrink-0 text-sm font-semibold">{label}</span>
-                {hours[key].length === 0 ? (
-                  <span className="text-sm text-text-muted">Fechado</span>
-                ) : (
-                  <div className="flex flex-1 flex-wrap gap-2">
-                    {hours[key].map((shift, index) => (
-                      <div key={`${key}-${index}`} className="flex items-center gap-1 rounded-[10px] border border-border bg-bg-card px-2 py-1">
-                        <input
-                          type="time"
-                          aria-label={`${label} — início do turno ${index + 1}`}
-                          className="h-6 w-[92px] bg-transparent text-sm outline-none"
-                          value={shift.opens}
-                          onChange={(event) => updateShift(key, index, 'opens', event.target.value, setHours)}
-                        />
-                        <span className="text-xs text-text-muted">–</span>
-                        <input
-                          type="time"
-                          aria-label={`${label} — fim do turno ${index + 1}`}
-                          className="h-6 w-[92px] bg-transparent text-sm outline-none"
-                          value={shift.closes}
-                          onChange={(event) => updateShift(key, index, 'closes', event.target.value, setHours)}
-                        />
-                        <button
-                          type="button"
-                          aria-label={`Remover turno de ${label}`}
-                          className="text-text-muted hover:text-critical"
-                          onClick={() => removeShift(key, index, setHours)}
-                        >
-                          <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {hoursMessage && <p role="status" className="mt-3 rounded-[14px] border border-positive bg-bg-card px-4 py-3 text-sm font-semibold text-positive">{hoursMessage}</p>}
+
+          {/* Modal no estilo iFood ("Disponível quando"): círculo por dia
+              pra ligar/desligar rápido, seções expansíveis só pros dias
+              ativos, dropdown de horário (não <input type=time> — cada
+              navegador desenha o próprio, aqui é sempre a mesma cara). */}
+          <MoSheet
+            open={horariosModalAberto}
+            onOpenChange={setHorariosModalAberto}
+            title="Horários"
+            description="Configure a semana como a cozinha trabalha. Turno que fecha depois da meia-noite também vale."
+            footer={
+              <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  className="ml-auto flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-strong"
-                  onClick={() => setHours((prev) => ({ ...prev, [key]: [...prev[key], { opens: '11:00', closes: '15:00' }] }))}
+                  className="text-sm font-semibold text-brand-strong"
+                  onClick={() =>
+                    setHours((prev) => ({
+                      ...prev,
+                      monday: [{ opens: '18:00', closes: '23:00' }],
+                      tuesday: [{ opens: '18:00', closes: '23:00' }],
+                      wednesday: [{ opens: '18:00', closes: '23:00' }],
+                      thursday: [{ opens: '18:00', closes: '23:00' }],
+                      friday: [{ opens: '18:00', closes: '23:00' }],
+                      saturday: [{ opens: '18:00', closes: '23:00' }],
+                    }))
+                  }
                 >
-                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                  Turno
+                  Usar 18h-23h, seg a sáb
                 </button>
+                <MoButton disabled={busy === 'hours'} onClick={() => void saveHours()}>
+                  {busy === 'hours' ? 'Salvando…' : 'Concluir'}
+                </MoButton>
               </div>
-            ))}
-          </div>
-          <button className="mt-5 rounded-[14px] bg-brand px-5 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy === 'hours'} onClick={() => void saveHours()}>
-            {busy === 'hours' ? 'Salvando…' : 'Salvar horários'}
-          </button>
-          {hoursMessage && <p role="status" className="mt-3 rounded-[14px] border border-positive bg-bg-card px-4 py-3 text-sm font-semibold text-positive">{hoursMessage}</p>}
+            }
+          >
+            <div className="flex flex-col gap-6 pb-4">
+              <div>
+                <p className="text-sm font-semibold text-text">Dias da semana</p>
+                <div className="mt-3 flex gap-2">
+                  {DAY_CIRCLES.map(({ key, letter, label }) => {
+                    const ativo = hours[key].length > 0;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-label={`${label}: ${ativo ? 'aberto' : 'fechado'}, toque pra ${ativo ? 'fechar' : 'abrir'}`}
+                        aria-pressed={ativo}
+                        onClick={() => toggleDia(key, setHours)}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${
+                          ativo ? 'border-brand bg-brand text-on-brand' : 'border-border text-text-muted hover:border-border-strong'
+                        }`}
+                      >
+                        {letter}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {DAYS.filter(({ key }) => hours[key].length > 0).map(({ key, label }) => {
+                  const recolhido = diasRecolhidos.has(key);
+                  return (
+                    <div key={key}>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 text-sm font-semibold text-text"
+                        aria-expanded={!recolhido}
+                        onClick={() =>
+                          setDiasRecolhidos((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            return next;
+                          })
+                        }
+                      >
+                        {recolhido ? <ChevronRight className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                        {label === 'Seg' ? 'Segunda-feira' : label === 'Ter' ? 'Terça-feira' : label === 'Qua' ? 'Quarta-feira' : label === 'Qui' ? 'Quinta-feira' : label === 'Sex' ? 'Sexta-feira' : label === 'Sáb' ? 'Sábado' : 'Domingo'}
+                      </button>
+                      {!recolhido && (
+                        <div className="mt-2 flex flex-col gap-2 pl-6">
+                          {hours[key].map((shift, index) => (
+                            <div key={`${key}-${index}`} className="flex items-center gap-2">
+                              <select
+                                aria-label={`${label} — início do turno ${index + 1}`}
+                                className="h-10 rounded-[10px] border border-border bg-bg px-2 text-sm outline-none focus:border-brand"
+                                value={shift.opens}
+                                onChange={(event) => updateShift(key, index, 'opens', event.target.value, setHours)}
+                              >
+                                {timeOptionsFor(shift.opens).map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                              <select
+                                aria-label={`${label} — fim do turno ${index + 1}`}
+                                className="h-10 rounded-[10px] border border-border bg-bg px-2 text-sm outline-none focus:border-brand"
+                                value={shift.closes}
+                                onChange={(event) => updateShift(key, index, 'closes', event.target.value, setHours)}
+                              >
+                                {timeOptionsFor(shift.closes).map((time) => (
+                                  <option key={time} value={time}>{time}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                aria-label={`Remover turno de ${label}`}
+                                className="flex h-10 w-10 items-center justify-center text-text-muted hover:text-critical"
+                                onClick={() => removeShift(key, index, setHours)}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="flex w-fit items-center gap-1 text-sm font-semibold text-brand-strong"
+                            onClick={() => setHours((prev) => ({ ...prev, [key]: [...prev[key], { opens: '11:00', closes: '15:00' }] }))}
+                          >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            Horário
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {DAYS.every(({ key }) => hours[key].length === 0) && (
+                  <p className="text-sm text-text-muted">Nenhum dia ligado ainda — toque num círculo acima pra abrir a semana.</p>
+                )}
+              </div>
+            </div>
+          </MoSheet>
         </section>
 
         <section id="cardapio" className="rounded-[20px] border border-border bg-bg-card p-5">
@@ -1022,6 +1131,24 @@ function removeShift(day: DayOfWeek, index: number, setHours: (fn: (prev: HoursD
     ...prev,
     [day]: prev[day].filter((_, shiftIndex) => shiftIndex !== index),
   }));
+}
+
+/** Círculo do dia (padrão iFood): sem turno nenhum ainda = liga com um turno
+ * padrão; com turno = desliga (limpa a lista). Nada é persistido até
+ * "Concluir"/"Salvar horários" — reabrir o modal sem salvar não perde o
+ * horário que já estava gravado no servidor. */
+function toggleDia(day: DayOfWeek, setHours: (fn: (prev: HoursDraft) => HoursDraft) => void) {
+  setHours((prev) => ({
+    ...prev,
+    [day]: prev[day].length > 0 ? [] : [{ opens: '18:00', closes: '23:00' }],
+  }));
+}
+
+/** `<select>` sempre precisa ter a option do valor atual — sem isso, um
+ * horário salvo fora da grade de 30min (import de planilha, dado antigo)
+ * "sumiria" silenciosamente pro primeiro item da lista ao abrir o modal. */
+function timeOptionsFor(value: string): string[] {
+  return TIME_OPTIONS.includes(value) ? TIME_OPTIONS : [...TIME_OPTIONS, value].sort();
 }
 
 function downloadBlob(blob: Blob, filename: string) {
