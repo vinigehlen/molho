@@ -324,7 +324,11 @@ function PaymentPanel({
   const confirmavel = order.paymentMethod === 'pix' || order.status === 'in_transit';
   return (
     <div className="mt-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
+      {/* flex-wrap: com o texto do botão travado em 1 linha (whitespace-nowrap
+          do MoButton), badge + botão precisam de espaço pra quebrar de linha
+          em vez de espremer o texto do botão em 2 linhas (dobrava a altura
+          só deste card, achado testando ao vivo — CTA ficava "gigante"). */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <MoBadge variant="caution">Aguardando pagamento</MoBadge>
         {confirmavel && (
           <MoButton variant="positive" size="sm" disabled={!online} loading={confirming} onClick={onMarkPaid}>

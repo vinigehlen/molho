@@ -21,7 +21,7 @@ import { cn } from '../lib/cn';
  */
 export const buttonVariants = cva(
   [
-    'relative inline-flex items-center justify-center gap-2',
+    'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap',
     'rounded-md font-semibold',
     'transition duration-base ease-out',
     'focus-visible:outline-none focus-visible:shadow-focus',
