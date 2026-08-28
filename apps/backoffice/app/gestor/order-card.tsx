@@ -1,7 +1,7 @@
 'use client';
 
 import React, { memo, useState, type DragEvent } from 'react';
-import { ChevronDown, ChevronUp, CircleCheck, Flag, MessageCircle, Printer } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleCheck, Flag, MessageCircle, Printer, Undo2 } from 'lucide-react';
 import type { AdminOrder } from '@molho/contracts';
 import { MoBadge, MoButton } from '@molho/ui';
 import { paymentGateReason } from '../../lib/order-queue';
@@ -235,15 +235,30 @@ export const OrderCard = memo(function OrderCard({
           </div>
         )}
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* Ícone, não botão de frase (pedido do lojista): "voltar etapa" é
+              ação secundária e rara, não precisa do peso visual de um botão
+              de texto — mesmo tratamento quadrado 44×44 do Imprimir/Avisar. */}
           {previous && !pending && (
-            <MoButton variant="secondary" size="sm" onClick={() => onMove(previous)}>
-              Voltar etapa
-            </MoButton>
+            <button
+              type="button"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg"
+              onClick={() => onMove(previous)}
+              aria-label="Voltar etapa"
+              title="Voltar etapa"
+            >
+              <Undo2 className="h-4 w-4" aria-hidden="true" />
+            </button>
           )}
           {next && (
             <MoButton
               variant="primary"
               size="sm"
+              // Pedido do lojista: pílula compacta (padding/fonte do tamanho
+              // do selo "Pago"), não o botão de texto cheio. A altura de
+              // 44px (h-11, herdada de size="sm") FICA — é o alvo de toque
+              // mínimo do design system (§6.1), não-negociável mesmo num
+              // botão visualmente mais enxuto.
+              className="rounded-pill px-3 text-caption"
               disabled={advanceBlockReason !== null}
               onClick={() => onAdvance(next.to)}
               title={advanceBlockReason ?? undefined}
@@ -331,7 +346,14 @@ function PaymentPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <MoBadge variant="caution">Aguardando pagamento</MoBadge>
         {confirmavel && (
-          <MoButton variant="positive" size="sm" disabled={!online} loading={confirming} onClick={onMarkPaid}>
+          <MoButton
+            variant="positive"
+            size="sm"
+            className="rounded-pill px-3 text-caption"
+            disabled={!online}
+            loading={confirming}
+            onClick={onMarkPaid}
+          >
             Marcar pago
           </MoButton>
         )}
