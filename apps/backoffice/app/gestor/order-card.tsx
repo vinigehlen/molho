@@ -180,7 +180,10 @@ export const OrderCard = memo(function OrderCard({
           "voltar etapa" à direita. Nunca mais frase dentro de botão: é o que
           fazia "Saiu p/ entrega"/"Voltar etapa" quebrarem em 2 linhas e cada
           card da coluna terminar com uma altura diferente da vizinha. */}
-      <div className="mt-3 flex items-center justify-between gap-2">
+      {/* flex-wrap: com 3 ícones (Fase 3 somou "Sinalizar") + Voltar etapa +
+          CTA, a linha some da largura do card em coluna estreita — sem wrap
+          o excesso vazava por cima da coluna vizinha em vez de quebrar. */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {pending ? (
           <MoBadge variant="caution">ação pendente…</MoBadge>
         ) : (
