@@ -8,6 +8,7 @@ import ConfiguracaoPage from './page';
 
 const mocks = vi.hoisted(() => ({
   getStaffSession: vi.fn(),
+  setStaffSession: vi.fn(),
   fetchMyStores: vi.fn(),
   fetchStoreSetup: vi.fn(),
   saveStoreSetup: vi.fn(),
@@ -22,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   deleteProductImage: vi.fn(),
 }));
 
-vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession }));
+vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession, setStaffSession: mocks.setStaffSession }));
 vi.mock('../../../lib/my-stores-api', () => ({ fetchMyStores: mocks.fetchMyStores }));
 vi.mock('../../../lib/store-setup-api', () => ({
   fetchStoreSetup: mocks.fetchStoreSetup,
@@ -74,6 +75,7 @@ function incompleteSetup() {
   return {
     id: STORE.id,
     tenantId: 'tenant-1',
+    tenantSlug: 'cabanhas-bbq',
     cnpj: null,
     ownerName: null,
     name: '',
@@ -118,9 +120,15 @@ async function mount() {
   });
 }
 
+let sessionState: Record<string, unknown> | null;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getStaffSession.mockReturnValue({ accessToken: 't', tenantId: 'tenant-1', userId: 'u1', tenantName: 'Cabanhas' });
+  sessionState = { accessToken: 't', tenantId: 'tenant-1', userId: 'u1', tenantName: 'Cabanhas' };
+  mocks.getStaffSession.mockImplementation(() => sessionState);
+  mocks.setStaffSession.mockImplementation((next: Record<string, unknown>) => {
+    sessionState = next;
+  });
   mocks.fetchMyStores.mockResolvedValue([STORE]);
   mocks.fetchStoreHours.mockResolvedValue({ shifts: [] });
   mocks.fetchDeliveryZones.mockResolvedValue([]);
@@ -182,6 +190,31 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
     await mount();
 
     expect(container.textContent).not.toContain('molho.live/');
+  });
+
+  it('salvar a loja com nome novo atualiza o link de domínio na hora, sem precisar relogar', async () => {
+    sessionState = { accessToken: 't', tenantId: 'tenant-1', userId: 'u1', tenantName: 'Cabanhas', tenantSlug: 'cabanhas-bbq' };
+    mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
+    mocks.saveStoreSetup.mockResolvedValue({ ...incompleteSetup(), name: 'Cabanhas Churrasco', tenantSlug: 'cabanhas-churrasco' });
+    await mount();
+
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'molho.live/cabanhas-bbq')).toBe(true);
+
+    const nameInput = [...container.querySelectorAll('label')]
+      .find((el) => el.querySelector('span')?.textContent?.trim() === 'Nome fantasia')
+      ?.querySelector('input');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(nameInput, 'Cabanhas Churrasco');
+      nameInput?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Salvar loja')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'molho.live/cabanhas-churrasco')).toBe(true);
   });
 });
 

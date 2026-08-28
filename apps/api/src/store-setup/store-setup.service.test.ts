@@ -7,6 +7,7 @@ import { StoreSetupService } from './store-setup.service';
 const STORE: StoreSetup = {
   id: '01980000-0000-7000-8000-000000000001',
   tenantId: '01980000-0000-7000-8000-000000000002',
+  tenantSlug: 'casa-molho',
   cnpj: null,
   ownerName: null,
   name: 'Casa Molho',

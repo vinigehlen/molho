@@ -2,9 +2,14 @@ import { z } from 'zod';
 
 export const pixKeyTypeSchema = z.enum(['cpf', 'cnpj', 'email', 'phone', 'random']);
 
-export const storeSetupSchema = z.object({
+export const storeSetupSchema = z.strictObject({
   id: z.uuid(),
   tenantId: z.uuid(),
+  /** Slug ATUAL do tenant (= domínio, `molho.live/<slug>`) — sincronizado
+   * com `name` a cada save (decisão de produto pré-lançamento: nome fantasia
+   * e domínio nunca divergem). Front usa pra atualizar a sessão local sem
+   * precisar de novo login. */
+  tenantSlug: z.string(),
   cnpj: z.string().nullable(),
   ownerName: z.string().nullable(),
   name: z.string(),
@@ -18,7 +23,7 @@ export const storeSetupSchema = z.object({
   timezone: z.string(),
 });
 
-export const updateStoreSetupSchema = z.object({
+export const updateStoreSetupSchema = z.strictObject({
   cnpj: z
     .string()
     .trim()

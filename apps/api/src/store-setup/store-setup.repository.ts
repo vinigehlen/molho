@@ -1,11 +1,12 @@
-import type { StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
+import { slugifyStoreName, type StoreSetup, type UpdateStoreSetupInput } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
+import { nextAvailableSlug, normalizeSlugForCreation } from '../platform/tenant-slug.util';
 import { StoreSetupNotFoundError } from './store-setup.errors';
 
 const SELECT = {
   id: true,
   tenantId: true,
-  tenant: { select: { cnpj: true } },
+  tenant: { select: { cnpj: true, slug: true } },
   name: true,
   addressText: true,
   phone: true,
@@ -49,6 +50,23 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
         data: { cnpj: normalizeCnpj(input.cnpj) },
       });
     }
+    // Nome fantasia -> domínio sempre sincronizados (decisão de produto,
+    // pré-lançamento: ninguém ainda divulgou link nenhum, então não existe
+    // link antigo pra quebrar). Só mexe no slug quando o NOME muda de
+    // verdade — resalvar o mesmo nome não pode gerar um -2 por acaso.
+    const client = this.requestContext.getClient();
+    const currentTenant = await client.tenant.findFirst({
+      where: { id: store.tenantId, deletedAt: null },
+      select: { name: true },
+    });
+    const newName = input.name.trim();
+    if (currentTenant && newName && currentTenant.name.trim() !== newName) {
+      const newSlug = await nextAvailableSlug(client, normalizeSlugForCreation(slugifyStoreName(newName)), store.tenantId);
+      await client.tenant.updateMany({
+        where: { id: store.tenantId, deletedAt: null },
+        data: { name: newName, slug: newSlug },
+      });
+    }
     await this.requestContext.getClient().store.updateMany({
       where: { id: storeId, deletedAt: null },
       data: {
@@ -87,11 +105,11 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
 }
 
 function toStoreSetup(
-  store: Omit<StoreSetup, 'cnpj' | 'ownerName'> & { tenant: { cnpj: string | null } },
+  store: Omit<StoreSetup, 'cnpj' | 'ownerName' | 'tenantSlug'> & { tenant: { cnpj: string | null; slug: string } },
   ownerName: string | null,
 ): StoreSetup {
   const { tenant, ...rest } = store;
-  return { ...rest, cnpj: tenant.cnpj, ownerName };
+  return { ...rest, cnpj: tenant.cnpj, tenantSlug: tenant.slug, ownerName };
 }
 
 function blankToNull(value: string | null): string | null {

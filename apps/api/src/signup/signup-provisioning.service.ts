@@ -10,6 +10,7 @@ import {
 import { hashEmailForLookup } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import { StaffProvisioningRepository } from '../platform/staff-provisioning.repository';
+import { nextAvailableSlug, normalizeSlugForCreation } from '../platform/tenant-slug.util';
 
 const SIGNUP_PLAN: Plan = 'standard';
 const TRIAL_DAYS = 7;
@@ -66,7 +67,7 @@ export class SignupProvisioningService {
       },
     });
 
-    const slug = await this.nextAvailableSlug(normalizeSlugForCreation(slugifyStoreName(input.restaurantName)));
+    const slug = await nextAvailableSlug(client, normalizeSlugForCreation(slugifyStoreName(input.restaurantName)));
     const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
     const tenant = await client.tenant.create({
       data: {
@@ -170,24 +171,7 @@ export class SignupProvisioningService {
     const client = this.requestContext.getClient();
     const existing = await client.tenant.findFirst({ where: { slug: base, deletedAt: null }, select: { id: true } });
     if (!existing) return { available: true };
-    const suggestion = await this.nextAvailableSlug(base);
+    const suggestion = await nextAvailableSlug(client, base);
     return { available: false, suggestion };
   }
-
-  private async nextAvailableSlug(base: string): Promise<string> {
-    const client = this.requestContext.getClient();
-    for (let i = 0; i < 50; i += 1) {
-      const candidate = i === 0 ? base : `${base}-${i + 1}`;
-      const existing = await client.tenant.findFirst({ where: { slug: candidate, deletedAt: null }, select: { id: true } });
-      if (!existing) return candidate;
-    }
-    return `${base}-${Date.now().toString(36)}`;
-  }
-}
-
-/** Garante tamanho m\u00ednimo (3) e teto de URL (30) \u2014 decis\u00e3o de CRIA\u00c7\u00c3O, n\u00e3o
- * do preview puro (`slugifyStoreName`, @molho/contracts). */
-function normalizeSlugForCreation(slug: string): string {
-  const trimmed = slug.slice(0, 30).replace(/-+$/g, '');
-  return trimmed.length >= 3 ? trimmed : `loja-${trimmed || 'molho'}`.slice(0, 30);
 }

@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, CheckCircle2, CircleDashed, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, CircleDashed, Plus, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
-import { getStaffSession } from '../../../lib/staff-session';
+import { getStaffSession, setStaffSession } from '../../../lib/staff-session';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
 import { fetchStoreSetup, saveStoreSetup } from '../../../lib/store-setup-api';
@@ -282,6 +282,13 @@ export default function ConfiguracaoPage() {
     try {
       const saved = await saveStoreSetup(storeId, storeForm);
       setSetup(saved);
+      // Nome fantasia sincroniza o slug no backend (store-setup.repository.ts)
+      // — sem atualizar a sessão local aqui, o link do domínio no topo ficava
+      // mostrando o slug ANTIGO até o staff deslogar e logar de novo.
+      const session = getStaffSession();
+      if (session && session.tenantSlug !== saved.tenantSlug) {
+        setStaffSession({ ...session, tenantSlug: saved.tenantSlug });
+      }
       setMessage('Loja salva.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a loja.');
@@ -697,24 +704,57 @@ export default function ConfiguracaoPage() {
             </div>
             <button className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold" onClick={() => setHours((prev) => ({ ...prev, monday: [{ opens: '18:00', closes: '23:00' }], tuesday: [{ opens: '18:00', closes: '23:00' }], wednesday: [{ opens: '18:00', closes: '23:00' }], thursday: [{ opens: '18:00', closes: '23:00' }], friday: [{ opens: '18:00', closes: '23:00' }], saturday: [{ opens: '18:00', closes: '23:00' }] }))}>Usar 18h-23h, seg a sáb</button>
           </div>
-          <div className="mt-5 space-y-3">
+          {/* Linha por dia, não card por dia: a versão anterior gastava
+              ~140px de altura por dia (card com borda própria, "Adicionar
+              turno" e turnos empilhados) pra mostrar quase sempre 0 ou 1
+              turno — 7 dias virava uma rolagem enorme só pra configurar
+              horário. Compacta pra ~40px por dia (uma linha), turno extra
+              cresce inline em vez de empilhar. */}
+          <div className="mt-4 divide-y divide-border overflow-hidden rounded-[14px] border border-border">
             {DAYS.map(({ key, label }) => (
-              <div key={key} className="rounded-[14px] border border-border bg-bg p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold">{label}</p>
-                  <button className="text-sm font-semibold text-brand-strong" onClick={() => setHours((prev) => ({ ...prev, [key]: [...prev[key], { opens: '11:00', closes: '15:00' }] }))}>Adicionar turno</button>
-                </div>
-                {hours[key].length === 0 ? <p className="mt-3 text-sm text-text-muted">Fechado</p> : null}
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  {hours[key].map((shift, index) => (
-                    <div key={`${key}-${index}`} className="flex items-center gap-2">
-                      <input type="time" className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={shift.opens} onChange={(event) => updateShift(key, index, 'opens', event.target.value, setHours)} />
-                      <span>até</span>
-                      <input type="time" className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={shift.closes} onChange={(event) => updateShift(key, index, 'closes', event.target.value, setHours)} />
-                      <button className="rounded-[14px] border border-border px-3 py-2 text-sm" onClick={() => removeShift(key, index, setHours)}>Remover</button>
-                    </div>
-                  ))}
-                </div>
+              <div key={key} className="flex flex-wrap items-center gap-2 bg-bg px-3 py-2">
+                <span className="w-9 shrink-0 text-sm font-semibold">{label}</span>
+                {hours[key].length === 0 ? (
+                  <span className="text-sm text-text-muted">Fechado</span>
+                ) : (
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    {hours[key].map((shift, index) => (
+                      <div key={`${key}-${index}`} className="flex items-center gap-1 rounded-[10px] border border-border bg-bg-card px-2 py-1">
+                        <input
+                          type="time"
+                          aria-label={`${label} — início do turno ${index + 1}`}
+                          className="h-6 w-[92px] bg-transparent text-sm outline-none"
+                          value={shift.opens}
+                          onChange={(event) => updateShift(key, index, 'opens', event.target.value, setHours)}
+                        />
+                        <span className="text-xs text-text-muted">–</span>
+                        <input
+                          type="time"
+                          aria-label={`${label} — fim do turno ${index + 1}`}
+                          className="h-6 w-[92px] bg-transparent text-sm outline-none"
+                          value={shift.closes}
+                          onChange={(event) => updateShift(key, index, 'closes', event.target.value, setHours)}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Remover turno de ${label}`}
+                          className="text-text-muted hover:text-critical"
+                          onClick={() => removeShift(key, index, setHours)}
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="ml-auto flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-strong"
+                  onClick={() => setHours((prev) => ({ ...prev, [key]: [...prev[key], { opens: '11:00', closes: '15:00' }] }))}
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  Turno
+                </button>
               </div>
             ))}
           </div>
