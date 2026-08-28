@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, CircleDashed } from 'lucide-react';
 import Link from 'next/link';
 import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
 import { getStaffSession } from '../../../lib/staff-session';
@@ -160,9 +161,12 @@ export default function ConfiguracaoPage() {
   const publishable = Object.values(checklist).every(Boolean);
   const completedSteps = Object.values(checklist).filter(Boolean).length;
   const totalSteps = Object.keys(checklist).length;
-  const progressPct = Math.round((completedSteps / totalSteps) * 100);
   const nextStep =
     Object.entries(checklist).find(([, ok]) => !ok)?.[0] ?? 'publicar';
+  // Campos de pagamento vivem na seção #loja, não numa #pagamento própria
+  // (mesmo ajuste que a grade de chips antiga já fazia) — sem isso o CTA
+  // "Completar Pagamento" levaria pra uma âncora que não existe.
+  const nextStepAnchor = nextStep === 'pagamento' ? 'loja' : nextStep;
 
   useEffect(() => {
     if (!getStaffSession()) return;
@@ -508,60 +512,60 @@ export default function ConfiguracaoPage() {
   return (
     <main className="min-h-screen bg-bg p-4 text-text md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <header className="overflow-hidden rounded-[20px] bg-text text-white shadow-sm">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.4fr_0.8fr] lg:p-8">
-            <div className="flex flex-col justify-between gap-8">
+        <header className="rounded-[12px] border border-border bg-bg-card p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              {publishable ? (
+                <CheckCircle2 className="h-6 w-6 shrink-0 text-positive" aria-hidden="true" />
+              ) : (
+                <CircleDashed className="h-6 w-6 shrink-0 text-caution" aria-hidden="true" />
+              )}
               <div>
-                <h1 className="max-w-2xl text-3xl font-semibold leading-tight md:text-4xl">Monte a loja que vai vender hoje</h1>
-                <p className="mt-3 max-w-xl text-base text-white/70">A sequência aqui é a mesma da operação real: casa pronta, cozinha aberta, entrega combinada, pagamento funcionando e cardápio no capricho.</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <a className="rounded-[14px] bg-brand px-4 py-3 text-sm font-semibold text-on-brand" href="#cardapio">Cadastrar cardápio</a>
-                <a className="rounded-[14px] border border-white/20 px-4 py-3 text-sm font-semibold text-white" href="#horarios">Ajustar horários</a>
-                <Link href="/gestor" className="rounded-[14px] border border-white/20 px-4 py-3 text-sm font-semibold text-white">Ir para pedidos</Link>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-text">{publishable ? 'Loja pronta' : 'Loja em preparo'}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${publishable ? 'bg-positive/10 text-positive' : 'bg-caution/10 text-caution'}`}>
+                    {completedSteps}/{totalSteps}
+                  </span>
+                </div>
+                <p className="text-sm text-text-muted">
+                  {publishable ? 'Já pode receber clientes.' : `Falta completar: ${stepLabel(nextStep)}.`}
+                </p>
               </div>
             </div>
-            <aside className="rounded-[20px] bg-bg-card p-5 text-text">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-text-muted">Publicação</p>
-                  <p className="mt-1 text-3xl font-semibold">{completedSteps}/{totalSteps}</p>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${publishable ? 'bg-positive/10 text-positive' : 'bg-brand-faint text-brand-strong'}`}>
-                  {publishable ? 'Pronta' : 'Em preparo'}
-                </span>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg">
-                <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progressPct}%` }} />
-              </div>
-              <p className="mt-4 text-sm text-text-muted">
-                {publishable ? 'Sua loja já pode receber clientes.' : `Próximo passo: ${stepLabel(nextStep)}.`}
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {Object.entries(checklist).map(([key, ok]) => (
-                  <a key={key} href={`#${key === 'pagamento' ? 'loja' : key}`} className="rounded-[14px] border border-border px-3 py-2 text-sm">
-                    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${ok ? 'bg-positive' : 'bg-brand'}`} />
-                    {stepLabel(key)}
-                  </a>
-                ))}
-              </div>
-              <div className="mt-5 rounded-[16px] border border-border bg-bg p-4">
-                <p className="text-xs font-semibold uppercase text-text-muted">Preview do cliente</p>
-                <p className="mt-2 text-lg font-semibold">{storeForm.name || 'Nome da loja'}</p>
-                <p className="mt-1 text-sm text-text-muted">{storeForm.addressText || 'Endereço, horários e entrega aparecem aqui no cardápio.'}</p>
-                <div className="mt-3 space-y-2">
-                  {products.slice(0, 3).map((product) => (
-                    <div key={product.id} className="flex items-center justify-between rounded-[12px] bg-bg-card px-3 py-2 text-sm">
-                      <span className="font-medium">{product.name}</span>
-                      <span className="text-text-muted">{centsToBRL(product.basePriceCents)}</span>
-                    </div>
-                  ))}
-                  {products.length === 0 && (
-                    <div className="rounded-[12px] bg-bg-card px-3 py-3 text-sm text-text-muted">Cadastre o primeiro item para o preview ganhar vida.</div>
-                  )}
-                </div>
-              </div>
-            </aside>
+            <div className="flex flex-wrap gap-2">
+              {publishable ? (
+                <>
+                  <a href="#loja" className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text">Editar loja</a>
+                  <Link href="/gestor" className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand">Ir para pedidos</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/gestor" className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text">Ir para pedidos</Link>
+                  <a href={`#${nextStepAnchor}`} className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand">Completar {stepLabel(nextStep)}</a>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {Object.entries(checklist).map(([key, ok]) => {
+              const isNext = !ok && key === nextStep;
+              return (
+                <a
+                  key={key}
+                  href={`#${key === 'pagamento' ? 'loja' : key}`}
+                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${
+                    ok
+                      ? 'border-positive/30 bg-positive/10 text-positive'
+                      : isNext
+                        ? 'border-caution/40 bg-caution/10 text-caution'
+                        : 'border-border text-text-muted'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${ok ? 'bg-positive' : isNext ? 'bg-caution' : 'bg-border-strong'}`} />
+                  {stepLabel(key)}
+                </a>
+              );
+            })}
           </div>
         </header>
 
@@ -806,7 +810,7 @@ export default function ConfiguracaoPage() {
             <button className="rounded-[14px] border border-border px-4 py-3 font-semibold" onClick={() => void downloadCatalogTemplate().then((blob) => downloadBlob(blob, 'modelo-cardapio.csv'))}>Baixar modelo</button>
             <label className="rounded-[14px] border border-border px-4 py-3 font-semibold">
               Importar planilha
-              <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(event) => event.target.files?.[0] && void importCatalog(event.target.files[0]).then(() => setMessage('Planilha importada. Recarregue para conferir.')).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha ao importar.'))} />
+              <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(event) => event.target.files?.[0] && void importCatalog(event.target.files[0]).then(() => setMessage('Planilha importada. Recarregue para conferir.')).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha ao importar.'))} />
             </label>
           </div>
         </section>

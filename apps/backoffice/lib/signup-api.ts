@@ -13,6 +13,17 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return body?.message ?? fallback;
 }
 
+export interface SlugAvailability {
+  available: boolean;
+  suggestion?: string;
+}
+
+export async function checkSlugAvailability(slug: string): Promise<SlugAvailability> {
+  const res = await fetch(`${API_URL}/v1/signup/slug-available?slug=${encodeURIComponent(slug)}`).catch(() => null);
+  if (!res || !res.ok) return { available: false };
+  return (await res.json()) as SlugAvailability;
+}
+
 export async function requestSignupOtp(email: string): Promise<void> {
   const res = await fetch(`${API_URL}/v1/signup/request-otp`, {
     method: 'POST',

@@ -2,11 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpException,
   HttpCode,
   HttpStatus,
   Inject,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -16,6 +18,7 @@ import {
   signupRequestOtpSchema,
   signupVerifySchema,
   type SignupRequestOtpInput,
+  type SignupSlugAvailability,
   type SignupVerifyInput,
   type SignupVerifyResponse,
 } from '@molho/contracts';
@@ -78,6 +81,15 @@ export class SignupController {
       }
       throw new BadRequestException(error instanceof Error ? error.message : 'Payload inválido.');
     }
+  }
+
+  @Get('slug-available')
+  async slugAvailable(@Query('slug') slug: string | undefined): Promise<SignupSlugAvailability> {
+    const value = typeof slug === 'string' ? slug.trim() : '';
+    if (!value) return { available: false };
+    return this.requestContext.run({ tenantId: PLATFORM_CONTEXT_TENANT_ID, isPlatform: true }, () =>
+      this.provisioning.checkSlugAvailability(value),
+    );
   }
 
   @Post('verify')

@@ -1,4 +1,12 @@
-import { defaultModulesForPlan, moduleDef, parseEmail, type Plan, type SignupVerifyInput } from '@molho/contracts';
+import {
+  defaultModulesForPlan,
+  moduleDef,
+  parseEmail,
+  slugifyStoreName,
+  type Plan,
+  type SignupSlugAvailability,
+  type SignupVerifyInput,
+} from '@molho/contracts';
 import { hashEmailForLookup } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import { StaffProvisioningRepository } from '../platform/staff-provisioning.repository';
@@ -58,7 +66,7 @@ export class SignupProvisioningService {
       },
     });
 
-    const slug = await this.nextAvailableSlug(slugify(input.restaurantName));
+    const slug = await this.nextAvailableSlug(normalizeSlugForCreation(slugifyStoreName(input.restaurantName)));
     const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
     const tenant = await client.tenant.create({
       data: {
@@ -147,6 +155,25 @@ export class SignupProvisioningService {
     return { accessUser: user, tenant, store, created: true };
   }
 
+  /**
+   * `GET /v1/signup/slug-available` (preview do form de cria\u00e7\u00e3o, Bloco 2) \u2014
+   * roda a MESMA normaliza\u00e7\u00e3o + checagem de unicidade que `provision()` usa
+   * de verdade, ent\u00e3o o preview nunca promete um slug que a cria\u00e7\u00e3o depois
+   * n\u00e3o entrega. `restaurantName` vazio/s\u00f3-s\u00edmbolo normaliza pro fallback
+   * `loja-*`, que sempre existe como candidato \u2014 nunca retorna slug vazio.
+   */
+  async checkSlugAvailability(candidateSlug: string): Promise<SignupSlugAvailability> {
+    // `candidateSlug` chega JÁ passado por `slugifyStoreName` no front (é o
+    // mesmo preview que o cliente vê embaixo do campo) — normaliza de novo
+    // aqui só como defesa, nunca confia em input de query string cru.
+    const base = normalizeSlugForCreation(slugifyStoreName(candidateSlug));
+    const client = this.requestContext.getClient();
+    const existing = await client.tenant.findFirst({ where: { slug: base, deletedAt: null }, select: { id: true } });
+    if (!existing) return { available: true };
+    const suggestion = await this.nextAvailableSlug(base);
+    return { available: false, suggestion };
+  }
+
   private async nextAvailableSlug(base: string): Promise<string> {
     const client = this.requestContext.getClient();
     for (let i = 0; i < 50; i += 1) {
@@ -158,14 +185,9 @@ export class SignupProvisioningService {
   }
 }
 
-function slugify(value: string): string {
-  const slug = value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 30)
-    .replace(/-+$/g, '');
-  return slug.length >= 3 ? slug : `loja-${slug || 'molho'}`.slice(0, 30);
+/** Garante tamanho m\u00ednimo (3) e teto de URL (30) \u2014 decis\u00e3o de CRIA\u00c7\u00c3O, n\u00e3o
+ * do preview puro (`slugifyStoreName`, @molho/contracts). */
+function normalizeSlugForCreation(slug: string): string {
+  const trimmed = slug.slice(0, 30).replace(/-+$/g, '');
+  return trimmed.length >= 3 ? trimmed : `loja-${trimmed || 'molho'}`.slice(0, 30);
 }
