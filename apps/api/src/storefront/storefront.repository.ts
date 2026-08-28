@@ -158,7 +158,10 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
             },
             available: true,
             modifierGroups: {
-              where: { deletedAt: null },
+              // `active: false` (aba Complementos, exceção MVP 2026-08-28) é
+              // pausa, não soft-delete — grupo continua existindo (histórico
+              // de pedido não quebra), mas nunca aparece pro cliente escolher.
+              where: { deletedAt: null, active: true },
               orderBy: { createdAt: 'asc' },
               select: {
                 id: true,

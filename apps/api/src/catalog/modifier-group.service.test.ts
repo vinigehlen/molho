@@ -4,6 +4,7 @@ import type {
   CreateModifierGroupInput,
   ModifierGroupRecord,
   ModifierGroupRepository,
+  ModifierGroupWithProductRecord,
   UpdateModifierGroupInput,
 } from './modifier-group.repository';
 import { ModifierGroupService } from './modifier-group.service';
@@ -11,10 +12,18 @@ import { ModifierGroupService } from './modifier-group.service';
 class FakeModifierGroupRepository implements ModifierGroupRepository {
   rows = new Map<string, ModifierGroupRecord>();
   productIds = new Set<string>(['prod-1']);
+  productNames = new Map<string, string>([['prod-1', 'Produto 1']]);
   private nextId = 1;
 
   async listByProduct(productId: string): Promise<ModifierGroupRecord[]> {
     return [...this.rows.values()].filter((r) => r.productId === productId);
+  }
+
+  async listAll(): Promise<ModifierGroupWithProductRecord[]> {
+    return [...this.rows.values()].map((row) => ({
+      ...row,
+      productName: this.productNames.get(row.productId) ?? row.productId,
+    }));
   }
 
   async findById(id: string): Promise<ModifierGroupRecord | null> {
@@ -32,6 +41,8 @@ class FakeModifierGroupRepository implements ModifierGroupRepository {
       name: input.name,
       min: input.min ?? 0,
       max: input.max ?? 1,
+      active: true,
+      pdvCode: input.pdvCode ?? null,
       version: 0,
     };
     this.rows.set(record.id, record);
@@ -117,5 +128,30 @@ describe('ModifierGroupService', () => {
     const created = await service.create({ productId: 'prod-1', name: 'Adicionais', min: 0, max: 2 });
     await service.delete(created.id, created.version);
     expect(repo.rows.has(created.id)).toBe(false);
+  });
+
+  it('8) listAll() (aba Complementos) devolve grupos de TODOS os produtos, com nome do produto dono', async () => {
+    const { service, repo } = setup();
+    repo.productIds.add('prod-2');
+    repo.productNames.set('prod-2', 'Produto 2');
+    await service.create({ productId: 'prod-1', name: 'Tamanho', min: 1, max: 1 });
+    await service.create({ productId: 'prod-2', name: 'Ponto da carne', min: 1, max: 1 });
+
+    const all = await service.listAll();
+
+    expect(all).toHaveLength(2);
+    expect(all.find((g) => g.name === 'Tamanho')?.productName).toBe('Produto 1');
+    expect(all.find((g) => g.name === 'Ponto da carne')?.productName).toBe('Produto 2');
+  });
+
+  it('9) create() nasce ativo por padrão; update() pausa (active:false) sem apagar', async () => {
+    const { service, repo } = setup();
+    const created = await service.create({ productId: 'prod-1', name: 'Adicionais', min: 0, max: 2 });
+    expect(created.active).toBe(true);
+
+    const paused = await service.update(created.id, created.version, { active: false });
+
+    expect(paused.active).toBe(false);
+    expect(repo.rows.has(created.id)).toBe(true);
   });
 });

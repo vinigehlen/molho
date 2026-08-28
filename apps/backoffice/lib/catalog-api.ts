@@ -17,6 +17,8 @@ export interface Product {
   basePriceCents: number;
   imageKey: string | null;
   available: boolean;
+  /** Código do item no PDV do lojista — texto livre, opcional. */
+  pdvCode: string | null;
   sortOrder: number;
   version: number;
 }
@@ -27,7 +29,16 @@ export interface ModifierGroup {
   name: string;
   min: number;
   max: number;
+  /** Pausado = existe, some pro cliente escolher (aba Complementos). */
+  active: boolean;
+  pdvCode: string | null;
   version: number;
+}
+
+/** Linha da aba "Complementos" — grupo + nome do produto dono (ver
+ * GET /v1/admin/modifier-groups sem `productId`). */
+export interface ModifierGroupWithProduct extends ModifierGroup {
+  productName: string;
 }
 
 export interface Modifier {
@@ -74,6 +85,7 @@ export async function createProduct(input: {
   name: string;
   description?: string;
   basePriceCents: number;
+  pdvCode?: string | null;
   sortOrder?: number;
 }): Promise<Product> {
   const res = await apiFetch('/v1/admin/products', {
@@ -87,7 +99,7 @@ export async function createProduct(input: {
 
 export async function updateProduct(
   product: Product,
-  input: Partial<Pick<Product, 'categoryId' | 'name' | 'description' | 'basePriceCents' | 'sortOrder'>>,
+  input: Partial<Pick<Product, 'categoryId' | 'name' | 'description' | 'basePriceCents' | 'pdvCode' | 'sortOrder'>>,
 ): Promise<Product> {
   const res = await apiFetch(`/v1/admin/products/${encodeURIComponent(product.id)}`, {
     method: 'PATCH',
@@ -121,13 +133,46 @@ export async function fetchModifierGroups(productId: string): Promise<ModifierGr
   return (await res.json()) as ModifierGroup[];
 }
 
-export async function createModifierGroup(input: { productId: string; name: string; min?: number; max?: number }): Promise<ModifierGroup> {
+/** Aba "Complementos": todos os grupos do tenant, com o nome do produto dono. */
+export async function fetchAllModifierGroups(): Promise<ModifierGroupWithProduct[]> {
+  const res = await apiFetch('/v1/admin/modifier-groups');
+  if (!res.ok) throw new Error(`Falha ao carregar complementos (${res.status})`);
+  return (await res.json()) as ModifierGroupWithProduct[];
+}
+
+export async function createModifierGroup(input: { productId: string; name: string; min?: number; max?: number; pdvCode?: string | null }): Promise<ModifierGroup> {
   const res = await apiFetch('/v1/admin/modifier-groups', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`Falha ao criar grupo de complementos (${res.status})`);
+  return (await res.json()) as ModifierGroup;
+}
+
+/** Pausar/reativar (badge "ativo/pausado" na aba Complementos) — mesmo
+ * padrão de setProductAvailability, sem endpoint dedicado: PATCH genérico
+ * com só o campo `active`. */
+export async function setModifierGroupActive(group: ModifierGroup, active: boolean): Promise<ModifierGroup> {
+  const res = await apiFetch(`/v1/admin/modifier-groups/${encodeURIComponent(group.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: group.version, active }),
+  });
+  if (!res.ok) throw new Error(`Falha ao atualizar o grupo (${res.status})`);
+  return (await res.json()) as ModifierGroup;
+}
+
+export async function updateModifierGroup(
+  group: ModifierGroup,
+  input: Partial<Pick<ModifierGroup, 'name' | 'min' | 'max' | 'pdvCode'>>,
+): Promise<ModifierGroup> {
+  const res = await apiFetch(`/v1/admin/modifier-groups/${encodeURIComponent(group.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: group.version, ...input }),
+  });
+  if (!res.ok) throw new Error(`Falha ao atualizar o grupo (${res.status})`);
   return (await res.json()) as ModifierGroup;
 }
 

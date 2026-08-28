@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -44,10 +43,14 @@ import type { ModifierGroupService } from './modifier-group.service';
 export class ModifierGroupsController {
   constructor(@Inject(MODIFIER_GROUP_SERVICE) private readonly modifierGroups: ModifierGroupService) {}
 
+  /**
+   * Sem `productId`: lista TODOS os grupos do tenant (aba "Complementos",
+   * exceção MVP 2026-08-28) — nunca 400 nesse caso, é o uso normal da aba,
+   * só o edit-de-produto passa `productId` pra filtrar.
+   */
   @Get()
   list(@Query('productId') productId?: string) {
-    if (!productId) throw new BadRequestException('Query param productId é obrigatório.');
-    return this.modifierGroups.listByProduct(productId);
+    return productId ? this.modifierGroups.listByProduct(productId) : this.modifierGroups.listAll();
   }
 
   @Get(':id')

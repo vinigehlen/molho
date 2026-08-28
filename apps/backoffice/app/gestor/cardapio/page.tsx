@@ -19,6 +19,7 @@ import {
   fetchProducts,
   importCatalog,
   reorderProductImage,
+  setModifierGroupActive,
   setProductAvailability,
   updateProduct,
   uploadProductImage,
@@ -58,10 +59,10 @@ export default function CardapioPage() {
   const [modifiers, setModifiers] = useState<Record<string, Modifier[]>>({});
   const [images, setImages] = useState<ProductImage[]>([]);
   const [categoryName, setCategoryName] = useState('');
-  const [productDraft, setProductDraft] = useState({ categoryId: '', name: '', description: '', price: '', photo: null as File | null });
-  const [editDraft, setEditDraft] = useState({ categoryId: '', name: '', description: '', price: '' });
+  const [productDraft, setProductDraft] = useState({ categoryId: '', name: '', description: '', price: '', pdvCode: '', photo: null as File | null });
+  const [editDraft, setEditDraft] = useState({ categoryId: '', name: '', description: '', price: '', pdvCode: '' });
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
-  const [groupDraft, setGroupDraft] = useState({ name: '', min: '0', max: '1' });
+  const [groupDraft, setGroupDraft] = useState({ name: '', min: '0', max: '1', pdvCode: '' });
   const [modifierDraft, setModifierDraft] = useState<Record<string, { name: string; price: string }>>({});
   const [busca, setBusca] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -112,7 +113,7 @@ export default function CardapioPage() {
 
   useEffect(() => {
     if (!selectedProduct) {
-      setEditDraft({ categoryId: '', name: '', description: '', price: '' });
+      setEditDraft({ categoryId: '', name: '', description: '', price: '', pdvCode: '' });
       return;
     }
     setEditDraft({
@@ -120,6 +121,7 @@ export default function CardapioPage() {
       name: selectedProduct.name,
       description: selectedProduct.description ?? '',
       price: centsToBRL(selectedProduct.basePriceCents),
+      pdvCode: selectedProduct.pdvCode ?? '',
     });
   }, [selectedProduct]);
 
@@ -166,12 +168,13 @@ export default function CardapioPage() {
         name: productDraft.name.trim(),
         description: productDraft.description.trim() || undefined,
         basePriceCents: brlToCents(productDraft.price),
+        pdvCode: productDraft.pdvCode.trim() || null,
         sortOrder: products.length,
       });
       if (productDraft.photo) await uploadProductImage(created.id, productDraft.photo);
       await reloadProducts(created.id);
       setSelectedProductId(created.id);
-      setProductDraft({ categoryId: productDraft.categoryId, name: '', description: '', price: '', photo: null });
+      setProductDraft({ categoryId: productDraft.categoryId, name: '', description: '', price: '', pdvCode: '', photo: null });
       setCatalogMessage(`Item "${created.name}" adicionado ao cardápio.`);
       setMessage('Produto adicionado.');
     } catch (cause) {
@@ -191,6 +194,7 @@ export default function CardapioPage() {
         name: editDraft.name.trim(),
         description: editDraft.description.trim() || null,
         basePriceCents: brlToCents(editDraft.price),
+        pdvCode: editDraft.pdvCode.trim() || null,
       });
       await reloadProducts(updated.id);
       setCatalogMessage(`Item "${updated.name}" atualizado.`);
@@ -314,6 +318,21 @@ export default function CardapioPage() {
     }
   }
 
+  /** Pausar/reativar grupo de complementos — mesma ideia do "esgotado" de
+   * produto: some pro cliente escolher, mas não apaga (histórico de pedido
+   * intacto). Também acessível na aba Complementos. */
+  async function toggleGroupActive(group: ModifierGroup) {
+    setBusy(`group-active:${group.id}`);
+    try {
+      const updated = await setModifierGroupActive(group, !group.active);
+      setGroups((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar o grupo.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function addGroup() {
     if (!selectedProductId || !groupDraft.name.trim()) return;
     setBusy('group');
@@ -323,10 +342,11 @@ export default function CardapioPage() {
         name: groupDraft.name.trim(),
         min: Number(groupDraft.min || 0),
         max: Number(groupDraft.max || 1),
+        pdvCode: groupDraft.pdvCode.trim() || null,
       });
       setGroups((prev) => [...prev, created]);
       setModifierDraft((prev) => ({ ...prev, [created.id]: { name: '', price: '' } }));
-      setGroupDraft({ name: '', min: '0', max: '1' });
+      setGroupDraft({ name: '', min: '0', max: '1', pdvCode: '' });
       setMessage('Grupo criado.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível criar grupo.');
@@ -430,6 +450,7 @@ export default function CardapioPage() {
                   <input className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.name} onChange={(event) => setProductDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Xis coração" />
                   <textarea className="min-h-24 rounded-[14px] border border-border bg-bg-card px-4 py-3" value={productDraft.description} onChange={(event) => setProductDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Pão, coração, milho, ervilha..." />
                   <MoneyInput value={productDraft.price} onChange={(value) => setProductDraft((prev) => ({ ...prev, price: value }))} placeholder="29,90" />
+                  <input className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.pdvCode} onChange={(event) => setProductDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
                   <input type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg-card p-3" onChange={(event) => setProductDraft((prev) => ({ ...prev, photo: event.target.files?.[0] ?? null }))} />
                   <button className="rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand" onClick={() => void addProduct()}>Adicionar produto</button>
                 </div>
@@ -496,6 +517,7 @@ export default function CardapioPage() {
                               </select>
                               <input className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Nome do item" />
                               <MoneyInput value={editDraft.price} onChange={(value) => setEditDraft((prev) => ({ ...prev, price: value }))} placeholder="29,90" />
+                              <input className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.pdvCode} onChange={(event) => setEditDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
                               <textarea className="min-h-24 rounded-[14px] border border-border bg-bg px-3 py-3 md:col-span-2" value={editDraft.description} onChange={(event) => setEditDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Descrição" />
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -571,16 +593,29 @@ export default function CardapioPage() {
                                   <p className="text-sm text-text-muted">Use grupos para tamanho, sabores, extras pagos ou opções sem custo como “sem salada”. Total exemplo: {centsToBRL(manualTotalCents)}</p>
                                 </div>
                               </div>
-                              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                              <div className="mt-3 grid gap-3 md:grid-cols-5">
                                 <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.name} onChange={(event) => setGroupDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Tamanho ou adicionais" />
                                 <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.min} onChange={(event) => setGroupDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
                                 <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.max} onChange={(event) => setGroupDraft((prev) => ({ ...prev, max: event.target.value }))} placeholder="Máx." />
+                                <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.pdvCode} onChange={(event) => setGroupDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código PDV" />
                                 <button className="rounded-[14px] bg-brand px-4 font-semibold text-on-brand" onClick={() => void addGroup()}>Criar grupo</button>
                               </div>
                               <div className="mt-4 space-y-3">
                                 {groups.map((group) => (
                                   <div key={group.id} className="rounded-[14px] border border-border bg-bg-card p-4">
-                                    <p className="font-semibold">{group.name} <span className="text-sm font-normal text-text-muted">mín. {group.min}, máx. {group.max}</span></p>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="font-semibold">{group.name} <span className="text-sm font-normal text-text-muted">mín. {group.min}, máx. {group.max}</span></p>
+                                      {/* Pausar sem apagar (aba Complementos): grupo some pro
+                                          cliente escolher, histórico de pedido não quebra. */}
+                                      <button
+                                        type="button"
+                                        disabled={busy === `group-active:${group.id}`}
+                                        onClick={() => void toggleGroupActive(group)}
+                                        className={`rounded-full px-2 py-0.5 text-xs font-semibold disabled:opacity-50 ${group.active ? 'bg-positive/10 text-positive' : 'bg-bg text-text-muted'}`}
+                                      >
+                                        {group.active ? 'ativo' : 'pausado'}
+                                      </button>
+                                    </div>
                                     <div className="mt-3 flex flex-wrap gap-2">
                                       {(modifiers[group.id] ?? []).map((item) => <span key={item.id} className="rounded-full border border-border px-3 py-1 text-sm">{item.name} {item.priceDeltaCents > 0 ? `+${centsToBRL(item.priceDeltaCents)}` : 'sem custo'}</span>)}
                                     </div>

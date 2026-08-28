@@ -10,6 +10,9 @@ export interface ProductRecord {
   basePriceCents: number;
   imageKey: string | null;
   available: boolean;
+  /** Código do item no PDV do lojista — texto livre opcional, nunca
+   * interpretado por nós (exceção MVP 2026-08-28, CLAUDE.md). */
+  pdvCode: string | null;
   sortOrder: number;
   version: number;
 }
@@ -19,6 +22,7 @@ export interface CreateProductInput {
   name: string;
   description?: string;
   basePriceCents: number;
+  pdvCode?: string | null;
   sortOrder?: number;
 }
 
@@ -27,6 +31,7 @@ export interface UpdateProductInput {
   name?: string;
   description?: string | null;
   basePriceCents?: number;
+  pdvCode?: string | null;
   sortOrder?: number;
   /** Confirma o upload feito via presigned PUT (StorageProvider) — nunca gerado a partir de input livre do cliente. */
   imageKey?: string;
@@ -51,6 +56,7 @@ const SELECT = {
   basePriceCents: true,
   imageKey: true,
   available: true,
+  pdvCode: true,
   sortOrder: true,
   version: true,
 } as const;
@@ -93,6 +99,7 @@ export class PrismaProductRepository implements ProductRepository {
         name: input.name,
         description: input.description,
         basePriceCents: input.basePriceCents,
+        pdvCode: input.pdvCode ?? null,
         sortOrder: input.sortOrder ?? 0,
       },
       select: SELECT,

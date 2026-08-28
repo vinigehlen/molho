@@ -3,6 +3,7 @@ import type {
   CreateModifierGroupInput,
   ModifierGroupRecord,
   ModifierGroupRepository,
+  ModifierGroupWithProductRecord,
   UpdateModifierGroupInput,
 } from './modifier-group.repository';
 
@@ -11,6 +12,11 @@ export class ModifierGroupService {
 
   listByProduct(productId: string): Promise<ModifierGroupRecord[]> {
     return this.repo.listByProduct(productId);
+  }
+
+  /** Aba "Complementos" — todos os grupos do tenant, com nome do produto. */
+  listAll(): Promise<ModifierGroupWithProductRecord[]> {
+    return this.repo.listAll();
   }
 
   get(id: string): Promise<ModifierGroupRecord | null> {

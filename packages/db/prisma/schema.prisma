@@ -412,6 +412,11 @@ model Product {
   imageKey       String?   @map("image_key")
   /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
   available      Boolean   @default(true)
+  /// Código do item no PDV do lojista (Épico combos/PDV, exceção MVP
+  /// 2026-08-28) — texto livre, opcional, nunca validado/interpretado por
+  /// nós: é só o número/código que o sistema de caixa do lojista já usa,
+  /// pra ele bater cardápio digital × PDV sem digitar duas vezes.
+  pdvCode        String?   @map("pdv_code")
   sortOrder      Int       @default(0) @map("sort_order")
   version        Int       @default(0)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -466,6 +471,11 @@ model ModifierGroup {
   /// CHECK min >= 0 AND min <= max à mão na migration.
   min       Int       @default(0)
   max       Int       @default(1)
+  /// Pausar SEM apagar (Épico combos/PDV) — mesma ideia do produto
+  /// "esgotado": o grupo continua existindo (histórico de pedido não
+  /// quebra), só não aparece pro cliente escolher.
+  active    Boolean   @default(true)
+  pdvCode   String?   @map("pdv_code")
   version   Int       @default(0)
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -843,6 +853,13 @@ model Order {
   /// preencher. Nullable, sem tamanho na migration além do já validado no
   /// zod (`.max(500)`).
   notes String? @map("notes")
+
+  /// Snapshot auditável do aceite legal do checkout. Nullable só por legado:
+  /// pedidos antigos nasceram antes desta exigência. Novo pedido de
+  /// storefront sempre informa as duas versões e o instante do aceite.
+  legalTermsVersion   String?   @map("legal_terms_version")
+  legalPrivacyVersion String?   @map("legal_privacy_version")
+  legalAcceptedAt     DateTime? @map("legal_accepted_at")
 
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e

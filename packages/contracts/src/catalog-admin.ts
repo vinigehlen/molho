@@ -4,7 +4,7 @@ const centsSchema = z.int().nonnegative();
 const versionSchema = z.int().nonnegative();
 const sortOrderSchema = z.int();
 
-export const catalogCategorySchema = z.object({
+export const catalogCategorySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   sortOrder: sortOrderSchema,
@@ -12,20 +12,22 @@ export const catalogCategorySchema = z.object({
   version: versionSchema,
 });
 
-export const createCatalogCategorySchema = z.object({
+export const createCatalogCategorySchema = z.strictObject({
   name: z.string().trim().min(1).max(80),
   sortOrder: sortOrderSchema.optional(),
   visible: z.boolean().optional(),
 });
 
-export const updateCatalogCategorySchema = z.object({
+export const updateCatalogCategorySchema = z.strictObject({
   version: versionSchema,
   name: z.string().trim().min(1).max(80).optional(),
   sortOrder: sortOrderSchema.optional(),
   visible: z.boolean().optional(),
 });
 
-export const catalogProductSchema = z.object({
+const pdvCodeSchema = z.string().trim().max(60).nullable();
+
+export const catalogProductSchema = z.strictObject({
   id: z.uuid(),
   categoryId: z.uuid(),
   name: z.string(),
@@ -33,56 +35,68 @@ export const catalogProductSchema = z.object({
   basePriceCents: centsSchema,
   imageKey: z.string().nullable(),
   available: z.boolean(),
+  /** Código do item no PDV do lojista — texto livre opcional, nunca
+   * interpretado por nós (exceção MVP 2026-08-28, CLAUDE.md). */
+  pdvCode: pdvCodeSchema,
   sortOrder: sortOrderSchema,
   version: versionSchema,
 });
 
-export const createCatalogProductSchema = z.object({
+export const createCatalogProductSchema = z.strictObject({
   categoryId: z.uuid(),
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(500).optional(),
   basePriceCents: centsSchema,
+  pdvCode: pdvCodeSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });
 
-export const updateCatalogProductSchema = z.object({
+export const updateCatalogProductSchema = z.strictObject({
   version: versionSchema,
   categoryId: z.uuid().optional(),
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(500).nullable().optional(),
   basePriceCents: centsSchema.optional(),
+  pdvCode: pdvCodeSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });
 
-export const setCatalogProductAvailabilitySchema = z.object({
+export const setCatalogProductAvailabilitySchema = z.strictObject({
   version: versionSchema,
   available: z.boolean(),
 });
 
-export const catalogModifierGroupSchema = z.object({
+export const catalogModifierGroupSchema = z.strictObject({
   id: z.uuid(),
   productId: z.uuid(),
   name: z.string(),
   min: z.int().nonnegative(),
   max: z.int().nonnegative(),
+  /** Pausado = continua existindo (histórico de pedido não quebra), some
+   * pro cliente escolher — mesma ideia do produto "esgotado". */
+  active: z.boolean(),
+  pdvCode: pdvCodeSchema,
   version: versionSchema,
 });
 
-export const createCatalogModifierGroupSchema = z.object({
+export const createCatalogModifierGroupSchema = z.strictObject({
   productId: z.uuid(),
   name: z.string().trim().min(1).max(80),
   min: z.int().nonnegative().optional(),
   max: z.int().nonnegative().optional(),
+  pdvCode: pdvCodeSchema.optional(),
 });
 
-export const updateCatalogModifierGroupSchema = z.object({
+export const updateCatalogModifierGroupSchema = z.strictObject({
   version: versionSchema,
   name: z.string().trim().min(1).max(80).optional(),
   min: z.int().nonnegative().optional(),
   max: z.int().nonnegative().optional(),
+  active: z.boolean().optional(),
+  pdvCode: pdvCodeSchema.optional(),
 });
 
-export const catalogModifierSchema = z.object({
+export const catalogModifierSchema = z.strictObject({
   id: z.uuid(),
   groupId: z.uuid(),
   name: z.string(),
@@ -90,19 +104,19 @@ export const catalogModifierSchema = z.object({
   version: versionSchema,
 });
 
-export const createCatalogModifierSchema = z.object({
+export const createCatalogModifierSchema = z.strictObject({
   groupId: z.uuid(),
   name: z.string().trim().min(1).max(80),
   priceDeltaCents: centsSchema,
 });
 
-export const updateCatalogModifierSchema = z.object({
+export const updateCatalogModifierSchema = z.strictObject({
   version: versionSchema,
   name: z.string().trim().min(1).max(80).optional(),
   priceDeltaCents: centsSchema.optional(),
 });
 
-export const catalogProductImageSchema = z.object({
+export const catalogProductImageSchema = z.strictObject({
   id: z.uuid(),
   productId: z.uuid(),
   imageKey: z.string(),
@@ -110,12 +124,12 @@ export const catalogProductImageSchema = z.object({
   version: versionSchema,
 });
 
-export const addCatalogProductImageSchema = z.object({
+export const addCatalogProductImageSchema = z.strictObject({
   imageKey: z.string().trim().min(1),
   position: z.int().nonnegative().optional(),
 });
 
-export const updateCatalogProductImageSchema = z.object({
+export const updateCatalogProductImageSchema = z.strictObject({
   version: versionSchema,
   position: z.int().nonnegative().optional(),
 });

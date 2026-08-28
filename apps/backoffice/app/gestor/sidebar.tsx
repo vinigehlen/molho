@@ -4,6 +4,7 @@ import React from 'react';
 import {
   BarChart3,
   ClipboardList,
+  ListPlus,
   LogOut,
   MapPin,
   PanelLeftClose,
@@ -26,6 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/gestor', label: 'Pedidos', icon: ClipboardList },
   { href: '/gestor/cardapio', label: 'Cardápio', icon: UtensilsCrossed },
+  { href: '/gestor/complementos', label: 'Complementos', icon: ListPlus },
   { href: '/gestor/balcao', label: 'Balcão', icon: Store },
   { href: '/gestor/entrega', label: 'Entrega', icon: MapPin },
   { href: '/gestor/analytics', label: 'Analytics', icon: BarChart3 },
