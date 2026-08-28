@@ -18,9 +18,6 @@ const mocks = vi.hoisted(() => ({
   createDeliveryZone: vi.fn(),
   fetchCategories: vi.fn(),
   fetchProducts: vi.fn(),
-  fetchProductImages: vi.fn(),
-  reorderProductImage: vi.fn(),
-  deleteProductImage: vi.fn(),
 }));
 
 vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession, setStaffSession: mocks.setStaffSession }));
@@ -37,24 +34,11 @@ vi.mock('../../../lib/delivery-zones-api', () => ({
   fetchDeliveryZones: mocks.fetchDeliveryZones,
   createDeliveryZone: mocks.createDeliveryZone,
 }));
+// Configuração só lê categorias/produtos pra saber se o passo "Cardápio" do
+// checklist está completo — o CRUD de verdade mora em /gestor/cardapio.
 vi.mock('../../../lib/catalog-api', () => ({
   fetchCategories: mocks.fetchCategories,
   fetchProducts: mocks.fetchProducts,
-  fetchModifierGroups: vi.fn().mockResolvedValue([]),
-  fetchModifiers: vi.fn().mockResolvedValue([]),
-  fetchProductImages: mocks.fetchProductImages,
-  reorderProductImage: mocks.reorderProductImage,
-  deleteProductImage: mocks.deleteProductImage,
-  createCategory: vi.fn(),
-  createModifier: vi.fn(),
-  createModifierGroup: vi.fn(),
-  createProduct: vi.fn(),
-  deleteProduct: vi.fn(),
-  downloadCatalogTemplate: vi.fn(),
-  importCatalog: vi.fn(),
-  setProductAvailability: vi.fn(),
-  updateProduct: vi.fn(),
-  uploadProductImage: vi.fn(),
 }));
 
 const STORE = { id: '0193f1a0-0000-7000-8000-000000000001', name: 'Cabanhas BBQ' };
@@ -134,7 +118,6 @@ beforeEach(() => {
   mocks.fetchDeliveryZones.mockResolvedValue([]);
   mocks.fetchCategories.mockResolvedValue([]);
   mocks.fetchProducts.mockResolvedValue([]);
-  mocks.fetchProductImages.mockResolvedValue([]);
 });
 
 afterEach(async () => {
@@ -174,6 +157,17 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
     expect(container.textContent).toContain('Loja pronta');
     expect(container.textContent).toContain('Já pode receber clientes.');
     expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'Ir para pedidos')).toBe(true);
+  });
+
+  it('cardápio incompleto: CTA "Completar Cardápio" leva pra /gestor/cardapio (aba própria)', async () => {
+    mocks.fetchStoreSetup.mockResolvedValue(completeSetup());
+    mocks.fetchStoreHours.mockResolvedValue({ shifts: [{ dayOfWeek: 'monday', opensAtMinutes: 60 * 18, closesAtMinutes: 60 * 23 }] });
+    mocks.fetchDeliveryZones.mockResolvedValue([ZONE]);
+    mocks.fetchCategories.mockResolvedValue([]);
+    await mount();
+
+    const link = [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'Completar Cardápio');
+    expect(link?.getAttribute('href')).toBe('/gestor/cardapio');
   });
 
   it('com tenantSlug na sessão: mostra o link do domínio da loja', async () => {
@@ -265,64 +259,5 @@ describe('ConfiguracaoPage — modal de horários (estilo iFood)', () => {
       document.body.querySelector<HTMLButtonElement>('[aria-label^="Segunda:"]')?.click();
     });
     expect(document.body.textContent).not.toContain('Segunda-feira');
-  });
-});
-
-describe('ConfiguracaoPage — galeria de fotos do produto', () => {
-  const IMG_A = { id: 'img-a', productId: 'prod-1', imageKey: 'a.jpg', imageUrl: 'https://cdn/a.jpg', position: 0, version: 0 };
-  const IMG_B = { id: 'img-b', productId: 'prod-1', imageKey: 'b.jpg', imageUrl: 'https://cdn/b.jpg', position: 1, version: 0 };
-
-  async function openProductGallery() {
-    mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
-    mocks.fetchCategories.mockResolvedValue([{ id: 'cat-1', name: 'Carnes', sortOrder: 0, visible: true }]);
-    mocks.fetchProducts.mockResolvedValue([
-      { id: 'prod-1', categoryId: 'cat-1', name: 'Picanha', description: null, basePriceCents: 9500, sortOrder: 0, available: true },
-    ]);
-    mocks.fetchProductImages.mockResolvedValue([IMG_A, IMG_B]);
-    await mount();
-    await act(async () => {
-      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Editar')?.click();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-  }
-
-  it('marca a primeira foto (menor position) como Capa', async () => {
-    await openProductGallery();
-    expect(container.textContent).toContain('Capa');
-  });
-
-  it('"Mover pra baixo" na capa troca as positions (A vira 1, B vira 0)', async () => {
-    mocks.reorderProductImage.mockImplementation(async (_productId: string, image: typeof IMG_A, position: number) => ({ ...image, position, version: image.version + 1 }));
-    await openProductGallery();
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('[aria-label="Mover pra baixo"]')?.click();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(mocks.reorderProductImage).toHaveBeenCalledWith('prod-1', IMG_A, 1);
-    expect(mocks.reorderProductImage).toHaveBeenCalledWith('prod-1', IMG_B, 0);
-  });
-
-  it('remover foto pede o id/version certos e tira da lista', async () => {
-    mocks.deleteProductImage.mockResolvedValue(undefined);
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      await openProductGallery();
-      const [deleteButton] = container.querySelectorAll<HTMLButtonElement>('[aria-label="Remover foto"]');
-
-      await act(async () => {
-        deleteButton.click();
-        await Promise.resolve();
-      });
-
-      expect(mocks.deleteProductImage).toHaveBeenCalledWith('prod-1', IMG_A);
-      expect(container.textContent).toContain('Foto removida.');
-    } finally {
-      window.confirm = originalConfirm;
-    }
   });
 });
