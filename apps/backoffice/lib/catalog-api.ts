@@ -163,6 +163,25 @@ export async function addProductImage(productId: string, imageKey: string, posit
   return (await res.json()) as ProductImage;
 }
 
+/** Move a foto pra uma posição nova (0 = capa, é o que o cardápio mostra). */
+export async function reorderProductImage(productId: string, image: ProductImage, position: number): Promise<ProductImage> {
+  const res = await apiFetch(`/v1/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(image.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: image.version, position }),
+  });
+  if (!res.ok) throw new Error(`Falha ao reordenar foto (${res.status})`);
+  return (await res.json()) as ProductImage;
+}
+
+export async function deleteProductImage(productId: string, image: ProductImage): Promise<void> {
+  const res = await apiFetch(
+    `/v1/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(image.id)}?version=${encodeURIComponent(image.version)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw new Error(`Falha ao remover foto (${res.status})`);
+}
+
 export async function uploadProductImage(productId: string, file: File): Promise<ProductImage> {
   const uploadFile = await compressProductImage(file);
   const uploadUrlRes = await apiFetch(`/v1/admin/products/${encodeURIComponent(productId)}/image/upload-url`, {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleDashed } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, CircleDashed, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
 import { getStaffSession } from '../../../lib/staff-session';
@@ -16,13 +16,15 @@ import {
   createModifierGroup,
   createProduct,
   deleteProduct,
+  deleteProductImage,
   downloadCatalogTemplate,
   fetchCategories,
   fetchModifierGroups,
   fetchModifiers,
-  fetchProducts,
   fetchProductImages,
+  fetchProducts,
   importCatalog,
+  reorderProductImage,
   setProductAvailability,
   updateProduct,
   uploadProductImage,
@@ -167,6 +169,14 @@ export default function ConfiguracaoPage() {
   // (mesmo ajuste que a grade de chips antiga já fazia) — sem isso o CTA
   // "Completar Pagamento" levaria pra uma âncora que não existe.
   const nextStepAnchor = nextStep === 'pagamento' ? 'loja' : nextStep;
+  // `tenantSlug` só existe na sessão pós-login/signup (staff-session.ts) —
+  // sem ele (sessão antiga, storage não migrado) o domínio simplesmente não
+  // aparece, nunca quebra a página.
+  const tenantSlug = getStaffSession()?.tenantSlug;
+  // Domínio real de produção é `{slug}.molho.live` (CLAUDE.md); em dev o
+  // tenant é servido em rota (`molho.vercel.app/{slug}`) — o texto usa a
+  // marca de produção, o link abre onde a loja REALMENTE responde hoje.
+  const storefrontUrl = tenantSlug ? `https://molho.vercel.app/${tenantSlug}` : null;
 
   useEffect(() => {
     if (!getStaffSession()) return;
@@ -376,6 +386,51 @@ export default function ConfiguracaoPage() {
     }
   }
 
+  /**
+   * Cardápio mostra sempre a foto de `position` mais baixa como capa
+   * (storefront.service.ts) — sem controle de ordem aqui, a foto nova
+   * entrava sempre no FIM da galeria e nunca virava a capa que o cliente vê.
+   * Troca (swap), não "pular pra 0": nunca cria duas fotos com a mesma
+   * position (o backend não impede duplicata).
+   */
+  async function moveImage(image: ProductImage, direction: 'up' | 'down') {
+    const sorted = [...images].sort((a, b) => a.position - b.position);
+    const index = sorted.findIndex((item) => item.id === image.id);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const other = sorted[targetIndex];
+    if (!other || !selectedProduct) return;
+    setBusy('product-photo-reorder');
+    setCatalogMessage(null);
+    try {
+      const [updatedImage, updatedOther] = await Promise.all([
+        reorderProductImage(selectedProduct.id, image, other.position),
+        reorderProductImage(selectedProduct.id, other, image.position),
+      ]);
+      setImages((prev) => prev.map((item) => (item.id === updatedImage.id ? updatedImage : item.id === updatedOther.id ? updatedOther : item)));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível reordenar a foto.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeImage(image: ProductImage) {
+    if (!selectedProduct) return;
+    const confirmed = window.confirm('Remover esta foto?');
+    if (!confirmed) return;
+    setBusy('product-photo-delete');
+    setCatalogMessage(null);
+    try {
+      await deleteProductImage(selectedProduct.id, image);
+      setImages((prev) => prev.filter((item) => item.id !== image.id));
+      setCatalogMessage('Foto removida.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível remover a foto.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeProduct(productToRemove: Product) {
     const confirmed = window.confirm(`Remover "${productToRemove.name}" do cardápio?`);
     if (!confirmed) return;
@@ -530,6 +585,11 @@ export default function ConfiguracaoPage() {
                 <p className="text-sm text-text-muted">
                   {publishable ? 'Já pode receber clientes.' : `Falta completar: ${stepLabel(nextStep)}.`}
                 </p>
+                {storefrontUrl && (
+                  <a href={storefrontUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-brand-strong underline-offset-2 hover:underline">
+                    molho.live/{tenantSlug}
+                  </a>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -753,12 +813,53 @@ export default function ConfiguracaoPage() {
                             </div>
                             <div className="mt-5">
                               <p className="text-sm font-semibold">Fotos do item</p>
+                              <p className="text-xs text-text-muted">A primeira foto é a capa que aparece no cardápio.</p>
                               <div className="mt-2 flex flex-wrap gap-3">
-                                {images.map((image) => (
-                                  <div key={image.id} className="h-24 w-24 overflow-hidden rounded-[14px] border border-border bg-bg">
-                                    {image.imageUrl ? <img src={image.imageUrl} alt={`Foto de ${selectedProduct.name}`} width={96} height={96} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">Foto salva</div>}
-                                  </div>
-                                ))}
+                                {[...images]
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((image, index) => (
+                                    <div key={image.id} className="w-24">
+                                      <div className="relative h-24 w-24 overflow-hidden rounded-[14px] border border-border bg-bg">
+                                        {image.imageUrl ? (
+                                          <img src={image.imageUrl} alt={`Foto de ${selectedProduct.name}`} width={96} height={96} className="h-full w-full object-cover" />
+                                        ) : (
+                                          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">Foto salva</div>
+                                        )}
+                                        {index === 0 && (
+                                          <span className="absolute left-1 top-1 rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-on-brand">Capa</span>
+                                        )}
+                                      </div>
+                                      <div className="mt-1 flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          aria-label="Mover pra cima"
+                                          disabled={index === 0 || busy === 'product-photo-reorder'}
+                                          className="flex h-7 w-7 items-center justify-center rounded-[10px] border border-border disabled:opacity-30"
+                                          onClick={() => void moveImage(image, 'up')}
+                                        >
+                                          <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          aria-label="Mover pra baixo"
+                                          disabled={index === images.length - 1 || busy === 'product-photo-reorder'}
+                                          className="flex h-7 w-7 items-center justify-center rounded-[10px] border border-border disabled:opacity-30"
+                                          onClick={() => void moveImage(image, 'down')}
+                                        >
+                                          <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          aria-label="Remover foto"
+                                          disabled={busy === 'product-photo-delete'}
+                                          className="flex h-7 w-7 items-center justify-center rounded-[10px] border border-critical text-critical disabled:opacity-30"
+                                          onClick={() => void removeImage(image)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
                                 {images.length === 0 && <div className="flex h-24 min-w-44 items-center rounded-[14px] border border-dashed border-border px-3 text-sm text-text-muted">Nenhuma foto cadastrada.</div>}
                               </div>
                               <div className="mt-3 flex flex-col gap-2 md:flex-row">
