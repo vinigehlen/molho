@@ -23,8 +23,8 @@ vi.mock('../../../lib/catalog-api', () => ({
   createModifier: mocks.createModifier,
 }));
 
-const TAMANHO = { id: 'mg-1', productId: 'prod-1', productName: 'Pizza', name: 'Tamanho', min: 1, max: 1, active: true, pdvCode: null, version: 0 };
-const PONTO = { id: 'mg-2', productId: 'prod-2', productName: 'Picanha', name: 'Ponto da carne', min: 1, max: 1, active: true, pdvCode: 'PDV-42', version: 0 };
+const TAMANHO = { id: 'mg-1', productId: 'prod-1', productNames: ['Pizza'], productIds: ['prod-1'], name: 'Tamanho', min: 1, max: 1, active: true, pdvCode: null, version: 0 };
+const PONTO = { id: 'mg-2', productId: 'prod-2', productNames: ['Picanha'], productIds: ['prod-2'], name: 'Ponto da carne', min: 1, max: 1, active: true, pdvCode: 'PDV-42', version: 0 };
 
 let container: HTMLDivElement;
 let root: Root;

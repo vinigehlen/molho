@@ -136,7 +136,7 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
    * montou no backoffice.
    */
   async listMenu(): Promise<StorefrontCategoryRecord[]> {
-    return this.requestContext.getClient().category.findMany({
+    const categories = await this.requestContext.getClient().category.findMany({
       where: { visible: true, deletedAt: null },
       orderBy: { sortOrder: 'asc' },
       select: {
@@ -157,21 +157,28 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
               select: { imageKey: true },
             },
             available: true,
-            modifierGroups: {
-              // `active: false` (aba Complementos, exceção MVP 2026-08-28) é
-              // pausa, não soft-delete — grupo continua existindo (histórico
-              // de pedido não quebra), mas nunca aparece pro cliente escolher.
-              where: { deletedAt: null, active: true },
+            // Reuso (exceção MVP 2026-08-28, fase 2/4): "grupos deste
+            // produto" é sempre o VÍNCULO (product_modifier_groups), não
+            // mais `product.modifierGroups` (a relação direta só sabe do
+            // dono/criador). `active: false` é pausa, não soft-delete —
+            // grupo continua existindo (histórico de pedido não quebra),
+            // mas nunca aparece pro cliente escolher.
+            productModifierGroups: {
+              where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
               orderBy: { createdAt: 'asc' },
               select: {
-                id: true,
-                name: true,
-                min: true,
-                max: true,
-                modifiers: {
-                  where: { deletedAt: null },
-                  orderBy: { createdAt: 'asc' },
-                  select: { id: true, name: true, priceDeltaCents: true },
+                modifierGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                    min: true,
+                    max: true,
+                    modifiers: {
+                      where: { deletedAt: null },
+                      orderBy: { createdAt: 'asc' },
+                      select: { id: true, name: true, priceDeltaCents: true },
+                    },
+                  },
                 },
               },
             },
@@ -179,5 +186,12 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
         },
       },
     });
+    return categories.map((category) => ({
+      ...category,
+      products: category.products.map(({ productModifierGroups, ...product }) => ({
+        ...product,
+        modifierGroups: productModifierGroups.map((link) => link.modifierGroup),
+      })),
+    }));
   }
 }

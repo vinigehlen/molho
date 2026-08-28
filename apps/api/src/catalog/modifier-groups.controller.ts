@@ -24,7 +24,7 @@ import { TenantContextInterceptor } from '../auth/guards/tenant-context.intercep
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { MODIFIER_GROUP_SERVICE } from './catalog.tokens';
 import { VersionQueryDto } from './dto/category.dto';
-import { CreateModifierGroupDto, UpdateModifierGroupDto } from './dto/modifier-group.dto';
+import { CreateModifierGroupDto, LinkModifierGroupDto, UpdateModifierGroupDto } from './dto/modifier-group.dto';
 import type { ModifierGroupService } from './modifier-group.service';
 
 /**
@@ -78,5 +78,24 @@ export class ModifierGroupsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string, @Query() query: VersionQueryDto): Promise<void> {
     await this.modifierGroups.delete(id, query.version);
+  }
+
+  /**
+   * Reuso (exceção MVP 2026-08-28, fase 2/4) — vincula um grupo EXISTENTE a
+   * outro produto sem recriar. Mesma permissão de criar produto: quem monta
+   * cardápio decide o que reaproveitar.
+   */
+  @Post(':id/products')
+  @RequirePermission('catalog.product.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async link(@Param('id') id: string, @Body() dto: LinkModifierGroupDto): Promise<void> {
+    await this.modifierGroups.link(id, dto.productId);
+  }
+
+  @Delete(':id/products/:productId')
+  @RequirePermission('catalog.product.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unlink(@Param('id') id: string, @Param('productId') productId: string): Promise<void> {
+    await this.modifierGroups.unlink(id, productId);
   }
 }

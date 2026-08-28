@@ -12,20 +12,24 @@ import {
   deleteProduct,
   deleteProductImage,
   downloadCatalogTemplate,
+  fetchAllModifierGroups,
   fetchCategories,
   fetchModifierGroups,
   fetchModifiers,
   fetchProductImages,
   fetchProducts,
   importCatalog,
+  linkModifierGroupToProduct,
   reorderProductImage,
   setModifierGroupActive,
   setProductAvailability,
+  unlinkModifierGroupFromProduct,
   updateProduct,
   uploadProductImage,
   type Category,
   type Modifier,
   type ModifierGroup,
+  type ModifierGroupWithProduct,
   type Product,
   type ProductImage,
 } from '../../../lib/catalog-api';
@@ -57,6 +61,10 @@ export default function CardapioPage() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [groups, setGroups] = useState<ModifierGroup[]>([]);
   const [modifiers, setModifiers] = useState<Record<string, Modifier[]>>({});
+  // Reuso (exceção MVP 2026-08-28, fase 2/4): todos os grupos do tenant, pra
+  // oferecer "vincular grupo existente" em vez de recriar do zero.
+  const [allGroups, setAllGroups] = useState<ModifierGroupWithProduct[]>([]);
+  const [linkGroupId, setLinkGroupId] = useState('');
   const [images, setImages] = useState<ProductImage[]>([]);
   const [categoryName, setCategoryName] = useState('');
   const [productDraft, setProductDraft] = useState({ categoryId: '', name: '', description: '', price: '', pdvCode: '', photo: null as File | null });
@@ -95,6 +103,9 @@ export default function CardapioPage() {
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : 'Não foi possível carregar categorias.'))
       .finally(() => setBusy(null));
+    fetchAllModifierGroups()
+      .then(setAllGroups)
+      .catch(() => {}); // não trava o cardápio se só a lista de reuso falhar
   }, []);
 
   useEffect(() => {
@@ -328,6 +339,42 @@ export default function CardapioPage() {
       setGroups((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar o grupo.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Reuso (exceção MVP 2026-08-28, fase 2/4): vincula um grupo já existente
+   * de OUTRO produto a este, sem recriar do zero (mesmo "Sabores possíveis"
+   * de uma pizza servindo várias pizzas, por exemplo). */
+  async function linkExistingGroup() {
+    if (!selectedProductId || !linkGroupId) return;
+    setBusy('link-group');
+    try {
+      await linkModifierGroupToProduct(linkGroupId, selectedProductId);
+      setGroups(await fetchModifierGroups(selectedProductId));
+      setAllGroups((prev) =>
+        prev.map((g) => (g.id === linkGroupId && !g.productIds.includes(selectedProductId) ? { ...g, productIds: [...g.productIds, selectedProductId] } : g)),
+      );
+      setLinkGroupId('');
+      setMessage('Grupo vinculado.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível vincular o grupo.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function unlinkExistingGroup(group: ModifierGroup) {
+    if (!selectedProductId) return;
+    setBusy(`unlink-group:${group.id}`);
+    try {
+      await unlinkModifierGroupFromProduct(group.id, selectedProductId);
+      setGroups((prev) => prev.filter((item) => item.id !== group.id));
+      setAllGroups((prev) => prev.map((g) => (g.id === group.id ? { ...g, productIds: g.productIds.filter((id) => id !== selectedProductId) } : g)));
+      setMessage('Grupo desvinculado deste item.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível desvincular o grupo.');
     } finally {
       setBusy(null);
     }
@@ -593,6 +640,32 @@ export default function CardapioPage() {
                                   <p className="text-sm text-text-muted">Use grupos para tamanho, sabores, extras pagos ou opções sem custo como “sem salada”. Total exemplo: {centsToBRL(manualTotalCents)}</p>
                                 </div>
                               </div>
+                              {/* Reuso (exceção MVP 2026-08-28, fase 2/4): vincular um
+                                  grupo que já existe em OUTRO produto, sem recriar
+                                  ("Sabores possíveis" de uma pizza servindo várias). */}
+                              {allGroups.some((g) => !g.productIds.includes(selectedProductId)) && (
+                                <div className="mt-3 flex gap-2">
+                                  <select
+                                    className="h-12 flex-1 rounded-[14px] border border-border bg-bg-card px-3"
+                                    value={linkGroupId}
+                                    onChange={(event) => setLinkGroupId(event.target.value)}
+                                  >
+                                    <option value="">Vincular grupo existente…</option>
+                                    {allGroups
+                                      .filter((g) => !g.productIds.includes(selectedProductId))
+                                      .map((g) => (
+                                        <option key={g.id} value={g.id}>{g.name} ({g.productNames.join(', ')})</option>
+                                      ))}
+                                  </select>
+                                  <button
+                                    className="rounded-[14px] border border-border px-4 font-semibold disabled:opacity-50"
+                                    disabled={!linkGroupId || busy === 'link-group'}
+                                    onClick={() => void linkExistingGroup()}
+                                  >
+                                    Vincular
+                                  </button>
+                                </div>
+                              )}
                               <div className="mt-3 grid gap-3 md:grid-cols-5">
                                 <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.name} onChange={(event) => setGroupDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Tamanho ou adicionais" />
                                 <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.min} onChange={(event) => setGroupDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
@@ -601,20 +674,35 @@ export default function CardapioPage() {
                                 <button className="rounded-[14px] bg-brand px-4 font-semibold text-on-brand" onClick={() => void addGroup()}>Criar grupo</button>
                               </div>
                               <div className="mt-4 space-y-3">
-                                {groups.map((group) => (
+                                {groups.map((group) => {
+                                  const reused = (allGroups.find((g) => g.id === group.id)?.productIds.length ?? 1) > 1;
+                                  return (
                                   <div key={group.id} className="rounded-[14px] border border-border bg-bg-card p-4">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="font-semibold">{group.name} <span className="text-sm font-normal text-text-muted">mín. {group.min}, máx. {group.max}</span></p>
-                                      {/* Pausar sem apagar (aba Complementos): grupo some pro
-                                          cliente escolher, histórico de pedido não quebra. */}
-                                      <button
-                                        type="button"
-                                        disabled={busy === `group-active:${group.id}`}
-                                        onClick={() => void toggleGroupActive(group)}
-                                        className={`rounded-full px-2 py-0.5 text-xs font-semibold disabled:opacity-50 ${group.active ? 'bg-positive/10 text-positive' : 'bg-bg text-text-muted'}`}
-                                      >
-                                        {group.active ? 'ativo' : 'pausado'}
-                                      </button>
+                                      <p className="font-semibold">
+                                        {group.name} <span className="text-sm font-normal text-text-muted">mín. {group.min}, máx. {group.max}</span>
+                                        {reused && <span className="ml-2 rounded-full bg-brand-faint px-1.5 py-0.5 text-xs font-semibold text-brand-strong">reutilizado</span>}
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        {/* Pausar sem apagar (aba Complementos): grupo some pro
+                                            cliente escolher, histórico de pedido não quebra. */}
+                                        <button
+                                          type="button"
+                                          disabled={busy === `group-active:${group.id}`}
+                                          onClick={() => void toggleGroupActive(group)}
+                                          className={`rounded-full px-2 py-0.5 text-xs font-semibold disabled:opacity-50 ${group.active ? 'bg-positive/10 text-positive' : 'bg-bg text-text-muted'}`}
+                                        >
+                                          {group.active ? 'ativo' : 'pausado'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={busy === `unlink-group:${group.id}`}
+                                          onClick={() => void unlinkExistingGroup(group)}
+                                          className="text-xs font-semibold text-text-muted hover:text-critical disabled:opacity-50"
+                                        >
+                                          Desvincular
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="mt-3 flex flex-wrap gap-2">
                                       {(modifiers[group.id] ?? []).map((item) => <span key={item.id} className="rounded-full border border-border px-3 py-1 text-sm">{item.name} {item.priceDeltaCents > 0 ? `+${centsToBRL(item.priceDeltaCents)}` : 'sem custo'}</span>)}
@@ -625,7 +713,8 @@ export default function CardapioPage() {
                                       <button className="rounded-[14px] border border-border font-semibold" onClick={() => void addModifier(group.id)}>Adicionar</button>
                                     </div>
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>

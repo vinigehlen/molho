@@ -15,11 +15,11 @@ export interface ModifierGroupRecord {
 }
 
 /** Aba "Complementos" (exceção MVP 2026-08-28) lista grupos do TENANT
- * inteiro, não de um produto só — precisa saber de qual produto cada um é,
- * já que hoje `ModifierGroup` ainda é 1:1 com produto (fase de reuso vem
- * depois, ver CLAUDE.md). */
+ * inteiro, não de um produto só. `productNames`/`productIds` refletem TODO
+ * vínculo (fase reuso — `product_modifier_groups`, não só o dono original). */
 export interface ModifierGroupWithProductRecord extends ModifierGroupRecord {
-  productName: string;
+  productNames: string[];
+  productIds: string[];
 }
 
 export interface CreateModifierGroupInput {
@@ -39,11 +39,21 @@ export interface UpdateModifierGroupInput {
 }
 
 export interface ModifierGroupRepository {
+  /** Grupos que VALEM pra este produto — dono original + vínculos extra
+   * (product_modifier_groups). Nunca lê `modifierGroup.productId` direto:
+   * depois do backfill da fase reuso, essa tabela é a única fonte de verdade
+   * de "quais grupos aparecem em qual produto". */
   listByProduct(productId: string): Promise<ModifierGroupRecord[]>;
-  /** Todos os grupos do tenant (aba Complementos), com o nome do produto dono. */
+  /** Todos os grupos do tenant (aba Complementos), com os produtos onde valem. */
   listAll(): Promise<ModifierGroupWithProductRecord[]>;
   findById(id: string): Promise<ModifierGroupRecord | null>;
   productExists(productId: string): Promise<boolean>;
+  /** Grupo já vinculado a este produto (evita vínculo duplicado / valida antes de desvincular). */
+  isLinkedToProduct(groupId: string, productId: string): Promise<boolean>;
+  /** Vincula um grupo EXISTENTE a outro produto — idempotente, não faz nada se já vinculado. */
+  linkToProduct(groupId: string, productId: string): Promise<void>;
+  /** Desvincula (soft delete só do vínculo) — o grupo em si continua existindo. */
+  unlinkFromProduct(groupId: string, productId: string): Promise<void>;
   create(input: CreateModifierGroupInput): Promise<ModifierGroupRecord>;
   update(id: string, expectedVersion: number, input: UpdateModifierGroupInput): Promise<ModifierGroupRecord>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
@@ -64,18 +74,38 @@ export class PrismaModifierGroupRepository implements ModifierGroupRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
   async listByProduct(productId: string): Promise<ModifierGroupRecord[]> {
-    return this.requestContext
-      .getClient()
-      .modifierGroup.findMany({ where: { productId, deletedAt: null }, select: SELECT });
+    const links = await this.requestContext.getClient().productModifierGroup.findMany({
+      where: { productId, deletedAt: null, modifierGroup: { deletedAt: null } },
+      select: { modifierGroup: { select: SELECT } },
+    });
+    return links.map((link) => link.modifierGroup);
   }
 
   async listAll(): Promise<ModifierGroupWithProductRecord[]> {
-    const rows = await this.requestContext.getClient().modifierGroup.findMany({
-      where: { deletedAt: null },
-      select: { ...SELECT, product: { select: { name: true } } },
-      orderBy: { name: 'asc' },
+    const links = await this.requestContext.getClient().productModifierGroup.findMany({
+      where: { deletedAt: null, modifierGroup: { deletedAt: null } },
+      select: {
+        productId: true,
+        product: { select: { name: true } },
+        modifierGroup: { select: SELECT },
+      },
+      orderBy: { modifierGroup: { name: 'asc' } },
     });
-    return rows.map(({ product, ...group }) => ({ ...group, productName: product.name }));
+    const byGroup = new Map<string, ModifierGroupWithProductRecord>();
+    for (const link of links) {
+      const existing = byGroup.get(link.modifierGroup.id);
+      if (existing) {
+        existing.productNames.push(link.product.name);
+        existing.productIds.push(link.productId);
+        continue;
+      }
+      byGroup.set(link.modifierGroup.id, {
+        ...link.modifierGroup,
+        productNames: [link.product.name],
+        productIds: [link.productId],
+      });
+    }
+    return [...byGroup.values()];
   }
 
   async findById(id: string): Promise<ModifierGroupRecord | null> {
@@ -91,8 +121,31 @@ export class PrismaModifierGroupRepository implements ModifierGroupRepository {
     return product !== null;
   }
 
+  async isLinkedToProduct(groupId: string, productId: string): Promise<boolean> {
+    const link = await this.requestContext.getClient().productModifierGroup.findFirst({
+      where: { modifierGroupId: groupId, productId, deletedAt: null },
+      select: { id: true },
+    });
+    return link !== null;
+  }
+
+  async linkToProduct(groupId: string, productId: string): Promise<void> {
+    if (await this.isLinkedToProduct(groupId, productId)) return;
+    await this.requestContext.getClient().productModifierGroup.create({
+      data: { tenantId: this.requestContext.getTenantId(), productId, modifierGroupId: groupId },
+    });
+  }
+
+  async unlinkFromProduct(groupId: string, productId: string): Promise<void> {
+    await this.requestContext.getClient().productModifierGroup.updateMany({
+      where: { modifierGroupId: groupId, productId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   async create(input: CreateModifierGroupInput): Promise<ModifierGroupRecord> {
-    return this.requestContext.getClient().modifierGroup.create({
+    const client = this.requestContext.getClient();
+    const created = await client.modifierGroup.create({
       data: {
         tenantId: this.requestContext.getTenantId(),
         productId: input.productId,
@@ -103,6 +156,13 @@ export class PrismaModifierGroupRepository implements ModifierGroupRepository {
       },
       select: SELECT,
     });
+    // Grupo nasce vinculado ao produto que o criou — mesma transação do
+    // request (RequestContextService.run()), então as duas escritas são
+    // atômicas juntas sem precisar de $transaction explícito.
+    await client.productModifierGroup.create({
+      data: { tenantId: this.requestContext.getTenantId(), productId: input.productId, modifierGroupId: created.id },
+    });
+    return created;
   }
 
   async update(

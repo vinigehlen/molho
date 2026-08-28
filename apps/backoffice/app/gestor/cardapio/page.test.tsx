@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   fetchCategories: vi.fn(),
   fetchProducts: vi.fn(),
   fetchProductImages: vi.fn(),
+  fetchAllModifierGroups: vi.fn(),
+  fetchModifierGroups: vi.fn(),
+  linkModifierGroupToProduct: vi.fn(),
   reorderProductImage: vi.fn(),
   deleteProductImage: vi.fn(),
   setProductAvailability: vi.fn(),
@@ -19,12 +22,16 @@ vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSe
 vi.mock('../../../lib/catalog-api', () => ({
   fetchCategories: mocks.fetchCategories,
   fetchProducts: mocks.fetchProducts,
-  fetchModifierGroups: vi.fn().mockResolvedValue([]),
+  fetchModifierGroups: mocks.fetchModifierGroups,
+  fetchAllModifierGroups: mocks.fetchAllModifierGroups,
   fetchModifiers: vi.fn().mockResolvedValue([]),
   fetchProductImages: mocks.fetchProductImages,
   reorderProductImage: mocks.reorderProductImage,
   deleteProductImage: mocks.deleteProductImage,
   setProductAvailability: mocks.setProductAvailability,
+  setModifierGroupActive: vi.fn(),
+  linkModifierGroupToProduct: mocks.linkModifierGroupToProduct,
+  unlinkModifierGroupFromProduct: vi.fn(),
   createCategory: vi.fn(),
   createModifier: vi.fn(),
   createModifierGroup: vi.fn(),
@@ -63,6 +70,8 @@ beforeEach(() => {
   mocks.fetchCategories.mockResolvedValue([CATEGORY]);
   mocks.fetchProducts.mockResolvedValue([PICANHA, COSTELA]);
   mocks.fetchProductImages.mockResolvedValue([]);
+  mocks.fetchAllModifierGroups.mockResolvedValue([]);
+  mocks.fetchModifierGroups.mockResolvedValue([]);
 });
 
 afterEach(async () => {
@@ -154,5 +163,41 @@ describe('CardapioPage — galeria de fotos do produto', () => {
     } finally {
       window.confirm = originalConfirm;
     }
+  });
+});
+
+describe('CardapioPage — reuso de grupo de complemento (fase 2/4)', () => {
+  const MOLHOS = { id: 'mg-1', productId: 'prod-2', productIds: ['prod-2'], productNames: ['Costela'], name: 'Molhos', min: 0, max: 3, active: true, pdvCode: null, version: 0 };
+
+  it('oferece "vincular grupo existente" só com grupo de OUTRO produto disponível', async () => {
+    mocks.fetchAllModifierGroups.mockResolvedValue([MOLHOS]);
+    await mount();
+
+    // Picanha (auto-selecionada) ainda não tem "Molhos" vinculado.
+    expect(container.textContent).toContain('Vincular grupo existente');
+    const option = [...container.querySelectorAll('option')].find((o) => o.textContent?.includes('Molhos'));
+    expect(option?.textContent).toContain('Costela');
+  });
+
+  it('vincular chama linkModifierGroupToProduct e recarrega os grupos do produto', async () => {
+    mocks.fetchAllModifierGroups.mockResolvedValue([MOLHOS]);
+    mocks.linkModifierGroupToProduct.mockResolvedValue(undefined);
+    mocks.fetchModifierGroups.mockResolvedValue([{ ...MOLHOS, productId: 'prod-1' }]);
+    await mount();
+
+    const selectWithMolhos = [...container.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.textContent?.includes('Molhos')));
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(selectWithMolhos, 'mg-1');
+      selectWithMolhos?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Vincular')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.linkModifierGroupToProduct).toHaveBeenCalledWith('mg-1', 'prod-1');
+    expect(container.textContent).toContain('Grupo vinculado.');
   });
 });

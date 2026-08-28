@@ -55,3 +55,9 @@ export class UpdateModifierGroupDto {
   @IsString()
   pdvCode?: string | null;
 }
+
+/** Reuso (exceção MVP 2026-08-28, fase 2/4) — vincula um grupo EXISTENTE a outro produto. */
+export class LinkModifierGroupDto {
+  @IsUUID(7)
+  productId!: string;
+}

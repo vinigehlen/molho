@@ -43,7 +43,9 @@ export default function ComplementosPage() {
   const gruposFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     if (!termo) return groups;
-    return groups.filter((group) => group.name.toLowerCase().includes(termo) || group.productName.toLowerCase().includes(termo));
+    return groups.filter(
+      (group) => group.name.toLowerCase().includes(termo) || group.productNames.some((name) => name.toLowerCase().includes(termo)),
+    );
   }, [groups, busca]);
 
   useEffect(() => {
@@ -163,7 +165,11 @@ export default function ComplementosPage() {
                   <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <button className="flex-1 text-left" onClick={() => openGroup(group)}>
                       <span className="font-semibold">{group.name}</span>
-                      <span className="ml-2 text-sm text-text-muted">{group.productName} · mín. {group.min}, máx. {group.max}</span>
+                      <span className="ml-2 text-sm text-text-muted">
+                        {group.productNames.join(', ')}
+                        {group.productNames.length > 1 && <span className="ml-1 rounded-full bg-brand-faint px-1.5 py-0.5 text-xs font-semibold text-brand-strong">reutilizado</span>}
+                        {' '}· mín. {group.min}, máx. {group.max}
+                      </span>
                       {group.pdvCode && <span className="ml-2 text-xs text-text-muted">PDV: {group.pdvCode}</span>}
                     </button>
                     <div className="flex items-center gap-2">

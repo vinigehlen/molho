@@ -105,10 +105,22 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         name: true,
         basePriceCents: true,
         available: true,
-        modifierGroups: {
-          where: { deletedAt: null },
+        // Reuso (exceção MVP 2026-08-28, fase 2/4): a allowlist de
+        // modificadores válidos PRA ESTE produto vem do VÍNCULO
+        // (product_modifier_groups), não da relação direta `modifierGroups`
+        // (que só sabe do dono/criador do grupo) — sem isso, um grupo
+        // reaproveitado num segundo produto validaria certo no storefront
+        // mas o checkout rejeitaria o modificador como "não pertence ao
+        // produto". Grupo pausado (`active: false`) também não é comprável,
+        // mesma regra do storefront.
+        productModifierGroups: {
+          where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
           select: {
-            modifiers: { where: { deletedAt: null }, select: { id: true, name: true, priceDeltaCents: true } },
+            modifierGroup: {
+              select: {
+                modifiers: { where: { deletedAt: null }, select: { id: true, name: true, priceDeltaCents: true } },
+              },
+            },
           },
         },
       },
@@ -118,7 +130,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       name: row.name,
       basePriceCents: row.basePriceCents,
       available: row.available,
-      modifiers: row.modifierGroups.flatMap((group) => group.modifiers),
+      modifiers: row.productModifierGroups.flatMap((link) => link.modifierGroup.modifiers),
     }));
   }
 

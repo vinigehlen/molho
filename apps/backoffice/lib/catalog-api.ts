@@ -35,10 +35,11 @@ export interface ModifierGroup {
   version: number;
 }
 
-/** Linha da aba "Complementos" — grupo + nome do produto dono (ver
- * GET /v1/admin/modifier-groups sem `productId`). */
+/** Linha da aba "Complementos" — grupo + produtos onde ele VALE (reuso, ver
+ * GET /v1/admin/modifier-groups sem `productId`). Pode ser mais de um. */
 export interface ModifierGroupWithProduct extends ModifierGroup {
-  productName: string;
+  productNames: string[];
+  productIds: string[];
 }
 
 export interface Modifier {
@@ -174,6 +175,25 @@ export async function updateModifierGroup(
   });
   if (!res.ok) throw new Error(`Falha ao atualizar o grupo (${res.status})`);
   return (await res.json()) as ModifierGroup;
+}
+
+/** Reuso (exceção MVP 2026-08-28, fase 2/4): vincula um grupo EXISTENTE a
+ * outro produto, sem recriar. Idempotente — vincular de novo não dá erro. */
+export async function linkModifierGroupToProduct(groupId: string, productId: string): Promise<void> {
+  const res = await apiFetch(`/v1/admin/modifier-groups/${encodeURIComponent(groupId)}/products`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ productId }),
+  });
+  if (!res.ok) throw new Error(`Falha ao vincular o grupo (${res.status})`);
+}
+
+/** Desvincula — o grupo em si continua existindo (e valendo pros outros produtos). */
+export async function unlinkModifierGroupFromProduct(groupId: string, productId: string): Promise<void> {
+  const res = await apiFetch(`/v1/admin/modifier-groups/${encodeURIComponent(groupId)}/products/${encodeURIComponent(productId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Falha ao desvincular o grupo (${res.status})`);
 }
 
 export async function fetchModifiers(groupId: string): Promise<Modifier[]> {

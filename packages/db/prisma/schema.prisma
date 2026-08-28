@@ -146,6 +146,7 @@ model Tenant {
   products             Product[]
   productImages        ProductImage[]
   modifierGroups       ModifierGroup[]
+  productModifierGroups ProductModifierGroup[]
   modifiers            Modifier[]
   addresses            Address[]
   deliveryZones        DeliveryZone[]
@@ -425,7 +426,12 @@ model Product {
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category       Category        @relation(fields: [categoryId], references: [id])
+  /// Grupo "dono" (criado a partir DESTE produto) — FK direta, ainda usada
+  /// pra decidir onde um grupo novo nasce. Pra "quais grupos valem PRA este
+  /// produto" (inclui reuso), ver `productModifierGroups` — fase reuso
+  /// (exceção MVP 2026-08-28, CLAUDE.md).
   modifierGroups ModifierGroup[]
+  productModifierGroups ProductModifierGroup[]
   orderItems     OrderItem[]
   images         ProductImage[]
 
@@ -481,13 +487,46 @@ model ModifierGroup {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product   Product    @relation(fields: [productId], references: [id])
-  modifiers Modifier[]
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product               Product                @relation(fields: [productId], references: [id])
+  modifiers             Modifier[]
+  productModifierGroups ProductModifierGroup[]
 
   // FK composta (product_id, tenant_id) → products(id, tenant_id) na migration.
   @@index([tenantId, productId])
   @@map("modifier_groups")
+}
+
+/// Reuso de grupo de complemento entre produtos (exceção MVP 2026-08-28,
+/// CLAUDE.md — fase 2/4 do combo). `ModifierGroup.productId` continua
+/// sendo o dono/criador (onde o grupo nasceu); esta tabela é a lista real
+/// de "em quais produtos este grupo vale" — todo grupo, inclusive os
+/// antigos, tem pelo menos UMA linha aqui (a migration faz o backfill do
+/// productId original). "Quais grupos valem pra este produto" SEMPRE
+/// consulta esta tabela, nunca `ModifierGroup.productId` direto — depois
+/// do backfill, os dois caminhos concordam pro caso 1:1 de sempre, e só
+/// esta tabela sabe sobre vínculo extra.
+model ProductModifierGroup {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  productId       String    @map("product_id") @db.Uuid
+  modifierGroupId String    @map("modifier_group_id") @db.Uuid
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id])
+
+  // FKs compostas (product_id, tenant_id) → products(id, tenant_id) e
+  // (modifier_group_id, tenant_id) → modifier_groups(id, tenant_id) na
+  // migration. Único parcial (product_id, modifier_group_id) WHERE
+  // deleted_at IS NULL também na migration (convenção soft-delete).
+  @@index([tenantId, productId])
+  @@index([tenantId, modifierGroupId])
+  @@map("product_modifier_groups")
 }
 
 model Modifier {
