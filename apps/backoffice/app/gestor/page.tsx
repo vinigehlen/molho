@@ -228,7 +228,10 @@ export default function GestorPage() {
               Ativar som
             </button>
           )}
-          {flaggedCount > 0 && (
+          {/* flaggedCount === 0 some com o botão só quando o filtro JÁ está
+              desligado — senão o board fica preso vazio (dessinalizou o
+              último pedido com o filtro ligado e perde como desligar). */}
+          {(flaggedCount > 0 || onlyFlagged) && (
             <button
               type="button"
               aria-pressed={onlyFlagged}
