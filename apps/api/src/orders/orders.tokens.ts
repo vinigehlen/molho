@@ -13,3 +13,5 @@ export const CHECKOUT_ORDER_RATE_LIMITER = Symbol('CHECKOUT_ORDER_RATE_LIMITER')
 export const COUNTER_ORDER_SERVICE = Symbol('COUNTER_ORDER_SERVICE');
 /** Ajuste de itens de um pedido já criado (Épico balcão — order edit). */
 export const ORDER_ADJUSTMENT_SERVICE = Symbol('ORDER_ADJUSTMENT_SERVICE');
+/** Sinalização manual de pendência no board (Fase 3, plano do gestor de pedidos — Épico 9). */
+export const ORDER_FLAG_SERVICE = Symbol('ORDER_FLAG_SERVICE');

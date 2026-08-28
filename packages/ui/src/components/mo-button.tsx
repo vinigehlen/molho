@@ -40,6 +40,9 @@ export const buttonVariants = cva(
         ghost: 'bg-transparent text-brand-strong hover:bg-brand-faint',
         // O red-500 do doc só alcança 4.08:1 com branco: usa-se o tom forte.
         danger: 'bg-critical-strong text-white hover:brightness-95',
+        // Confirmação positiva fora da marca (ex.: "Marcar pago" no gestor) —
+        // ink-900 sobre green-500 dá 5.72:1, mesmo par do MoBadge positive.
+        positive: 'bg-positive text-text hover:brightness-95',
         // A cor do PIX é do Banco Central e não se toca — o que muda é o texto.
         // Branco sobre o teal dá 2.35:1; ink dá 7.9:1.
         pix: 'bg-pix text-text hover:brightness-95',

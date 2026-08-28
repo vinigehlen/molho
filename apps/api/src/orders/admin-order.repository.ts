@@ -37,6 +37,8 @@ export interface AdminOrderRow {
     notes: string | null;
     modifiers: { name: string }[];
   }[];
+  flaggedAt: Date | null;
+  flaggedReason: string | null;
 }
 
 /** Row do Prisma → shape do contrato. Puro: achata o endereço-snapshot, puxa o nome do JOIN, Date → ISO. */
@@ -80,6 +82,8 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
       notes: i.notes,
       modifiers: i.modifiers.map((m) => ({ name: m.name })),
     })),
+    flaggedAt: row.flaggedAt?.toISOString() ?? null,
+    flaggedReason: row.flaggedReason,
   };
 }
 
@@ -118,6 +122,8 @@ const SELECT = {
       modifiers: { select: { name: true } },
     },
   },
+  flaggedAt: true,
+  flaggedReason: true,
 } as const;
 
 function orderDestination(row: AdminOrderRow): AdminOrder['destination'] {

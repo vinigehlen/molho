@@ -66,6 +66,19 @@ export async function confirmPayment(id: string, version: number): Promise<Respo
 }
 
 /**
+ * Sinalizar/dessinalizar pendência (Fase 3, plano do gestor). 409 é benigno
+ * pelo mesmo motivo de `confirmPayment`: outro tablet pode ter mexido no
+ * pedido no meio — quem chama refaz o fetch.
+ */
+export async function setOrderFlag(id: string, version: number, flagged: boolean, reason: string | null): Promise<Response> {
+  return apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/flag`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version, flagged, reason: reason ?? undefined }),
+  });
+}
+
+/**
  * Telefone do cliente pro click-to-chat (Épico 11). Buscado SÓ no clique do
  * botão: PII não trafega no payload do board. 403 = módulo `notify.whatsapp_ctc`
  * desligado pro tenant — devolve `null` igual ao 404, quem chama mostra o

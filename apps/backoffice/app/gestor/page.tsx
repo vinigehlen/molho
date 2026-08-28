@@ -1,54 +1,36 @@
 'use client';
 
-import { memo, useEffect, useRef, useState, type DragEvent } from 'react';
+import React, { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, CircleCheck, MessageCircle, Printer } from 'lucide-react';
+import { Flag } from 'lucide-react';
 import type { AdminOrder } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { refreshStaffSession } from '../../lib/staff-auth';
-import { BOARD_COLUMNS, COLUMN_LABEL, confirmPayment, fetchActiveOrders, fetchOrder, groupByColumn, type BoardColumn } from '../../lib/orders-api';
+import {
+  BOARD_COLUMNS,
+  COLUMN_LABEL,
+  confirmPayment,
+  fetchActiveOrders,
+  fetchOrder,
+  groupByColumn,
+  setOrderFlag,
+  type BoardColumn,
+} from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
 import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
-import { isBackwardStaffTransition, isLegalStaffTransition, paymentGateReason } from '../../lib/order-queue';
+import { isBackwardStaffTransition, isLegalStaffTransition } from '../../lib/order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
-import { centsToBRL, fulfillmentDeadline, isoToTime } from '../../lib/format';
+import { isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
+import { OrderCard } from './order-card';
 import { PrintJobConsumer } from './print-job-consumer';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
-/** Próxima ação do fluxo por status (o botão "Avançar" do card). */
-const NEXT_ACTION: Partial<Record<AdminOrder['status'], { to: AdminOrder['status']; label: string }>> = {
-  received: { to: 'preparing', label: 'Preparar' },
-  preparing: { to: 'ready', label: 'Pronto' },
-  in_transit: { to: 'completed', label: 'Concluir' },
-};
-
-const PREVIOUS_ACTION: Partial<Record<AdminOrder['status'], AdminOrder['status']>> = {
-  preparing: 'received',
-  ready: 'preparing',
-  in_transit: 'ready',
-};
-
 function statusLabel(status: AdminOrder['status']): string {
   return status in COLUMN_LABEL ? COLUMN_LABEL[status as keyof typeof COLUMN_LABEL] : status;
-}
-
-function destinationLabel(order: AdminOrder): string {
-  if (order.destination === 'delivery') return 'Delivery';
-  if (order.destination === 'balcao') return 'Balcão';
-  return 'Retirada';
-}
-
-function nextAction(order: AdminOrder): { to: AdminOrder['status']; label: string } | undefined {
-  if (order.status === 'ready') {
-    return order.destination === 'delivery'
-      ? { to: 'in_transit', label: 'Saiu p/ entrega' }
-      : { to: 'completed', label: 'Pronto p/ Retirar' };
-  }
-  return NEXT_ACTION[order.status];
 }
 
 /**
@@ -148,6 +130,21 @@ export default function GestorPage() {
   const [reversal, setReversal] = useState<{ order: AdminOrder; toStatus: AdminOrder['status'] } | null>(null);
   const [reversalReason, setReversalReason] = useState('');
 
+  // Sinalização manual de pendência (Fase 3, plano do gestor). Dessinalizar
+  // não precisa de motivo (é limpar um alerta que já cumpriu seu papel);
+  // sinalizar abre um diálogo pra registrar POR QUE — vira o `flaggedReason`
+  // que outro staff vê ao passar o mouse no card.
+  const [flagDialog, setFlagDialog] = useState<AdminOrder | null>(null);
+  const [flagReason, setFlagReason] = useState('');
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
+
+  async function applyFlag(order: AdminOrder, flagged: boolean, reason: string | null) {
+    // 409 (version desatualizada) é benigno, mesmo padrão de markPaid: o fetch fresco reconcilia.
+    await setOrderFlag(order.id, order.version, flagged, reason).catch(() => null);
+    const fresh = await fetchOrder(order.id).catch(() => null);
+    setOrders((prev) => (prev ? applyOrderUpdate(prev, order.id, fresh) : prev));
+  }
+
   function requestTransition(order: AdminOrder, toStatus: AdminOrder['status']) {
     if (!isLegalStaffTransition(order.status, toStatus)) return;
     if (isBackwardStaffTransition(order.status, toStatus)) {
@@ -200,7 +197,9 @@ export default function GestorPage() {
     );
   }
 
-  const groups = orders ? groupByColumn(orders) : null;
+  const visibleOrders = onlyFlagged ? orders?.filter((o) => o.flaggedAt !== null) ?? null : orders;
+  const groups = visibleOrders ? groupByColumn(visibleOrders) : null;
+  const flaggedCount = orders?.filter((o) => o.flaggedAt !== null).length ?? 0;
 
   return (
     <main className="min-h-screen bg-bg p-4">
@@ -227,6 +226,19 @@ export default function GestorPage() {
               onClick={ativarSom}
             >
               Ativar som
+            </button>
+          )}
+          {flaggedCount > 0 && (
+            <button
+              type="button"
+              aria-pressed={onlyFlagged}
+              onClick={() => setOnlyFlagged((value) => !value)}
+              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium tabular-nums transition-colors ${
+                onlyFlagged ? 'border-critical bg-critical/10 text-critical-strong' : 'border-border text-text-muted'
+              }`}
+            >
+              <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+              Só sinalizados ({flaggedCount})
             </button>
           )}
           {tenantId && <PrintJobConsumer active={online} />}
@@ -292,6 +304,11 @@ export default function GestorPage() {
                         onMarkPaid={() => void markPaid(order)}
                         onNotify={() => setAvisando(order)}
                         onPrint={() => void queuePrintCopy(order)}
+                        onFlag={() => {
+                          setFlagDialog(order);
+                          setFlagReason('');
+                        }}
+                        onUnflag={() => void applyFlag(order, false, null)}
                         printFeedback={printFeedback[order.id] ?? null}
                         dragging={draggingId === order.id}
                         onDragStart={(event) => {
@@ -400,249 +417,44 @@ export default function GestorPage() {
           </section>
         </div>
       )}
-    </main>
-  );
-}
-
-interface OrderCardProps {
-  order: AdminOrder;
-  pending: boolean;
-  online: boolean;
-  confirming: boolean;
-  onAdvance: (to: AdminOrder['status']) => void;
-  onMove: (to: AdminOrder['status']) => void;
-  onMarkPaid: () => void;
-  onNotify: () => void;
-  onPrint: () => void;
-  printFeedback: { state: 'queueing' | 'queued' | 'failed'; message: string } | null;
-  dragging: boolean;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
-}
-
-/**
- * Memoizado com comparador próprio: os callbacks (onAdvance, onMove…) são
- * closures novas a cada render do board — comparação rasa padrão do memo()
- * nunca bateria neles, então o memo não pegaria nada. `applyOrderUpdate`
- * (order-updates.ts) já preserva a referência de `order` pra pedido que não
- * mudou; comparar só o que carrega estado real (order, flags, printFeedback)
- * é o que faz um nudge do SSE re-renderizar só o card afetado, não a coluna
- * inteira.
- */
-const OrderCard = memo(function OrderCard({
-  order,
-  pending,
-  online,
-  confirming,
-  onAdvance,
-  onMove,
-  onMarkPaid,
-  onNotify,
-  onPrint,
-  printFeedback,
-  dragging,
-  onDragStart,
-  onDragEnd,
-}: OrderCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [renderedAt] = useState(() => Date.now());
-  const next = nextAction(order);
-  const previous = PREVIOUS_ACTION[order.status];
-  const advanceBlockReason = next ? paymentGateReason(order, next.to) : null;
-  const printDisabled = printFeedback?.state === 'queueing';
-  const deadline = fulfillmentDeadline(order, renderedAt);
-  return (
-    <article
-      className={`rounded-[14px] border border-border bg-bg p-3 transition ${dragging ? 'opacity-50' : ''}`}
-      draggable={!pending}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-    >
-      {/* Nome + horário + valor: a TRÍADE de reconciliação do PIX estático (§5.5) —
-          é o que o lojista casa com o extrato do banco (o txid não é confiável). */}
-      <button
-        type="button"
-        className="w-full cursor-pointer text-left"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <span className="font-medium text-text">{order.customerName}</span>
-          <span className="shrink-0 text-right text-xs tabular-nums text-text-muted">
-            <span className="block">{isoToTime(order.createdAt)}</span>
-            <span className={`mt-0.5 block ${deadline.overdue ? 'font-semibold text-critical' : ''}`}>{deadline.text}</span>
-          </span>
-        </div>
-        <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
-          {destinationLabel(order)}
-        </span>
-        <div className="mt-1 flex items-center justify-between text-sm tabular-nums text-text">
-          <span>{centsToBRL(order.totalCents)}</span>
-          <span className="inline-flex items-center gap-1 text-xs text-brand-strong">
-            {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
-            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-          </span>
-        </div>
-        <ul className="mt-2 space-y-0.5 text-xs text-text-muted">
-          {order.items.map((item, i) => (
-            <li key={i} className="tabular-nums">{item.quantity}× {item.name}</li>
-          ))}
-        </ul>
-      </button>
-
-      {expanded && <OrderDetails order={order} />}
-
-      <PaymentPanel order={order} online={online} confirming={confirming} onMarkPaid={onMarkPaid} />
-
-      {advanceBlockReason && (
-        <p className="mt-2 text-xs font-medium text-caution" role="status">
-          {advanceBlockReason}
-        </p>
-      )}
-
-      <div className="mt-3 flex items-center justify-between gap-2">
-        {pending ? (
-          <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-text">ação pendente…</span>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Segunda via durável (Épico 10): cria `print_job`; o agente local
-                imprime depois pelo claim da fila. Não muda estado do pedido. */}
-            <button
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
-              disabled={printDisabled}
-              onClick={onPrint}
-              aria-label="Imprimir comanda"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              {printDisabled ? 'Enfileirando…' : 'Imprimir'}
-            </button>
-            {printFeedback && printFeedback.state !== 'queueing' && (
-              <span
-                className={`text-[11px] ${
-                  printFeedback.state === 'queued' ? 'text-positive' : 'text-critical'
-                }`}
-                aria-live="polite"
+      {flagDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <section
+            className="w-full max-w-md rounded-[20px] bg-bg-card p-5 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="flag-title"
+          >
+            <h2 id="flag-title" className="text-lg font-semibold text-text">Sinalizar pedido</h2>
+            <p className="mt-2 text-sm text-text-muted">
+              O pedido de {flagDialog.customerName} fica destacado no board até alguém dessinalizar.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-text" htmlFor="flag-reason">Motivo (opcional)</label>
+            <textarea
+              id="flag-reason"
+              className="mt-1 min-h-20 w-full rounded-[14px] border border-border bg-bg p-3 text-sm text-text"
+              value={flagReason}
+              onChange={(event) => setFlagReason(event.target.value)}
+              maxLength={200}
+              autoFocus
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="rounded-[10px] border border-border px-3 py-2 text-sm text-text" onClick={() => setFlagDialog(null)}>
+                Cancelar
+              </button>
+              <button
+                className="rounded-[10px] bg-critical-strong px-3 py-2 text-sm font-medium text-white"
+                onClick={() => {
+                  void applyFlag(flagDialog, true, flagReason.trim() || null);
+                  setFlagDialog(null);
+                }}
               >
-                {printFeedback.message}
-              </span>
-            )}
-            {/* Click-to-chat (Épico 11): só precisa de rede quando o sheet abre
-                (busca o telefone), então não é gateado por `online` como o
-                "Marcar pago". */}
-            <button
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-border px-2 py-1 text-xs font-medium text-text"
-              onClick={onNotify}
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-              Avisar cliente
-            </button>
-          </div>
-        )}
-        {next && (
-          <button
-            className="rounded-[10px] bg-brand px-3 py-1 text-xs font-medium text-on-brand disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={advanceBlockReason !== null}
-            onClick={() => onAdvance(next.to)}
-            title={advanceBlockReason ?? undefined}
-          >
-            {next.label}
-          </button>
-        )}
-        {previous && !pending && (
-          <button
-            className="rounded-[10px] border border-brand px-3 py-1 text-xs font-medium text-brand-strong"
-            onClick={() => onMove(previous)}
-          >
-            Voltar etapa
-          </button>
-        )}
-      </div>
-    </article>
-  );
-},
-(prev, next) =>
-  prev.order === next.order &&
-  prev.pending === next.pending &&
-  prev.online === next.online &&
-  prev.confirming === next.confirming &&
-  prev.printFeedback === next.printFeedback &&
-  prev.dragging === next.dragging);
-
-function OrderDetails({ order }: { order: AdminOrder }) {
-  return (
-    <div className="mt-3 space-y-3 border-t border-border pt-3 text-xs text-text-muted">
-      <div>
-        <p className="font-semibold text-text">Itens e observações</p>
-        <ul className="mt-1 space-y-2">
-          {order.items.map((item, index) => (
-            <li key={index}>
-              <span className="font-medium text-text">{item.quantity}× {item.name}</span>
-              {item.modifiers.length > 0 && <p>+ {item.modifiers.map((modifier) => modifier.name).join(', ')}</p>}
-              {item.notes && <p className="italic">Obs.: {item.notes}</p>}
-            </li>
-          ))}
-        </ul>
-      </div>
-      {order.delivery && (
-        <div>
-          <p className="font-semibold text-text">Entrega</p>
-          <p>{order.delivery.street}, {order.delivery.number ?? 's/n'}{order.delivery.complement ? `, ${order.delivery.complement}` : ''}</p>
-          <p>{order.delivery.neighborhood}, {order.delivery.city}/{order.delivery.state}</p>
-          {order.delivery.referencePoint && <p>Referência: {order.delivery.referencePoint}</p>}
-          {!order.delivery.postalCodeVerified && <p className="font-medium text-caution">Confira o endereço e a taxa antes de despachar.</p>}
+                Sinalizar
+              </button>
+            </div>
+          </section>
         </div>
       )}
-      <div className="flex justify-between tabular-nums"><span>Subtotal</span><span>{centsToBRL(order.subtotalCents)}</span></div>
-      <div className="flex justify-between tabular-nums"><span>Taxa de entrega</span><span>{centsToBRL(order.deliveryFeeCents)}</span></div>
-    </div>
-  );
-}
-
-/**
- * Painel de reconciliação de pagamento (item 6). "Marcar pago" gateado por
- * ALCANÇABILIDADE DA API (`online`), NUNCA por streamStatus: sem tempo real o
- * REST ainda confirma; sem rede, não. Motivo do disable fica VISÍVEL. PIX é
- * pré-pago (bloqueia preparo, §5.5); pós-pago (dinheiro/cartão na entrega) só é
- * confirmado na entrega, então lá a confirmação vale a partir do "Saiu".
- */
-function PaymentPanel({
-  order,
-  online,
-  confirming,
-  onMarkPaid,
-}: {
-  order: AdminOrder;
-  online: boolean;
-  confirming: boolean;
-  onMarkPaid: () => void;
-}) {
-  if (order.paymentStatus === 'confirmado') {
-    return (
-      <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-positive">
-        <CircleCheck className="h-3.5 w-3.5" /> Pago
-      </div>
-    );
-  }
-  // Pós-pago só faz sentido confirmar a partir da saída pra entrega (recebe na
-  // ponta). PIX pode ser confirmado assim que o dinheiro cai, ainda em Recebidos.
-  const confirmavel = order.paymentMethod === 'pix' || order.status === 'in_transit';
-  return (
-    <div className="mt-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="rounded-full bg-caution px-2 py-0.5 text-xs font-medium text-text">Aguardando pagamento</span>
-        {confirmavel && (
-          <button
-            className="rounded-[10px] bg-positive px-3 py-1 text-xs font-medium text-text disabled:opacity-50"
-            disabled={!online || confirming}
-            onClick={onMarkPaid}
-          >
-            {confirming ? 'Confirmando…' : 'Marcar pago'}
-          </button>
-        )}
-      </div>
-      {confirmavel && !online && (
-        <span className="text-[11px] text-text-muted">Sem conexão com o sistema. Reconecte pra confirmar o pagamento.</span>
-      )}
-    </div>
+    </main>
   );
 }

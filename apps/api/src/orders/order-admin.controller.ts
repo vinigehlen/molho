@@ -24,10 +24,12 @@ import { RequirePermissionGuard } from '../auth/guards/require-permission.guard'
 import { requireTenantIdHeader } from '../auth/guards/tenant-header.util';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
 import type { AdminOrderRepository } from './admin-order.repository';
+import { FlagOrderDto } from './dto/flag-order.dto';
 import { TransitionOrderDto } from './dto/transition-order.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
+import type { OrderFlagService } from './order-flag.service';
 import type { OrderStatusService } from './order-status.service';
-import { ADMIN_ORDER_REPOSITORY, ORDER_STATUS_SERVICE } from './orders.tokens';
+import { ADMIN_ORDER_REPOSITORY, ORDER_FLAG_SERVICE, ORDER_STATUS_SERVICE } from './orders.tokens';
 import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
@@ -48,6 +50,7 @@ export class OrderAdminController {
   constructor(
     @Inject(ORDER_STATUS_SERVICE) private readonly orderStatus: OrderStatusService,
     @Inject(ADMIN_ORDER_REPOSITORY) private readonly orders: AdminOrderRepository,
+    @Inject(ORDER_FLAG_SERVICE) private readonly orderFlag: OrderFlagService,
   ) {}
 
   /** Board do gestor: pedidos ativos do tenant (load inicial + refetch na reconexão). */
@@ -107,6 +110,32 @@ export class OrderAdminController {
 
     // Enfileira o cutuque — o flush (publish) acontece DEPOIS do commit, no
     // OrderPublishInterceptor. version = dto.version+1 (lock otimista aplicou).
+    queueOrderPublish(req, tenantId, { orderId: id, event: 'status_changed', version: dto.version + 1 });
+  }
+
+  /**
+   * Sinalizar/dessinalizar pendência (Fase 3, plano do gestor — versão MVP
+   * manual da "tag de pendência" do iFood). Mesma permissão de transição:
+   * quem pode mexer no andamento do pedido pode marcar "precisa de atenção".
+   */
+  @Patch(':id/flag')
+  @RequirePermission('order.update_status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async flag(
+    @Param('id') id: string,
+    @Body() dto: FlagOrderDto,
+    @Req() req: RequestWithUser,
+  ): Promise<void> {
+    const tenantId = requireTenantIdHeader(req);
+    const role = resolveActorRole(req, tenantId);
+    await this.orderFlag.setFlag({
+      orderId: id,
+      expectedVersion: dto.version,
+      flagged: dto.flagged,
+      reason: dto.reason ?? null,
+      actor: { userId: req.user.sub, role },
+    });
+
     queueOrderPublish(req, tenantId, { orderId: id, event: 'status_changed', version: dto.version + 1 });
   }
 }

@@ -906,6 +906,15 @@ model Order {
   /// não duplicados aqui.
   canceledReason String?   @map("canceled_reason")
 
+  /// Sinalização manual (Fase 3, plano do gestor — versão MVP da "tag de
+  /// pendência" do iFood, que lá é automática por chat/negociação in-app;
+  /// aqui é o staff marcando "esse pedido precisa de atenção" na mão,
+  /// porque não existe chat com o cliente dentro do produto). Não bloqueia
+  /// nenhuma transição de status — é só um filtro/destaque visual no board.
+  /// `null` = não sinalizado (estado normal da imensa maioria das linhas).
+  flaggedAt     DateTime? @map("flagged_at")
+  flaggedReason String?   @map("flagged_reason")
+
   /// Chave de idempotência da CRIAÇÃO do pedido (Épico balcão) — nula pro
   /// checkout normal (que já tem seu próprio cap de escrita pública, ver
   /// CheckoutOrderRateLimitMiddleware). POS/balcão manda o mesmo header

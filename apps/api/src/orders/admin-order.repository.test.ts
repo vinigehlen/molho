@@ -29,6 +29,8 @@ const ROW: AdminOrderRow = {
   deliveryPostalCodeVerified: true,
   customer: { name: 'Ana Souza', phoneCiphertext: Buffer.from('phone') },
   items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }],
+  flaggedAt: null,
+  flaggedReason: null,
 };
 
 describe('toAdminOrder', () => {
@@ -113,5 +115,19 @@ describe('toAdminOrder', () => {
     expect(toAdminOrder({ ...ROW, fulfillmentType: 'pickup', customer: { name: 'Balcão', phoneCiphertext: null } }).destination).toBe(
       'balcao',
     );
+  });
+
+  it('sinalização de pendência (Fase 3): null por padrão, ISO quando presente', () => {
+    expect(toAdminOrder(ROW).flaggedAt).toBeNull();
+    expect(toAdminOrder(ROW).flaggedReason).toBeNull();
+
+    const flagged = toAdminOrder({
+      ...ROW,
+      flaggedAt: new Date('2026-07-26T18:35:00.000Z'),
+      flaggedReason: 'Cliente pediu troca de item por telefone',
+    });
+    expect(flagged.flaggedAt).toBe('2026-07-26T18:35:00.000Z');
+    expect(flagged.flaggedReason).toBe('Cliente pediu troca de item por telefone');
+    expect(adminOrderSchema.safeParse(flagged).success).toBe(true);
   });
 });
