@@ -580,12 +580,12 @@ export default function ConfiguracaoPage() {
           <h2 className="text-2xl font-semibold">Entrega</h2>
           <p className="mt-1 text-sm text-text-muted">Cadastre ao menos uma área simples para liberar o checkout do delivery.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-8">
-            <input className="h-12 rounded-[14px] border border-border bg-bg px-3 md:col-span-2" value={zoneDraft.name} onChange={(event) => setZoneDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Centro" />
-            <input className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.city} onChange={(event) => setZoneDraft((prev) => ({ ...prev, city: event.target.value }))} placeholder="Cidade" />
-            <input className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.state} onChange={(event) => setZoneDraft((prev) => ({ ...prev, state: event.target.value.toUpperCase().slice(0, 2) }))} placeholder="UF" />
+            <input aria-label="Nome da área de entrega" className="h-12 rounded-[14px] border border-border bg-bg px-3 md:col-span-2" value={zoneDraft.name} onChange={(event) => setZoneDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Centro" />
+            <input aria-label="Cidade da área de entrega" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.city} onChange={(event) => setZoneDraft((prev) => ({ ...prev, city: event.target.value }))} placeholder="Cidade" />
+            <input aria-label="UF da área de entrega" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.state} onChange={(event) => setZoneDraft((prev) => ({ ...prev, state: event.target.value.toUpperCase().slice(0, 2) }))} placeholder="UF" />
             <MoneyInput value={zoneDraft.fee} onChange={(value) => setZoneDraft((prev) => ({ ...prev, fee: value }))} placeholder="Taxa" />
-            <input type="number" min="0" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.etaMin} onChange={(event) => setZoneDraft((prev) => ({ ...prev, etaMin: event.target.value }))} placeholder="Mín. min" />
-            <input type="number" min="0" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.etaMax} onChange={(event) => setZoneDraft((prev) => ({ ...prev, etaMax: event.target.value }))} placeholder="Máx. min" />
+            <input aria-label="Tempo mínimo de entrega em minutos" type="number" min="0" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.etaMin} onChange={(event) => setZoneDraft((prev) => ({ ...prev, etaMin: event.target.value }))} placeholder="Mín. min" />
+            <input aria-label="Tempo máximo de entrega em minutos" type="number" min="0" className="h-12 rounded-[14px] border border-border bg-bg px-3" value={zoneDraft.etaMax} onChange={(event) => setZoneDraft((prev) => ({ ...prev, etaMax: event.target.value }))} placeholder="Máx. min" />
             <button className="rounded-[14px] bg-brand px-4 font-semibold text-on-brand" onClick={() => void addZone()}>Adicionar</button>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">

@@ -107,7 +107,7 @@ export default function SignupPage() {
               disabled={busy}
               required
             />
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || !email.trim()}>
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || !email.trim()}>
               {busy ? 'Enviando…' : 'Enviar código'}
             </button>
           </form>
@@ -154,7 +154,7 @@ export default function SignupPage() {
               />
               <SlugPreview slug={slug} checking={checkingSlug} availability={slugAvailability} />
             </div>
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6 || !ownerName.trim() || !slug}>
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6 || !ownerName.trim() || !slug}>
               {busy ? 'Criando…' : 'Criar minha loja'}
             </button>
             <button type="button" className="w-full text-sm font-medium text-brand-strong" onClick={() => { setStep('email'); setCode(''); setError(null); }}>

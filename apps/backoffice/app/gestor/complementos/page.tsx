@@ -189,10 +189,10 @@ export default function ComplementosPage() {
                   {expanded && (
                     <div className="border-t border-border p-4">
                       <div className="grid gap-3 md:grid-cols-4">
-                        <input className="h-11 rounded-[14px] border border-border bg-bg-card px-3 md:col-span-2" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Nome do grupo" />
-                        <input className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={editDraft.min} onChange={(event) => setEditDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
-                        <input className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={editDraft.max} onChange={(event) => setEditDraft((prev) => ({ ...prev, max: event.target.value }))} placeholder="Máx." />
-                        <input className="h-11 rounded-[14px] border border-border bg-bg-card px-3 md:col-span-3" value={editDraft.pdvCode} onChange={(event) => setEditDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
+                        <input aria-label="Nome do grupo" className="h-11 rounded-[14px] border border-border bg-bg-card px-3 md:col-span-2" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Nome do grupo" />
+                        <input aria-label="Mínimo de opções do grupo" className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={editDraft.min} onChange={(event) => setEditDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
+                        <input aria-label="Máximo de opções do grupo" className="h-11 rounded-[14px] border border-border bg-bg-card px-3" value={editDraft.max} onChange={(event) => setEditDraft((prev) => ({ ...prev, max: event.target.value }))} placeholder="Máx." />
+                        <input aria-label="Código no PDV do grupo" className="h-11 rounded-[14px] border border-border bg-bg-card px-3 md:col-span-3" value={editDraft.pdvCode} onChange={(event) => setEditDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
                         <button className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand disabled:opacity-50" disabled={busy === 'save-group'} onClick={() => void saveGroup(group)}>
                           {busy === 'save-group' ? 'Salvando…' : 'Salvar grupo'}
                         </button>
@@ -210,6 +210,7 @@ export default function ComplementosPage() {
                         </div>
                         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_160px_120px]">
                           <input
+                            aria-label="Nome do item do grupo"
                             className="h-11 rounded-[14px] border border-border bg-bg-card px-3"
                             value={modifierDraft[group.id]?.name ?? ''}
                             onChange={(event) => setModifierDraft((prev) => ({ ...prev, [group.id]: { ...(prev[group.id] ?? { price: '' }), name: event.target.value } }))}
@@ -218,6 +219,7 @@ export default function ComplementosPage() {
                           <div className="flex h-11 items-center rounded-[14px] border border-border bg-bg-card px-3 focus-within:border-brand">
                             <span className="mr-2 text-sm font-semibold text-text-muted">R$</span>
                             <input
+                              aria-label="Preço do item do grupo"
                               className="h-full min-w-0 flex-1 bg-transparent outline-none"
                               inputMode="decimal"
                               value={modifierDraft[group.id]?.price ?? ''}

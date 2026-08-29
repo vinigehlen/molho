@@ -446,6 +446,7 @@ function ZonesPanel({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Nome">
           <input
+            aria-label="Nome da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -455,6 +456,7 @@ function ZonesPanel({
         </Field>
         <Field label="Cidade">
           <input
+            aria-label="Cidade da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text"
             value={form.city}
             onChange={(e) => setForm({ ...form, city: e.target.value })}
@@ -464,6 +466,7 @@ function ZonesPanel({
         </Field>
         <Field label="UF">
           <input
+            aria-label="UF da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm uppercase text-text"
             value={form.state}
             onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -473,6 +476,7 @@ function ZonesPanel({
         </Field>
         <Field label="Taxa">
           <input
+            aria-label="Taxa de entrega da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm tabular-nums text-text"
             value={form.feeReais}
             onChange={(e) => setForm({ ...form, feeReais: e.target.value })}

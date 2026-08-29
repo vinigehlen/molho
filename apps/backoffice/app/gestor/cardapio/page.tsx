@@ -480,7 +480,7 @@ export default function CardapioPage() {
               <div className="rounded-[14px] border border-border bg-bg p-4">
                 <h3 className="font-semibold">Categoria</h3>
                 <div className="mt-3 flex gap-2">
-                  <input className="h-12 flex-1 rounded-[14px] border border-border bg-bg-card px-4" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Hambúrgueres" />
+                  <input aria-label="Nome da categoria" className="h-12 flex-1 rounded-[14px] border border-border bg-bg-card px-4" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Hambúrgueres" />
                   <button className="rounded-[14px] bg-brand px-4 font-semibold text-on-brand" onClick={() => void addCategory()}>Adicionar</button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -490,15 +490,15 @@ export default function CardapioPage() {
               <div className="rounded-[14px] border border-border bg-bg p-4">
                 <h3 className="font-semibold">Produto</h3>
                 <div className="mt-3 grid gap-3">
-                  <select className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={productDraft.categoryId} onChange={(event) => setProductDraft((prev) => ({ ...prev, categoryId: event.target.value }))}>
+                  <select aria-label="Categoria do produto" className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={productDraft.categoryId} onChange={(event) => setProductDraft((prev) => ({ ...prev, categoryId: event.target.value }))}>
                     <option value="">Categoria</option>
                     {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                   </select>
-                  <input className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.name} onChange={(event) => setProductDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Xis coração" />
-                  <textarea className="min-h-24 rounded-[14px] border border-border bg-bg-card px-4 py-3" value={productDraft.description} onChange={(event) => setProductDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Pão, coração, milho, ervilha..." />
+                  <input aria-label="Nome do produto" className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.name} onChange={(event) => setProductDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Xis coração" />
+                  <textarea aria-label="Descrição do produto" className="min-h-24 rounded-[14px] border border-border bg-bg-card px-4 py-3" value={productDraft.description} onChange={(event) => setProductDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Pão, coração, milho, ervilha..." />
                   <MoneyInput value={productDraft.price} onChange={(value) => setProductDraft((prev) => ({ ...prev, price: value }))} placeholder="29,90" />
-                  <input className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.pdvCode} onChange={(event) => setProductDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
-                  <input type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg-card p-3" onChange={(event) => setProductDraft((prev) => ({ ...prev, photo: event.target.files?.[0] ?? null }))} />
+                  <input aria-label="Código no PDV" className="h-12 rounded-[14px] border border-border bg-bg-card px-4" value={productDraft.pdvCode} onChange={(event) => setProductDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
+                  <input aria-label="Foto do produto" type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg-card p-3" onChange={(event) => setProductDraft((prev) => ({ ...prev, photo: event.target.files?.[0] ?? null }))} />
                   <button className="rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand" onClick={() => void addProduct()}>Adicionar produto</button>
                 </div>
               </div>
@@ -559,13 +559,13 @@ export default function CardapioPage() {
                         {expanded && (
                           <div className="border-t border-border p-4">
                             <div className="grid gap-3 md:grid-cols-2">
-                              <select className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.categoryId} onChange={(event) => setEditDraft((prev) => ({ ...prev, categoryId: event.target.value }))}>
+                              <select aria-label="Categoria do item" className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.categoryId} onChange={(event) => setEditDraft((prev) => ({ ...prev, categoryId: event.target.value }))}>
                                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                               </select>
-                              <input className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Nome do item" />
+                              <input aria-label="Nome do item" className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Nome do item" />
                               <MoneyInput value={editDraft.price} onChange={(value) => setEditDraft((prev) => ({ ...prev, price: value }))} placeholder="29,90" />
-                              <input className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.pdvCode} onChange={(event) => setEditDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
-                              <textarea className="min-h-24 rounded-[14px] border border-border bg-bg px-3 py-3 md:col-span-2" value={editDraft.description} onChange={(event) => setEditDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Descrição" />
+                              <input aria-label="Código no PDV" className="h-11 rounded-[14px] border border-border bg-bg px-3" value={editDraft.pdvCode} onChange={(event) => setEditDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código no PDV (opcional)" />
+                              <textarea aria-label="Descrição do item" className="min-h-24 rounded-[14px] border border-border bg-bg px-3 py-3 md:col-span-2" value={editDraft.description} onChange={(event) => setEditDraft((prev) => ({ ...prev, description: event.target.value }))} placeholder="Descrição" />
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                               <button className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand disabled:opacity-50" disabled={busy === 'product-edit'} onClick={() => void saveSelectedProduct()}>
@@ -627,7 +627,7 @@ export default function CardapioPage() {
                                 {images.length === 0 && <div className="flex h-24 min-w-44 items-center rounded-[14px] border border-dashed border-border px-3 text-sm text-text-muted">Nenhuma foto cadastrada.</div>}
                               </div>
                               <div className="mt-3 flex flex-col gap-2 md:flex-row">
-                                <input type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg p-3" onChange={(event) => setEditPhoto(event.target.files?.[0] ?? null)} />
+                                <input aria-label="Adicionar foto do item" type="file" accept="image/*" className="rounded-[14px] border border-border bg-bg p-3" onChange={(event) => setEditPhoto(event.target.files?.[0] ?? null)} />
                                 <button className="rounded-[14px] border border-border px-4 py-2 font-semibold disabled:opacity-50" disabled={!editPhoto || busy === 'product-photo'} onClick={() => void uploadSelectedProductPhoto()}>
                                   {busy === 'product-photo' ? 'Enviando…' : 'Adicionar foto'}
                                 </button>
@@ -646,6 +646,7 @@ export default function CardapioPage() {
                               {allGroups.some((g) => !g.productIds.includes(selectedProductId)) && (
                                 <div className="mt-3 flex gap-2">
                                   <select
+                                    aria-label="Vincular grupo existente"
                                     className="h-12 flex-1 rounded-[14px] border border-border bg-bg-card px-3"
                                     value={linkGroupId}
                                     onChange={(event) => setLinkGroupId(event.target.value)}
@@ -667,10 +668,10 @@ export default function CardapioPage() {
                                 </div>
                               )}
                               <div className="mt-3 grid gap-3 md:grid-cols-5">
-                                <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.name} onChange={(event) => setGroupDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Tamanho ou adicionais" />
-                                <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.min} onChange={(event) => setGroupDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
-                                <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.max} onChange={(event) => setGroupDraft((prev) => ({ ...prev, max: event.target.value }))} placeholder="Máx." />
-                                <input className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.pdvCode} onChange={(event) => setGroupDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código PDV" />
+                                <input aria-label="Nome do grupo" className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.name} onChange={(event) => setGroupDraft((prev) => ({ ...prev, name: event.target.value }))} placeholder="Tamanho ou adicionais" />
+                                <input aria-label="Mínimo de opções do grupo" className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.min} onChange={(event) => setGroupDraft((prev) => ({ ...prev, min: event.target.value }))} placeholder="Mín." />
+                                <input aria-label="Máximo de opções do grupo" className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.max} onChange={(event) => setGroupDraft((prev) => ({ ...prev, max: event.target.value }))} placeholder="Máx." />
+                                <input aria-label="Código PDV do grupo" className="h-12 rounded-[14px] border border-border bg-bg-card px-3" value={groupDraft.pdvCode} onChange={(event) => setGroupDraft((prev) => ({ ...prev, pdvCode: event.target.value }))} placeholder="Código PDV" />
                                 <button className="rounded-[14px] bg-brand px-4 font-semibold text-on-brand" onClick={() => void addGroup()}>Criar grupo</button>
                               </div>
                               <div className="mt-4 space-y-3">
@@ -708,7 +709,7 @@ export default function CardapioPage() {
                                       {(modifiers[group.id] ?? []).map((item) => <span key={item.id} className="rounded-full border border-border px-3 py-1 text-sm">{item.name} {item.priceDeltaCents > 0 ? `+${centsToBRL(item.priceDeltaCents)}` : 'sem custo'}</span>)}
                                     </div>
                                     <div className="mt-3 grid gap-2 md:grid-cols-[1fr_160px_120px]">
-                                      <input className="h-11 rounded-[14px] border border-border bg-bg px-3" value={modifierDraft[group.id]?.name ?? ''} onChange={(event) => setModifierDraft((prev) => ({ ...prev, [group.id]: { ...(prev[group.id] ?? { price: '' }), name: event.target.value } }))} placeholder="Extra queijo / Sem salada / Calabresa" />
+                                      <input aria-label="Nome do complemento" className="h-11 rounded-[14px] border border-border bg-bg px-3" value={modifierDraft[group.id]?.name ?? ''} onChange={(event) => setModifierDraft((prev) => ({ ...prev, [group.id]: { ...(prev[group.id] ?? { price: '' }), name: event.target.value } }))} placeholder="Extra queijo / Sem salada / Calabresa" />
                                       <MoneyInput value={modifierDraft[group.id]?.price ?? ''} onChange={(value) => setModifierDraft((prev) => ({ ...prev, [group.id]: { ...(prev[group.id] ?? { name: '' }), price: value } }))} placeholder="4,00" />
                                       <button className="rounded-[14px] border border-border font-semibold" onClick={() => void addModifier(group.id)}>Adicionar</button>
                                     </div>

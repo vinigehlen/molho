@@ -110,7 +110,7 @@ export default function LoginPage() {
               disabled={!channel || busy}
               required
             />
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={!channel || busy}>
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={!channel || busy}>
               {busy ? 'Enviando…' : 'Enviar código'}
             </button>
           </form>
@@ -147,7 +147,7 @@ export default function LoginPage() {
               disabled={busy}
               autoFocus
             />
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6}>
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6}>
               {busy ? 'Entrando…' : 'Entrar'}
             </button>
             <button type="button" className="w-full text-sm font-medium text-brand-strong" onClick={() => { setStep('identifier'); setCode(''); setError(null); }}>
