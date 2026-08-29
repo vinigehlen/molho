@@ -66,6 +66,36 @@ export const setCatalogProductAvailabilitySchema = z.strictObject({
   available: z.boolean(),
 });
 
+/** Apresentação comercial de um produto numa categoria. Durante a expansão
+ * do Épico 4B toda linha existente é `isPrimary=true` e permanece sincronizada
+ * com os campos legados de Product para deploy sem downtime. */
+export const catalogProductOfferSchema = z.strictObject({
+  id: z.uuid(),
+  productId: z.uuid(),
+  categoryId: z.uuid(),
+  priceCents: centsSchema,
+  available: z.boolean(),
+  pdvCode: pdvCodeSchema,
+  sortOrder: sortOrderSchema,
+  isPrimary: z.boolean(),
+  version: versionSchema,
+});
+
+/** Não cria ofertas secundárias ainda: este contrato só edita a oferta
+ * compatível que já nasceu no backfill. */
+export const updateCatalogProductOfferSchema = z.strictObject({
+  version: versionSchema,
+  categoryId: z.uuid().optional(),
+  priceCents: centsSchema.optional(),
+  pdvCode: pdvCodeSchema.optional(),
+  sortOrder: sortOrderSchema.optional(),
+});
+
+export const setCatalogProductOfferAvailabilitySchema = z.strictObject({
+  version: versionSchema,
+  available: z.boolean(),
+});
+
 export const catalogModifierGroupSchema = z.strictObject({
   id: z.uuid(),
   productId: z.uuid(),
@@ -140,7 +170,14 @@ export type UpdateCatalogCategoryInput = z.infer<typeof updateCatalogCategorySch
 export type CatalogProduct = z.infer<typeof catalogProductSchema>;
 export type CreateCatalogProductInput = z.infer<typeof createCatalogProductSchema>;
 export type UpdateCatalogProductInput = z.infer<typeof updateCatalogProductSchema>;
-export type SetCatalogProductAvailabilityInput = z.infer<typeof setCatalogProductAvailabilitySchema>;
+export type SetCatalogProductAvailabilityInput = z.infer<
+  typeof setCatalogProductAvailabilitySchema
+>;
+export type CatalogProductOffer = z.infer<typeof catalogProductOfferSchema>;
+export type UpdateCatalogProductOfferInput = z.infer<typeof updateCatalogProductOfferSchema>;
+export type SetCatalogProductOfferAvailabilityInput = z.infer<
+  typeof setCatalogProductOfferAvailabilitySchema
+>;
 export type CatalogModifierGroup = z.infer<typeof catalogModifierGroupSchema>;
 export type CreateCatalogModifierGroupInput = z.infer<typeof createCatalogModifierGroupSchema>;
 export type UpdateCatalogModifierGroupInput = z.infer<typeof updateCatalogModifierGroupSchema>;

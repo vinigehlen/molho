@@ -1,4 +1,5 @@
 import type { RequestContextService } from '../context/request-context.service';
+import type { CatalogActor } from './catalog-actor';
 import { CatalogNotFoundError } from './catalog-errors';
 import { assertOptimisticUpdate } from './optimistic-update.util';
 
@@ -42,7 +43,12 @@ export interface ProductRepository {
   findById(id: string): Promise<ProductRecord | null>;
   categoryExists(categoryId: string): Promise<boolean>;
   create(input: CreateProductInput): Promise<ProductRecord>;
-  update(id: string, expectedVersion: number, input: UpdateProductInput): Promise<ProductRecord>;
+  update(
+    id: string,
+    expectedVersion: number,
+    input: UpdateProductInput,
+    actor: CatalogActor,
+  ): Promise<ProductRecord>;
   /** "Esgotado manual" (definicoes-v1 §5.4) — nunca passa pelo update() genérico, ver ProductService. */
   setAvailable(id: string, expectedVersion: number, available: boolean): Promise<ProductRecord>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
@@ -73,7 +79,9 @@ export class PrismaProductRepository implements ProductRepository {
   }
 
   async findById(id: string): Promise<ProductRecord | null> {
-    return this.requestContext.getClient().product.findFirst({ where: { id, deletedAt: null }, select: SELECT });
+    return this.requestContext
+      .getClient()
+      .product.findFirst({ where: { id, deletedAt: null }, select: SELECT });
   }
 
   /**
@@ -106,23 +114,74 @@ export class PrismaProductRepository implements ProductRepository {
     });
   }
 
-  async update(id: string, expectedVersion: number, input: UpdateProductInput): Promise<ProductRecord> {
+  async update(
+    id: string,
+    expectedVersion: number,
+    input: UpdateProductInput,
+    actor: CatalogActor,
+  ): Promise<ProductRecord> {
     const client = this.requestContext.getClient();
+    const before = await this.findById(id);
+    if (!before) throw new CatalogNotFoundError('Produto');
     const result = await client.product.updateMany({
       where: { id, version: expectedVersion, deletedAt: null },
       data: { ...input, version: { increment: 1 } },
     });
-    await assertOptimisticUpdate('Produto', result.count, async () => (await this.findById(id)) !== null);
-    return this.findByIdOrThrow(id);
+    await assertOptimisticUpdate(
+      'Produto',
+      result.count,
+      async () => (await this.findById(id)) !== null,
+    );
+    const after = await this.findByIdOrThrow(id);
+
+    // Endpoint legado continua vivo durante a expansão. A trigger já
+    // sincronizou a oferta primária; a auditoria usa a mesma ação/entidade da
+    // API nova para não fragmentar o histórico de mudança de preço.
+    if (after.basePriceCents !== before.basePriceCents) {
+      const primaryOffer = await client.productOffer.findFirst({
+        where: { productId: id, isPrimary: true, deletedAt: null },
+        select: { id: true },
+      });
+      await client.auditLog.create({
+        data: {
+          tenantId: this.requestContext.getTenantId(),
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'catalog.offer_price_update',
+          entity: 'product_offer',
+          beforeJson: {
+            offerId: primaryOffer?.id ?? null,
+            productId: id,
+            priceCents: before.basePriceCents,
+          },
+          afterJson: {
+            offerId: primaryOffer?.id ?? null,
+            productId: id,
+            priceCents: after.basePriceCents,
+          },
+          ip: actor.ip,
+        },
+      });
+    }
+
+    return after;
   }
 
-  async setAvailable(id: string, expectedVersion: number, available: boolean): Promise<ProductRecord> {
+  async setAvailable(
+    id: string,
+    expectedVersion: number,
+    available: boolean,
+  ): Promise<ProductRecord> {
     const client = this.requestContext.getClient();
     const result = await client.product.updateMany({
       where: { id, version: expectedVersion, deletedAt: null },
       data: { available, version: { increment: 1 } },
     });
-    await assertOptimisticUpdate('Produto', result.count, async () => (await this.findById(id)) !== null);
+    await assertOptimisticUpdate(
+      'Produto',
+      result.count,
+      async () => (await this.findById(id)) !== null,
+    );
     return this.findByIdOrThrow(id);
   }
 
@@ -132,7 +191,11 @@ export class PrismaProductRepository implements ProductRepository {
       where: { id, version: expectedVersion, deletedAt: null },
       data: { deletedAt: new Date(), version: { increment: 1 } },
     });
-    await assertOptimisticUpdate('Produto', result.count, async () => (await this.findById(id)) !== null);
+    await assertOptimisticUpdate(
+      'Produto',
+      result.count,
+      async () => (await this.findById(id)) !== null,
+    );
   }
 
   private async findByIdOrThrow(id: string): Promise<ProductRecord> {

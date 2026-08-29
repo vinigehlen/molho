@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogConflictError, CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
-import type { CreateProductInput, ProductRecord, ProductRepository, UpdateProductInput } from './product.repository';
+import {
+  CatalogConflictError,
+  CatalogNotFoundError,
+  CatalogValidationError,
+} from './catalog-errors';
+import type {
+  CreateProductInput,
+  ProductRecord,
+  ProductRepository,
+  UpdateProductInput,
+} from './product.repository';
 import { ProductService } from './product.service';
+
+const ACTOR = { userId: 'owner-1', role: 'owner', ip: '127.0.0.1' } as const;
 
 class FakeProductRepository implements ProductRepository {
   rows = new Map<string, ProductRecord>();
@@ -37,7 +48,11 @@ class FakeProductRepository implements ProductRepository {
     return record;
   }
 
-  async update(id: string, expectedVersion: number, input: UpdateProductInput): Promise<ProductRecord> {
+  async update(
+    id: string,
+    expectedVersion: number,
+    input: UpdateProductInput,
+  ): Promise<ProductRecord> {
     const existing = this.rows.get(id);
     if (!existing) throw new CatalogNotFoundError('Produto');
     if (existing.version !== expectedVersion) throw new CatalogConflictError('Produto');
@@ -46,7 +61,11 @@ class FakeProductRepository implements ProductRepository {
     return updated;
   }
 
-  async setAvailable(id: string, expectedVersion: number, available: boolean): Promise<ProductRecord> {
+  async setAvailable(
+    id: string,
+    expectedVersion: number,
+    available: boolean,
+  ): Promise<ProductRecord> {
     const existing = this.rows.get(id);
     if (!existing) throw new CatalogNotFoundError('Produto');
     if (existing.version !== expectedVersion) throw new CatalogConflictError('Produto');
@@ -71,7 +90,11 @@ function setup() {
 describe('ProductService', () => {
   it('1) create() delega pro repositório quando a categoria existe', async () => {
     const { service } = setup();
-    const created = await service.create({ categoryId: 'cat-1', name: 'X-Burger', basePriceCents: 2500 });
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
     expect(created.name).toBe('X-Burger');
     expect(created.available).toBe(true);
   });
@@ -100,26 +123,39 @@ describe('ProductService', () => {
 
   it('5) create() rejeita nome vazio', async () => {
     const { service } = setup();
-    await expect(service.create({ categoryId: 'cat-1', name: '', basePriceCents: 2500 })).rejects.toThrow(
-      CatalogValidationError,
-    );
+    await expect(
+      service.create({ categoryId: 'cat-1', name: '', basePriceCents: 2500 }),
+    ).rejects.toThrow(CatalogValidationError);
   });
 
   it('6) update() movendo categoryId valida a nova categoria', async () => {
     const { service, repo } = setup();
-    const created = await service.create({ categoryId: 'cat-1', name: 'X-Burger', basePriceCents: 2500 });
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
     await expect(
-      service.update(created.id, created.version, { categoryId: 'cat-inexistente' }),
+      service.update(created.id, created.version, { categoryId: 'cat-inexistente' }, ACTOR),
     ).rejects.toThrow(CatalogNotFoundError);
 
     repo.categoryIds.add('cat-2');
-    const updated = await service.update(created.id, created.version, { categoryId: 'cat-2' });
+    const updated = await service.update(
+      created.id,
+      created.version,
+      { categoryId: 'cat-2' },
+      ACTOR,
+    );
     expect(updated.categoryId).toBe('cat-2');
   });
 
   it('7) setAvailable() é o único caminho pra alterar "available" — separado de update() (§5-C.5)', async () => {
     const { service } = setup();
-    const created = await service.create({ categoryId: 'cat-1', name: 'X-Burger', basePriceCents: 2500 });
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
     const updated = await service.setAvailable(created.id, created.version, false);
     expect(updated.available).toBe(false);
     expect(updated.name).toBe('X-Burger'); // não mexeu em mais nada
@@ -127,7 +163,11 @@ describe('ProductService', () => {
 
   it('8) setAvailable() com version desatualizada propaga CatalogConflictError', async () => {
     const { service } = setup();
-    const created = await service.create({ categoryId: 'cat-1', name: 'X-Burger', basePriceCents: 2500 });
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
     await expect(service.setAvailable(created.id, created.version + 1, false)).rejects.toThrow(
       CatalogConflictError,
     );
@@ -135,7 +175,11 @@ describe('ProductService', () => {
 
   it('9) delete() remove do repositório', async () => {
     const { service, repo } = setup();
-    const created = await service.create({ categoryId: 'cat-1', name: 'X-Burger', basePriceCents: 2500 });
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
     await service.delete(created.id, created.version);
     expect(repo.rows.has(created.id)).toBe(false);
   });
