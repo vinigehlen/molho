@@ -91,6 +91,11 @@ beforeAll(async () => {
   const grupo = await migratorPrisma.modifierGroup.create({
     data: { tenantId: tenantAtivaId, productId: burger.id, name: 'Adicionais', min: 0, max: 2 },
   });
+  // Vínculo produto↔grupo na tabela de junção (fase 2 do combo): storefront e
+  // revalidação consultam os grupos SEMPRE por aqui, nunca por `productId`.
+  await migratorPrisma.productModifierGroup.create({
+    data: { tenantId: tenantAtivaId, productId: burger.id, modifierGroupId: grupo.id },
+  });
   await migratorPrisma.modifier.create({
     data: { tenantId: tenantAtivaId, groupId: grupo.id, name: 'Bacon', priceDeltaCents: 400 },
   });
@@ -131,6 +136,7 @@ afterAll(async () => {
     for (const tid of [tenantAtivaId, tenantOutraId, tenantDesligadaId]) {
       if (!tid) continue;
       await migratorPrisma.modifier.deleteMany({ where: { tenantId: tid } });
+      await migratorPrisma.productModifierGroup.deleteMany({ where: { tenantId: tid } });
       await migratorPrisma.modifierGroup.deleteMany({ where: { tenantId: tid } });
       await migratorPrisma.product.deleteMany({ where: { tenantId: tid } });
       await migratorPrisma.category.deleteMany({ where: { tenantId: tid } });

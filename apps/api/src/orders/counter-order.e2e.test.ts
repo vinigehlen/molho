@@ -206,17 +206,18 @@ describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
     );
   });
 
-  it('preço do item unit vem do CATÁLOGO — um lineTotalCents mandado no body é ignorado', async () => {
+  it('preço do item unit vem do CATÁLOGO — um lineTotalCents no body é rejeitado (schema strict)', async () => {
     const token = await cashierToken();
 
     const res = await post(token, randomUUID(), {
-      // 'unit' não tem campo de preço no schema — mandar um extra não muda nada.
+      // 'unit' não tem campo de preço no schema — z.strictObject rejeita o extra.
       items: [{ kind: 'unit', productId, quantity: 1, lineTotalCents: 1 }],
       paymentMethod: 'card_at_counter',
     });
 
-    expect(res.status).toBe(201);
-    expect(res.body.subtotalCents).toBe(800); // basePriceCents do catálogo, NUNCA "1"
+    // O preço vem SEMPRE do catálogo (coberto pelos testes acima); um campo de
+    // preço no body agora é 400 explícito, nunca aceito e ignorado.
+    expect(res.status).toBe(400);
   });
 
   it('weighed com lineTotalCents <= 0: 400', async () => {

@@ -235,7 +235,7 @@ describe('POST /v1/admin/stores/:storeId/orders/:orderId/adjustments', () => {
     expect(order.currentTotalCents).toBe(1600 + 2400);
   }, 15_000);
 
-  it('add_item ignora qualquer preço mandado no body — só productId/quantity contam', async () => {
+  it('add_item rejeita campo de preço no body — schema strict, só productId/quantity valem', async () => {
     const token = await staffToken();
     const { orderId } = await createOrder('received', [{ quantity: 1, unitBasePriceCents: 800 }]);
 
@@ -243,11 +243,12 @@ describe('POST /v1/admin/stores/:storeId/orders/:orderId/adjustments', () => {
       kind: 'add_item',
       productId,
       quantity: 1,
-      lineTotalCents: 1, // campo estranho ao schema — zod descarta, nunca chega no preço
+      lineTotalCents: 1, // campo estranho ao contrato — z.strictObject rejeita, não descarta em silêncio
     });
 
-    expect(res.status).toBe(201);
-    expect(res.body.currentSubtotalCents).toBe(800 + 800); // 800 do catálogo, nunca "1"
+    // O preço vem SEMPRE do catálogo (coberto pelo teste acima); mandar um
+    // campo de preço agora é 400 explícito, nunca aceito e ignorado.
+    expect(res.status).toBe(400);
   });
 
   it('remove_item: currentTotalCents cai, item some do efetivo (não pode ser removido de novo)', async () => {
