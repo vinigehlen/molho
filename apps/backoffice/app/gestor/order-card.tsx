@@ -175,98 +175,90 @@ export const OrderCard = memo(function OrderCard({
         </p>
       )}
 
-      {/* Barra de ação: 2 zonas fixas (Fase 1, plano do gestor) — utilitários
-          (ícone-only, 44×44, alvo de toque §6.1) à esquerda, ação principal +
-          "voltar etapa" à direita. Nunca mais frase dentro de botão: é o que
-          fazia "Saiu p/ entrega"/"Voltar etapa" quebrarem em 2 linhas e cada
-          card da coluna terminar com uma altura diferente da vizinha. */}
-      {/* flex-wrap: com 3 ícones (Fase 3 somou "Sinalizar") + Voltar etapa +
-          CTA, a linha some da largura do card em coluna estreita — sem wrap
-          o excesso vazava por cima da coluna vizinha em vez de quebrar. */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      {/* Barra de ação: 2 fileiras (pedido do lojista, testado ao vivo) — TODO
+          ícone-only junto numa linha (Imprimir/Avisar/Sinalizar/Voltar etapa,
+          44×44), o(s) botão(ões) de texto sozinho(s) na linha de baixo. Nunca
+          mistura ícone com texto na mesma fileira.
+          Altura do CTA de texto IGUALADA ao selo "Pago"/"Aguardando
+          pagamento" (h-auto + py-1, decisão consciente do lojista — abaixo
+          do alvo de toque de 44px que o design system recomenda pro
+          tablet de cozinha, mas foi pedido 2x de forma explícita). */}
+      <div className="mt-3 flex flex-col gap-2">
         {pending ? (
           <MoBadge variant="caution">ação pendente…</MoBadge>
         ) : (
-          <div className="flex items-center gap-1.5">
-            {/* Segunda via durável (Épico 10): cria `print_job`; o agente local
-                imprime depois pelo claim da fila. Não muda estado do pedido. */}
-            <button
-              type="button"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={printDisabled}
-              onClick={onPrint}
-              aria-label={printDisabled ? 'Enfileirando segunda via…' : 'Imprimir comanda'}
-              title={printDisabled ? 'Enfileirando…' : 'Imprimir'}
-            >
-              <Printer className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {/* Click-to-chat (Épico 11): só precisa de rede quando o sheet abre
-                (busca o telefone), então não é gateado por `online` como o
-                "Marcar pago". */}
-            <button
-              type="button"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg"
-              onClick={onNotify}
-              aria-label="Avisar cliente"
-              title="Avisar cliente"
-            >
-              <MessageCircle className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {/* Sinalização manual de pendência (Fase 3, plano do gestor). */}
-            <button
-              type="button"
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition hover:bg-bg ${
-                order.flaggedAt ? 'border-critical text-critical-strong' : 'border-border text-text-muted'
-              }`}
-              onClick={order.flaggedAt ? onUnflag : onFlag}
-              aria-label={order.flaggedAt ? 'Dessinalizar pedido' : 'Sinalizar pedido'}
-              title={order.flaggedAt ? 'Dessinalizar' : 'Sinalizar'}
-            >
-              <Flag className="h-4 w-4" aria-hidden="true" fill={order.flaggedAt ? 'currentColor' : 'none'} />
-            </button>
-            {printFeedback && printFeedback.state !== 'queueing' && (
-              <span
-                className={`text-[11px] ${printFeedback.state === 'queued' ? 'text-positive' : 'text-critical'}`}
-                aria-live="polite"
+          <>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Segunda via durável (Épico 10): cria `print_job`; o agente local
+                  imprime depois pelo claim da fila. Não muda estado do pedido. */}
+              <button
+                type="button"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={printDisabled}
+                onClick={onPrint}
+                aria-label={printDisabled ? 'Enfileirando segunda via…' : 'Imprimir comanda'}
+                title={printDisabled ? 'Enfileirando…' : 'Imprimir'}
               >
-                {printFeedback.message}
-              </span>
+                <Printer className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {/* Click-to-chat (Épico 11): só precisa de rede quando o sheet abre
+                  (busca o telefone), então não é gateado por `online` como o
+                  "Marcar pago". */}
+              <button
+                type="button"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg"
+                onClick={onNotify}
+                aria-label="Avisar cliente"
+                title="Avisar cliente"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {/* Sinalização manual de pendência (Fase 3, plano do gestor). */}
+              <button
+                type="button"
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md border transition hover:bg-bg ${
+                  order.flaggedAt ? 'border-critical text-critical-strong' : 'border-border text-text-muted'
+                }`}
+                onClick={order.flaggedAt ? onUnflag : onFlag}
+                aria-label={order.flaggedAt ? 'Dessinalizar pedido' : 'Sinalizar pedido'}
+                title={order.flaggedAt ? 'Dessinalizar' : 'Sinalizar'}
+              >
+                <Flag className="h-4 w-4" aria-hidden="true" fill={order.flaggedAt ? 'currentColor' : 'none'} />
+              </button>
+              {previous && (
+                <button
+                  type="button"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg"
+                  onClick={() => onMove(previous)}
+                  aria-label="Voltar etapa"
+                  title="Voltar etapa"
+                >
+                  <Undo2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+              {printFeedback && printFeedback.state !== 'queueing' && (
+                <span
+                  className={`text-[11px] ${printFeedback.state === 'queued' ? 'text-positive' : 'text-critical'}`}
+                  aria-live="polite"
+                >
+                  {printFeedback.message}
+                </span>
+              )}
+            </div>
+            {next && (
+              <MoButton
+                variant="primary"
+                size="sm"
+                className="h-auto w-fit self-end rounded-pill px-3 py-1 text-caption"
+                disabled={advanceBlockReason !== null}
+                onClick={() => onAdvance(next.to)}
+                title={advanceBlockReason ?? undefined}
+              >
+                {next.label}
+              </MoButton>
             )}
-          </div>
+          </>
         )}
-        <div className="flex shrink-0 items-center gap-1.5">
-          {/* Ícone, não botão de frase (pedido do lojista): "voltar etapa" é
-              ação secundária e rara, não precisa do peso visual de um botão
-              de texto — mesmo tratamento quadrado 44×44 do Imprimir/Avisar. */}
-          {previous && !pending && (
-            <button
-              type="button"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border text-text-muted transition hover:bg-bg"
-              onClick={() => onMove(previous)}
-              aria-label="Voltar etapa"
-              title="Voltar etapa"
-            >
-              <Undo2 className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
-          {next && (
-            <MoButton
-              variant="primary"
-              size="sm"
-              // Pedido do lojista: pílula compacta (padding/fonte do tamanho
-              // do selo "Pago"), não o botão de texto cheio. A altura de
-              // 44px (h-11, herdada de size="sm") FICA — é o alvo de toque
-              // mínimo do design system (§6.1), não-negociável mesmo num
-              // botão visualmente mais enxuto.
-              className="rounded-pill px-3 text-caption"
-              disabled={advanceBlockReason !== null}
-              onClick={() => onAdvance(next.to)}
-              title={advanceBlockReason ?? undefined}
-            >
-              {next.label}
-            </MoButton>
-          )}
-        </div>
       </div>
     </article>
   );
@@ -349,7 +341,7 @@ function PaymentPanel({
           <MoButton
             variant="positive"
             size="sm"
-            className="rounded-pill px-3 text-caption"
+            className="h-auto w-fit rounded-pill px-3 py-1 text-caption"
             disabled={!online}
             loading={confirming}
             onClick={onMarkPaid}

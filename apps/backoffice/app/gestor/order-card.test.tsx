@@ -105,26 +105,31 @@ describe('OrderCard — barra de ação (Fase 1 do plano do gestor)', () => {
     expect(preparar?.className).not.toContain('opacity-50');
   });
 
-  it('"Voltar etapa" é ícone-only (44×44, aria-label) e o CTA principal tem a MESMA altura', () => {
+  it('"Voltar etapa" é ícone-only (44×44, aria-label) e fica na MESMA fileira dos outros ícones', () => {
     const onMove = vi.fn();
     render({ order: order({ status: 'preparing' }), onMove });
     const voltar = container.querySelector('[aria-label="Voltar etapa"]') as HTMLButtonElement | null;
-    const pronto = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Pronto');
+    const print = container.querySelector('[aria-label="Imprimir comanda"]');
     expect(voltar).toBeTruthy();
     expect(voltar?.textContent?.trim()).toBe('');
     expect(voltar?.className).toContain('h-11');
     expect(voltar?.className).toContain('w-11');
-    expect(pronto?.className).toContain('h-11');
+    // mesmo pai flex que o Imprimir — ícones não misturam com botão de texto na mesma fileira.
+    expect(voltar?.parentElement).toBe(print?.parentElement);
     act(() => voltar?.click());
     expect(onMove).toHaveBeenCalledWith('received');
   });
 
-  it('CTA principal é pílula compacta (padding/fonte do tamanho do selo Pago), sem perder o alvo de toque de 44px', () => {
+  it('CTA principal é pílula do tamanho do selo Pago (decisão consciente do lojista, abaixo do alvo de toque de 44px)', () => {
     render({ order: order({ status: 'preparing' }) });
     const pronto = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Pronto');
+    const print = container.querySelector('[aria-label="Imprimir comanda"]');
     expect(pronto?.className).toContain('rounded-pill');
     expect(pronto?.className).toContain('text-caption');
-    expect(pronto?.className).toContain('h-11'); // alvo de toque não é negociável, só o padding/fonte encolhem
+    expect(pronto?.className).toContain('h-auto');
+    expect(pronto?.className).not.toContain('h-11');
+    // fileira separada da dos ícones (pedido do lojista: nunca mistura ícone com texto).
+    expect(pronto?.parentElement).not.toBe(print?.parentElement);
   });
 });
 
