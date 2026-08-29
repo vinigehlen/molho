@@ -21,15 +21,15 @@
     "setup": "bash scripts/setup.sh"
   },
   "devDependencies": {
-    "@eslint/js": "^9.18.0",
-    "eslint": "^9.18.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-tailwindcss": "^3.17.5",
-    "playwright": "^1.61.1",
-    "prettier": "^3.4.2",
-    "tailwindcss": "^3.4.19",
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-tailwindcss": "^4.4.0",
+    "playwright": "^1.62.1",
+    "prettier": "^3.9.6",
+    "tailwindcss": "^4.3.3",
+    "turbo": "^2.10.12",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.68.0"
   }
 }
