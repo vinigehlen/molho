@@ -17,7 +17,9 @@ function order(id: string, status: AdminOrder['status']): AdminOrder {
     subtotalCents: 100,
     deliveryFeeCents: 0,
     totalCents: 100,
+    currentTotalCents: null,
     fulfillmentType: 'delivery',
+    destination: 'delivery',
     delivery: {
       label: 'Casa',
       street: 'R',
@@ -46,13 +48,14 @@ describe('groupByColumn', () => {
     expect(groups.ready).toEqual([]);
   });
 
-  it('ignora status terminal que não é coluna do board (ex.: completed)', () => {
+  it('inclui completed na coluna de finalizados', () => {
     const groups = groupByColumn([order('a', 'completed'), order('b', 'ready')]);
+    expect(groups.completed.map((o) => o.id)).toEqual(['a']);
     expect(groups.ready.map((o) => o.id)).toEqual(['b']);
-    expect(Object.values(groups).flat()).toHaveLength(1);
+    expect(Object.values(groups).flat()).toHaveLength(2);
   });
 
-  it('BOARD_COLUMNS são os 4 ativos na ordem do fluxo', () => {
-    expect(BOARD_COLUMNS).toEqual(['received', 'preparing', 'ready', 'in_transit']);
+  it('BOARD_COLUMNS colocam finalizados ao lado de saíram', () => {
+    expect(BOARD_COLUMNS).toEqual(['received', 'preparing', 'ready', 'in_transit', 'completed']);
   });
 });

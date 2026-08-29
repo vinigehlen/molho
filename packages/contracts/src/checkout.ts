@@ -26,6 +26,19 @@ import { normalizePostalCode } from './postal-code';
 
 const centsSchema = z.int().nonnegative();
 
+export const CURRENT_TERMS_VERSION = '2026-08-26';
+export const CURRENT_PRIVACY_VERSION = '2026-08-26';
+
+/**
+ * Aceite legal do checkout. Fica FORA de `checkoutRequestSchema` porque
+ * aquele schema também serve `/checkout/revalidate` — público, anônimo e de
+ * alto volume. O aceite só é necessário quando o pedido nasce.
+ */
+export const checkoutLegalAcceptanceSchema = z.strictObject({
+  termsVersion: z.literal(CURRENT_TERMS_VERSION),
+  privacyVersion: z.literal(CURRENT_PRIVACY_VERSION),
+});
+
 /**
  * `unitBasePriceCents`/`modifiers[].priceDeltaCents` são o preço que o
  * CLIENTE tem em cache (o carrinho de `@molho/contracts/cart.ts`) — não são
@@ -36,10 +49,10 @@ const centsSchema = z.int().nonnegative();
  * "mudou desde o que o cliente mandou" não fazia sentido sem o cliente
  * mandar o preço).
  */
-export const checkoutItemInputSchema = z.object({
+export const checkoutItemInputSchema = z.strictObject({
   productId: z.uuid(),
   unitBasePriceCents: z.int().nonnegative(),
-  modifiers: z.array(z.object({ modifierId: z.uuid(), priceDeltaCents: z.int().nonnegative() })),
+  modifiers: z.array(z.strictObject({ modifierId: z.uuid(), priceDeltaCents: z.int().nonnegative() })),
   quantity: z.int().positive(),
   notes: z.string().max(280).nullable(),
 });
@@ -56,7 +69,7 @@ export const checkoutItemInputSchema = z.object({
  * `resolveAddress` na API). Podem chegar vazios — é o caso normal quando o
  * ViaCEP respondeu no browser e o cliente não editou nada.
  */
-export const checkoutAddressInputSchema = z.object({
+export const checkoutAddressInputSchema = z.strictObject({
   label: z.string(),
   /** Aceita "93610-000" ou "93610000" — a normalização é do servidor. */
   postalCode: z.string().refine((raw) => normalizePostalCode(raw) !== null, 'CEP precisa ter 8 dígitos'),
@@ -113,7 +126,7 @@ export const PAYMENT_METHOD_MODULE: Record<z.infer<typeof paymentMethodSchema>, 
   card_on_delivery: 'payments.on_delivery',
 };
 
-const checkoutRequestBase = z.object({
+const checkoutRequestBase = z.strictObject({
   items: z.array(checkoutItemInputSchema).min(1),
   fulfillmentType: fulfillmentTypeSchema,
   /**
@@ -131,6 +144,14 @@ const checkoutRequestBase = z.object({
    * um código" como prova de que ele é válido.
    */
   couponCode: z.string().trim().min(1).optional(),
+  /**
+   * Agendamento (Épico conversão, C3). Ausente/omitido = "o quanto antes" —
+   * comportamento ATUAL, intacto. Igual `couponCode`: o servidor SEMPRE
+   * revalida (cai num slot definido, dentro do horário de funcionamento,
+   * slot ainda tem vaga na OCORRÊNCIA pedida) — nunca confia que uma data
+   * escolhida na UI ainda é válida quando o pedido é criado.
+   */
+  scheduledFor: z.iso.datetime().optional(),
 });
 
 /**
@@ -167,14 +188,14 @@ export const checkoutRequestSchema = z
     path: ['address'],
   });
 
-export const revalidatedItemSchema = z.object({
+export const revalidatedItemSchema = z.strictObject({
   productId: z.uuid(),
   name: z.string(),
   /** `false` = sumiu do carrinho nesta revalidação (esgotado, ou removido do catálogo). */
   available: z.boolean(),
   unitBasePriceCents: centsSchema,
   modifiers: z.array(
-    z.object({ modifierId: z.uuid(), name: z.string(), priceDeltaCents: centsSchema }),
+    z.strictObject({ modifierId: z.uuid(), name: z.string(), priceDeltaCents: centsSchema }),
   ),
   quantity: z.int().positive(),
   notes: z.string().nullable(),
@@ -183,7 +204,7 @@ export const revalidatedItemSchema = z.object({
   priceChanged: z.boolean(),
 });
 
-export const revalidatedCheckoutSchema = z.object({
+export const revalidatedCheckoutSchema = z.strictObject({
   items: z.array(revalidatedItemSchema),
   subtotalCents: centsSchema,
   /** Em pickup sempre `true` — não existe zona pra quem retira no balcão. */
@@ -209,6 +230,16 @@ export const revalidatedCheckoutSchema = z.object({
   couponValid: z.boolean(),
   /** Sempre `0` sem cupom válido. Descontado só do subtotal, nunca da taxa de entrega. */
   discountCents: centsSchema,
+  /**
+   * Agendamento (Épico conversão, C3). `scheduledFor` ecoa o que o cliente
+   * mandou (`null` = "o quanto antes", nunca confundir com "agendamento
+   * inválido"). `scheduledForValid` só é relevante quando `scheduledFor` não
+   * é `null` — mesmo racional de `couponValid`: um horário que cabia no
+   * slot no `/revalidate` e deixa de caber no `/checkout/orders` (slot
+   * lotou, fechou a loja) é `hasUnfavorableDivergence`, não campo separado.
+   */
+  scheduledFor: z.iso.datetime().nullable(),
+  scheduledForValid: z.boolean(),
   /** `null` quando `withinZone: false`. Já contabiliza `discountCents` (subtotal + fee - discount). */
   totalCents: centsSchema.nullable(),
   /**
@@ -230,13 +261,13 @@ export const revalidatedCheckoutSchema = z.object({
  * tipo e-mail") — o payload já embute a chave, isto aqui não é usado pra
  * montar nada.
  */
-export const checkoutOrderPixSchema = z.object({
+export const checkoutOrderPixSchema = z.strictObject({
   payload: z.string(),
   key: z.string(),
   keyType: z.enum(['cpf', 'cnpj', 'email', 'phone', 'random']),
 });
 
-const checkoutOrderResponseBase = z.object({
+const checkoutOrderResponseBase = z.strictObject({
   orderId: z.uuid(),
   status: z.literal('received'),
   paymentStatus: z.literal('aguardando_confirmacao'),
@@ -244,6 +275,8 @@ const checkoutOrderResponseBase = z.object({
   /** Cupom (Épico conversão, C2) — 0/null quando o pedido não usou cupom. */
   discountCents: centsSchema,
   couponCode: z.string().nullable(),
+  /** Agendamento (Épico conversão, C3) — `null` = "o quanto antes". */
+  scheduledFor: z.iso.datetime().nullable(),
   fulfillmentType: fulfillmentTypeSchema,
   /** Snapshot congelado na criação; nunca é recalculado quando zona/horário mudam. */
   fulfillmentDeadlineAt: z.iso.datetime(),
@@ -264,6 +297,7 @@ export type CheckoutAddressInput = z.infer<typeof checkoutAddressInputSchema>;
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
+export type CheckoutLegalAcceptance = z.infer<typeof checkoutLegalAcceptanceSchema>;
 export type RevalidatedItem = z.infer<typeof revalidatedItemSchema>;
 export type RevalidatedCheckout = z.infer<typeof revalidatedCheckoutSchema>;
 export type CheckoutOrderPix = z.infer<typeof checkoutOrderPixSchema>;

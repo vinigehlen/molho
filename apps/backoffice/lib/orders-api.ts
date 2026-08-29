@@ -9,7 +9,7 @@ import { apiFetch } from './api-client';
  * (`AdminOrder`) é importado, e tipo é apagado no build. Se a máquina de
  * estados mudar, este array acompanha (teste cravaria a divergência se houver).
  */
-export const BOARD_COLUMNS = ['received', 'preparing', 'ready', 'in_transit'] as const;
+export const BOARD_COLUMNS = ['received', 'preparing', 'ready', 'in_transit', 'completed'] as const;
 export type BoardColumn = (typeof BOARD_COLUMNS)[number];
 
 export const COLUMN_LABEL: Record<BoardColumn, string> = {
@@ -17,6 +17,7 @@ export const COLUMN_LABEL: Record<BoardColumn, string> = {
   preparing: 'Preparando',
   ready: 'Prontos',
   in_transit: 'Saíram',
+  completed: 'Finalizados',
 };
 
 export async function fetchActiveOrders(): Promise<AdminOrder[]> {
@@ -65,6 +66,19 @@ export async function confirmPayment(id: string, version: number): Promise<Respo
 }
 
 /**
+ * Sinalizar/dessinalizar pendência (Fase 3, plano do gestor). 409 é benigno
+ * pelo mesmo motivo de `confirmPayment`: outro tablet pode ter mexido no
+ * pedido no meio — quem chama refaz o fetch.
+ */
+export async function setOrderFlag(id: string, version: number, flagged: boolean, reason: string | null): Promise<Response> {
+  return apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/flag`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version, flagged, reason: reason ?? undefined }),
+  });
+}
+
+/**
  * Telefone do cliente pro click-to-chat (Épico 11). Buscado SÓ no clique do
  * botão: PII não trafega no payload do board. 403 = módulo `notify.whatsapp_ctc`
  * desligado pro tenant — devolve `null` igual ao 404, quem chama mostra o
@@ -80,7 +94,7 @@ export async function fetchCustomerPhone(id: string): Promise<string | null> {
 
 /** Agrupa pedidos por coluna do board, preservando a ordem de chegada (FIFO). Puro, testável. */
 export function groupByColumn(orders: AdminOrder[]): Record<BoardColumn, AdminOrder[]> {
-  const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [] };
+  const groups: Record<BoardColumn, AdminOrder[]> = { received: [], preparing: [], ready: [], in_transit: [], completed: [] };
   for (const order of orders) {
     if (order.status in groups) groups[order.status as BoardColumn].push(order);
   }

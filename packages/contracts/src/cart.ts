@@ -39,7 +39,7 @@ export const CART_SCHEMA_VERSION = 2;
  */
 export const CART_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const cartModifierSchema = z.object({
+export const cartModifierSchema = z.strictObject({
   id: z.uuid(),
   groupId: z.uuid(),
   /** Snapshot de exibição — o servidor revalida no checkout. */
@@ -47,7 +47,7 @@ export const cartModifierSchema = z.object({
   priceDeltaCents: z.int().nonnegative(),
 });
 
-export const cartItemSchema = z.object({
+export const cartItemSchema = z.strictObject({
   /**
    * Identidade da LINHA, não do produto: o mesmo X-Burger com bacon e sem
    * bacon são duas linhas independentes. Sem isto, editar ou remover uma
@@ -66,7 +66,7 @@ export const cartItemSchema = z.object({
   notes: z.string().max(280).nullable(),
 });
 
-export const cartSchema = z.object({
+export const cartSchema = z.strictObject({
   schemaVersion: z.literal(CART_SCHEMA_VERSION),
   /** Slug da loja dona deste carrinho — confere com a chave, defesa contra carrinho cruzado. */
   slug: z.string(),

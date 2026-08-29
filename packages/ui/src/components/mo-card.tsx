@@ -39,14 +39,27 @@ const cardVariants = cva(
 
 type CardVariants = VariantProps<typeof cardVariants>;
 
-export interface MoCardProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick'>,
-    Omit<CardVariants, 'interactive'> {
-  /** Quando presente, o card vira um <button> focável e operável por teclado. */
-  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+interface MoCardCommonProps extends Omit<CardVariants, 'interactive'> {
   /** Força o visual interativo mesmo sem onClick (ex.: card que é um <a> por fora). */
   interactive?: boolean;
 }
+
+/**
+ * `onClick` presente = o card RENDERIZA um <button> de verdade — por isso o
+ * resto das props também precisa ser button-shaped (`disabled`, `type` etc.),
+ * nunca div-shaped. Union discriminada em vez de um único tipo "achatado":
+ * a variante antiga deixava o TS aceitar atributo de <div> num card que ia
+ * virar <button> em runtime, sem avisar.
+ */
+export type MoCardProps =
+  | (MoCardCommonProps &
+      Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'onClick'> & {
+        onClick: React.MouseEventHandler<HTMLButtonElement>;
+      })
+  | (MoCardCommonProps &
+      Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick'> & {
+        onClick?: undefined;
+      });
 
 export const MoCard = React.forwardRef<HTMLDivElement | HTMLButtonElement, MoCardProps>(
   function MoCard({ className, padding, interactive, onClick, children, ...props }, ref) {
@@ -70,7 +83,7 @@ export const MoCard = React.forwardRef<HTMLDivElement | HTMLButtonElement, MoCar
       <div
         ref={ref as React.Ref<HTMLDivElement>}
         className={cn(cardVariants({ padding, interactive: isInteractive }), className)}
-        {...props}
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
       >
         {children}
       </div>

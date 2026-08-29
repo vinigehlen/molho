@@ -71,7 +71,7 @@ export const SEED_TENANTS: readonly SeedTenantDef[] = [
     name: 'Pizzaria Roma',
     cnpj: '98.765.432/0001-98',
     plan: 'pro',
-    themeKey: 'roxo',
+    themeKey: 'grafite',
     store: {
       name: 'Pizzaria Roma — Centro',
       addressText: 'Rua Comercial, 100 — Centro Histórico, Porto Alegre - RS',

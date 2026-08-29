@@ -48,12 +48,29 @@ export interface CheckoutCouponRecord {
   active: boolean;
 }
 
+/** Recorte de StoreSchedulingSlot que o checkout precisa (Épico conversão, C3) — nunca a linha inteira. */
+export interface CheckoutSchedulingSlotRecord {
+  dayOfWeek: Weekday;
+  startsAtMinutes: number;
+  endsAtMinutes: number;
+  maxOrders: number;
+}
+
 export interface CheckoutRepository {
   findStore(): Promise<CheckoutStoreRecord | null>;
   listStoreHours(): Promise<CheckoutStoreHoursRecord[]>;
   findProductsByIds(productIds: readonly string[]): Promise<CheckoutProductRecord[]>;
   /** `mode: 'insensitive'` — mesma comparação do índice único parcial em upper(code) (packages/db). */
   findCoupon(code: string): Promise<CheckoutCouponRecord | null>;
+  listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]>;
+  /**
+   * Contagem OTIMISTA (leitura, sem lock) de pedidos já agendados na
+   * ocorrência [start, end) — mesmo racional de `isCouponUsable` ler
+   * `usesCount < maxUses` sem travar: só fecha a corrida de verdade o
+   * incremento atômico em `CheckoutOrderRepository.claimSchedulingSlot`, no
+   * momento de criar o pedido.
+   */
+  countScheduledOrders(start: Date, end: Date): Promise<number>;
 }
 
 /**
@@ -88,10 +105,22 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         name: true,
         basePriceCents: true,
         available: true,
-        modifierGroups: {
-          where: { deletedAt: null },
+        // Reuso (exceção MVP 2026-08-28, fase 2/4): a allowlist de
+        // modificadores válidos PRA ESTE produto vem do VÍNCULO
+        // (product_modifier_groups), não da relação direta `modifierGroups`
+        // (que só sabe do dono/criador do grupo) — sem isso, um grupo
+        // reaproveitado num segundo produto validaria certo no storefront
+        // mas o checkout rejeitaria o modificador como "não pertence ao
+        // produto". Grupo pausado (`active: false`) também não é comprável,
+        // mesma regra do storefront.
+        productModifierGroups: {
+          where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
           select: {
-            modifiers: { where: { deletedAt: null }, select: { id: true, name: true, priceDeltaCents: true } },
+            modifierGroup: {
+              select: {
+                modifiers: { where: { deletedAt: null }, select: { id: true, name: true, priceDeltaCents: true } },
+              },
+            },
           },
         },
       },
@@ -101,8 +130,21 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       name: row.name,
       basePriceCents: row.basePriceCents,
       available: row.available,
-      modifiers: row.modifierGroups.flatMap((group) => group.modifiers),
+      modifiers: row.productModifierGroups.flatMap((link) => link.modifierGroup.modifiers),
     }));
+  }
+
+  async listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]> {
+    return this.requestContext.getClient().storeSchedulingSlot.findMany({
+      where: { deletedAt: null },
+      select: { dayOfWeek: true, startsAtMinutes: true, endsAtMinutes: true, maxOrders: true },
+    });
+  }
+
+  async countScheduledOrders(start: Date, end: Date): Promise<number> {
+    return this.requestContext.getClient().order.count({
+      where: { scheduledFor: { gte: start, lt: end } },
+    });
   }
 
   async findCoupon(code: string): Promise<CheckoutCouponRecord | null> {

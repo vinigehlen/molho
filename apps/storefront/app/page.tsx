@@ -9,7 +9,7 @@ export default function HomePage() {
     <HomePlaceholder
       title="Sua loja ainda não tem cardápio"
       description={t(COPY.sistema.emConstrucao, { epico: 5 })}
-      ctaLabel={COPY.storefront.carrinhoVazioAcao}
+      ctaLabel="Criar minha loja"
       signupLabel="Crie seu restaurante"
       signupHref={`${backofficeUrl}/signup`}
     />

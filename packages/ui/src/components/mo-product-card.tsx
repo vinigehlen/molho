@@ -50,6 +50,13 @@ export function MoProductCard({
   const grid = variant === 'grid';
   const podeSelecionar = available && Boolean(onSelect);
   const podeAdicionar = available && Boolean(onQuickAdd);
+  // URL assinada do R2 pode expirar/quebrar depois do card já montado — sem
+  // isso, o consumidor via o ícone de imagem quebrada do navegador em vez do
+  // placeholder que já existe pra "sem foto".
+  const [imagemQuebrada, setImagemQuebrada] = React.useState(false);
+  React.useEffect(() => {
+    setImagemQuebrada(false);
+  }, [imageUrl]);
 
   const foto = (
     <div
@@ -58,13 +65,12 @@ export function MoProductCard({
         grid ? 'aspect-square w-full' : 'h-[88px] w-[88px]',
       )}
     >
-      {imageUrl ? (
-        // Decorativa (alt=""): o nome do produto já está no texto ao lado,
-        // duplicar no alt faria o leitor de tela repetir a mesma informação.
+      {imageUrl && !imagemQuebrada ? (
         <img
           src={imageUrl}
-          alt=""
+          alt={`Foto de ${name}`}
           loading="lazy"
+          onError={() => setImagemQuebrada(true)}
           className={cn('h-full w-full object-cover', !available && 'grayscale')}
         />
       ) : (
@@ -113,7 +119,12 @@ export function MoProductCard({
           'flex w-full gap-3 rounded-lg text-left',
           'transition duration-base ease-out',
           'focus-visible:outline-none focus-visible:shadow-focus',
-          grid ? 'flex-col' : 'flex-row-reverse items-start',
+          // list: sem isso o hover/foco desenhava a caixa colada no texto
+          // (padding zero), então o texto parecia "vazar" pra fora dela. O
+          // `-m-2` cancela o `p-2` no fluxo (linhas não crescem, não
+          // desalinham com a coluna de categorias) e só sobra o respiro
+          // visual dentro da caixa de hover.
+          grid ? 'flex-col' : 'flex-row-reverse items-start p-2 -m-2',
           podeSelecionar ? 'cursor-pointer hover:shadow-2' : 'cursor-default',
         )}
       >

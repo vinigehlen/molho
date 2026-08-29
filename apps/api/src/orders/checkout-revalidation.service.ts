@@ -1,8 +1,13 @@
 import type { CheckoutRequest, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
 import type { ResolvedAddress } from '../geo/resolve-address';
 import type { DeliveryMatchRepository } from '../storefront/delivery-match.repository';
-import { computeStoreOpenState } from '../storefront/store-hours';
-import type { CheckoutCouponRecord, CheckoutRepository } from './checkout-revalidation.repository';
+import { computeStoreOpenState, isWithinAnyShift, localWeekdayAndMinutes, localWeekMinutes, slotOccurrenceRange } from '../storefront/store-hours';
+import type {
+  CheckoutCouponRecord,
+  CheckoutRepository,
+  CheckoutSchedulingSlotRecord,
+  CheckoutStoreHoursRecord,
+} from './checkout-revalidation.repository';
 
 const FALLBACK_TIMEZONE = 'America/Sao_Paulo';
 
@@ -39,7 +44,7 @@ export class CheckoutRevalidationService {
     const isPickup = request.fulfillmentType === 'pickup';
     const uniqueProductIds = [...new Set(request.items.map((item) => item.productId))];
 
-    const [store, hours, products, zoneMatch, coupon] = await Promise.all([
+    const [store, hours, products, zoneMatch, coupon, schedulingSlots] = await Promise.all([
       this.checkoutRepo.findStore(),
       this.checkoutRepo.listStoreHours(),
       this.checkoutRepo.findProductsByIds(uniqueProductIds),
@@ -57,6 +62,8 @@ export class CheckoutRevalidationService {
       // Épico conversão (C2). Sem couponCode no request, nem consulta —
       // não vale gastar round-trip num cupom que ninguém pediu.
       request.couponCode ? this.checkoutRepo.findCoupon(request.couponCode) : Promise.resolve(null),
+      // Épico conversão (C3). Mesmo racional do cupom — sem scheduledFor, sem consulta.
+      request.scheduledFor ? this.checkoutRepo.listSchedulingSlots() : Promise.resolve<CheckoutSchedulingSlotRecord[]>([]),
     ]);
 
     const productById = new Map(products.map((product) => [product.id, product]));
@@ -130,6 +137,17 @@ export class CheckoutRevalidationService {
     if (request.couponCode && !couponValid) hasUnfavorableDivergence = true;
     const discountCents = coupon && couponValid ? computeDiscountCents(coupon, subtotalCents) : 0;
 
+    // Épico conversão (C3). Mesma categoria de divergência do cupom: um
+    // horário que cabia no slot no /revalidate e deixa de caber no
+    // /checkout/orders (slot lotou, loja fechou o turno) é
+    // hasUnfavorableDivergence, nunca campo separado pra UI decidir sozinha.
+    // Sem scheduledFor, não é divergência — "o quanto antes" continua valendo.
+    const timezone = store?.timezone ?? FALLBACK_TIMEZONE;
+    const scheduledForValid = request.scheduledFor
+      ? await this.isScheduledForUsable(new Date(request.scheduledFor), timezone, hours, schedulingSlots)
+      : false;
+    if (request.scheduledFor && !scheduledForValid) hasUnfavorableDivergence = true;
+
     const anyUnavailable = items.some((item) => !item.available);
     const canSubmit = withinZone && isOpenNow && !belowMinimum && !anyUnavailable;
 
@@ -152,10 +170,43 @@ export class CheckoutRevalidationService {
       couponCode: request.couponCode ?? null,
       couponValid,
       discountCents,
+      scheduledFor: request.scheduledFor ?? null,
+      scheduledForValid,
       totalCents: withinZone ? subtotalCents + (deliveryFeeCents ?? 0) - discountCents : null,
       hasUnfavorableDivergence,
       canSubmit,
     };
+  }
+
+  /**
+   * Futuro, dentro do horário de funcionamento, cai num StoreSchedulingSlot
+   * definido, e a OCORRÊNCIA específica desse slot (este dia civil, não a
+   * recorrência semanal inteira) ainda tem vaga — os 4 pontos de "quando
+   * agendamento é aceito" da doc de handoff. `countScheduledOrders` é
+   * leitura OTIMISTA (mesmo racional de `isCouponUsable`); o incremento
+   * atômico de verdade só acontece em
+   * `CheckoutOrderRepository.claimSchedulingSlot`, no momento de criar o
+   * pedido.
+   */
+  private async isScheduledForUsable(
+    at: Date,
+    timezone: string,
+    hours: readonly CheckoutStoreHoursRecord[],
+    slots: readonly CheckoutSchedulingSlotRecord[],
+  ): Promise<boolean> {
+    if (at.getTime() <= this.now().getTime()) return false;
+
+    const { dayOfWeek, minutes } = localWeekdayAndMinutes(timezone, at);
+    if (!isWithinAnyShift(hours, localWeekMinutes(timezone, at))) return false;
+
+    const slot = slots.find(
+      (s) => s.dayOfWeek === dayOfWeek && minutes >= s.startsAtMinutes && minutes < s.endsAtMinutes,
+    );
+    if (!slot) return false;
+
+    const { start, end } = slotOccurrenceRange(timezone, at, slot);
+    const scheduledCount = await this.checkoutRepo.countScheduledOrders(start, end);
+    return scheduledCount < slot.maxOrders;
   }
 }
 

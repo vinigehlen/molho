@@ -10,10 +10,10 @@ import './preview.css';
  * É o mesmo mecanismo da produção (o storefront injeta o bloco --brand-* no
  * elemento raiz do tenant) e resolve um problema real: conteúdo em portal —
  * MoSheet, toasts — vive fora da árvore do Storybook. Preso a um wrapper, o
- * sheet renderizaria sempre no tema roxo e escaparia do portão de contraste.
+ * sheet renderizaria sempre no tema padrão e escaparia do portão de contraste.
  */
 const withTheme: Decorator = (Story, context) => {
-  const key = (context.globals.theme as ThemeKey) ?? 'roxo';
+  const key = (context.globals.theme as ThemeKey) ?? 'brasa';
 
   React.useLayoutEffect(() => {
     const raiz = document.documentElement;
@@ -35,8 +35,8 @@ const preview: Preview = {
   decorators: [withTheme],
   globalTypes: {
     theme: {
-      description: 'Template de tema do storefront (o lojista escolhe 1 dos 4)',
-      defaultValue: 'roxo',
+      description: 'Template de tema do storefront (o lojista escolhe 1 dos 3)',
+      defaultValue: 'brasa',
       toolbar: {
         title: 'Tema',
         icon: 'paintbrush',

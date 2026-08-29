@@ -159,7 +159,7 @@ afterAll(async () => {
 }, 30_000);
 
 describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
-  it('unit+weighed: completed, confirmado, totais certos (unit do CATÁLOGO, weighed do valor mandado)', async () => {
+  it('unit+weighed: received, confirmado, totais certos (unit do CATÁLOGO, weighed do valor mandado)', async () => {
     const token = await cashierToken();
 
     const res = await post(token, randomUUID(), {
@@ -172,7 +172,7 @@ describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      status: 'completed',
+      status: 'received',
       paymentStatus: 'confirmado',
       paymentMethod: 'pix',
       subtotalCents: 2400 + 4200,
@@ -180,24 +180,44 @@ describe('POST /v1/admin/stores/:storeId/counter-orders', () => {
     });
 
     const order = await migratorPrisma.order.findUniqueOrThrow({ where: { id: res.body.orderId } });
-    expect(order.status).toBe('completed');
+    expect(order.status).toBe('received');
     expect(order.paymentStatus).toBe('confirmado');
     expect(order.fulfillmentType).toBe('pickup');
     expect(order.changeForCents).toBeNull();
     expect(order.deliveryFeeCents).toBe(0);
   }, 15_000);
 
-  it('preço do item unit vem do CATÁLOGO — um lineTotalCents mandado no body é ignorado', async () => {
+  it('pedido de balcão entra na listagem ativa do gestor', async () => {
     const token = await cashierToken();
-
     const res = await post(token, randomUUID(), {
-      // 'unit' não tem campo de preço no schema — mandar um extra não muda nada.
-      items: [{ kind: 'unit', productId, quantity: 1, lineTotalCents: 1 }],
+      items: [{ kind: 'unit', productId, quantity: 1 }],
       paymentMethod: 'card_at_counter',
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.subtotalCents).toBe(800); // basePriceCents do catálogo, NUNCA "1"
+    const board = await request(app.getHttpServer())
+      .get('/v1/admin/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId);
+
+    expect(board.status).toBe(200);
+    expect(board.body.some((order: { id: string; status: string }) => order.id === res.body.orderId && order.status === 'received')).toBe(
+      true,
+    );
+  });
+
+  it('preço do item unit vem do CATÁLOGO — um lineTotalCents no body é rejeitado (schema strict)', async () => {
+    const token = await cashierToken();
+
+    const res = await post(token, randomUUID(), {
+      // 'unit' não tem campo de preço no schema — z.strictObject rejeita o extra.
+      items: [{ kind: 'unit', productId, quantity: 1, lineTotalCents: 1 }],
+      paymentMethod: 'card_at_counter',
+    });
+
+    // O preço vem SEMPRE do catálogo (coberto pelos testes acima); um campo de
+    // preço no body agora é 400 explícito, nunca aceito e ignorado.
+    expect(res.status).toBe(400);
   });
 
   it('weighed com lineTotalCents <= 0: 400', async () => {

@@ -26,7 +26,7 @@ import { z } from 'zod';
  */
 export const ADDRESS_SCHEMA_VERSION = 2;
 
-export const customerAddressSchema = z.object({
+export const customerAddressSchema = z.strictObject({
   schemaVersion: z.literal(ADDRESS_SCHEMA_VERSION),
   /** Rótulo livre — "Casa"/"Trabalho" são sugestão de UI, nunca enum (mesmo racional do Store.themeKey). */
   label: z.string(),

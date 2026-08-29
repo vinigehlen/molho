@@ -25,12 +25,12 @@ describe('MoCartBar', () => {
 
   it('o botão carrega um aria-label completo (contador e total não são anunciados soltos)', () => {
     render(<MoCartBar itemCount={3} totalCents={4500} onClick={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Ver carrinho — 3 itens, total R$ 45,00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver carrinho: 3 itens, total R$ 45,00' })).toBeInTheDocument();
   });
 
   it('singular: "1 item", não "1 itens"', () => {
     render(<MoCartBar itemCount={1} totalCents={1990} onClick={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Ver carrinho — 1 item, total R$ 19,90' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver carrinho: 1 item, total R$ 19,90' })).toBeInTheDocument();
   });
 
   it('clique dispara onClick', async () => {

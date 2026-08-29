@@ -40,6 +40,14 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# ─── Agent/editor artifacts (local only) ───
+.codex/
+.impeccable/
+.impeccable-review-*.png
+.github/agents/
+.github/hooks/
+.github/skills/
+
 # ─── Logs ──────────────────────────────────
 *.log
 npm-debug.log*
@@ -54,6 +62,11 @@ packages/db/prisma/generated/
 .claude/
 .agents/
 skills-lock.json
+
+# ─── Product exploration artifacts ─────────
+# Pesquisa e opções visuais exportadas ficam fora da fonte de produção.
+# Promova manualmente para docs/ quando virarem decisão oficial.
+artifacts/
 
 # ─── Playwright ────────────────────────────
 playwright-report

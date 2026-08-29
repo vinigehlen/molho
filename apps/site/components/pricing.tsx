@@ -47,7 +47,7 @@ export function Pricing() {
   return (
     <section id="planos" className="[background-color:var(--ink-900)] px-6 py-16 sm:px-10">
       <div className="mx-auto max-w-6xl text-center">
-        <h2 className="[font-family:var(--font-display)] text-display uppercase text-cream">Preço do letreiro, sem letra miúda</h2>
+        <h2 className="[font-family:var(--font-display)] text-display uppercase text-cream">Sem comissão, sem letra miúda</h2>
         <p className="mt-3 font-mono text-caption uppercase tracking-wide text-cream/80">
           Reajuste só por IPCA · Cancela quando quiser · Sem taxa por venda
         </p>

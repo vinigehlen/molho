@@ -29,6 +29,7 @@ class FakeProductRepository implements ProductRepository {
       basePriceCents: input.basePriceCents,
       imageKey: null,
       available: true,
+      pdvCode: input.pdvCode ?? null,
       sortOrder: input.sortOrder ?? 0,
       version: 0,
     };

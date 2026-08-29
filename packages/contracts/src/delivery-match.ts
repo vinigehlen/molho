@@ -29,20 +29,20 @@ import { normalizePostalCode } from './postal-code';
  * CIDADE — o número apenas refina o ponto, que não participa do preço. Exigir
  * número pra mostrar a taxa seria atrito sem contrapartida.
  */
-export const deliveryMatchRequestSchema = z.object({
+export const deliveryMatchRequestSchema = z.strictObject({
   postalCode: z.string().refine((raw) => normalizePostalCode(raw) !== null, 'CEP precisa ter 8 dígitos'),
   number: z.string().nullable(),
 });
 
 export const deliveryMatchResponseSchema = z.discriminatedUnion('withinZone', [
-  z.object({
+  z.strictObject({
     withinZone: z.literal(true),
     zoneName: z.string(),
     feeCents: z.int().nonnegative(),
     etaMinMinutes: z.int().nonnegative(),
     etaMaxMinutes: z.int().nonnegative(),
   }),
-  z.object({
+  z.strictObject({
     withinZone: z.literal(false),
   }),
 ]);

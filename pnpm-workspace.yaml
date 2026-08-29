@@ -10,3 +10,6 @@ allowBuilds:
   unrs-resolver: true
   "@prisma/engines": true
   prisma: true
+  "@sentry/cli": true
+
+auditConfig: { ignoreGhsas: null }

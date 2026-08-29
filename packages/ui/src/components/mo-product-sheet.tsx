@@ -64,23 +64,25 @@ export interface MoProductSheetProps {
  * `lineTotalCents` do `packages/contracts/src/cart.ts` em vez de importá-la.
  * É só exibição: o servidor sempre revalida no checkout (Épico 7).
  */
-export function MoProductSheet({ open, onOpenChange, product, onAddToCart, className }: MoProductSheetProps) {
+export function MoProductSheet({ open, product, ...props }: MoProductSheetProps) {
+  // Remonta por `key` ao abrir ou trocar de produto — quantidade/observações/
+  // seleção voltam ao padrão pelos inicializadores do useState, sem effect que
+  // "ajusta" state em cima de prop. Sem isto o segundo produto herdaria a
+  // escolha do primeiro.
+  if (!open || !product) return null;
+  return <MoProductSheetInner key={product.id} product={product} {...props} />;
+}
+
+function MoProductSheetInner({
+  onOpenChange,
+  product,
+  onAddToCart,
+  className,
+}: Omit<MoProductSheetProps, 'open' | 'product'> & { product: NonNullable<MoProductSheetProps['product']> }) {
   const [quantidade, setQuantidade] = React.useState(1);
   const [observacoes, setObservacoes] = React.useState('');
   const [selecoes, setSelecoes] = React.useState<Record<string, string[]>>({});
   const observacoesId = React.useId();
-
-  // Reseta ao abrir (ou ao trocar de produto com o sheet já aberto) — sem
-  // isto, o segundo produto herdaria quantidade/observações/seleção do
-  // primeiro.
-  React.useEffect(() => {
-    if (!open) return;
-    setQuantidade(1);
-    setObservacoes('');
-    setSelecoes({});
-  }, [open, product?.id]);
-
-  if (!open || !product) return null;
 
   const grupoIncompleto = product.modifierGroups.some(
     (grupo) => (selecoes[grupo.id]?.length ?? 0) < grupo.min,
@@ -98,8 +100,6 @@ export function MoProductSheet({ open, onOpenChange, product, onAddToCart, class
   const totalCents = (product.basePriceCents + deltaSelecionado) * quantidade;
 
   function handleAdicionar() {
-    if (!product) return;
-
     const modifiers: MoProductSheetSelectedModifier[] = product.modifierGroups.flatMap((grupo) =>
       (selecoes[grupo.id] ?? [])
         .map((id) => grupo.modifiers.find((modificador) => modificador.id === id))
@@ -122,7 +122,7 @@ export function MoProductSheet({ open, onOpenChange, product, onAddToCart, class
 
   return (
     <MoSheet
-      open={open}
+      open
       onOpenChange={onOpenChange}
       title={product.name}
       className={className}
@@ -138,7 +138,7 @@ export function MoProductSheet({ open, onOpenChange, product, onAddToCart, class
       {product.imageUrl ? (
         <img
           src={product.imageUrl}
-          alt=""
+          alt={`Foto de ${product.name}`}
           className="-mx-6 mb-4 aspect-video w-[calc(100%+3rem)] object-cover"
         />
       ) : null}

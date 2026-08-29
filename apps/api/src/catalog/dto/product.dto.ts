@@ -20,6 +20,10 @@ export class CreateProductDto {
   basePriceCents!: number;
 
   @IsOptional()
+  @IsString()
+  pdvCode?: string | null;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   sortOrder?: number;
@@ -49,6 +53,10 @@ export class UpdateProductDto {
   @IsInt()
   @Min(0)
   basePriceCents?: number;
+
+  @IsOptional()
+  @IsString()
+  pdvCode?: string | null;
 
   @IsOptional()
   @Type(() => Number)

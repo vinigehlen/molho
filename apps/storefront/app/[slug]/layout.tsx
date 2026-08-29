@@ -10,7 +10,35 @@ interface TenantLayoutProps {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const store = await getStorefront(slug);
-  return store ? { title: store.store.name } : {};
+  if (!store) return {};
+
+  const title = store.store.name;
+  const descriptionParts = [
+    `Peça no cardápio digital do ${store.store.name}`,
+    store.store.addressText ? `em ${store.store.addressText}` : null,
+    'com entrega, retirada e pagamento pelo Molho.',
+  ].filter(Boolean);
+  const description = descriptionParts.join(' ');
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/${slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `/${slug}`,
+      images: ['/og-image-1200x630.png'],
+      locale: 'pt_BR',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og-image-1200x630.png'],
+    },
+  };
 }
 
 /**

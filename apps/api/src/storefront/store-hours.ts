@@ -66,6 +66,53 @@ function forwardDistance(from: number, to: number): number {
   return ((to - from) % MINUTES_PER_WEEK + MINUTES_PER_WEEK) % MINUTES_PER_WEEK;
 }
 
+/**
+ * Épico conversão (C3) — "minutos da semana" locais no timezone da loja pra
+ * UM instante (não "agora", um `scheduledFor` qualquer). Mesma conversão de
+ * relógio de parede que `computeStoreOpenState` já faz pra `now`, extraída
+ * pra ser reutilizável com qualquer `Date`.
+ */
+export function localWeekMinutes(timezone: string, at: Date): number {
+  const offset = utcOffsetMinutes(timezone, at);
+  const localAt = new Date(at.getTime() + offset * 60_000);
+  return localAt.getUTCDay() * MINUTES_PER_DAY + localAt.getUTCHours() * 60 + localAt.getUTCMinutes();
+}
+
+export function localWeekdayAndMinutes(timezone: string, at: Date): { dayOfWeek: Weekday; minutes: number } {
+  const weekMinutes = localWeekMinutes(timezone, at);
+  const dayIndex = Math.floor(weekMinutes / MINUTES_PER_DAY);
+  return { dayOfWeek: WEEKDAYS[dayIndex]!, minutes: weekMinutes % MINUTES_PER_DAY };
+}
+
+/**
+ * Épico conversão (C3) — os limites REAIS (instantes UTC) da ocorrência de
+ * UM slot recorrente na semana de `at`. `slot` nunca atravessa meia-noite
+ * (CHECK `starts_at_minutes < ends_at_minutes` na migration, diferente de
+ * StoreShift) — os dois limites caem no MESMO dia civil local.
+ */
+export function slotOccurrenceRange(
+  timezone: string,
+  at: Date,
+  slot: { startsAtMinutes: number; endsAtMinutes: number },
+): { start: Date; end: Date } {
+  const offset = utcOffsetMinutes(timezone, at);
+  const localAt = new Date(at.getTime() + offset * 60_000);
+  const localMidnight = Date.UTC(localAt.getUTCFullYear(), localAt.getUTCMonth(), localAt.getUTCDate());
+  return {
+    start: new Date(localMidnight + slot.startsAtMinutes * 60_000 - offset * 60_000),
+    end: new Date(localMidnight + slot.endsAtMinutes * 60_000 - offset * 60_000),
+  };
+}
+
+/** Mesma aritmética circular de `computeStoreOpenState` — turno pode atravessar meia-noite, agendamento não precisa saber disso, só "cai dentro de algum turno?". */
+export function isWithinAnyShift(shifts: readonly StoreShift[], weekMinutes: number): boolean {
+  return shifts.some((shift) => {
+    const dayIndex = WEEKDAYS.indexOf(shift.dayOfWeek);
+    const start = dayIndex * MINUTES_PER_DAY + shift.opensAtMinutes;
+    return forwardDistance(start, weekMinutes) < shiftDurationMinutes(shift);
+  });
+}
+
 export function computeStoreOpenState(
   shifts: readonly StoreShift[],
   timezone: string,

@@ -7,6 +7,7 @@ import type {
   CheckoutCouponRecord,
   CheckoutProductRecord,
   CheckoutRepository,
+  CheckoutSchedulingSlotRecord,
   CheckoutStoreHoursRecord,
   CheckoutStoreRecord,
 } from './checkout-revalidation.repository';
@@ -48,6 +49,16 @@ class FakeCheckoutRepository implements CheckoutRepository {
   async findCoupon(_code: string) {
     return this.coupon;
   }
+  slots: CheckoutSchedulingSlotRecord[] = [];
+  async listSchedulingSlots() {
+    return this.slots;
+  }
+  scheduledCounts: number[] = [];
+  scheduledCountResult = 0;
+  async countScheduledOrders(start: Date, end: Date) {
+    this.scheduledCounts.push(start.getTime(), end.getTime());
+    return this.scheduledCountResult;
+  }
 }
 
 class FakeDeliveryMatchRepository implements DeliveryMatchRepository {
@@ -78,7 +89,7 @@ const RESOLVED: ResolvedAddress = {
 };
 
 function baseRequest(
-  overrides: Partial<Pick<CheckoutRequest, 'items' | 'address' | 'fulfillmentType' | 'couponCode'>> = {},
+  overrides: Partial<Pick<CheckoutRequest, 'items' | 'address' | 'fulfillmentType' | 'couponCode' | 'scheduledFor'>> = {},
 ): CheckoutRequest {
   return {
     items: [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [{ modifierId: 'mod-bacon', priceDeltaCents: 500 }], quantity: 1, notes: null }],
@@ -441,5 +452,88 @@ describe('CheckoutRevalidationService — cupom de desconto', () => {
 
     expect(result.couponValid).toBe(false);
     expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+});
+
+/** Épico conversão (C3) — docs/handoff-features-conversao-gestor.md A3. FIXED_NOW é quarta 12h em São Paulo. */
+describe('CheckoutRevalidationService — agendamento de pedido', () => {
+  // Quarta 18h-20h em São Paulo — 2026-07-22 é quarta, GMT-3.
+  const SLOT: CheckoutSchedulingSlotRecord = {
+    dayOfWeek: 'wednesday',
+    startsAtMinutes: 18 * 60,
+    endsAtMinutes: 20 * 60,
+    maxOrders: 5,
+  };
+  const WITHIN_SLOT_UTC = '2026-07-22T21:00:00.000Z'; // 18h em São Paulo, dentro do slot.
+
+  it('1) sem scheduledFor: "o quanto antes", sem divergência', async () => {
+    const { service } = setup();
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.scheduledFor).toBeNull();
+    expect(result.scheduledForValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(false);
+  });
+
+  it('2) scheduledFor futuro, dentro de um slot com vaga: válido, sem divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.slots = [SLOT];
+    checkoutRepo.scheduledCountResult = 2; // 2 de 5 vagas usadas
+
+    const result = await service.revalidate(baseRequest({ scheduledFor: WITHIN_SLOT_UTC }), RESOLVED);
+
+    expect(result.scheduledForValid).toBe(true);
+    expect(result.hasUnfavorableDivergence).toBe(false);
+  });
+
+  it('3) scheduledFor no PASSADO: inválido, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.slots = [SLOT];
+
+    const result = await service.revalidate(baseRequest({ scheduledFor: '2026-07-20T12:00:00.000Z' }), RESOLVED);
+
+    expect(result.scheduledForValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('4) scheduledFor fora de qualquer slot definido: inválido, divergência', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.slots = [SLOT];
+    // 10h em São Paulo (13h UTC), fora do slot 18h-20h.
+    const result = await service.revalidate(baseRequest({ scheduledFor: '2026-07-22T13:00:00.000Z' }), RESOLVED);
+
+    expect(result.scheduledForValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('5) slot lotado (contagem >= maxOrders): inválido, divergência — mesma categoria de item indisponível', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.slots = [SLOT];
+    checkoutRepo.scheduledCountResult = 5; // maxOrders atingido
+
+    const result = await service.revalidate(baseRequest({ scheduledFor: WITHIN_SLOT_UTC }), RESOLVED);
+
+    expect(result.scheduledForValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('6) loja fechada no horário pedido (fora de qualquer turno): inválido mesmo caindo num slot cadastrado', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.hours = []; // nenhum turno cadastrado — loja nunca abre
+    checkoutRepo.slots = [SLOT];
+
+    const result = await service.revalidate(baseRequest({ scheduledFor: WITHIN_SLOT_UTC }), RESOLVED);
+
+    expect(result.scheduledForValid).toBe(false);
+    expect(result.hasUnfavorableDivergence).toBe(true);
+  });
+
+  it('7) scheduledFor não consulta contagem quando nem cai em slot nenhum (economiza round-trip)', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.slots = [SLOT];
+
+    await service.revalidate(baseRequest({ scheduledFor: '2026-07-22T13:00:00.000Z' }), RESOLVED);
+
+    expect(checkoutRepo.scheduledCounts).toHaveLength(0);
   });
 });

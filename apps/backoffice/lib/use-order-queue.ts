@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AdminOrder } from '@molho/contracts';
 import { fetchOrder, transitionOrder } from './orders-api';
-import { type QueuedIntent, enqueueIntent, evaluateIntent, loadQueue, removeIntent } from './order-queue';
+import { type QueuedIntent, enqueueIntent, loadQueue } from './order-queue';
+import { syncOrderQueue } from './order-queue-sync';
 
 export interface QueueConflict {
   intent: QueuedIntent;
@@ -68,31 +69,13 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
 
   const sync = useCallback(async (): Promise<number> => {
     if (!tenantId || !userId || syncing.current) return 0;
-    let unresolved = 0;
     syncing.current = true;
     try {
-      for (const intent of loadQueue(tenantId)) {
-        const order = await fetchOrder(intent.orderId).catch(() => null);
-        const ev = evaluateIntent(intent, order, userId, Date.now());
-        if (ev.action === 'drop') {
-          removeIntent(tenantId, intent.idempotencyKey);
-        } else if (ev.action === 'conflict') {
-          unresolved += 1;
-          removeIntent(tenantId, intent.idempotencyKey);
-          setConflicts((c) => [...c, { intent, order, reason: ev.reason }]);
-        } else if (order) {
-          // apply: versão FRESCA (a precondição já confirmou que o estado bate).
-          const res = await transitionOrder(order.id, intent.toStatus, order.version, intent.reason, intent.idempotencyKey);
-          removeIntent(tenantId, intent.idempotencyKey);
-          if (res.ok) setAutoApplied((a) => [...a, { intent, at: Date.now() }]);
-          else {
-            unresolved += 1;
-            setConflicts((c) => [...c, { intent, order, reason: `não aplicado (HTTP ${res.status})` }]);
-          }
-        }
-      }
+      const result = await syncOrderQueue(tenantId, userId);
+      if (result.conflicts.length > 0) setConflicts((c) => [...c, ...result.conflicts]);
+      if (result.autoApplied.length > 0) setAutoApplied((a) => [...a, ...result.autoApplied]);
       refresh();
-      return unresolved;
+      return result.unresolved;
     } finally {
       syncing.current = false;
     }
@@ -103,17 +86,17 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
     if (online && tenantId && loadQueue(tenantId).length > 0) void sync();
   }, [online, tenantId, sync]);
 
-  const resolveConflict = useCallback(async (idempotencyKey: string, action: 'reapply' | 'discard') => {
-    let target: QueueConflict | undefined;
-    setConflicts((c) => {
-      target = c.find((x) => x.intent.idempotencyKey === idempotencyKey);
-      return c.filter((x) => x.intent.idempotencyKey !== idempotencyKey);
-    });
-    if (action === 'discard' || !target) return;
-    // Reaplicar: refetch pra versão FRESCA (o operador escolheu ver o estado e reaplicar). Chave nova (é uma decisão nova).
-    const fresh = await fetchOrder(target.intent.orderId).catch(() => null);
-    if (fresh) await transitionOrder(fresh.id, target.intent.toStatus, fresh.version, target.intent.reason, crypto.randomUUID());
-  }, []);
+  const resolveConflict = useCallback(
+    async (idempotencyKey: string, action: 'reapply' | 'discard') => {
+      const target = conflicts.find((x) => x.intent.idempotencyKey === idempotencyKey);
+      setConflicts((c) => c.filter((x) => x.intent.idempotencyKey !== idempotencyKey));
+      if (action === 'discard' || !target) return;
+      // Reaplicar: refetch pra versão FRESCA (o operador escolheu ver o estado e reaplicar). Chave nova (é uma decisão nova).
+      const fresh = await fetchOrder(target.intent.orderId).catch(() => null);
+      if (fresh) await transitionOrder(fresh.id, target.intent.toStatus, fresh.version, target.intent.reason, crypto.randomUUID());
+    },
+    [conflicts],
+  );
 
   return { pending, conflicts, autoApplied, submit, sync, resolveConflict };
 }

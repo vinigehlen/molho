@@ -37,7 +37,9 @@ const badgeVariants = cva(
         canceled: 'bg-status-canceled text-status-canceled-on',
 
         neutral: 'bg-border text-text',
+        // ink-900 sobre green-500 dá 5.72:1.
         positive: 'bg-positive text-text',
+        // ink-900 sobre amber-500 dá 9.18:1 (mesmo par de --status-preparing-on).
         caution: 'bg-caution text-text',
         // critical-strong, e não critical: branco sobre o red-500 dá 4.08:1.
         critical: 'bg-critical-strong text-white',

@@ -215,6 +215,24 @@ describe('catálogo granular (Épico 4 — categories/products/modifiers, sem co
   });
 });
 
+describe('analytics do lojista', () => {
+  it('owner/manager/cashier leem analytics geral; waiter/kitchen ficam fora', () => {
+    for (const role of ['owner', 'manager', 'cashier'] as const) {
+      expect(can(ator(role, 'tenant', 'tenant-1'), 'analytics.read', NA_LOJA_1).allowed).toBe(true);
+    }
+
+    for (const role of ['waiter', 'kitchen'] as const) {
+      expect(can(ator(role, 'tenant', 'tenant-1'), 'analytics.read', NA_LOJA_1).allowed).toBe(false);
+    }
+  });
+
+  it('ranking de clientes é só owner/manager; cashier não vê dado pessoal', () => {
+    expect(can(ator('owner', 'tenant', 'tenant-1'), 'analytics.customers.read', NA_LOJA_1).allowed).toBe(true);
+    expect(can(ator('manager', 'tenant', 'tenant-1'), 'analytics.customers.read', NA_LOJA_1).allowed).toBe(true);
+    expect(can(ator('cashier', 'tenant', 'tenant-1'), 'analytics.customers.read', NA_LOJA_1).allowed).toBe(false);
+  });
+});
+
 describe('impersonation (permissões do Épico 2; fluxo é do Épico 14)', () => {
   it('platform_support tem os dois níveis; finance e engineer não têm nenhum', () => {
     const support: Actor = {

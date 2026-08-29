@@ -1,7 +1,15 @@
-import type { CheckoutAddressInput, FulfillmentType, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import type {
+  CheckoutAddressInput,
+  CheckoutLegalAcceptance,
+  FulfillmentType,
+  PaymentMethod,
+  RevalidatedCheckout,
+  RevalidatedItem,
+} from '@molho/contracts';
 import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { ResolvedAddress } from '../geo/resolve-address';
+import { localWeekdayAndMinutes, slotOccurrenceRange } from '../storefront/store-hours';
 
 /**
  * O endereço que vai pro banco: o que o cliente digitou (rótulo, número,
@@ -51,6 +59,8 @@ export interface CreateOrderParams {
   /** Mesmo instante-base usado no prazo, para não depender de dois relógios. */
   createdAt: Date;
   fulfillmentDeadlineAt: Date;
+  /** Snapshot auditável das versões legais aceitas no checkout. */
+  legalAcceptance: CheckoutLegalAcceptance;
   /**
    * Cupom (Épico conversão, C2) — `null`/`0` nos três juntos, ou os três
    * preenchidos juntos (mesmo CHECK `orders_discount_coupon_consistency_check`
@@ -61,6 +71,8 @@ export interface CreateOrderParams {
   couponId: string | null;
   couponCodeSnapshot: string | null;
   discountCents: number;
+  /** Agendamento (Épico conversão, C3) — `null` = "o quanto antes", comportamento atual. */
+  scheduledFor: Date | null;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -70,6 +82,8 @@ export interface StoreForOrder {
   pixKeyType: string | null;
   pixMerchantCity: string | null;
   name: string;
+  /** Épico conversão (C3) — `claimSchedulingSlot` resolve slot/ocorrência no timezone da loja. */
+  timezone: string;
 }
 
 export interface CheckoutOrderRepository {
@@ -102,6 +116,23 @@ export interface CheckoutOrderRepository {
    * confirmado uso disponível de verdade.
    */
   claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null>;
+  /**
+   * Fecha a corrida do teto do SLOT (Épico conversão, C3, docs/handoff A3) —
+   * diferente do cupom, não existe coluna contadora pra `UPDATE ... WHERE`
+   * atômico (slots são recorrentes, a OCORRÊNCIA não é uma linha). Resolve
+   * de novo qual slot/ocorrência `scheduledFor` casa (auto-contido, mesmo
+   * racional de `claimCoupon` resolver por código sem ajuda de fora) e usa
+   * `pg_advisory_xact_lock` chaveado em (tenant, loja, início da ocorrência)
+   * pra serializar concorrentes DENTRO da mesma transação de request — o
+   * lock libera sozinho no commit/rollback. Sob o lock, conta pedidos já
+   * agendados nessa ocorrência (leitura fresca, ninguém mais pode estar
+   * contando ao mesmo tempo) e devolve se ainda cabe. O INSERT em orders que
+   * acontece DEPOIS, ainda dentro da mesma transação, é o que efetivamente
+   * "reserva" a vaga pra quem for contar depois. `false` também quando
+   * `scheduledFor` não cai em slot nenhum (não deveria acontecer se a
+   * revalidação rodou certo — defensivo, nunca aplica sem slot real).
+   */
+  claimSchedulingSlot(storeId: string, timezone: string, scheduledFor: Date): Promise<boolean>;
   /** Grava o endereço do localStorage como linha real, vinculada ao customer autenticado (CLAUDE.md regra 13). */
   createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string>;
   createOrder(params: CreateOrderParams): Promise<string>;
@@ -144,7 +175,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     return this.requestContext.getClient().store.findFirst({
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, pixKey: true, pixKeyType: true, pixMerchantCity: true, name: true },
+      select: { id: true, pixKey: true, pixKeyType: true, pixMerchantCity: true, name: true, timezone: true },
     });
   }
 
@@ -168,6 +199,33 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     `;
     const row = rows[0];
     return row ? { couponId: row.id, couponCodeSnapshot: row.code } : null;
+  }
+
+  async claimSchedulingSlot(storeId: string, timezone: string, scheduledFor: Date): Promise<boolean> {
+    const client = this.requestContext.getClient();
+    const { dayOfWeek, minutes } = localWeekdayAndMinutes(timezone, scheduledFor);
+    const slot = await client.storeSchedulingSlot.findFirst({
+      where: { storeId, dayOfWeek, deletedAt: null, startsAtMinutes: { lte: minutes }, endsAtMinutes: { gt: minutes } },
+      select: { startsAtMinutes: true, endsAtMinutes: true, maxOrders: true },
+    });
+    if (!slot) return false;
+
+    const { start, end } = slotOccurrenceRange(timezone, scheduledFor, slot);
+    const tenantId = this.requestContext.getTenantId();
+    const lockKey = `${tenantId}:${storeId}:${start.toISOString()}`;
+    // hashtext() cabe em int4 (32 bits) — colisão possível mas rara, e o
+    // pior caso é serializar duas ocorrências DIFERENTES sem necessidade
+    // (perf), nunca um falso negativo de capacidade (a contagem abaixo é a
+    // fonte de verdade, o lock só ordena o acesso a ela).
+    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+    const rows = await client.$queryRaw<{ count: bigint }[]>`
+      SELECT count(*)::bigint AS "count" FROM "orders"
+      WHERE "tenant_id" = ${tenantId}::uuid
+        AND "store_id" = ${storeId}::uuid
+        AND "scheduled_for" >= ${start}
+        AND "scheduled_for" < ${end}
+    `;
+    return Number(rows[0]?.count ?? 0) < slot.maxOrders;
   }
 
   async createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string> {
@@ -205,6 +263,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       couponId,
       couponCodeSnapshot,
       discountCents,
+      scheduledFor,
+      legalAcceptance,
     } = params;
     // `address`/`deliveryAddressId` nulos ⟺ pickup — o CHECK
     // `orders_delivery_requires_address_check` (migration) barra a
@@ -218,20 +278,26 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "discount_cents", "coupon_id", "coupon_code_snapshot",
+        "scheduled_for",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
         "delivery_geo", "delivery_postal_code_verified", "customer_verified",
-        "fulfillment_deadline_at", "created_at"
+        "fulfillment_deadline_at",
+        "legal_terms_version", "legal_privacy_version", "legal_accepted_at",
+        "created_at"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${fulfillmentType}::"FulfillmentType",
         ${changeForCents},
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
         ${discountCents}, ${couponId}::uuid, ${couponCodeSnapshot},
+        ${scheduledFor},
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},
         ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified},
-        ${fulfillmentDeadlineAt}, ${createdAt}
+        ${fulfillmentDeadlineAt},
+        ${legalAcceptance.termsVersion}, ${legalAcceptance.privacyVersion}, ${createdAt},
+        ${createdAt}
       )
       RETURNING "id"
     `;

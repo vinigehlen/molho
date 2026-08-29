@@ -32,7 +32,9 @@ interface Handlers {
 export function useOrdersStream(tenantId: string | null, handlers: Handlers): StreamStatus {
   const [status, setStatus] = useState<StreamStatus>('connecting');
   const handlersRef = useRef(handlers);
-  handlersRef.current = handlers;
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
 
   useEffect(() => {
     if (!tenantId) return;

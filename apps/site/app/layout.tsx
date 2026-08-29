@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import { THEMES } from '@molho/ui';
+import { CookieConsent } from '../components/cookie-consent';
+import { SiteAnalytics } from '../components/site-analytics';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -8,11 +10,11 @@ const display = Space_Grotesk({ subsets: ['latin'], variable: '--font-display', 
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
 
 const DESCRICAO =
-  'Cardápio digital do seu jeito: fotos, preço e "esgotou hoje" sem trocar a letrinha. PIX, entrega e gestor de pedidos, sem comissão por venda.';
+  'Cardápio digital, pedido com PIX e gestor de pedidos pro seu delivery ou restaurante, sem comissão por venda. Chega de anotar pedido no WhatsApp.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://molho.live'),
-  title: 'Molho — cardápio digital, PIX e delivery sem comissão',
+  title: 'Molho: cardápio digital, PIX e delivery sem comissão',
   description: DESCRICAO,
   icons: {
     icon: [
@@ -29,6 +31,12 @@ export const metadata: Metadata = {
     locale: 'pt_BR',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Molho: cardápio digital, PIX e delivery sem comissão',
+    description: DESCRICAO,
+    images: ['/og-image-1200x630.png'],
+  },
 };
 
 // Sourced do token único (packages/ui/themes.ts), nunca hex à mão — o lint de
@@ -40,7 +48,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${display.variable} ${mono.variable}`}>
-      <body className="bg-cream [font-family:var(--font-inter)] text-text antialiased">{children}</body>
+      <body className="bg-cream [font-family:var(--font-inter)] text-text antialiased">
+        {children}
+        <SiteAnalytics />
+        <CookieConsent />
+      </body>
     </html>
   );
 }

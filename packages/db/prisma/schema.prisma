@@ -146,6 +146,7 @@ model Tenant {
   products             Product[]
   productImages        ProductImage[]
   modifierGroups       ModifierGroup[]
+  productModifierGroups ProductModifierGroup[]
   modifiers            Modifier[]
   addresses            Address[]
   deliveryZones        DeliveryZone[]
@@ -412,6 +413,11 @@ model Product {
   imageKey       String?   @map("image_key")
   /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
   available      Boolean   @default(true)
+  /// Código do item no PDV do lojista (Épico combos/PDV, exceção MVP
+  /// 2026-08-28) — texto livre, opcional, nunca validado/interpretado por
+  /// nós: é só o número/código que o sistema de caixa do lojista já usa,
+  /// pra ele bater cardápio digital × PDV sem digitar duas vezes.
+  pdvCode        String?   @map("pdv_code")
   sortOrder      Int       @default(0) @map("sort_order")
   version        Int       @default(0)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -420,7 +426,12 @@ model Product {
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category       Category        @relation(fields: [categoryId], references: [id])
+  /// Grupo "dono" (criado a partir DESTE produto) — FK direta, ainda usada
+  /// pra decidir onde um grupo novo nasce. Pra "quais grupos valem PRA este
+  /// produto" (inclui reuso), ver `productModifierGroups` — fase reuso
+  /// (exceção MVP 2026-08-28, CLAUDE.md).
   modifierGroups ModifierGroup[]
+  productModifierGroups ProductModifierGroup[]
   orderItems     OrderItem[]
   images         ProductImage[]
 
@@ -466,18 +477,56 @@ model ModifierGroup {
   /// CHECK min >= 0 AND min <= max à mão na migration.
   min       Int       @default(0)
   max       Int       @default(1)
+  /// Pausar SEM apagar (Épico combos/PDV) — mesma ideia do produto
+  /// "esgotado": o grupo continua existindo (histórico de pedido não
+  /// quebra), só não aparece pro cliente escolher.
+  active    Boolean   @default(true)
+  pdvCode   String?   @map("pdv_code")
   version   Int       @default(0)
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product   Product    @relation(fields: [productId], references: [id])
-  modifiers Modifier[]
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product               Product                @relation(fields: [productId], references: [id])
+  modifiers             Modifier[]
+  productModifierGroups ProductModifierGroup[]
 
   // FK composta (product_id, tenant_id) → products(id, tenant_id) na migration.
   @@index([tenantId, productId])
   @@map("modifier_groups")
+}
+
+/// Reuso de grupo de complemento entre produtos (exceção MVP 2026-08-28,
+/// CLAUDE.md — fase 2/4 do combo). `ModifierGroup.productId` continua
+/// sendo o dono/criador (onde o grupo nasceu); esta tabela é a lista real
+/// de "em quais produtos este grupo vale" — todo grupo, inclusive os
+/// antigos, tem pelo menos UMA linha aqui (a migration faz o backfill do
+/// productId original). "Quais grupos valem pra este produto" SEMPRE
+/// consulta esta tabela, nunca `ModifierGroup.productId` direto — depois
+/// do backfill, os dois caminhos concordam pro caso 1:1 de sempre, e só
+/// esta tabela sabe sobre vínculo extra.
+model ProductModifierGroup {
+  id              String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  productId       String    @map("product_id") @db.Uuid
+  modifierGroupId String    @map("modifier_group_id") @db.Uuid
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id])
+
+  // FKs compostas (product_id, tenant_id) → products(id, tenant_id) e
+  // (modifier_group_id, tenant_id) → modifier_groups(id, tenant_id) na
+  // migration. Único parcial (product_id, modifier_group_id) WHERE
+  // deleted_at IS NULL também na migration (convenção soft-delete).
+  @@index([tenantId, productId])
+  @@index([tenantId, modifierGroupId])
+  @@map("product_modifier_groups")
 }
 
 model Modifier {
@@ -844,11 +893,27 @@ model Order {
   /// zod (`.max(500)`).
   notes String? @map("notes")
 
+  /// Snapshot auditável do aceite legal do checkout. Nullable só por legado:
+  /// pedidos antigos nasceram antes desta exigência. Novo pedido de
+  /// storefront sempre informa as duas versões e o instante do aceite.
+  legalTermsVersion   String?   @map("legal_terms_version")
+  legalPrivacyVersion String?   @map("legal_privacy_version")
+  legalAcceptedAt     DateTime? @map("legal_accepted_at")
+
   canceledAt     DateTime? @map("canceled_at")
   /// Só o motivo, pra exibição (tela de acompanhamento, WhatsApp). Ator e
   /// papel de quem cancelou vivem no audit_log/order_status_history —
   /// não duplicados aqui.
   canceledReason String?   @map("canceled_reason")
+
+  /// Sinalização manual (Fase 3, plano do gestor — versão MVP da "tag de
+  /// pendência" do iFood, que lá é automática por chat/negociação in-app;
+  /// aqui é o staff marcando "esse pedido precisa de atenção" na mão,
+  /// porque não existe chat com o cliente dentro do produto). Não bloqueia
+  /// nenhuma transição de status — é só um filtro/destaque visual no board.
+  /// `null` = não sinalizado (estado normal da imensa maioria das linhas).
+  flaggedAt     DateTime? @map("flagged_at")
+  flaggedReason String?   @map("flagged_reason")
 
   /// Chave de idempotência da CRIAÇÃO do pedido (Épico balcão) — nula pro
   /// checkout normal (que já tem seu próprio cap de escrita pública, ver

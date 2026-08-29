@@ -13,18 +13,18 @@ export function Hero() {
             (2.31:1, medido) — por isso mostarda aqui é sempre FUNDO de chip
             com texto ink por cima (9.19:1), nunca cor de texto direta. */}
         <p className="font-mono text-caption uppercase tracking-wide text-on-brand">
-          Cardápio digital do seu jeito
+          Chega de comanda no WhatsApp
         </p>
 
         <h1 className="mt-4 [font-family:var(--font-display)] text-display-lg uppercase leading-tight text-on-brand sm:text-[44px]">
-          O letreiro da casa, agora{' '}
-          <span className="inline-block rounded-sm bg-caution px-2 text-text">na tela</span> de todo
-          mundo.
+          Tenha seu próprio delivery,{' '}
+          <span className="inline-block rounded-sm bg-caution px-2 text-text">livre de taxas</span>.
         </h1>
 
         <p className="mt-4 text-body-lg text-on-brand">
-          Fotos, preço e &ldquo;esgotou hoje&rdquo; sem trocar a letrinha. O cliente pede pelo celular, você
-          recebe redondo — sem comissão por venda.
+          Cardápio digital, pedido com PIX e um painel pra cozinha ver tudo em tempo real, pronto
+          pra rodar a sexta-feira de pico sem digitar nada no WhatsApp. Mensalidade fixa, sem
+          comissão por venda.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">

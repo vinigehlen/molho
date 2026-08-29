@@ -2,7 +2,7 @@ import { Controller, Get, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { configureSecurityHeaders } from './security-headers';
+import { buildSecurityHeaders, configureSecurityHeaders } from './security-headers';
 
 /**
  * Sobe um app real porque o que se quer provar é que o middleware roda na
@@ -31,21 +31,25 @@ afterAll(async () => {
 });
 
 describe('configureSecurityHeaders', () => {
-  it('marca nosniff, frame-options e referrer-policy na resposta', async () => {
+  it('marca nosniff, frame-options, referrer-policy e CSP report-only na resposta', async () => {
     const res = await request(app.getHttpServer()).get('/__ok').expect(200);
 
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-frame-options']).toBe('DENY');
     expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(res.headers['content-security-policy-report-only']).toContain("default-src 'self'");
   });
 
-  it('NÃO manda HSTS: ligar antes do TLS de molho.live validado tranca o domínio', async () => {
-    // Guarda deliberada, não descuido — o header vale pelo max-age inteiro e
-    // não tem como voltar atrás pelo servidor. Só entra depois do passe de
-    // fumaça de produção (docs/08 §7b); quem adicionar HSTS deve APAGAR este
-    // teste conscientemente, não descobrir o efeito em produção.
+  it('não manda HSTS por padrão: ligar antes do TLS de molho.live validado tranca o domínio', async () => {
     const res = await request(app.getHttpServer()).get('/__ok').expect(200);
 
     expect(res.headers['strict-transport-security']).toBeUndefined();
+  });
+
+  it('prepara HSTS só quando MOLHO_ENABLE_HSTS=true', () => {
+    expect(buildSecurityHeaders({ MOLHO_ENABLE_HSTS: 'false' })['Strict-Transport-Security']).toBeUndefined();
+    expect(buildSecurityHeaders({ MOLHO_ENABLE_HSTS: 'true' })['Strict-Transport-Security']).toBe(
+      'max-age=15552000; includeSubDomains',
+    );
   });
 });

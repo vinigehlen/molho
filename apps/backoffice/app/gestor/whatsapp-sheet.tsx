@@ -67,7 +67,7 @@ export function WhatsAppSheet({ order, onClose }: { order: AdminOrder; onClose: 
         <p className="text-caption text-critical">{erro}</p>
       ) : (
         <label className="flex flex-col gap-2">
-          <span className="text-caption text-text-muted">Dá uma olhada antes de mandar — pode editar.</span>
+          <span className="text-caption text-text-muted">Dá uma olhada antes de mandar, pode editar.</span>
           <textarea
             className="min-h-32 w-full rounded-[14px] border border-border bg-bg p-3 text-body text-text focus-visible:outline-none focus-visible:shadow-focus"
             value={texto}

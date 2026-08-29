@@ -1,7 +1,14 @@
-import { buildPixBrCode, parsePhoneNumber, PICKUP_ETA_MAX_MINUTES } from '@molho/contracts';
+import {
+  buildPixBrCode,
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+  parsePhoneNumber,
+  PICKUP_ETA_MAX_MINUTES,
+} from '@molho/contracts';
 import type {
   CheckoutOrderPix,
   CheckoutOrderResponse,
+  CheckoutLegalAcceptance,
   CheckoutRequest,
   GuestCustomer,
   RevalidatedCheckout,
@@ -25,6 +32,11 @@ import type { PaymentMethodModuleGate } from './payment-method-module-gate';
 function isPixKeyType(value: string | null): value is CheckoutOrderPix['keyType'] {
   return value === 'cpf' || value === 'cnpj' || value === 'email' || value === 'phone' || value === 'random';
 }
+
+const DEFAULT_LEGAL_ACCEPTANCE: CheckoutLegalAcceptance = {
+  termsVersion: CURRENT_TERMS_VERSION,
+  privacyVersion: CURRENT_PRIVACY_VERSION,
+};
 
 /**
  * Monta o BR Code da loja pra ESTE pedido (Épico 8) — `txid` é o próprio
@@ -125,6 +137,7 @@ export class CheckoutOrderService {
     /** `null` ⟺ `request.fulfillmentType === 'pickup'` (invariante do controller). */
     resolved: ResolvedAddress | null,
     guest: GuestCustomer | null = null,
+    legalAcceptance: CheckoutLegalAcceptance = DEFAULT_LEGAL_ACCEPTANCE,
   ): Promise<CreateOrderResult> {
     const { customerId, verified } = await this.resolveCustomer(tenantId, authenticatedCustomerId, guest);
 
@@ -178,6 +191,22 @@ export class CheckoutOrderService {
     }
     const discountCents = couponId ? revalidation.discountCents : 0;
 
+    // Épico conversão (C3). Mesmo racional do cupom acima: scheduledForValid
+    // aqui já passou pelas checagens de leitura (horário, slot, teto
+    // aparente) — só `claimSchedulingSlot` (advisory lock + contagem fresca)
+    // fecha a corrida de verdade. Perder a corrida revalida de novo e
+    // devolve pro cliente confirmar, nunca cria o pedido fingindo que o
+    // horário ainda tem vaga.
+    let scheduledFor: Date | null = null;
+    if (revalidation.scheduledFor && revalidation.scheduledForValid) {
+      const claimed = await this.repo.claimSchedulingSlot(store.id, store.timezone, new Date(revalidation.scheduledFor));
+      if (!claimed) {
+        const fresh = await this.revalidationService.revalidate(request, resolved);
+        return { ok: false, revalidation: fresh };
+      }
+      scheduledFor = new Date(revalidation.scheduledFor);
+    }
+
     // Só dá pra validar DEPOIS da revalidação — antes disso não existe
     // totalCents real (docs/02 §5.5: pedir troco pra menos que o total é
     // request inválido).
@@ -211,6 +240,8 @@ export class CheckoutOrderService {
       couponId,
       couponCodeSnapshot,
       discountCents,
+      scheduledFor,
+      legalAcceptance,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
@@ -226,6 +257,7 @@ export class CheckoutOrderService {
         fulfillmentDeadlineAt,
         discountCents,
         couponCodeSnapshot,
+        scheduledFor,
       ),
     };
   }
@@ -240,6 +272,7 @@ export class CheckoutOrderService {
     fulfillmentDeadlineAt: Date,
     discountCents: number,
     couponCodeSnapshot: string | null,
+    scheduledFor: Date | null,
   ): CheckoutOrderResponse {
     const base = {
       orderId,
@@ -248,6 +281,7 @@ export class CheckoutOrderService {
       totalCents,
       discountCents,
       couponCode: couponCodeSnapshot,
+      scheduledFor: scheduledFor?.toISOString() ?? null,
       fulfillmentType: request.fulfillmentType,
       fulfillmentDeadlineAt: fulfillmentDeadlineAt.toISOString(),
     };

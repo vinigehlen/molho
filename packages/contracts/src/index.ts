@@ -1,6 +1,8 @@
 export * from './address';
 export * from './admin-order';
+export * from './analytics';
 export * from './cart';
+export * from './catalog-admin';
 export * from './checkout';
 export * from './copy.pt-BR';
 export * from './coupon-admin';
@@ -21,3 +23,4 @@ export * from './scheduling-slot-admin';
 export * from './signup';
 export * from './storefront';
 export * from './store-hours-admin';
+export * from './store-setup';

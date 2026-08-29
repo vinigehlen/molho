@@ -28,7 +28,7 @@ const baseZoneFields = {
  * validação de geometria, fica pro PostGIS/`ST_IsValid` no servidor).
  * `coordinates`: 1+ anéis, cada anel com 4+ posições `[lng, lat]`.
  */
-const geoJsonPolygonSchema = z.object({
+const geoJsonPolygonSchema = z.strictObject({
   type: z.literal('Polygon'),
   coordinates: z.array(z.array(z.tuple([z.number(), z.number()])).min(4)).min(1),
 });
@@ -62,7 +62,7 @@ export const createDeliveryZoneSchema = z.discriminatedUnion('kind', [cityZoneSc
 /** Update é replace da zona inteira — mesma forma do create. */
 export const updateDeliveryZoneSchema = createDeliveryZoneSchema;
 
-export const deliveryZoneResponseSchema = z.object({
+export const deliveryZoneResponseSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   kind: z.enum(['city', 'polygon']),

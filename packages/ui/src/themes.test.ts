@@ -5,19 +5,19 @@ import { DEFAULT_THEME, THEMES, THEME_KEYS, getTheme, themeToCssVars } from './t
 const WHITE = '#FFFFFF';
 
 describe('temas do storefront', () => {
-  it('expõe exatamente os 4 templates decididos — nada de cor livre', () => {
-    expect(THEME_KEYS).toEqual(['roxo', 'brasa', 'folha', 'grafite']);
+  it('expõe exatamente os 3 templates decididos — nada de cor livre', () => {
+    expect(THEME_KEYS).toEqual(['brasa', 'folha', 'grafite']);
   });
 
-  it('usa Roxo como padrão', () => {
-    expect(DEFAULT_THEME).toBe('roxo');
-    expect(THEMES.roxo.brand).toBe('#D63A1E');
+  it('usa Brasa como padrão', () => {
+    expect(DEFAULT_THEME).toBe('brasa');
+    expect(THEMES.brasa.brand).toBe('#D63A1E');
   });
 
   it('cai no padrão quando o tenant não escolheu (ou escolheu lixo)', () => {
-    expect(getTheme(null).key).toBe('roxo');
-    expect(getTheme('tema-que-nao-existe').key).toBe('roxo');
-    expect(getTheme('brasa').key).toBe('brasa');
+    expect(getTheme(null).key).toBe('brasa');
+    expect(getTheme('tema-que-nao-existe').key).toBe('brasa');
+    expect(getTheme('folha').key).toBe('folha');
   });
 
   it('vira um bloco --brand-* pronto para o <html> do tenant', () => {
@@ -35,7 +35,7 @@ describe('temas do storefront', () => {
 // A promessa de marca é "todos AA por construção" (§6.2) e o §6.1 torna o
 // contraste bloqueante. Aqui isso deixa de ser promessa: um template que
 // reprove quebra o build antes de chegar em qualquer loja.
-describe('acessibilidade dos 4 templates (AA por construção)', () => {
+describe('acessibilidade dos 3 templates (AA por construção)', () => {
   it.each(THEME_KEYS)('%s: texto sobre a cor da marca passa AA', (key) => {
     const theme = THEMES[key];
     const ratio = contrastRatio(theme.onBrand, theme.brand);

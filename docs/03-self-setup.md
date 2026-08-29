@@ -52,21 +52,22 @@ Landing → "Criar minha loja grátis"
 - SEO por loja continua: `<title>` + meta description, **Open Graph com a capa dela** (o que aparece quando ela manda o link no WhatsApp), JSON-LD `Restaurant`/`Menu`, favicon com o logo dela e PWA manifest.
 - Domínio próprio fica como **feature do Premium na Fase 3**, se algum cliente pedir. Não antes.
 
-## 5. Tema: 4 templates (decisão travada)
+## 5. Tema: 3 templates (decisão travada)
 
-Em vez de um seletor de cor livre (que exige rampa OKLCH, validação de contraste e ainda produz loja feia), o lojista **escolhe 1 entre 4 templates prontos**. Cada um é um conjunto fechado e testado de cor, header e densidade — todos aprovados em WCAG AA por construção.
+Em vez de um seletor de cor livre (que exige rampa OKLCH, validação de contraste e ainda produz loja feia), o lojista **escolhe 1 entre 3 templates prontos**. Cada um é um conjunto fechado e testado de cor, header e densidade — todos aprovados em WCAG AA por construção.
 
 | Template | Cor | Personalidade | Para quem |
 |---|---|---|---|
-| **1. Roxo** (padrão) | Vermelho Brasa `#D63A1E` | Moderno, fintech, confiável | Quem não quer decidir. É o default |
-| **2. Brasa** | Vermelho Brasa `#D63A1E` | Apetitoso, quente, urgente | Hamburgueria, pizzaria, churrasco |
-| **3. Folha** | Verde-profundo `#0F8A5F` | Fresco, natural, saudável | Saudável, natural, açaí, sucos |
-| **4. Grafite** | Preto `#141216` + acento âmbar | Sofisticado, minimalista | Alta gastronomia, cafés, autoral |
+| **1. Brasa** (padrão) | Vermelho Brasa `#D63A1E` | Apetitoso, quente, urgente | Hamburgueria, pizzaria, churrasco. Também o default — quem não quer decidir |
+| **2. Folha** | Verde-profundo `#0F8A5F` | Fresco, natural, saudável | Saudável, natural, açaí, sucos |
+| **3. Grafite** | Preto `#141216` + acento âmbar | Sofisticado, minimalista | Alta gastronomia, cafés, autoral |
 
 **O que o lojista escolhe/envia:** template · logo · foto de capa · descrição curta · ordem das categorias.
 **O que ele NÃO mexe:** tipografia, raios, espaçamento, layout, componentes, cores funcionais, cor do PIX.
 
-**Implementação:** cada template é só um bloco de `--brand-*` no `theme_json` — quatro constantes em `packages/ui/themes.ts`. Sem cálculo de rampa, sem validação de contraste em runtime, sem "ajustamos seu tom". **Simples, previsível e toda loja fica bonita.**
+**Implementação:** cada template é só um bloco de `--brand-*` no `theme_json` — três constantes em `packages/ui/themes.ts`. Sem cálculo de rampa, sem validação de contraste em runtime, sem "ajustamos seu tom". **Simples, previsível e toda loja fica bonita.**
+
+*Histórico: existiu um 4º template, "Roxo", byte-idêntico ao Brasa — resíduo do rebrand de roxo `#820AD1` pra vermelho Brasa `#D63A1E`. Removido; ver git history.*
 
 Preview ao vivo dos 4 lado a lado no wizard, com o cardápio real dele já dentro.
 

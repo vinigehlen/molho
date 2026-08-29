@@ -12,9 +12,16 @@ import { cn } from '../lib/cn';
  * desktop. `pix` é variante própria porque a cor do PIX é do Banco Central e
  * nunca acompanha o tema do lojista.
  */
-const buttonVariants = cva(
+/**
+ * Exportado pra quem precisa do visual de `MoButton` num elemento que NÃO é
+ * `<button>` (ex.: `<Link>` de navegação) — `MoButton` só renderiza
+ * `<button>` de propósito (semântica de ação, não de link). Composição
+ * direta com a variante em vez de props polimórficas tipo `asChild`: menos
+ * API de superfície, mesmo resultado visual, sem depender de Radix Slot.
+ */
+export const buttonVariants = cva(
   [
-    'relative inline-flex items-center justify-center gap-2',
+    'relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap',
     'rounded-md font-semibold',
     'transition duration-base ease-out',
     'focus-visible:outline-none focus-visible:shadow-focus',
@@ -33,6 +40,9 @@ const buttonVariants = cva(
         ghost: 'bg-transparent text-brand-strong hover:bg-brand-faint',
         // O red-500 do doc só alcança 4.08:1 com branco: usa-se o tom forte.
         danger: 'bg-critical-strong text-white hover:brightness-95',
+        // Confirmação positiva fora da marca (ex.: "Marcar pago" no gestor) —
+        // ink-900 sobre green-500 dá 5.72:1, mesmo par do MoBadge positive.
+        positive: 'bg-positive text-text hover:brightness-95',
         // A cor do PIX é do Banco Central e não se toca — o que muda é o texto.
         // Branco sobre o teal dá 2.35:1; ink dá 7.9:1.
         pix: 'bg-pix text-text hover:brightness-95',

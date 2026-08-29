@@ -33,8 +33,8 @@ export const Padrao: Story = {
 
 /** Com onClick, o card vira <button> — foco, Enter e Espaço funcionam de graça. */
 export const Interativo: Story = {
-  render: (args) => (
-    <MoCard {...args} onClick={() => alert('Abriu o produto')} className="max-w-sm">
+  render: () => (
+    <MoCard onClick={() => alert('Abriu o produto')} className="max-w-sm">
       <MoCardHeader>
         <MoCardTitle>Risoto de funghi</MoCardTitle>
         <MoCardDescription>No capricho, com parmesão de verdade.</MoCardDescription>

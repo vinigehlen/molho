@@ -25,6 +25,7 @@ export interface PricedCounterItem {
 
 export interface ExistingCounterOrder {
   id: string;
+  status: string;
   paymentMethod: string;
   subtotalCents: number;
   totalCents: number;
@@ -90,7 +91,7 @@ export class PrismaCounterOrderRepository implements CounterOrderRepository {
     const tenantId = this.requestContext.getTenantId();
     return this.requestContext.getClient().order.findFirst({
       where: { tenantId, idempotencyKey, deletedAt: null },
-      select: { id: true, paymentMethod: true, subtotalCents: true, totalCents: true },
+      select: { id: true, status: true, paymentMethod: true, subtotalCents: true, totalCents: true },
     });
   }
 
@@ -120,7 +121,7 @@ export class PrismaCounterOrderRepository implements CounterOrderRepository {
         "delivery_geo", "delivery_postal_code_verified", "customer_verified",
         "notes", "idempotency_key", "created_at"
       ) VALUES (
-        ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'completed', ${paymentMethod}::"PaymentMethod", 'confirmado', 'not_applicable',
+        ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'confirmado', 'not_applicable',
         'pickup', NULL,
         ${subtotalCents}, 0, ${totalCents},
         NULL, true, false,

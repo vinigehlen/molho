@@ -84,6 +84,7 @@ describe('MoButton', () => {
   it.each([
     ['danger', 'bg-critical-strong', 'text-white'],
     ['pix', 'bg-pix', 'text-text'],
+    ['positive', 'bg-positive', 'text-text'],
   ] as const)('a variante %s usa o par de tokens que passa AA', (variant, bg, fg) => {
     render(<MoButton variant={variant}>Ação</MoButton>);
 

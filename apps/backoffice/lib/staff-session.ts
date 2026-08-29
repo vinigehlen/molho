@@ -11,6 +11,7 @@ export interface StaffSession {
   /** userId (sub do JWT) — marca autoria dos intents da fila offline (tablet compartilhado). */
   userId: string;
   tenantName: string;
+  tenantSlug?: string;
 }
 
 const TENANT_KEY = 'molho.staff-tenant';

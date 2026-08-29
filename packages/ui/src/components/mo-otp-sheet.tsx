@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { isPlausiblePhoneDigits } from '../lib/masks';
 import { MoButton } from './mo-button';
 import { MoInput } from './mo-input';
 import { MoSheet } from './mo-sheet';
@@ -28,6 +29,11 @@ export interface MoOtpSheetProps {
 
 type Step = 'phone' | 'code';
 
+/** Espelha o cooldown de 60s do `OtpService` (CLAUDE.md, seção Segurança) —
+ * sem contador visível, "Reenviar código" parecia clicável e o cliente
+ * (Riley-tipo) clicava várias vezes sem entender por que nada mudava. */
+const REENVIO_COOLDOWN_SEGUNDOS = 60;
+
 /**
  * MoOtpSheet — login por OTP do cliente final, único ponto do storefront que
  * pede telefone (CLAUDE.md regra 13: só no "Fazer pedido" final, nunca antes).
@@ -38,40 +44,42 @@ type Step = 'phone' | 'code';
  * recebe SMS) e, no canal de e-mail, a forma grosseira do e-mail: a mesma
  * checagem que libera o botão, sem round-trip só pra descobrir formato.
  */
-export function MoOtpSheet({
-  open,
+export function MoOtpSheet({ open, ...props }: MoOtpSheetProps) {
+  // Remonta a cada abertura: os campos voltam ao estado inicial pelos
+  // inicializadores do useState, sem effect que "ajusta" state em cima de prop.
+  if (!open) return null;
+  return <MoOtpSheetInner {...props} />;
+}
+
+function MoOtpSheetInner({
   onOpenChange,
   channel = 'sms',
   onRequestCode,
   onVerifyCode,
   onVerified,
   className,
-}: MoOtpSheetProps) {
+}: Omit<MoOtpSheetProps, 'open'>) {
   const [step, setStep] = React.useState<Step>('phone');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [cooldown, setCooldown] = React.useState(0);
 
+  // Conta 1 em 1s até zerar; recomeça toda vez que `cooldown` é setado de
+  // novo pra 60 (envio inicial e cada reenvio).
   React.useEffect(() => {
-    if (!open) return;
-    setStep('phone');
-    setPhone('');
-    setEmail('');
-    setCode('');
-    setError(null);
-    setLoading(false);
-  }, [open]);
-
-  if (!open) return null;
+    if (cooldown <= 0) return;
+    const id = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
 
   const porEmail = channel === 'email';
-  const digitos = phone.replace(/\D/g, '');
   // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — fixo (10 dígitos)
   // nunca recebe SMS. Mesma exigência de parsePhoneNumber (@molho/contracts),
   // que rejeitaria um fixo de qualquer forma.
-  const telefoneValido = digitos.length === 11;
+  const telefoneValido = isPlausiblePhoneDigits(phone);
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const contatoValido = telefoneValido && (!porEmail || emailValido);
   const codigoValido = code.replace(/\D/g, '').length === 6;
@@ -87,6 +95,7 @@ export function MoOtpSheet({
       return;
     }
     setStep('code');
+    setCooldown(REENVIO_COOLDOWN_SEGUNDOS);
   }
 
   async function enviarCodigo() {
@@ -109,16 +118,21 @@ export function MoOtpSheet({
   }
 
   async function reenviarCodigo() {
+    if (cooldown > 0 || loading) return;
     setError(null);
     setLoading(true);
     const resultado = await onRequestCode(phone, porEmail ? email.trim() : undefined);
     setLoading(false);
-    if (!resultado.ok) setError(resultado.message);
+    if (!resultado.ok) {
+      setError(resultado.message);
+      return;
+    }
+    setCooldown(REENVIO_COOLDOWN_SEGUNDOS);
   }
 
   return (
     <MoSheet
-      open={open}
+      open
       onOpenChange={onOpenChange}
       title={step === 'phone' ? (porEmail ? 'Confirma seus contatos' : 'Confirma seu telefone') : 'Digite o código'}
       description={
@@ -179,8 +193,13 @@ export function MoOtpSheet({
               <button type="button" onClick={trocarNumero} className="text-brand-strong underline-offset-2 hover:underline">
                 Trocar número
               </button>
-              <button type="button" onClick={reenviarCodigo} className="text-brand-strong underline-offset-2 hover:underline">
-                Reenviar código
+              <button
+                type="button"
+                onClick={reenviarCodigo}
+                disabled={cooldown > 0}
+                className="text-brand-strong underline-offset-2 hover:underline disabled:text-text-muted disabled:no-underline"
+              >
+                {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar código'}
               </button>
             </div>
           </>

@@ -1,4 +1,5 @@
 import type { CounterOrderInput, CounterOrderItemInput, CounterOrderResponse } from '@molho/contracts';
+import type { OrderStatus } from '@molho/contracts';
 import {
   CounterOrderProductNotFoundError,
   CounterOrderStoreNotFoundError,
@@ -48,7 +49,7 @@ export class CounterOrderService {
     if (existing) {
       return {
         orderId: existing.id,
-        status: 'completed',
+        status: existing.status as OrderStatus,
         paymentStatus: 'confirmado',
         paymentMethod: existing.paymentMethod as CounterOrderResponse['paymentMethod'],
         subtotalCents: existing.subtotalCents,
@@ -73,16 +74,16 @@ export class CounterOrderService {
 
     if (created) {
       await this.repo.createOrderItems(orderId, items);
-      // Ação sensível (dinheiro, CLAUDE.md regra 9) — grava mesmo pedido
-      // nascendo direto `completed` (staff bateu no caixa, não é transição
-      // do gestor). actorId = staff, customerId sempre null (mesma regra de
+      // Ação sensível (dinheiro, CLAUDE.md regra 9) — grava a criação do
+      // pedido de balcão já pago, mas ainda ativo na fila do gestor/cozinha.
+      // actorId = staff, customerId sempre null (mesma regra de
       // "nunca os dois" do order_status_history — quem criou foi STAFF, não
       // o cliente, mesmo o pedido pertencendo a um Customer anônimo).
       await this.orderStatusRepo.recordHistory({
         tenantId,
         orderId,
         fromStatus: null,
-        toStatus: 'completed',
+        toStatus: 'received',
         actorId: actor.id,
         actorRole: actor.role,
         customerId: null,
@@ -93,7 +94,7 @@ export class CounterOrderService {
         actorId: actor.id,
         actorRole: actor.role,
         fromStatus: null,
-        toStatus: 'completed',
+        toStatus: 'received',
         reason: 'balcão',
       });
     }
@@ -102,7 +103,7 @@ export class CounterOrderService {
 
     return {
       orderId,
-      status: 'completed',
+      status: 'received',
       paymentStatus: 'confirmado',
       paymentMethod: input.paymentMethod,
       subtotalCents,

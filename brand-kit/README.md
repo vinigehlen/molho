@@ -7,11 +7,11 @@ O símbolo é o **"o" de molho** transformado em monograma: um anel espesso e pe
 ## Estrutura do kit
 | Pasta | Conteúdo | Onde usar |
 |---|---|---|
-| `01-lockup-horizontal/` | cor · mono roxo · branco · preto (SVG + PNG) | **Aplicação principal**: site, e-mail, docs, assinatura, apresentações |
+| `01-lockup-horizontal/` | cor · mono (vermelho Brasa) · branco · preto (SVG + PNG) | **Aplicação principal**: site, e-mail, docs, assinatura, apresentações |
 | `02-lockup-vertical/` | cor · branco · preto | Formatos quadrados, embalagem, splash, QR de mesa |
-| `03-simbolo/` | roxo · branco · preto · **compacto** | Isolado. A versão *compacta* (anel mais grosso, pingo maior) é obrigatória abaixo de 24px |
-| `04-wordmark/` | ink · roxo · branco | Quando o símbolo já aparece no contexto (ex.: header do app) |
-| `05-app/` | app-icon (roxo/dark/claro), **maskable**, avatar WhatsApp · PNG 1024/512/192/180 | Lojas, PWA manifest, avatar do robô |
+| `03-simbolo/` | cor · branco · preto · **compacto** | Isolado. A versão *compacta* (anel mais grosso, pingo maior) é obrigatória abaixo de 24px |
+| `04-wordmark/` | ink · cor · branco | Quando o símbolo já aparece no contexto (ex.: header do app) |
+| `05-app/` | app-icon (cor/dark/claro), **maskable**, avatar WhatsApp · PNG 1024/512/192/180 | Lojas, PWA manifest, avatar do robô |
 | `06-favicon/` | favicon.svg, tile, branco · PNG 16/32/48 | `<link rel="icon">` |
 | `07-social/` | og-image 1200×630 (SVG + PNG) | Open Graph, WhatsApp link preview, LinkedIn |
 | `08-impressos/` | cartão de QR de mesa | Gráfica — substituir o placeholder pelo QR real do tenant |

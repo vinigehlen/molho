@@ -17,7 +17,9 @@ const ORDER: AdminOrder = {
   subtotalCents: 3200,
   deliveryFeeCents: 490,
   totalCents: 3690,
+  currentTotalCents: null,
   fulfillmentType: 'delivery',
+  destination: 'delivery',
   delivery: {
     label: 'Casa',
     street: 'Rua das Flores',
@@ -53,7 +55,7 @@ describe('whatsappMessage', () => {
   });
 
   it('pickup: "ready" é a mensagem de retirada, nunca "saiu pra entrega"', () => {
-    const pickup: AdminOrder = { ...ORDER, fulfillmentType: 'pickup', delivery: null };
+    const pickup: AdminOrder = { ...ORDER, fulfillmentType: 'pickup', destination: 'pickup', delivery: null };
 
     expect(whatsappMessage({ ...pickup, status: 'preparing' })).toContain('Confirmei seu pedido');
     expect(whatsappMessage({ ...pickup, status: 'ready' })).toContain('pronto pra retirada');

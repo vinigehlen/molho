@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { MapPin } from 'lucide-react';
+import { LayoutGrid, List, MapPin, User } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
 import {
@@ -18,7 +19,11 @@ import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
 import { fetchDeliveryMatch } from '../../lib/delivery-match-api';
 import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
+import { useCustomerToken } from '../../lib/use-customer-token';
 import { lookupPostalCode } from '../../lib/viacep';
+
+const LEGAL_TERMS_HREF = 'https://molho.live/termos';
+const LEGAL_PRIVACY_HREF = 'https://molho.live/privacidade';
 
 /**
  * Espelhado de packages/contracts/src/copy.pt-BR.ts (COPY.storefront) — só
@@ -30,6 +35,10 @@ import { lookupPostalCode } from '../../lib/viacep';
  */
 const COPY_FORA_DA_AREA = 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!';
 const COPY_PEDIDO_MINIMO = 'Faltam {valor} pra fechar o pedido mínimo da casa.';
+/** Cliente que já verificou o telefone nesta loja (pediu antes) ganha uma
+ * saudação mais quente — sem round-trip pro nome: o token de sessão em
+ * localStorage já entrega essa informação de graça. */
+const COPY_SAUDACAO_RECORRENTE = 'Que bom te ver de novo 👋 Bateu a fome?';
 
 function interpolarCopy(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (bruto, chave: string) => vars[chave] ?? bruto);
@@ -63,15 +72,26 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
   return produto.modifierGroups.every((grupo) => grupo.min === 0);
 }
 
+const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
+
 export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
+  // Sempre 'list' no SSR e no primeiro paint (senão a hidratação diverge); lê a
+  // preferência salva logo após o mount — o "flash" de 1 frame é preferível.
+  const [visualizacao, setVisualizacao] = React.useState<'list' | 'grid'>('list');
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
   const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
   const cart = useCart(slug);
+  const customerSession = useCustomerToken(slug);
+  const saudacao = customerSession.token ? COPY_SAUDACAO_RECORRENTE : greeting;
   const { address, setAddress } = useAddress(slug);
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (window.localStorage.getItem(VISUALIZACAO_STORAGE_KEY) === 'grid') setVisualizacao('grid');
+  }, []);
 
   // Roda de novo sempre que o CEP mudar (endereço novo salvo, ou já veio de
   // uma visita anterior) — sem isto, o cliente precisaria reabrir o
@@ -114,6 +134,11 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
     for (const secao of secoes) observer.observe(secao);
     return () => observer.disconnect();
   }, [categories]);
+
+  function trocarVisualizacao(valor: 'list' | 'grid') {
+    setVisualizacao(valor);
+    window.localStorage.setItem(VISUALIZACAO_STORAGE_KEY, valor);
+  }
 
   function irParaCategoria(id: string) {
     setCategoriaAtiva(id);
@@ -164,10 +189,24 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const foraDaArea = deliveryMatch?.withinZone === false;
 
   return (
-    <div className="pb-24">
-      <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
-        <h1 className="text-title-lg">{storeName}</h1>
-        <p className="text-body opacity-90">{greeting}</p>
+    <div className="mx-auto max-w-6xl pb-24">
+      <header className="flex items-start justify-between gap-2 bg-brand px-4 py-6 text-on-brand">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-title-lg">{storeName}</h1>
+          <p className="text-body opacity-90">{saudacao}</p>
+        </div>
+        {/* Sem link nenhum pro cardápio, /minha-conta (já com histórico de
+            pedidos pronto) ficava só alcançável digitando a URL na mão —
+            achado do critique de consumidor. Aparece sempre, mesmo sem
+            sessão: a própria página trata o caso "sem pedido ainda" com uma
+            mensagem, nunca um formulário de login morto. */}
+        <Link
+          href={`/${slug}/minha-conta`}
+          aria-label="Minha conta"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
+        >
+          <User className="h-5 w-5" aria-hidden="true" />
+        </Link>
       </header>
 
       <button
@@ -177,7 +216,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
       >
         <MapPin className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
         <span className="truncate">
-          {address ? `${address.label} — ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
+          {address ? `${address.label}: ${address.street}, ${address.number ?? 's/n'}` : 'Adicionar endereço de entrega'}
         </span>
       </button>
 
@@ -189,40 +228,95 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         </div>
       ) : null}
 
+      {/* Abaixo de md: chips horizontais rolando (mesmo padrão de sempre).
+          md+: coluna fixa de categorias à esquerda — mesma ideia da sidebar
+          do gestor, só que sem colapsar (cardápio não precisa disso) e sem
+          ícone (categoria não tem um natural). */}
       <MoCategoryChips
+        className="md:hidden"
         categories={categories.map((categoria) => ({ id: categoria.id, name: categoria.name }))}
         activeId={categoriaAtiva}
         onSelect={irParaCategoria}
       />
 
-      <div className="flex flex-col gap-8 p-4">
-        {categories.map((categoria) => (
-          <section
-            key={categoria.id}
-            id={categoria.id}
-            ref={(elemento) => {
-              if (elemento) secoesRef.current.set(categoria.id, elemento);
-              else secoesRef.current.delete(categoria.id);
-            }}
-            className="scroll-mt-16"
-          >
-            <h2 className="mb-3 text-title text-text">{categoria.name}</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {categoria.products.map((produto) => (
-                <MoProductCard
-                  key={produto.id}
-                  name={produto.name}
-                  description={produto.description}
-                  priceCents={produto.basePriceCents}
-                  imageUrl={produto.imageUrl}
-                  available={produto.available}
-                  onSelect={() => setProdutoSelecionado(produto)}
-                  onQuickAdd={podeAdicionarRapido(produto) ? () => adicaoRapida(produto) : undefined}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+      <div className="md:grid md:grid-cols-[220px_1fr] md:gap-8 md:px-4 md:pt-4">
+        <nav
+          className="sticky top-4 hidden h-fit flex-col gap-1 self-start md:flex"
+          aria-label="Categorias do cardápio"
+        >
+          {categories.map((categoria) => (
+            <button
+              key={categoria.id}
+              type="button"
+              onClick={() => irParaCategoria(categoria.id)}
+              aria-current={categoria.id === categoriaAtiva ? 'true' : undefined}
+              className={`rounded-[14px] px-3 py-2.5 text-left text-body-strong transition-colors ${
+                categoria.id === categoriaAtiva ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              {categoria.name}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex flex-col gap-6 p-4 md:p-0">
+          {/* Alternância lista/grade: preferência do CLIENTE, não do
+              lojista — por isso vive só no localStorage do navegador (mesma
+              ideia do `use-sidebar-state` do gestor), nunca no backend. */}
+          <div className="flex justify-end gap-1" role="group" aria-label="Visualização do cardápio">
+            <button
+              type="button"
+              onClick={() => trocarVisualizacao('list')}
+              aria-pressed={visualizacao === 'list'}
+              aria-label="Ver em lista"
+              className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                visualizacao === 'list' ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              <List className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => trocarVisualizacao('grid')}
+              aria-pressed={visualizacao === 'grid'}
+              aria-label="Ver em grade"
+              className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                visualizacao === 'grid' ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg-card hover:text-text'
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          {categories.map((categoria) => (
+            <section
+              key={categoria.id}
+              id={categoria.id}
+              ref={(elemento) => {
+                if (elemento) secoesRef.current.set(categoria.id, elemento);
+                else secoesRef.current.delete(categoria.id);
+              }}
+              className="scroll-mt-16"
+            >
+              <h2 className="mb-3 text-title text-text md:hidden">{categoria.name}</h2>
+              <div className={visualizacao === 'grid' ? 'grid grid-cols-2 gap-4' : 'flex flex-col gap-2'}>
+                {categoria.products.map((produto) => (
+                  <MoProductCard
+                    key={produto.id}
+                    variant={visualizacao}
+                    name={produto.name}
+                    description={produto.description}
+                    priceCents={produto.basePriceCents}
+                    imageUrl={produto.imageUrl}
+                    available={produto.available}
+                    onSelect={() => setProdutoSelecionado(produto)}
+                    onQuickAdd={podeAdicionarRapido(produto) ? () => adicaoRapida(produto) : undefined}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
 
       <MoProductSheet
@@ -249,6 +343,17 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         totalCents={cart.subtotalCents}
         onClick={() => router.push(`/${slug}/carrinho`)}
       />
+
+      <footer className="px-4 pb-8 pt-2 text-center text-caption text-text-muted">
+        Feito com Molho ·{' '}
+        <a href={LEGAL_TERMS_HREF} className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+          Termos
+        </a>{' '}
+        ·{' '}
+        <a href={LEGAL_PRIVACY_HREF} className="font-semibold text-brand-strong underline-offset-2 hover:underline">
+          Privacidade
+        </a>
+      </footer>
     </div>
   );
 }

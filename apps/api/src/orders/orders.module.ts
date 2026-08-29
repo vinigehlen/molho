@@ -45,9 +45,12 @@ import {
   COUNTER_ORDER_SERVICE,
   ORDER_ADJUSTMENT_SERVICE,
   ORDER_EVENT_BUS,
+  ORDER_FLAG_SERVICE,
   ORDER_STATUS_SERVICE,
   PAYMENT_CONFIRMATION_SERVICE,
 } from './orders.tokens';
+import { PrismaOrderFlagRepository } from './order-flag.repository';
+import { OrderFlagService } from './order-flag.service';
 import { PrismaPaymentConfirmationRepository } from './payment-confirmation.repository';
 import { PaymentConfirmationService } from './payment-confirmation.service';
 import { PrismaPaymentMethodModuleGate } from './payment-method-module-gate';
@@ -129,6 +132,12 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService): PaymentConfirmationService =>
         new PaymentConfirmationService(new PrismaPaymentConfirmationRepository(requestContext)),
+    },
+    {
+      provide: ORDER_FLAG_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): OrderFlagService =>
+        new OrderFlagService(new PrismaOrderFlagRepository(requestContext)),
     },
     {
       provide: CHECKOUT_REVALIDATION_SERVICE,

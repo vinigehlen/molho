@@ -15,8 +15,9 @@
  */
 
 import { z } from 'zod';
+import { orderStatusSchema } from './admin-order';
 
-export const counterUnitItemSchema = z.object({
+export const counterUnitItemSchema = z.strictObject({
   kind: z.literal('unit'),
   productId: z.uuid(),
   quantity: z.int().min(1),
@@ -25,7 +26,7 @@ export const counterUnitItemSchema = z.object({
 });
 export type CounterUnitItemInput = z.infer<typeof counterUnitItemSchema>;
 
-export const counterWeighedItemSchema = z.object({
+export const counterWeighedItemSchema = z.strictObject({
   kind: z.literal('weighed'),
   productId: z.uuid(),
   weightGrams: z.int().min(1),
@@ -41,7 +42,7 @@ export type CounterOrderItemInput = z.infer<typeof counterOrderItemSchema>;
 export const counterOrderPaymentMethodSchema = z.enum(['pix', 'cash_at_counter', 'card_at_counter']);
 export type CounterOrderPaymentMethod = z.infer<typeof counterOrderPaymentMethodSchema>;
 
-export const counterOrderSchema = z.object({
+export const counterOrderSchema = z.strictObject({
   items: z.array(counterOrderItemSchema).min(1),
   paymentMethod: counterOrderPaymentMethodSchema,
   /** Nome pra chamar no balcão — sem ele, o pedido chama só "Balcão" (customer anônimo, sem telefone/e-mail). */
@@ -50,9 +51,9 @@ export const counterOrderSchema = z.object({
 });
 export type CounterOrderInput = z.infer<typeof counterOrderSchema>;
 
-export const counterOrderResponseSchema = z.object({
+export const counterOrderResponseSchema = z.strictObject({
   orderId: z.uuid(),
-  status: z.literal('completed'),
+  status: orderStatusSchema,
   paymentStatus: z.literal('confirmado'),
   paymentMethod: counterOrderPaymentMethodSchema,
   subtotalCents: z.int(),

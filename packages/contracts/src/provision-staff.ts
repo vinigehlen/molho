@@ -31,7 +31,7 @@ export const provisionStaffSchema = z
 
 export type ProvisionStaffInput = z.infer<typeof provisionStaffSchema>;
 
-export const provisionStaffResponseSchema = z.object({
+export const provisionStaffResponseSchema = z.strictObject({
   userId: z.uuid(),
   role: z.enum(ROLES),
   scopeType: provisionStaffScopeTypeSchema,

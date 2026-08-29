@@ -40,20 +40,23 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
-/** Statuses ATIVOS que o gestor mostra no board (não-terminais). Terminais (completed/cancelados/expired/delivery_failed) saem do board. */
-export const ACTIVE_ORDER_STATUSES = ['received', 'preparing', 'ready', 'in_transit'] as const;
+/** Statuses que o gestor mostra no board. Terminais infelizes (cancelados/expired/delivery_failed) saem do board. */
+export const ACTIVE_ORDER_STATUSES = ['received', 'preparing', 'ready', 'in_transit', 'completed'] as const;
 
-const adminOrderItemSchema = z.object({
+export const orderDestinationSchema = z.enum(['delivery', 'pickup', 'balcao']);
+export type OrderDestination = z.infer<typeof orderDestinationSchema>;
+
+const adminOrderItemSchema = z.strictObject({
   name: z.string(),
   quantity: z.int().positive(),
   lineTotalCents: centsSchema,
   /** Pra comanda de cozinha (fallback universal, docs/02 §6) — sem preço, o gestor não mostra o delta. */
-  modifiers: z.array(z.object({ name: z.string() })),
+  modifiers: z.array(z.strictObject({ name: z.string() })),
   notes: z.string().nullable(),
 });
 
 /** Endereço de entrega — snapshot congelado no pedido (nunca JOIN vivo, CLAUDE.md "complexidade deliberada"). */
-const adminOrderDeliverySchema = z.object({
+const adminOrderDeliverySchema = z.strictObject({
   label: z.string(),
   street: z.string(),
   number: z.string().nullable(),
@@ -81,7 +84,7 @@ const adminOrderDeliverySchema = z.object({
  * demanda, pra PII não trafegar no payload do board inteiro).
  * Valor/horário/nome lado a lado alimentam a reconciliação manual do PIX.
  */
-export const adminOrderSchema = z.object({
+export const adminOrderSchema = z.strictObject({
   id: z.uuid(),
   status: orderStatusSchema,
   version: z.int().nonnegative(),
@@ -111,9 +114,17 @@ export const adminOrderSchema = z.object({
    */
   currentTotalCents: centsSchema.nullable(),
   fulfillmentType: fulfillmentTypeSchema,
+  destination: orderDestinationSchema,
   /** `null` quando `fulfillmentType === 'pickup'` — retira no endereço da PRÓPRIA loja, que o lojista já sabe de cor. */
   delivery: adminOrderDeliverySchema.nullable(),
   items: z.array(adminOrderItemSchema),
+  /**
+   * Sinalização manual de pendência (Fase 3, plano do gestor) — `null` =
+   * não sinalizado. Não é status nem bloqueia transição, é só destaque/filtro
+   * visual no board (staff marcando "esse pedido precisa de atenção" na mão).
+   */
+  flaggedAt: z.iso.datetime().nullable(),
+  flaggedReason: z.string().nullable(),
 });
 export type AdminOrder = z.infer<typeof adminOrderSchema>;
 export type AdminOrderItem = z.infer<typeof adminOrderItemSchema>;

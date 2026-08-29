@@ -42,6 +42,7 @@ const CATEGORIAS: StorefrontCategory[] = [
         description: null,
         basePriceCents: 2800,
         imageUrl: null,
+        images: [],
         available: true,
         modifierGroups: [],
       },

@@ -66,3 +66,12 @@ export const MASKS: Record<MaskKind, (value: string) => string> = {
 export function unmask(value: string): string {
   return digits(value);
 }
+
+/**
+ * Validação grosseira pra liberar botão (11 dígitos = DDD + nono dígito +
+ * número, sempre celular). NÃO é validação de domínio — é só gate de UI;
+ * o telefone de verdade é validado no backend (`PhoneNumber`, contracts).
+ */
+export function isPlausiblePhoneDigits(value: string): boolean {
+  return digits(value).length === 11;
+}

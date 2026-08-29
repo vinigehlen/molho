@@ -4,6 +4,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -153,6 +154,11 @@ export class CheckoutRequestDto {
   @IsString()
   @IsNotEmpty()
   couponCode?: string;
+
+  /** Espelha checkoutRequestSchema.scheduledFor (Épico conversão, C3) — opcional, ISO 8601. */
+  @IsOptional()
+  @IsISO8601()
+  scheduledFor?: string;
 }
 
 /**
@@ -164,7 +170,7 @@ export class CheckoutRequestDto {
  * branch certo — é isso que faz o `if` valer como type guard.
  */
 export function toCheckoutRequest(dto: CheckoutRequestDto): CheckoutRequest {
-  const { items, fulfillmentType, address, couponCode } = dto;
+  const { items, fulfillmentType, address, couponCode, scheduledFor } = dto;
   // Espelha checkoutRequestSchema.refine (@molho/contracts/checkout.ts) — lá é
   // só documentação de forma (nunca roda em runtime na API, o `class-validator`
   // é quem valida de verdade aqui). `delivery` sem endereço, ou `pickup` COM
@@ -178,12 +184,13 @@ export function toCheckoutRequest(dto: CheckoutRequestDto): CheckoutRequest {
       fulfillmentType,
       address,
       couponCode,
+      scheduledFor,
       paymentMethod: 'cash_on_delivery',
       changeForCents: dto.changeForCents ?? null,
     };
   }
   if (dto.paymentMethod === 'pix') {
-    return { items, fulfillmentType, address, couponCode, paymentMethod: 'pix' };
+    return { items, fulfillmentType, address, couponCode, scheduledFor, paymentMethod: 'pix' };
   }
-  return { items, fulfillmentType, address, couponCode, paymentMethod: 'card_on_delivery' };
+  return { items, fulfillmentType, address, couponCode, scheduledFor, paymentMethod: 'card_on_delivery' };
 }

@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { slugifyStoreName } from '@molho/contracts';
 import { activateStaffSession } from '../../lib/staff-auth';
-import { requestSignupOtp, verifySignup } from '../../lib/signup-api';
+import { checkSlugAvailability, requestSignupOtp, verifySignup, type SlugAvailability } from '../../lib/signup-api';
+
+const SLUG_CHECK_DEBOUNCE_MS = 400;
 
 export default function SignupPage() {
   const router = useRouter();
@@ -14,6 +17,31 @@ export default function SignupPage() {
   const [restaurantName, setRestaurantName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slugAvailability, setSlugAvailability] = useState<SlugAvailability | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+
+  const slug = slugifyStoreName(restaurantName);
+  // Sem isso, cada tecla digitada dispararia uma checagem de disponibilidade
+  // contra o backend — 400ms de silêncio depois da última tecla é o que
+  // separa "usuário ainda digitando" de "usuário parou, checa agora".
+  useEffect(() => {
+    if (!slug) {
+      setSlugAvailability(null);
+      setCheckingSlug(false);
+      return;
+    }
+    setCheckingSlug(true);
+    const timer = setTimeout(() => {
+      checkSlugAvailability(slug)
+        .then(setSlugAvailability)
+        .finally(() => setCheckingSlug(false));
+    }, SLUG_CHECK_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [slug]);
+  const emailErrorId = 'signup-email-error';
+  const detailsErrorId = 'signup-details-error';
+  const emailHasError = step === 'email' && error !== null;
+  const detailsHasError = step === 'details' && error !== null;
 
   async function sendCode() {
     if (!email.trim()) return;
@@ -30,7 +58,10 @@ export default function SignupPage() {
   }
 
   async function createStore() {
-    if (code.length !== 6 || !restaurantName.trim() || !ownerName.trim()) return;
+    // `!slug` (não `!restaurantName.trim()`): um nome só de símbolos/emoji
+    // passa no trim() mas normaliza pra string vazia — sem isso o backend
+    // recebia um `restaurantName` "válido" que não vira URL nenhuma.
+    if (code.length !== 6 || !slug || !ownerName.trim()) return;
     setBusy(true);
     setError(null);
     try {
@@ -46,7 +77,7 @@ export default function SignupPage() {
         slug: result.tenant.slug,
         stores: [result.store],
       });
-      router.replace('/gestor');
+      router.replace('/gestor/configuracao');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível criar sua loja.');
     } finally {
@@ -68,14 +99,16 @@ export default function SignupPage() {
               id="email"
               type="email"
               autoComplete="email"
+              aria-invalid={emailHasError}
+              aria-describedby={emailHasError ? emailErrorId : undefined}
               className="w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-text outline-none focus:border-brand"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               disabled={busy}
               required
             />
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || !email.trim()}>
-              {busy ? 'Enviando...' : 'Enviar código'}
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || !email.trim()}>
+              {busy ? 'Enviando…' : 'Enviar código'}
             </button>
           </form>
         )}
@@ -90,6 +123,8 @@ export default function SignupPage() {
                 autoComplete="one-time-code"
                 pattern="[0-9]{6}"
                 maxLength={6}
+                aria-invalid={detailsHasError}
+                aria-describedby={detailsHasError ? detailsErrorId : undefined}
                 className="mt-2 w-full rounded-[14px] border border-border bg-bg px-4 py-3 text-center text-2xl tracking-[0.35em] text-text outline-none focus:border-brand"
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -117,9 +152,10 @@ export default function SignupPage() {
                 disabled={busy}
                 required
               />
+              <SlugPreview slug={slug} checking={checkingSlug} availability={slugAvailability} />
             </div>
-            <button className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6 || !ownerName.trim() || !restaurantName.trim()}>
-              {busy ? 'Criando...' : 'Criar minha loja'}
+            <button type="submit" className="w-full rounded-[14px] bg-brand px-4 py-3 font-semibold text-on-brand disabled:opacity-50" disabled={busy || code.length !== 6 || !ownerName.trim() || !slug}>
+              {busy ? 'Criando…' : 'Criar minha loja'}
             </button>
             <button type="button" className="w-full text-sm font-medium text-brand-strong" onClick={() => { setStep('email'); setCode(''); setError(null); }}>
               Usar outro e-mail
@@ -127,8 +163,44 @@ export default function SignupPage() {
           </form>
         )}
 
-        {error && <p className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical" role="alert">{error}</p>}
+        {error && (
+          <p
+            id={step === 'email' ? emailErrorId : detailsErrorId}
+            className="mt-4 rounded-[14px] bg-brand-faint p-3 text-sm text-critical"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
       </section>
     </main>
+  );
+}
+
+/**
+ * Preview de `molho.live/<slug>` embaixo do nome (Bloco 2). Só reporta
+ * "indisponível" depois que a checagem de verdade voltar do backend — nunca
+ * assume ocupado enquanto ainda está checando, senão pisca âmbar a cada
+ * tecla antes do debounce resolver.
+ */
+function SlugPreview({ slug, checking, availability }: { slug: string; checking: boolean; availability: SlugAvailability | null }) {
+  if (!slug) return <p className="mt-2 text-xs text-text-muted">molho.live/<span className="italic">digite um nome</span></p>;
+
+  if (checking || !availability) {
+    return <p className="mt-2 text-xs text-text-muted">molho.live/{slug} · checando disponibilidade…</p>;
+  }
+
+  if (availability.available) {
+    return (
+      <p className="mt-2 text-xs font-medium text-positive">
+        molho.live/{slug} · disponível
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-2 text-xs font-medium text-brand-strong">
+      molho.live/{slug} · indisponível{availability.suggestion ? ` — sugerimos ${availability.suggestion}` : ''}
+    </p>
   );
 }

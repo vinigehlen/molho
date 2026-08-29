@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { fetchPrintQueueStatus, PrintingUnavailableError, type PrintQueueStatus } from '../../../lib/printing-api';
@@ -43,17 +42,12 @@ export default function ImpressaoPage() {
   return (
     <main className="min-h-screen bg-bg p-4">
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-brand-strong">Épico 10</p>
-            <h1 className="text-2xl font-semibold text-text">Impressão da cozinha</h1>
-            <p className="mt-1 text-sm text-text-muted">
-              Configure o computador da loja para puxar a fila de comandas e mandar para a impressora local.
-            </p>
-          </div>
-          <Link className="rounded-full border border-border px-3 py-1 text-sm font-medium text-text" href="/gestor">
-            Voltar aos pedidos
-          </Link>
+        <div>
+          <p className="text-sm font-medium text-brand-strong">Impressão</p>
+          <h1 className="text-2xl font-semibold text-text">Impressão da cozinha</h1>
+          <p className="mt-1 text-sm text-text-muted">
+            Configure o computador da loja para puxar a fila de comandas e mandar para a impressora local.
+          </p>
         </div>
 
         <section className="rounded-[20px] border border-border bg-bg-card p-4">
@@ -156,9 +150,9 @@ function QueueStatusCard({
           </p>
         </div>
         {failed > 0 || stalePrinting > 0 ? (
-          <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-white">atenção</span>
+          <span className="rounded-full bg-caution px-3 py-1 text-xs font-medium text-text">atenção</span>
         ) : (
-          <span className="rounded-full bg-positive px-3 py-1 text-xs font-medium text-white">ok</span>
+          <span className="rounded-full bg-positive px-3 py-1 text-xs font-medium text-text">ok</span>
         )}
       </div>
       <dl className="mt-4 grid gap-3 sm:grid-cols-4">

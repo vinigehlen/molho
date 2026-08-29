@@ -24,7 +24,7 @@ export interface QueuedIntent {
 const LEGAL_NEXT: Record<string, readonly AdminOrder['status'][]> = {
   received: ['preparing', 'canceled'],
   preparing: ['received', 'ready', 'canceled'],
-  ready: ['preparing', 'in_transit'],
+  ready: ['preparing', 'in_transit', 'completed'],
   in_transit: ['ready', 'completed', 'delivery_failed'],
 };
 

@@ -6,6 +6,14 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
+    // App Next.js: nunca emite .d.ts (noEmit acima). "declaration" do
+    // tsconfig.base.json é pras LIBS de packages/* — herdado aqui, ele
+    // ainda liga a checagem de "tipo inferido portável" (TS2742) mesmo sem
+    // emitir nada, e ela quebra em componente sem tipo de retorno explícito
+    // quando o pnpm resolve @types/react num path diferente do local (achado
+    // tentando publicar o preview: compilava local, quebrava no builder
+    // remoto da Vercel). Desliga aqui — nenhum app tem consumidor de .d.ts.
+    "declaration": false,
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./*"] },

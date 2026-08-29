@@ -4,7 +4,7 @@ import { orderStatusSchema } from './admin-order';
 
 const nullableTrimmedText = (max: number) => z.string().trim().max(max).nullable();
 
-export const customerProfileSchema = z.object({
+export const customerProfileSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   phoneMasked: z.string().nullable(),
@@ -14,13 +14,13 @@ export const customerProfileSchema = z.object({
 });
 export type CustomerProfile = z.infer<typeof customerProfileSchema>;
 
-export const updateCustomerProfileSchema = z.object({
+export const updateCustomerProfileSchema = z.strictObject({
   name: z.string().trim().min(2).max(80),
   version: z.int().nonnegative(),
 });
 export type UpdateCustomerProfileInput = z.infer<typeof updateCustomerProfileSchema>;
 
-export const customerProfileAddressFieldsSchema = z.object({
+export const customerProfileAddressFieldsSchema = z.strictObject({
   label: z.string().trim().min(1).max(40),
   street: z.string().trim().min(1).max(160),
   number: nullableTrimmedText(20),
@@ -47,7 +47,7 @@ export const updateCustomerProfileAddressSchema = customerProfileAddressFieldsSc
 });
 export type UpdateCustomerProfileAddressInput = z.infer<typeof updateCustomerProfileAddressSchema>;
 
-export const customerOrderSummarySchema = z.object({
+export const customerOrderSummarySchema = z.strictObject({
   id: z.uuid(),
   status: orderStatusSchema,
   paymentStatus: paymentStatusSchema,
@@ -55,7 +55,7 @@ export const customerOrderSummarySchema = z.object({
   totalCents: z.int().nonnegative(),
   createdAt: z.iso.datetime(),
   items: z.array(
-    z.object({
+    z.strictObject({
       name: z.string(),
       quantity: z.int().positive(),
     }),

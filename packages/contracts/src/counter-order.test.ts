@@ -20,13 +20,7 @@ describe('counterOrderSchema', () => {
       items: [{ ...UNIT_ITEM, lineTotalCents: 999999 }],
       paymentMethod: 'pix',
     });
-    // .strict() não está setado, mas o discriminatedUnion casa pela shape de 'unit' — lineTotalCents
-    // extra é ignorado pelo zod (não vaza pro tipo inferido, é isso que importa: CounterUnitItemInput não tem o campo).
-    expect(result.success).toBe(true);
-    if (result.success) {
-      const item = result.data.items[0];
-      expect(item && 'lineTotalCents' in item).toBe(false);
-    }
+    expect(result.success).toBe(false);
   });
 
   it('aceita item weighed com lineTotalCents', () => {

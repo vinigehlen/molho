@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
   CreateDeliveryZoneInput,
@@ -312,17 +311,12 @@ export default function EntregaPage() {
 
 function PageHeader() {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <p className="text-sm font-medium text-brand-strong">Entrega</p>
-        <h1 className="text-2xl font-semibold text-text">Zonas e horários</h1>
-        <p className="mt-1 text-sm text-text-muted">
-          Configure cidades atendidas, taxa, prazo e a grade semanal da loja.
-        </p>
-      </div>
-      <Link className="rounded-full border border-border px-3 py-1 text-sm font-medium text-text" href="/gestor">
-        Voltar aos pedidos
-      </Link>
+    <div>
+      <p className="text-sm font-medium text-brand-strong">Entrega</p>
+      <h1 className="text-2xl font-semibold text-text">Zonas e horários</h1>
+      <p className="mt-1 text-sm text-text-muted">
+        Configure cidades atendidas, taxa, prazo e a grade semanal da loja.
+      </p>
     </div>
   );
 }
@@ -452,6 +446,7 @@ function ZonesPanel({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Nome">
           <input
+            aria-label="Nome da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -461,6 +456,7 @@ function ZonesPanel({
         </Field>
         <Field label="Cidade">
           <input
+            aria-label="Cidade da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm text-text"
             value={form.city}
             onChange={(e) => setForm({ ...form, city: e.target.value })}
@@ -470,6 +466,7 @@ function ZonesPanel({
         </Field>
         <Field label="UF">
           <input
+            aria-label="UF da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm uppercase text-text"
             value={form.state}
             onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -479,6 +476,7 @@ function ZonesPanel({
         </Field>
         <Field label="Taxa">
           <input
+            aria-label="Taxa de entrega da zona"
             className="w-full rounded-[14px] border border-border bg-bg px-3 py-2 text-sm tabular-nums text-text"
             value={form.feeReais}
             onChange={(e) => setForm({ ...form, feeReais: e.target.value })}
@@ -590,7 +588,7 @@ function ZonesPanel({
                 </p>
               </div>
               <span className="rounded-full bg-brand-faint px-3 py-1 text-xs font-medium text-brand-strong">
-                zona por raio — editar via suporte
+                zona por raio, editar via suporte
               </span>
             </div>
           </div>

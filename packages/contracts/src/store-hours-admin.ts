@@ -29,17 +29,17 @@ export const dayOfWeekSchema = z.enum([
  * "fecha no dia seguinte" (ex. sexta 22h–sábado 02h: dayOfWeek=friday,
  * opens=1320, closes=120).
  */
-export const shiftSchema = z.object({
+export const shiftSchema = z.strictObject({
   dayOfWeek: dayOfWeekSchema,
   opensAtMinutes: z.int().min(0).max(1439),
   closesAtMinutes: z.int().min(0).max(1439),
 });
 
-export const putStoreHoursSchema = z.object({
+export const putStoreHoursSchema = z.strictObject({
   shifts: z.array(shiftSchema),
 });
 
-export const storeHoursResponseSchema = z.object({
+export const storeHoursResponseSchema = z.strictObject({
   shifts: z.array(shiftSchema),
 });
 

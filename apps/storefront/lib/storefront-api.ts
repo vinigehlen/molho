@@ -20,7 +20,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
  * Devolve `null` pra QUALQUER resposta não-200 (loja inexistente, módulo
  * `channel.storefront` desligado, erro de rede) ou payload que não bate com
  * o contrato — nunca lança. Quem chama decide o que fazer: `notFound()` na
- * página, ou cair no tema padrão Roxo no layout raiz. Uma falha aqui não
+ * página, ou cair no tema padrão Brasa no layout raiz. Uma falha aqui não
  * pode derrubar o app inteiro numa página que só precisa do tema pra pintar
  * o `<html>`.
  */

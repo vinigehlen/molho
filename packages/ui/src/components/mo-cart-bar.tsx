@@ -66,7 +66,7 @@ export function MoCartBar({ itemCount, totalCents, onClick, className }: MoCartB
       <button
         type="button"
         onClick={onClick}
-        aria-label={`Ver carrinho — ${itens}, total ${formatCents(totalCents)}`}
+        aria-label={`Ver carrinho: ${itens}, total ${formatCents(totalCents)}`}
         className={cn(
           'flex w-full items-center gap-3 rounded-pill bg-brand px-3 py-3 text-on-brand shadow-3',
           'transition duration-base ease-out hover:brightness-95 active:scale-[.98]',

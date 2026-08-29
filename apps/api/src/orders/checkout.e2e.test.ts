@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import { MESSAGING_PROVIDER } from '../messaging/messaging.module';
 import type { MockMessagingProvider } from '../messaging/mock-messaging.provider';
@@ -117,6 +118,10 @@ function checkoutBody(
       expectedDeliveryFeeCents: overrides.expectedDeliveryFeeCents ?? 800,
     },
     paymentMethod: overrides.paymentMethod ?? 'pix',
+    legalAcceptance: {
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+    },
     ...(overrides.paymentMethod === 'cash_on_delivery' ? { changeForCents: overrides.changeForCents ?? null } : {}),
   };
 }
@@ -175,6 +180,12 @@ beforeAll(async () => {
   const group = await migratorPrisma.modifierGroup.create({
     data: { tenantId, productId, name: 'Adicionais', min: 0, max: 2 },
   });
+  // Vínculo produto↔grupo na tabela de junção (fase 2 do combo): a revalidação
+  // do checkout monta a allowlist de preço/disponibilidade dos modificadores
+  // SEMPRE por aqui, nunca por `ModifierGroup.productId`.
+  await migratorPrisma.productModifierGroup.create({
+    data: { tenantId, productId, modifierGroupId: group.id },
+  });
   const modifier = await migratorPrisma.modifier.create({
     data: { tenantId, groupId: group.id, name: 'Bacon', priceDeltaCents: 400 },
   });
@@ -225,6 +236,7 @@ afterAll(async () => {
     await migratorPrisma.$executeRaw`DELETE FROM delivery_zones WHERE tenant_id = ${tenantId}::uuid`;
     await migratorPrisma.storeHours.deleteMany({ where: { tenantId } });
     await migratorPrisma.modifier.deleteMany({ where: { tenantId } });
+    await migratorPrisma.productModifierGroup.deleteMany({ where: { tenantId } });
     await migratorPrisma.modifierGroup.deleteMany({ where: { tenantId } });
     await migratorPrisma.product.deleteMany({ where: { tenantId } });
     await migratorPrisma.category.deleteMany({ where: { tenantId } });

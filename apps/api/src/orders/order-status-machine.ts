@@ -31,7 +31,7 @@ const LEGAL_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> =
   pending_payment: ['received', 'expired'],
   received: ['preparing', 'canceled', 'auto_canceled'],
   preparing: ['received', 'ready', 'canceled'],
-  ready: ['preparing', 'in_transit'],
+  ready: ['preparing', 'in_transit', 'completed'],
   in_transit: ['ready', 'completed', 'delivery_failed'],
   completed: [],
   expired: [],

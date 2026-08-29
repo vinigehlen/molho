@@ -118,7 +118,7 @@ describe('MoCheckoutReviewSheet', () => {
         {...paymentProps()}
       />,
     );
-    expect(screen.getByText('A loja está fechada agora — não dá pra confirmar o pedido.')).toBeInTheDocument();
+    expect(screen.getByText('A loja está fechada agora, não dá pra confirmar o pedido.')).toBeInTheDocument();
   });
 
   it('abaixo do mínimo: mostra quanto falta', () => {
@@ -159,7 +159,7 @@ describe('MoCheckoutReviewSheet', () => {
         {...paymentProps()}
       />,
     );
-    expect(screen.getByText('Esgotou — removido do pedido')).toBeInTheDocument();
+    expect(screen.getByText('Esgotou, removido do pedido')).toBeInTheDocument();
   });
 
   it('preço mudou: mostra o aviso no item', () => {
@@ -197,6 +197,31 @@ describe('MoCheckoutReviewSheet', () => {
 
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it('aceite legal desmarcado: mostra links e bloqueia confirmação até marcar', async () => {
+    const user = userEvent.setup();
+    const onLegalAcceptedChange = vi.fn();
+    render(
+      <MoCheckoutReviewSheet
+        open
+        onOpenChange={() => {}}
+        review={baseReview()}
+        onConfirm={() => {}}
+        {...paymentProps()}
+        legalAccepted={false}
+        onLegalAcceptedChange={onLegalAcceptedChange}
+        termsHref="https://molho.live/termos"
+        privacyHref="https://molho.live/privacidade"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Confirmar pedido' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'termos de uso' })).toHaveAttribute('href', 'https://molho.live/termos');
+    expect(screen.getByRole('link', { name: 'política de privacidade' })).toHaveAttribute('href', 'https://molho.live/privacidade');
+
+    await user.click(screen.getByRole('checkbox', { name: /Li e aceito/ }));
+    expect(onLegalAcceptedChange).toHaveBeenCalledWith(true);
   });
 
   describe('seletor de forma de pagamento (Épico 8)', () => {

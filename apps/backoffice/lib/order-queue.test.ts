@@ -18,7 +18,7 @@ function order(status: AdminOrder['status'], over: Partial<AdminOrder> = {}): Ad
   return {
     id: 'o1', status, version: 1, createdAt: '2026-07-27T18:00:00.000Z', customerName: 'X', customerVerified: true,
     paymentMethod: 'pix', paymentStatus: 'confirmado', changeForCents: null,
-    subtotalCents: 100, deliveryFeeCents: 0, totalCents: 100, fulfillmentType: 'delivery',
+    subtotalCents: 100, deliveryFeeCents: 0, totalCents: 100, currentTotalCents: null, fulfillmentType: 'delivery', destination: 'delivery',
     delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
     items: [], ...over, fulfillmentDeadlineAt: over.fulfillmentDeadlineAt ?? null,
   };

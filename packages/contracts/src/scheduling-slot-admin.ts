@@ -28,11 +28,11 @@ export const schedulingSlotSchema = z
     message: 'startsAtMinutes precisa ser antes de endsAtMinutes.',
   });
 
-export const putSchedulingSlotsSchema = z.object({
+export const putSchedulingSlotsSchema = z.strictObject({
   slots: z.array(schedulingSlotSchema),
 });
 
-export const schedulingSlotsResponseSchema = z.object({
+export const schedulingSlotsResponseSchema = z.strictObject({
   slots: z.array(schedulingSlotSchema),
 });
 

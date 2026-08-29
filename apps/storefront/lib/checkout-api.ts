@@ -146,6 +146,11 @@ export type CreateOrderResult =
  */
 export type CheckoutIdentity = { accessToken: string } | { guest: { name: string; phone: string } };
 
+const LEGAL_ACCEPTANCE = {
+  termsVersion: '2026-08-26',
+  privacyVersion: '2026-08-26',
+} as const;
+
 export async function createOrder(
   slug: string,
   body: CheckoutRequestBody,
@@ -160,7 +165,11 @@ export async function createOrder(
         'Content-Type': 'application/json',
         ...(autenticado ? { Authorization: `Bearer ${identity.accessToken}` } : {}),
       },
-      body: JSON.stringify(autenticado ? body : { ...body, customer: identity.guest }),
+      body: JSON.stringify({
+        ...body,
+        legalAcceptance: LEGAL_ACCEPTANCE,
+        ...(autenticado ? {} : { customer: identity.guest }),
+      }),
     });
   } catch {
     return { status: 'error' };

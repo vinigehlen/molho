@@ -29,7 +29,7 @@ export interface AdminOrderRow {
   deliveryPostalCode: string | null;
   deliveryReferencePoint: string | null;
   deliveryPostalCodeVerified: boolean;
-  customer: { name: string };
+  customer: { name: string; phoneCiphertext: Uint8Array | Buffer | null };
   items: {
     name: string;
     quantity: number;
@@ -37,6 +37,8 @@ export interface AdminOrderRow {
     notes: string | null;
     modifiers: { name: string }[];
   }[];
+  flaggedAt: Date | null;
+  flaggedReason: string | null;
 }
 
 /** Row do Prisma → shape do contrato. Puro: achata o endereço-snapshot, puxa o nome do JOIN, Date → ISO. */
@@ -57,6 +59,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
     totalCents: row.totalCents,
     currentTotalCents: row.currentTotalCents,
     fulfillmentType: row.fulfillmentType,
+    destination: orderDestination(row),
     delivery:
       row.fulfillmentType === 'pickup' || row.deliveryLabel === null
         ? null
@@ -79,6 +82,8 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
       notes: i.notes,
       modifiers: i.modifiers.map((m) => ({ name: m.name })),
     })),
+    flaggedAt: row.flaggedAt?.toISOString() ?? null,
+    flaggedReason: row.flaggedReason,
   };
 }
 
@@ -107,7 +112,7 @@ const SELECT = {
   deliveryPostalCode: true,
   deliveryReferencePoint: true,
   deliveryPostalCodeVerified: true,
-  customer: { select: { name: true } },
+  customer: { select: { name: true, phoneCiphertext: true } },
   items: {
     select: {
       name: true,
@@ -117,7 +122,17 @@ const SELECT = {
       modifiers: { select: { name: true } },
     },
   },
+  flaggedAt: true,
+  flaggedReason: true,
 } as const;
+
+function orderDestination(row: AdminOrderRow): AdminOrder['destination'] {
+  if (row.fulfillmentType === 'delivery') return 'delivery';
+  if (row.paymentMethod === 'cash_at_counter' || row.paymentMethod === 'card_at_counter' || !row.customer.phoneCiphertext) {
+    return 'balcao';
+  }
+  return 'pickup';
+}
 
 export interface AdminOrderRepository {
   /** Pedidos ATIVOS (não-terminais) do tenant, mais antigos primeiro (FIFO da cozinha). RLS filtra o tenant. */

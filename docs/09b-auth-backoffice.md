@@ -22,6 +22,17 @@ Status: implementado na branch `codex/epico-9b-login-staff`, aguardando revisão
 - Logout remoto falhou: a sessão local não é descartada, para não parecer que o tablet saiu enquanto cookies válidos permanecem na API.
 - A listagem de tenants parte exclusivamente dos scopes do JWT verificado e usa IDs explícitos no `WHERE`. Não lê `user_roles` em massa.
 
+## Recuperação de acesso
+
+Não existe reset de senha: o gestor usa OTP. Se um staff perdeu acesso ao e-mail/celular do OTP, a recuperação no MVP é operacional e auditada:
+
+1. Outro owner do mesmo tenant pede a troca do contato ou recria o vínculo do staff.
+2. Se não houver owner com acesso, suporte Molho valida a titularidade por dados comerciais/contratuais antes de alterar o destino do OTP.
+3. A troca nunca emite sessão sem OTP e nunca reaproveita o contato antigo como prova única.
+4. Toda alteração feita por suporte grava auditoria com ator, motivo, antes/depois e timestamp.
+
+Detalhe completo do fluxo MVP: `docs/02-definicoes-v1.md` §5.6.
+
 ## Configuração de staging conferida em 2026-08-14
 
 - Fly possui `OTP_CHANNEL_STAFF`, `RESEND_API_KEY`, `MOLHO_EMAIL_FROM`, `MOLHO_EMAIL_PEPPER`, JWT, Redis e CORS.
