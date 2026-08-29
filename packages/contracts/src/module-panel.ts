@@ -36,7 +36,7 @@ export const setEntitlementSchema = z
 export type SetEntitlementInput = z.infer<typeof setEntitlementSchema>;
 
 /** Um módulo NÃO-core no painel — estado das 3 camadas (§5-B.1) + metadados do registry. */
-export const moduleStateSchema = z.object({
+export const moduleStateSchema = z.strictObject({
   moduleKey: z.enum(MODULE_KEYS as [string, ...string[]]),
   entitled: z.boolean(),
   enabled: z.boolean(),
@@ -52,5 +52,5 @@ export const moduleStateSchema = z.object({
 });
 export type ModuleStateResponse = z.infer<typeof moduleStateSchema>;
 
-export const moduleStatesResponseSchema = z.object({ modules: z.array(moduleStateSchema) });
+export const moduleStatesResponseSchema = z.strictObject({ modules: z.array(moduleStateSchema) });
 export type ModuleStatesResponse = z.infer<typeof moduleStatesResponseSchema>;

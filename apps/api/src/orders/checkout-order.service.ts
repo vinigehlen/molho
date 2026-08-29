@@ -1,7 +1,14 @@
-import { buildPixBrCode, parsePhoneNumber, PICKUP_ETA_MAX_MINUTES } from '@molho/contracts';
+import {
+  buildPixBrCode,
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+  parsePhoneNumber,
+  PICKUP_ETA_MAX_MINUTES,
+} from '@molho/contracts';
 import type {
   CheckoutOrderPix,
   CheckoutOrderResponse,
+  CheckoutLegalAcceptance,
   CheckoutRequest,
   GuestCustomer,
   RevalidatedCheckout,
@@ -25,6 +32,11 @@ import type { PaymentMethodModuleGate } from './payment-method-module-gate';
 function isPixKeyType(value: string | null): value is CheckoutOrderPix['keyType'] {
   return value === 'cpf' || value === 'cnpj' || value === 'email' || value === 'phone' || value === 'random';
 }
+
+const DEFAULT_LEGAL_ACCEPTANCE: CheckoutLegalAcceptance = {
+  termsVersion: CURRENT_TERMS_VERSION,
+  privacyVersion: CURRENT_PRIVACY_VERSION,
+};
 
 /**
  * Monta o BR Code da loja pra ESTE pedido (Épico 8) — `txid` é o próprio
@@ -125,6 +137,7 @@ export class CheckoutOrderService {
     /** `null` ⟺ `request.fulfillmentType === 'pickup'` (invariante do controller). */
     resolved: ResolvedAddress | null,
     guest: GuestCustomer | null = null,
+    legalAcceptance: CheckoutLegalAcceptance = DEFAULT_LEGAL_ACCEPTANCE,
   ): Promise<CreateOrderResult> {
     const { customerId, verified } = await this.resolveCustomer(tenantId, authenticatedCustomerId, guest);
 
@@ -228,6 +241,7 @@ export class CheckoutOrderService {
       couponCodeSnapshot,
       discountCents,
       scheduledFor,
+      legalAcceptance,
     });
     await this.repo.createOrderItems(orderId, revalidation.items);
     await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });

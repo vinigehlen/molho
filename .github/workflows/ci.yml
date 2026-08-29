@@ -21,6 +21,8 @@ jobs:
         with: { node-version: 22, cache: pnpm }
 
       - run: pnpm install --frozen-lockfile
+      - name: Auditoria de dependências
+        run: pnpm audit --audit-level high --ignore-unfixable
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -12,7 +12,7 @@ import type { RequestWithGeocode } from '../geo/geocode.middleware';
 import { resolveAddress } from '../geo/resolve-address';
 import { StorefrontRateLimitGuard } from '../storefront/storefront-rate-limit.guard';
 import { CheckoutRequestDto, toCheckoutRequest } from './dto/checkout-request.dto';
-import { CheckoutOrderRequestDto, toGuestCustomer } from './dto/checkout-order-request.dto';
+import { CheckoutOrderRequestDto, toGuestCustomer, toLegalAcceptance } from './dto/checkout-order-request.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import { CHECKOUT_ORDER_SERVICE, CHECKOUT_REVALIDATION_SERVICE } from './orders.tokens';
 import { PRINTING_SERVICE } from '../printing/printing.tokens';
@@ -94,6 +94,7 @@ export class CheckoutController {
       request,
       resolved,
       toGuestCustomer(dto),
+      toLegalAcceptance(dto),
     );
     if (!result.ok) {
       res.status(HttpStatus.CONFLICT);

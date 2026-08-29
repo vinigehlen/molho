@@ -24,14 +24,14 @@ import { paymentMethodSchema } from './checkout';
 /** Dinheiro é SEMPRE inteiro em centavos (CLAUDE.md regra 4). Nunca float, nunca string. */
 const centsSchema = z.int().nonnegative();
 
-export const storefrontModifierSchema = z.object({
+export const storefrontModifierSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   /** Complemento nunca reduz o preço base — CHECK >= 0 no banco. */
   priceDeltaCents: centsSchema,
 });
 
-export const storefrontModifierGroupSchema = z.object({
+export const storefrontModifierGroupSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   /** `min > 0` = grupo obrigatório. `max` limita a seleção ("Escolha até 2"). */
@@ -40,7 +40,7 @@ export const storefrontModifierGroupSchema = z.object({
   modifiers: z.array(storefrontModifierSchema),
 });
 
-export const storefrontProductSchema = z.object({
+export const storefrontProductSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   description: z.string().nullable(),
@@ -61,19 +61,19 @@ export const storefrontProductSchema = z.object({
    * produto que só sabe de foto única continua funcionando lendo só
    * `imageUrl`; quem quiser carrossel usa este array.
    */
-  images: z.array(z.object({ url: z.url() })),
+  images: z.array(z.strictObject({ url: z.url() })),
   /** "Esgotado manual" (definicoes-v1 §5.4): item aparece no cardápio, mas não entra no carrinho. */
   available: z.boolean(),
   modifierGroups: z.array(storefrontModifierGroupSchema),
 });
 
-export const storefrontCategorySchema = z.object({
+export const storefrontCategorySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   products: z.array(storefrontProductSchema),
 });
 
-export const storefrontStoreSchema = z.object({
+export const storefrontStoreSchema = z.strictObject({
   slug: z.string(),
   /** Nome da marca (`tenants.name`) — é o que vai no cabeçalho do storefront. */
   name: z.string(),
@@ -117,7 +117,7 @@ export const storefrontStoreSchema = z.object({
   availablePaymentMethods: z.array(paymentMethodSchema),
 });
 
-export const storefrontPayloadSchema = z.object({
+export const storefrontPayloadSchema = z.strictObject({
   store: storefrontStoreSchema,
   categories: z.array(storefrontCategorySchema),
   /**

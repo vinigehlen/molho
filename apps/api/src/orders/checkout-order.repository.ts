@@ -1,4 +1,11 @@
-import type { CheckoutAddressInput, FulfillmentType, PaymentMethod, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
+import type {
+  CheckoutAddressInput,
+  CheckoutLegalAcceptance,
+  FulfillmentType,
+  PaymentMethod,
+  RevalidatedCheckout,
+  RevalidatedItem,
+} from '@molho/contracts';
 import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { ResolvedAddress } from '../geo/resolve-address';
@@ -52,6 +59,8 @@ export interface CreateOrderParams {
   /** Mesmo instante-base usado no prazo, para não depender de dois relógios. */
   createdAt: Date;
   fulfillmentDeadlineAt: Date;
+  /** Snapshot auditável das versões legais aceitas no checkout. */
+  legalAcceptance: CheckoutLegalAcceptance;
   /**
    * Cupom (Épico conversão, C2) — `null`/`0` nos três juntos, ou os três
    * preenchidos juntos (mesmo CHECK `orders_discount_coupon_consistency_check`
@@ -255,6 +264,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       couponCodeSnapshot,
       discountCents,
       scheduledFor,
+      legalAcceptance,
     } = params;
     // `address`/`deliveryAddressId` nulos ⟺ pickup — o CHECK
     // `orders_delivery_requires_address_check` (migration) barra a
@@ -272,7 +282,9 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
         "delivery_geo", "delivery_postal_code_verified", "customer_verified",
-        "fulfillment_deadline_at", "created_at"
+        "fulfillment_deadline_at",
+        "legal_terms_version", "legal_privacy_version", "legal_accepted_at",
+        "created_at"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${fulfillmentType}::"FulfillmentType",
@@ -283,7 +295,9 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},
         ${pontoOuNulo(address)}, ${address?.postalCodeVerified ?? true}, ${customerVerified},
-        ${fulfillmentDeadlineAt}, ${createdAt}
+        ${fulfillmentDeadlineAt},
+        ${legalAcceptance.termsVersion}, ${legalAcceptance.privacyVersion}, ${createdAt},
+        ${createdAt}
       )
       RETURNING "id"
     `;

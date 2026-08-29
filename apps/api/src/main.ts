@@ -4,12 +4,16 @@ import { NestFactory } from '@nestjs/core';
 import { COPY, t } from '@molho/contracts';
 import { AppModule } from './app.module';
 import { configureCors } from './bootstrap/cors';
+import { GlobalExceptionFilter } from './bootstrap/global-exception.filter';
 import { configureSecurityHeaders } from './bootstrap/security-headers';
+import { initSentry } from './bootstrap/sentry';
 import { configureTrustProxy } from './bootstrap/trust-proxy';
 
 const PORTA_PADRAO = 3333;
 
 async function bootstrap() {
+  initSentry();
+
   // Logger padrão do Nest (não pino): sem auth, sem banco e sem volume de
   // tráfego ainda, o console estruturado do Nest já cobre a necessidade —
   // trocar por pino é reversível quando o Épico 9 (realtime) pedir mais.
@@ -23,6 +27,7 @@ async function bootstrap() {
   // erro) — forbidNonWhitelisted seria mais estrito, mas whitelist já evita
   // um client mandar campo a mais que o controller não espera.
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   // CORS com credenciais + allowlist de origens exatas (Épico 9). Com o stream
   // SSE autenticado por cookie, CORS PASSA a ser fronteira de segurança: só as

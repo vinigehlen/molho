@@ -15,13 +15,13 @@ import type { NextFunction, Request, Response } from 'express';
  * **`Referrer-Policy`** — não vazar path (que carrega id de pedido/tenant) pra
  * terceiro na navegação de saída.
  *
- * **HSTS (`Strict-Transport-Security`) está DELIBERADAMENTE FORA** até o TLS de
- * `molho.live` estar validado em produção: o header tranca o browser em HTTPS
- * pelo `max-age` inteiro, e ligá-lo antes do certificado confirmado deixa o
- * domínio inacessível por dias, sem como voltar atrás pelo servidor. Entra
- * depois do passe de fumaça de produção (docs/08 §7b), não neste passo.
+ * **HSTS (`Strict-Transport-Security`) é opt-in por `MOLHO_ENABLE_HSTS=true`**:
+ * o header tranca o browser em HTTPS pelo `max-age` inteiro, então não pode
+ * ligar por acidente antes do TLS de `molho.live` estar validado em produção.
  *
- * CSP completa também não mora aqui — é item separado de pré-go-live (docs/07).
+ * **CSP entra em modo report-only**: dá visibilidade antes de bloquear
+ * hidratação, analytics ou integrações. Trocar para modo enforce é passo
+ * separado depois de observar produção/staging.
  *
  * Mora neste módulo, e não no `main.ts`, pelo mesmo motivo do `configureCors`:
  * `Test.createTestingModule()` não roda o bootstrap.
@@ -30,11 +30,21 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy-Report-Only':
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.posthog.com https://*.posthog.com https://www.googletagmanager.com https://www.google-analytics.com; connect-src 'self' http://localhost:* https: ws: wss:; media-src 'self' blob: https:; form-action 'self'",
 };
+
+export function buildSecurityHeaders(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const headers = { ...SECURITY_HEADERS };
+  if (env.MOLHO_ENABLE_HSTS === 'true') {
+    headers['Strict-Transport-Security'] = 'max-age=15552000; includeSubDomains';
+  }
+  return headers;
+}
 
 export function configureSecurityHeaders(app: INestApplication): void {
   app.use((_req: Request, res: Response, next: NextFunction) => {
-    for (const [nome, valor] of Object.entries(SECURITY_HEADERS)) {
+    for (const [nome, valor] of Object.entries(buildSecurityHeaders())) {
       res.setHeader(nome, valor);
     }
     next();

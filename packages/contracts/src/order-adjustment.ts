@@ -16,7 +16,7 @@
 
 import { z } from 'zod';
 
-export const orderAdjustmentAddItemSchema = z.object({
+export const orderAdjustmentAddItemSchema = z.strictObject({
   kind: z.literal('add_item'),
   productId: z.uuid(),
   quantity: z.int().min(1),
@@ -25,13 +25,13 @@ export const orderAdjustmentAddItemSchema = z.object({
 });
 export type OrderAdjustmentAddItemInput = z.infer<typeof orderAdjustmentAddItemSchema>;
 
-export const orderAdjustmentRemoveItemSchema = z.object({
+export const orderAdjustmentRemoveItemSchema = z.strictObject({
   kind: z.literal('remove_item'),
   orderItemId: z.uuid(),
 });
 export type OrderAdjustmentRemoveItemInput = z.infer<typeof orderAdjustmentRemoveItemSchema>;
 
-export const orderAdjustmentChangeQtySchema = z.object({
+export const orderAdjustmentChangeQtySchema = z.strictObject({
   kind: z.literal('change_qty'),
   orderItemId: z.uuid(),
   /** Nova quantidade final do item — nunca um delta. Mínimo 1: zerar é `remove_item`, não `change_qty` com 0. */
@@ -49,7 +49,7 @@ export type OrderAdjustmentInput = z.infer<typeof orderAdjustmentSchema>;
 export type OrderAdjustmentKind = OrderAdjustmentInput['kind'];
 
 /** Totais ATUAIS do pedido depois do ajuste — o gestor substitui o total exibido por este, sem refazer o cálculo no cliente. */
-export const orderAdjustmentResponseSchema = z.object({
+export const orderAdjustmentResponseSchema = z.strictObject({
   orderId: z.uuid(),
   currentSubtotalCents: z.int(),
   currentTotalCents: z.int(),

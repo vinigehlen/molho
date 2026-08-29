@@ -6,18 +6,18 @@ export const analyticsFulfillmentSchema = z.enum(['delivery', 'pickup', 'balcao'
 export const analyticsGranularitySchema = z.enum(['day', 'month']);
 export const analyticsTopItemsSortSchema = z.enum(['qty', 'revenue']);
 
-export const analyticsOverviewSchema = z.object({
-  realizado: z.object({
+export const analyticsOverviewSchema = z.strictObject({
+  realizado: z.strictObject({
     faturamentoCents: centsSchema.nonnegative(),
     pedidos: z.int().nonnegative(),
     ticketMedioCents: centsSchema.nonnegative(),
   }),
-  emAberto: z.object({
+  emAberto: z.strictObject({
     faturamentoCents: centsSchema.nonnegative(),
     pedidos: z.int().nonnegative(),
   }),
   fulfillment: z.array(
-    z.object({
+    z.strictObject({
       tipo: analyticsFulfillmentSchema,
       pedidos: z.int().nonnegative(),
       faturamentoCents: centsSchema.nonnegative(),
@@ -25,27 +25,27 @@ export const analyticsOverviewSchema = z.object({
   ),
 });
 
-export const analyticsTimeseriesPointSchema = z.object({
+export const analyticsTimeseriesPointSchema = z.strictObject({
   bucket: z.string(),
   faturamentoCents: centsSchema.nonnegative(),
   pedidos: z.int().nonnegative(),
 });
 
-export const analyticsPeakHourSchema = z.object({
+export const analyticsPeakHourSchema = z.strictObject({
   dow: z.int().min(0).max(6),
   hour: z.int().min(0).max(23),
   pedidos: z.int().nonnegative(),
   faturamentoCents: centsSchema.nonnegative(),
 });
 
-export const analyticsTopItemSchema = z.object({
+export const analyticsTopItemSchema = z.strictObject({
   productId: z.uuid(),
   nome: z.string(),
   unidades: z.int().nonnegative(),
   faturamentoCents: centsSchema.nonnegative(),
 });
 
-export const analyticsCustomerSchema = z.object({
+export const analyticsCustomerSchema = z.strictObject({
   customerId: z.uuid(),
   nomeMascarado: z.string().nullable(),
   telefoneMascarado: z.string().nullable(),
@@ -53,7 +53,7 @@ export const analyticsCustomerSchema = z.object({
   faturamentoCents: centsSchema.nonnegative(),
 });
 
-export const analyticsRegionSchema = z.object({
+export const analyticsRegionSchema = z.strictObject({
   cityKey: z.string().nullable(),
   cidade: z.string(),
   uf: z.string().nullable(),
@@ -61,7 +61,7 @@ export const analyticsRegionSchema = z.object({
   faturamentoCents: centsSchema.nonnegative(),
 });
 
-export const analyticsIdleItemSchema = z.object({
+export const analyticsIdleItemSchema = z.strictObject({
   productId: z.uuid(),
   nome: z.string(),
   categoria: z.string(),

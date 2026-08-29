@@ -138,6 +138,22 @@ Quando o Épico 9 ligar `preparing` a um consumidor real: `OrderStatusRepository
 
 **Limitação de reconciliação do PIX estático (não é bug, é característica do modelo).** O payload embute um `txid` (campo 62/05 do BR Code, referência do pedido) mas isso é *best-effort*, não garantia: é chave PIX ESTÁTICA, não PIX dinâmico via API do BACEN com txid rastreado do lado do PSP — muitos apps de banco não mostram esse campo pro humano no extrato de uma chave estática, só valor + nome do pagador + horário. A reconciliação real, e a única em que o lojista pode confiar, é **valor + horário + nome do cliente** — o que significa que dois pedidos do MESMO valor, na MESMA janela curta, são indistinguíveis pro lojista olhando o extrato. A tela de confirmação de pagamento do Épico 9 precisa mostrar os três (valor, horário do pedido, nome do cliente) lado a lado — é o que torna a reconciliação manual operável, não o txid.
 
+### 5.6 Recuperação de acesso no MVP
+
+Molho não tem senha, então não existe "reset de senha". A recuperação é sempre troca controlada do destino de OTP.
+
+**Staff do restaurante (gestor):**
+- Se ainda existe outro `owner` com acesso ao tenant, ele resolve pelo fluxo administrativo: remove o vínculo antigo e convida/cadastra o novo e-mail ou celular. No MVP, enquanto convite completo não estiver pronto, o suporte Molho executa esse ajuste no super-admin com pedido escrito do owner.
+- Se o único owner perdeu acesso, o suporte Molho faz verificação manual antes de trocar o destino do OTP: dados do contrato/assinatura, domínio/slug da loja, CNPJ ou dados comerciais cadastrados e confirmação por canal comercial conhecido. Não basta "tenho o telefone antigo" ou "sou funcionário".
+- Toda troca feita por suporte é ação sensível: registra auditoria com ator, motivo, antes/depois e timestamp. O usuário antigo fica sem papel até novo convite explícito.
+
+**Cliente final do restaurante:**
+- Cliente não acessa backoffice e não tem senha. Se perdeu o telefone/e-mail usado antes, ele faz um novo checkout com o novo contato.
+- Histórico antigo não é "migrado" automaticamente para outro telefone/e-mail. Unificação de cliente por suporte fica fora do MVP, para evitar anexar pedidos de uma pessoa à identidade errada.
+- Se precisar de dado pessoal ou exclusão LGPD, o atendimento segue pelo restaurante controlador dos dados; o Molho opera a solicitação conforme contrato/DPA.
+
+**Regra de segurança:** recuperação de acesso nunca emite sessão temporária sem OTP e nunca aceita troca de contato sem trilha auditável. No MVP, preferimos suporte manual lento a um fluxo automático que permita tomada de conta.
+
 ---
 
 ## 6. Impressão (decidido)

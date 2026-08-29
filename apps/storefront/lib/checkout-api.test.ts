@@ -210,26 +210,34 @@ describe('createOrder', () => {
   const pix = { payload: '00020101...6304ABCD', key: 'loja@exemplo.com', keyType: 'email' };
 
   it('201 pix: devolve status created com orderId/totalCents/pix', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        orderId: 'order-1',
+        status: 'received',
+        paymentStatus: 'aguardando_confirmacao',
+        totalCents: 7380,
+        fulfillmentType: 'delivery',
+        fulfillmentDeadlineAt: deadline,
+        paymentMethod: 'pix',
+        pix,
+      }),
+    }));
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 201,
-        json: async () => ({
-          orderId: 'order-1',
-          status: 'received',
-          paymentStatus: 'aguardando_confirmacao',
-          totalCents: 7380,
-          fulfillmentType: 'delivery',
-          fulfillmentDeadlineAt: deadline,
-          paymentMethod: 'pix',
-          pix,
-        }),
-      })),
+      fetchMock,
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
     expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'pix', pix });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      legalAcceptance: {
+        termsVersion: '2026-08-26',
+        privacyVersion: '2026-08-26',
+      },
+    });
   });
 
   it('201 cash_on_delivery: devolve status created com changeForCents, sem pix', async () => {

@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import { MESSAGING_PROVIDER } from '../messaging/messaging.module';
 import type { MockMessagingProvider } from '../messaging/mock-messaging.provider';
@@ -117,6 +118,10 @@ function checkoutBody(
       expectedDeliveryFeeCents: overrides.expectedDeliveryFeeCents ?? 800,
     },
     paymentMethod: overrides.paymentMethod ?? 'pix',
+    legalAcceptance: {
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+    },
     ...(overrides.paymentMethod === 'cash_on_delivery' ? { changeForCents: overrides.changeForCents ?? null } : {}),
   };
 }

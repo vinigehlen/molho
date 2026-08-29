@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { getTheme, themeToCssVars, type Theme } from '@molho/ui';
 import './globals.css';
+import { CookieConsent } from '../components/cookie-consent';
+import { StorefrontAnalytics } from '../components/storefront-analytics';
 import { getStorefront } from '../lib/storefront-api';
 
 const DESCRICAO = 'Cardápio digital, PDV e delivery para o seu restaurante. Sem taxa por venda.';
@@ -77,7 +79,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="pt-BR" style={cssVars}>
-      <body className="bg-bg font-sans text-text antialiased">{children}</body>
+      <body className="bg-bg font-sans text-text antialiased">
+        {children}
+        <StorefrontAnalytics />
+        <CookieConsent />
+      </body>
     </html>
   );
 }

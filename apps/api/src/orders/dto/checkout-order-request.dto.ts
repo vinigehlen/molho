@@ -1,6 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, Length, MaxLength, ValidateNested } from 'class-validator';
-import type { GuestCustomer } from '@molho/contracts';
+import { IsDefined, IsIn, IsNotEmpty, IsOptional, IsString, Length, MaxLength, ValidateNested } from 'class-validator';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+  type CheckoutLegalAcceptance,
+  type GuestCustomer,
+} from '@molho/contracts';
 import { CheckoutRequestDto } from './checkout-request.dto';
 
 /** Espelha `guestCustomerSchema` (@molho/contracts/storefront.ts). */
@@ -21,6 +26,15 @@ export class GuestCustomerDto {
   phone!: string;
 }
 
+/** Versões legais aceitas no checkout; timestamp é sempre do servidor. */
+export class CheckoutLegalAcceptanceDto {
+  @IsIn([CURRENT_TERMS_VERSION])
+  termsVersion!: string;
+
+  @IsIn([CURRENT_PRIVACY_VERSION])
+  privacyVersion!: string;
+}
+
 /**
  * Body do `POST /checkout/orders` — `CheckoutRequestDto` MAIS a identidade
  * auto-declarada do checkout guest.
@@ -36,6 +50,11 @@ export class GuestCustomerDto {
  * service, junto do resto da decisão de identidade.
  */
 export class CheckoutOrderRequestDto extends CheckoutRequestDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => CheckoutLegalAcceptanceDto)
+  legalAcceptance!: CheckoutLegalAcceptanceDto;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => GuestCustomerDto)
@@ -46,4 +65,11 @@ export class CheckoutOrderRequestDto extends CheckoutRequestDto {
 export function toGuestCustomer(dto: CheckoutOrderRequestDto): GuestCustomer | null {
   if (!dto.customer) return null;
   return { name: dto.customer.name.trim(), phone: dto.customer.phone };
+}
+
+export function toLegalAcceptance(dto: CheckoutOrderRequestDto): CheckoutLegalAcceptance {
+  return {
+    termsVersion: dto.legalAcceptance.termsVersion as typeof CURRENT_TERMS_VERSION,
+    privacyVersion: dto.legalAcceptance.privacyVersion as typeof CURRENT_PRIVACY_VERSION,
+  };
 }

@@ -45,7 +45,7 @@ export const createCouponSchema = z
     message: 'startsAt precisa ser antes de endsAt.',
   });
 
-export const updateCouponSchema = z.object({
+export const updateCouponSchema = z.strictObject({
   version: z.int().nonnegative(),
   active: z.boolean().optional(),
   minOrderCents: z.int().nonnegative().optional(),
@@ -54,7 +54,7 @@ export const updateCouponSchema = z.object({
   maxUses: z.int().positive().optional(),
 });
 
-export const couponResponseSchema = z.object({
+export const couponResponseSchema = z.strictObject({
   id: z.uuid(),
   code: z.string(),
   discountType: couponDiscountTypeSchema,
