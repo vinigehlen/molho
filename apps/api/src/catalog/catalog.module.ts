@@ -17,6 +17,9 @@ import { PrismaModifierGroupRepository } from './modifier-group.repository';
 import { ProductsController } from './products.controller';
 import { ProductService } from './product.service';
 import { PrismaProductRepository } from './product.repository';
+import { ProductOffersController } from './product-offers.controller';
+import { ProductOfferService } from './product-offer.service';
+import { PrismaProductOfferRepository } from './product-offer.repository';
 import { ProductImagesController } from './product-images.controller';
 import { ProductImageService } from './product-image.service';
 import { PrismaProductImageRepository } from './product-image.repository';
@@ -28,12 +31,14 @@ import {
   MODIFIER_GROUP_SERVICE,
   MODIFIER_SERVICE,
   PRODUCT_IMAGE_SERVICE,
+  PRODUCT_OFFER_SERVICE,
   PRODUCT_SERVICE,
 } from './catalog.tokens';
 
 export {
   CATEGORY_SERVICE,
   PRODUCT_SERVICE,
+  PRODUCT_OFFER_SERVICE,
   MODIFIER_GROUP_SERVICE,
   MODIFIER_SERVICE,
   PRODUCT_IMAGE_SERVICE,
@@ -60,6 +65,7 @@ export {
   controllers: [
     CategoriesController,
     ProductsController,
+    ProductOffersController,
     ModifierGroupsController,
     ModifiersController,
     ProductImagesController,
@@ -77,6 +83,12 @@ export {
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService): ProductService =>
         new ProductService(new PrismaProductRepository(requestContext)),
+    },
+    {
+      provide: PRODUCT_OFFER_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): ProductOfferService =>
+        new ProductOfferService(new PrismaProductOfferRepository(requestContext)),
     },
     {
       provide: MODIFIER_GROUP_SERVICE,
@@ -106,6 +118,7 @@ export {
   exports: [
     CATEGORY_SERVICE,
     PRODUCT_SERVICE,
+    PRODUCT_OFFER_SERVICE,
     MODIFIER_GROUP_SERVICE,
     MODIFIER_SERVICE,
     PRODUCT_IMAGE_SERVICE,

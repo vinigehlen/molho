@@ -1,5 +1,11 @@
 import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
-import type { CreateProductInput, ProductRecord, ProductRepository, UpdateProductInput } from './product.repository';
+import type { CatalogActor } from './catalog-actor';
+import type {
+  CreateProductInput,
+  ProductRecord,
+  ProductRepository,
+  UpdateProductInput,
+} from './product.repository';
 
 export class ProductService {
   constructor(private readonly repo: ProductRepository) {}
@@ -19,11 +25,16 @@ export class ProductService {
     return this.repo.create(input);
   }
 
-  async update(id: string, expectedVersion: number, input: UpdateProductInput): Promise<ProductRecord> {
+  async update(
+    id: string,
+    expectedVersion: number,
+    input: UpdateProductInput,
+    actor: CatalogActor,
+  ): Promise<ProductRecord> {
     if (input.name !== undefined) this.assertValidName(input.name);
     if (input.basePriceCents !== undefined) this.assertValidPrice(input.basePriceCents);
     if (input.categoryId !== undefined) await this.assertCategoryExists(input.categoryId);
-    return this.repo.update(id, expectedVersion, input);
+    return this.repo.update(id, expectedVersion, input, actor);
   }
 
   /**
@@ -50,7 +61,9 @@ export class ProductService {
 
   private assertValidPrice(cents: number): void {
     if (!Number.isInteger(cents) || cents < 0) {
-      throw new CatalogValidationError('Preço precisa ser um inteiro em centavos, maior ou igual a zero.');
+      throw new CatalogValidationError(
+        'Preço precisa ser um inteiro em centavos, maior ou igual a zero.',
+      );
     }
   }
 

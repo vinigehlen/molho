@@ -135,30 +135,31 @@ model Tenant {
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
 
-  plan                 Plan?                @relation(fields: [planId], references: [id])
-  stores               Store[]
-  customers            Customer[]
-  entitlements         TenantEntitlement[]
-  settings             TenantSetting[]
-  moduleAudits         ModuleAudit[]
-  auditLogs            AuditLog[]
-  categories           Category[]
-  products             Product[]
-  productImages        ProductImage[]
-  modifierGroups       ModifierGroup[]
+  plan                  Plan?                  @relation(fields: [planId], references: [id])
+  stores                Store[]
+  customers             Customer[]
+  entitlements          TenantEntitlement[]
+  settings              TenantSetting[]
+  moduleAudits          ModuleAudit[]
+  auditLogs             AuditLog[]
+  categories            Category[]
+  products              Product[]
+  productOffers         ProductOffer[]
+  productImages         ProductImage[]
+  modifierGroups        ModifierGroup[]
   productModifierGroups ProductModifierGroup[]
-  modifiers            Modifier[]
-  addresses            Address[]
-  deliveryZones        DeliveryZone[]
-  storeHours           StoreHours[]
-  storeSchedulingSlots StoreSchedulingSlot[]
-  orders               Order[]
-  orderItems           OrderItem[]
-  orderItemModifiers   OrderItemModifier[]
-  orderStatusHistories OrderStatusHistory[]
-  orderAdjustments     OrderAdjustment[]
-  printJobs            PrintJob[]
-  coupons              Coupon[]
+  modifiers             Modifier[]
+  addresses             Address[]
+  deliveryZones         DeliveryZone[]
+  storeHours            StoreHours[]
+  storeSchedulingSlots  StoreSchedulingSlot[]
+  orders                Order[]
+  orderItems            OrderItem[]
+  orderItemModifiers    OrderItemModifier[]
+  orderStatusHistories  OrderStatusHistory[]
+  orderAdjustments      OrderAdjustment[]
+  printJobs             PrintJob[]
+  coupons               Coupon[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -177,32 +178,32 @@ enum PixKeyType {
 }
 
 model Store {
-  id             String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId       String                                 @map("tenant_id") @db.Uuid
-  name           String
-  addressText    String                                 @map("address_text")
+  id              String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId        String                                 @map("tenant_id") @db.Uuid
+  name            String
+  addressText     String                                 @map("address_text")
   /// geography(Point,4326) — PostGIS habilitado agora; sem uso ainda (zonas
   /// de entrega chegam no Épico 6, mas o tipo geo já nasce certo).
-  geo            Unsupported("geography(Point, 4326)")?
-  timezone       String
-  phone          String?
-  whatsappNumber String?                                @map("whatsapp_number")
-  minOrderCents  Int                                    @default(0) @map("min_order_cents")
+  geo             Unsupported("geography(Point, 4326)")?
+  timezone        String
+  phone           String?
+  whatsappNumber  String?                                @map("whatsapp_number")
+  minOrderCents   Int                                    @default(0) @map("min_order_cents")
   /// Chave PIX do LOJISTA (Épico 8) — o dinheiro cai direto na conta dele,
   /// nunca passa pelo Molho (docs/01 §5-D.1, modelo A). Nula até o lojista
   /// configurar; sem ela o checkout não tem como montar o QR e a loja não
   /// está pronta pra vender (mesmo erro de "loja não configurada" da falta
   /// de Store em si — CheckoutStoreNotConfiguredError).
-  pixKey          String?     @map("pix_key")
-  pixKeyType      PixKeyType? @map("pix_key_type")
+  pixKey          String?                                @map("pix_key")
+  pixKeyType      PixKeyType?                            @map("pix_key_type")
   /// Campo 60 do BR Code (cidade do lojista) — curto e sem acento por
   /// exigência do padrão EMV (≤15 chars), por isso não deriva de
   /// `addressText` (texto livre, formato não previsível). Preenchido junto
   /// com a chave PIX.
-  pixMerchantCity String?     @map("pix_merchant_city")
-  createdAt      DateTime                               @default(now()) @map("created_at")
-  updatedAt      DateTime                               @updatedAt @map("updated_at")
-  deletedAt      DateTime?                              @map("deleted_at")
+  pixMerchantCity String?                                @map("pix_merchant_city")
+  createdAt       DateTime                               @default(now()) @map("created_at")
+  updatedAt       DateTime                               @updatedAt @map("updated_at")
+  deletedAt       DateTime?                              @map("deleted_at")
 
   tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   deliveryZones        DeliveryZone[]
@@ -389,8 +390,9 @@ model Category {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   products Product[]
+  offers   ProductOffer[]
 
   @@index([tenantId, sortOrder])
   @@map("categories")
@@ -424,22 +426,59 @@ model Product {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category       Category        @relation(fields: [categoryId], references: [id])
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category              Category               @relation(fields: [categoryId], references: [id])
   /// Grupo "dono" (criado a partir DESTE produto) — FK direta, ainda usada
   /// pra decidir onde um grupo novo nasce. Pra "quais grupos valem PRA este
   /// produto" (inclui reuso), ver `productModifierGroups` — fase reuso
   /// (exceção MVP 2026-08-28, CLAUDE.md).
-  modifierGroups ModifierGroup[]
+  modifierGroups        ModifierGroup[]
   productModifierGroups ProductModifierGroup[]
-  orderItems     OrderItem[]
-  images         ProductImage[]
+  orderItems            OrderItem[]
+  images                ProductImage[]
+  offers                ProductOffer[]
 
   // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
   // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
   // de uma relação simples; ver migration.
   @@index([tenantId, categoryId, sortOrder])
   @@map("products")
+}
+
+/// Apresentação comercial de um produto dentro do cardápio. O Product guarda
+/// a identidade reutilizável (nome, descrição e mídia); preço, categoria,
+/// disponibilidade, código PDV e ordem pertencem à oferta.
+///
+/// Épico 4B é uma expansão compatível: `Product` ainda mantém as colunas
+/// antigas e a migration sincroniza a oferta primária nos dois sentidos.
+/// `isPrimary` identifica essa ponte temporária. Ofertas secundárias só serão
+/// abertas pela API no próximo épico, depois de a UI representar o mesmo
+/// produto em mais de uma categoria.
+model ProductOffer {
+  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  productId  String    @map("product_id") @db.Uuid
+  categoryId String    @map("category_id") @db.Uuid
+  priceCents Int       @map("price_cents")
+  available  Boolean   @default(true)
+  pdvCode    String?   @map("pdv_code")
+  sortOrder  Int       @default(0) @map("sort_order")
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  version    Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+
+  // FKs compostas e os dois índices únicos parciais vivem na migration SQL:
+  // (tenant, product, category) entre ofertas vivas e uma única oferta
+  // primária viva por produto. Prisma não expressa índice parcial.
+  @@index([tenantId, categoryId, sortOrder])
+  @@index([tenantId, productId])
+  @@map("product_offers")
 }
 
 /// N fotos por produto (Épico conversão, C1) — tabela em vez de array de URL
@@ -562,12 +601,12 @@ model Modifier {
 /// tratamento do Cart), nunca uma linha aqui. Só depois do OTP no checkout
 /// (Épico 7) o endereço vira linha, vinculada ao customer autenticado.
 model Address {
-  id             String                                @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId       String                                @map("tenant_id") @db.Uuid
-  customerId     String                                @map("customer_id") @db.Uuid
+  id             String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String                                 @map("tenant_id") @db.Uuid
+  customerId     String                                 @map("customer_id") @db.Uuid
   /// String livre, não enum — mesmo racional do Store.themeKey: o cliente
   /// sugere "Casa"/"Trabalho", mas nunca trava num valor desconhecido.
-  label          String                                @default("Endereço")
+  label          String                                 @default("Endereço")
   street         String
   /// Aceita "s/n" como valor — endereço sem número não é dado ausente.
   number         String?
@@ -575,19 +614,19 @@ model Address {
   neighborhood   String
   city           String
   state          String
-  postalCode     String?                               @map("postal_code")
+  postalCode     String?                                @map("postal_code")
   /// "Perto da padaria" — padrão BR, útil pro motoboy. Livre, sem estrutura.
-  referencePoint String?                               @map("reference_point")
+  referencePoint String?                                @map("reference_point")
   /// geography(Point,4326) — mesmo tipo do Store.geo. NULLABLE desde o Bloco
   /// 2 do Épico 6: com taxa por município, o preço vem da CIDADE e o ponto
   /// não participa do cálculo — serve pro motoboy/mapa. Geocoder mudo (OSM
   /// fora do ar) não pode recusar endereço válido. Sem fallback pro geo da
   /// loja: pin falso é pior que pin ausente.
   geo            Unsupported("geography(Point, 4326)")?
-  version        Int                                   @default(0)
-  createdAt      DateTime                              @default(now()) @map("created_at")
-  updatedAt      DateTime                              @updatedAt @map("updated_at")
-  deletedAt      DateTime?                             @map("deleted_at")
+  version        Int                                    @default(0)
+  createdAt      DateTime                               @default(now()) @map("created_at")
+  updatedAt      DateTime                               @updatedAt @map("updated_at")
+  deletedAt      DateTime?                              @map("deleted_at")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id])
@@ -604,9 +643,9 @@ model Address {
 /// N zonas por loja (mesmo com 1 só no seed): "taxa e ETA POR zona" já pede
 /// suporte a múltiplas, e zona premium sobreposta a uma maior é caso real.
 model DeliveryZone {
-  id            String                                  @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId      String                                  @map("tenant_id") @db.Uuid
-  storeId       String                                  @map("store_id") @db.Uuid
+  id            String                                   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId      String                                   @map("tenant_id") @db.Uuid
+  storeId       String                                   @map("store_id") @db.Uuid
   /// Identificação pro lojista (ex. "Zona padrão") — sem uso no match.
   name          String
   /// Zona por CIDADE (Épico 6, pivot): município servido, taxa fixa. Casa por
@@ -622,16 +661,16 @@ model DeliveryZone {
   /// polygon. Caminho vivo, não legado — tenant que cobra por distância usa
   /// este.
   polygon       Unsupported("geography(Polygon, 4326)")?
-  feeCents      Int                                     @map("fee_cents")
-  etaMinMinutes Int                                     @map("eta_min_minutes")
-  etaMaxMinutes Int                                     @map("eta_max_minutes")
+  feeCents      Int                                      @map("fee_cents")
+  etaMinMinutes Int                                      @map("eta_min_minutes")
+  etaMaxMinutes Int                                      @map("eta_max_minutes")
   /// Zonas sobrepostas: menor valor é checado primeiro (zona premium menor
   /// "vence" a zona grande por fora). CHECK >= 0 na migration.
-  priority      Int                                     @default(0)
-  version       Int                                     @default(0)
-  createdAt     DateTime                                @default(now()) @map("created_at")
-  updatedAt     DateTime                                @updatedAt @map("updated_at")
-  deletedAt     DateTime?                               @map("deleted_at")
+  priority      Int                                      @default(0)
+  version       Int                                      @default(0)
+  createdAt     DateTime                                 @default(now()) @map("created_at")
+  updatedAt     DateTime                                 @updatedAt @map("updated_at")
+  deletedAt     DateTime?                                @map("deleted_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   store  Store  @relation(fields: [storeId], references: [id])
@@ -703,11 +742,11 @@ model StoreSchedulingSlot {
   startsAtMinutes Int       @map("starts_at_minutes")
   endsAtMinutes   Int       @map("ends_at_minutes")
   /// Teto de pedidos agendados NESTA ocorrência do slot (CHECK > 0 na migration).
-  maxOrders Int @map("max_orders")
-  version   Int @default(0)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  maxOrders       Int       @map("max_orders")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   store  Store  @relation(fields: [storeId], references: [id])
@@ -789,11 +828,11 @@ model Order {
   /// Nunca nulo: pedido só nasce depois do OTP (CLAUDE.md regra 13).
   customerId String @map("customer_id") @db.Uuid
 
-  status        OrderStatus   @default(received)
+  status          OrderStatus     @default(received)
   /// Sem @default — o cliente escolhe no checkout, nunca "cai" num método sem querer.
-  paymentMethod PaymentMethod @map("payment_method")
-  paymentStatus PaymentStatus @default(aguardando_confirmacao) @map("payment_status")
-  refundStatus  RefundStatus  @default(not_applicable) @map("refund_status")
+  paymentMethod   PaymentMethod   @map("payment_method")
+  paymentStatus   PaymentStatus   @default(aguardando_confirmacao) @map("payment_status")
+  refundStatus    RefundStatus    @default(not_applicable) @map("refund_status")
   /// `pickup` = os campos `delivery*` abaixo (exceto `deliveryPostalCodeVerified`,
   /// irrelevante nesse branch) ficam NULL — CHECK na migration garante que
   /// `delivery` só nasce sem eles. Sem @default: o cliente escolhe no
@@ -801,12 +840,12 @@ model Order {
   fulfillmentType FulfillmentType @map("fulfillment_type")
   /// Só quando paymentMethod = cash_on_delivery — "troco pra quanto" (o valor
   /// que o cliente vai entregar, não o troco em si). docs/02 §5.5.
-  changeForCents Int? @map("change_for_cents")
+  changeForCents  Int?            @map("change_for_cents")
   /// Agendamento (Épico conversão, C3). `null` = "o quanto antes" — o
   /// comportamento ATUAL, preservado por default. Setado = cliente escolheu
   /// data/horário no checkout; validar contra StoreSchedulingSlot (horário +
   /// teto) é trabalho do serviço de checkout, fora do escopo deste commit.
-  scheduledFor DateTime? @map("scheduled_for")
+  scheduledFor    DateTime?       @map("scheduled_for")
 
   subtotalCents    Int @map("subtotal_cents")
   deliveryFeeCents Int @map("delivery_fee_cents")
@@ -826,7 +865,7 @@ model Order {
   /// sobre ESTORNO pós-criação; desconto muda quanto foi cobrado NA CRIAÇÃO,
   /// então entra na mesma fórmula do CHECK de total, não é campo novo de
   /// "total líquido").
-  discountCents Int @default(0) @map("discount_cents")
+  discountCents      Int     @default(0) @map("discount_cents")
   /// FK só rastreabilidade (mesmo racional de deliveryAddressId) — o pedido
   /// nunca depende do cupom continuar existindo/ativo. `couponCodeSnapshot`
   /// é a fonte de verdade pra EXIBIR o código no pedido depois.
@@ -856,23 +895,23 @@ model Order {
   /// delivery` — pickup não coleta endereço do cliente nenhum (retira no
   /// endereço da PRÓPRIA loja, que o lojista já sabe de cor). CHECK na
   /// migration barra a combinação inválida (`delivery` sem endereço).
-  deliveryAddressId      String?                               @map("delivery_address_id") @db.Uuid
-  deliveryLabel          String?                               @map("delivery_label")
-  deliveryStreet         String?                               @map("delivery_street")
-  deliveryNumber         String?                               @map("delivery_number")
-  deliveryComplement     String?                               @map("delivery_complement")
-  deliveryNeighborhood   String?                               @map("delivery_neighborhood")
-  deliveryCity           String?                               @map("delivery_city")
-  deliveryState          String?                               @map("delivery_state")
-  deliveryPostalCode     String?                               @map("delivery_postal_code")
-  deliveryReferencePoint String?                               @map("delivery_reference_point")
+  deliveryAddressId          String?                                @map("delivery_address_id") @db.Uuid
+  deliveryLabel              String?                                @map("delivery_label")
+  deliveryStreet             String?                                @map("delivery_street")
+  deliveryNumber             String?                                @map("delivery_number")
+  deliveryComplement         String?                                @map("delivery_complement")
+  deliveryNeighborhood       String?                                @map("delivery_neighborhood")
+  deliveryCity               String?                                @map("delivery_city")
+  deliveryState              String?                                @map("delivery_state")
+  deliveryPostalCode         String?                                @map("delivery_postal_code")
+  deliveryReferencePoint     String?                                @map("delivery_reference_point")
   /// geography(Point,4326) NULLABLE — mesmo racional de Address.geo (Épico
   /// 6, Bloco 2): a zona por município decide a taxa sem ponto nenhum.
-  deliveryGeo            Unsupported("geography(Point, 4326)")? @map("delivery_geo")
+  deliveryGeo                Unsupported("geography(Point, 4326)")? @map("delivery_geo")
   /// Falso quando o ViaCEP ficou mudo e a CIDADE que decidiu a taxa veio do
   /// texto digitado pelo cliente, não de fonte autoritativa — o gestor mostra
   /// pro lojista conferir a taxa antes de despachar.
-  deliveryPostalCodeVerified Boolean                           @default(true) @map("delivery_postal_code_verified")
+  deliveryPostalCodeVerified Boolean                                @default(true) @map("delivery_postal_code_verified")
   /// Snapshot da procedência da IDENTIDADE no momento do pedido (Épico 9c):
   /// `false` = nasceu pelo checkout guest (`checkout.guest`), com telefone
   /// auto-declarado e sem OTP. Snapshot, e não JOIN em
@@ -881,7 +920,7 @@ model Order {
   /// nesse pedido" acontece na hora do pedido. SEM `@default` de propósito:
   /// quem insere é SQL cru que lista a coluna, e um default `true` deixaria
   /// um writer futuro carimbar "verificado" por omissão.
-  customerVerified           Boolean                           @map("customer_verified")
+  customerVerified           Boolean                                @map("customer_verified")
 
   /// Prazo máximo prometido no momento da criação. Congelado: delivery usa
   /// o etaMaxMinutes da zona; pickup usa 30 min. Nullable só para legado.
@@ -942,6 +981,7 @@ model Order {
   adjustments     OrderAdjustment[]
   printJobs       PrintJob[]
 
+  @@unique([tenantId, idempotencyKey])
   // FKs compostas (store_id/customer_id/delivery_address_id, tenant_id) →
   // stores/customers/addresses(id, tenant_id) na migration.
   @@index([tenantId, customerId])
@@ -949,7 +989,6 @@ model Order {
   // por status, já ordenados por criação — sem sort adicional.
   @@index([tenantId, storeId, status, createdAt])
   @@index([tenantId, createdAt])
-  @@unique([tenantId, idempotencyKey])
   @@map("orders")
 }
 
@@ -966,30 +1005,30 @@ enum CouponDiscountType {
 /// padrão do city/polygon de DeliveryZone) — qual dos dois é obrigatório
 /// depende de `discountType`.
 model Coupon {
-  id       String @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId String @map("tenant_id") @db.Uuid
+  id                 String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId           String             @map("tenant_id") @db.Uuid
   /// Único por tenant, case-insensitive — índice único parcial em
   /// `upper(code)` na migration (CLAUDE.md: nunca no schema.prisma).
-  code         String
-  discountType CouponDiscountType @map("discount_type")
+  code               String
+  discountType       CouponDiscountType @map("discount_type")
   /// 1–100, só quando discountType = percent.
-  discountPercent Int? @map("discount_percent")
+  discountPercent    Int?               @map("discount_percent")
   /// Sempre > 0, só quando discountType = fixed.
-  discountValueCents Int? @map("discount_value_cents")
-  minOrderCents      Int  @default(0) @map("min_order_cents")
-  startsAt           DateTime @map("starts_at")
-  endsAt             DateTime @map("ends_at")
+  discountValueCents Int?               @map("discount_value_cents")
+  minOrderCents      Int                @default(0) @map("min_order_cents")
+  startsAt           DateTime           @map("starts_at")
+  endsAt             DateTime           @map("ends_at")
   /// Contador GLOBAL do cupom (não por cliente — fora do v1). Incremento é
   /// `UPDATE ... WHERE uses_count < max_uses` + checar linhas afetadas —
   /// mesmo padrão do optimistic lock de zona (P1.2) — pra fechar a corrida
   /// no último uso disponível.
-  maxUses   Int @map("max_uses")
-  usesCount Int @default(0) @map("uses_count")
-  active    Boolean @default(true)
-  version   Int @default(0)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  maxUses            Int                @map("max_uses")
+  usesCount          Int                @default(0) @map("uses_count")
+  active             Boolean            @default(true)
+  version            Int                @default(0)
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  deletedAt          DateTime?          @map("deleted_at")
 
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
@@ -1172,16 +1211,16 @@ model OrderAdjustment {
   orderItem OrderItem @relation(fields: [orderItemId], references: [id])
   actor     User      @relation(fields: [actorId], references: [id])
 
+  // Idempotência escopada ao PEDIDO (não ao tenant inteiro, diferente de
+  // orders.idempotencyKey): a mesma chave em pedidos DIFERENTES não deve
+  // colidir — cada ajuste de balcão é uma ação sobre UM pedido específico.
+  @@unique([tenantId, orderId, idempotencyKey])
   // FKs compostas (order_id, tenant_id) → orders(id, tenant_id) e
   // (order_item_id, tenant_id) → order_items(id, tenant_id) na migration —
   // mesmo guardrail de tenant_id de PrintJob/OrderStatusHistory. actor_id →
   // users(id) é FK SIMPLES (users não tem tenant_id, mesma exceção do
   // CLAUDE.md).
   @@index([tenantId, orderId])
-  // Idempotência escopada ao PEDIDO (não ao tenant inteiro, diferente de
-  // orders.idempotencyKey): a mesma chave em pedidos DIFERENTES não deve
-  // colidir — cada ajuste de balcão é uma ação sobre UM pedido específico.
-  @@unique([tenantId, orderId, idempotencyKey])
   @@map("order_adjustments")
 }
 

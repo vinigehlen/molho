@@ -33,6 +33,7 @@ import type { RateLimiter } from '../rate-limit/rate-limiter';
 import { STORAGE_PROVIDER, UPLOAD_URL_RATE_LIMITER } from '../storage/storage.module';
 import type { StorageProvider } from '../storage/storage-provider.port';
 import { CatalogExceptionFilter } from './catalog-exception.filter';
+import { resolveCatalogActor } from './catalog-actor';
 import { PRODUCT_SERVICE } from './catalog.tokens';
 import { CreateProductDto, SetProductAvailabilityDto, UpdateProductDto } from './dto/product.dto';
 import { CreateImageUploadUrlDto } from './dto/product-image.dto';
@@ -76,9 +77,10 @@ export class ProductsController {
 
   @Patch(':id')
   @RequirePermission('catalog.product.update')
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req: RequestWithUser) {
     const { version, ...input } = dto;
-    return this.products.update(id, version, input);
+    const tenantId = requireTenantIdHeader(req);
+    return this.products.update(id, version, input, resolveCatalogActor(req, tenantId));
   }
 
   /**
@@ -113,7 +115,10 @@ export class ProductsController {
     if (!withinLimit) {
       res.set('Retry-After', '60');
       throw new HttpException(
-        { error: 'rate_limited', message: 'Muitas URLs de upload geradas — tente de novo em instantes.' },
+        {
+          error: 'rate_limited',
+          message: 'Muitas URLs de upload geradas — tente de novo em instantes.',
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -131,7 +136,9 @@ export class ProductsController {
       };
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      throw new ServiceUnavailableException('Serviço de upload de imagem temporariamente indisponível.');
+      throw new ServiceUnavailableException(
+        'Serviço de upload de imagem temporariamente indisponível.',
+      );
     }
   }
 
