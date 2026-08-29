@@ -46,7 +46,7 @@ jobs:
         run: ./scripts/check-dev-stub-excluded.sh
 
       - name: Cache dos browsers do Playwright
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
