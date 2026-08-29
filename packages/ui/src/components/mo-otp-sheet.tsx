@@ -44,15 +44,21 @@ const REENVIO_COOLDOWN_SEGUNDOS = 60;
  * recebe SMS) e, no canal de e-mail, a forma grosseira do e-mail: a mesma
  * checagem que libera o botão, sem round-trip só pra descobrir formato.
  */
-export function MoOtpSheet({
-  open,
+export function MoOtpSheet({ open, ...props }: MoOtpSheetProps) {
+  // Remonta a cada abertura: os campos voltam ao estado inicial pelos
+  // inicializadores do useState, sem effect que "ajusta" state em cima de prop.
+  if (!open) return null;
+  return <MoOtpSheetInner {...props} />;
+}
+
+function MoOtpSheetInner({
   onOpenChange,
   channel = 'sms',
   onRequestCode,
   onVerifyCode,
   onVerified,
   className,
-}: MoOtpSheetProps) {
+}: Omit<MoOtpSheetProps, 'open'>) {
   const [step, setStep] = React.useState<Step>('phone');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
@@ -61,17 +67,6 @@ export function MoOtpSheet({
   const [error, setError] = React.useState<string | null>(null);
   const [cooldown, setCooldown] = React.useState(0);
 
-  React.useEffect(() => {
-    if (!open) return;
-    setStep('phone');
-    setPhone('');
-    setEmail('');
-    setCode('');
-    setError(null);
-    setLoading(false);
-    setCooldown(0);
-  }, [open]);
-
   // Conta 1 em 1s até zerar; recomeça toda vez que `cooldown` é setado de
   // novo pra 60 (envio inicial e cada reenvio).
   React.useEffect(() => {
@@ -79,8 +74,6 @@ export function MoOtpSheet({
     const id = setTimeout(() => setCooldown((s) => s - 1), 1000);
     return () => clearTimeout(id);
   }, [cooldown]);
-
-  if (!open) return null;
 
   const porEmail = channel === 'email';
   // Sempre celular (DDD + nono dígito + 8 dígitos = 11) — fixo (10 dígitos)
@@ -139,7 +132,7 @@ export function MoOtpSheet({
 
   return (
     <MoSheet
-      open={open}
+      open
       onOpenChange={onOpenChange}
       title={step === 'phone' ? (porEmail ? 'Confirma seus contatos' : 'Confirma seu telefone') : 'Digite o código'}
       description={

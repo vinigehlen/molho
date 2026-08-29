@@ -33,21 +33,18 @@ export interface MoGuestCheckoutSheetProps {
  * validação grosseira que libera o botão. O telefone de verdade é validado
  * por `parsePhoneNumber` no servidor, que é quem manda.
  */
-export function MoGuestCheckoutSheet({ open, onOpenChange, onSubmit, className }: MoGuestCheckoutSheetProps) {
+export function MoGuestCheckoutSheet({ open, ...props }: MoGuestCheckoutSheetProps) {
+  // Remonta a cada abertura: os campos voltam ao vazio pelos inicializadores do
+  // useState, sem effect que "ajusta" state em cima de prop.
+  if (!open) return null;
+  return <MoGuestCheckoutSheetInner {...props} />;
+}
+
+function MoGuestCheckoutSheetInner({ onOpenChange, onSubmit, className }: Omit<MoGuestCheckoutSheetProps, 'open'>) {
   const [name, setName] = React.useState('');
   const [phone, setPhone] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    setName('');
-    setPhone('');
-    setError(null);
-    setLoading(false);
-  }, [open]);
-
-  if (!open) return null;
 
   // Celular (DDD + nono dígito + 8) — mesma exigência do MoOtpSheet e do
   // parsePhoneNumber: o lojista liga pra confirmar, e fixo não recebe torpedo.
@@ -66,7 +63,7 @@ export function MoGuestCheckoutSheet({ open, onOpenChange, onSubmit, className }
 
   return (
     <MoSheet
-      open={open}
+      open
       onOpenChange={onOpenChange}
       title="Quase lá"
       description="Só o nome e o telefone pra loja falar com você sobre a entrega."
