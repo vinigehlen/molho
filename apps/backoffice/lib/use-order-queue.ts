@@ -86,17 +86,17 @@ export function useOrderQueue(tenantId: string | null, userId: string | null, on
     if (online && tenantId && loadQueue(tenantId).length > 0) void sync();
   }, [online, tenantId, sync]);
 
-  const resolveConflict = useCallback(async (idempotencyKey: string, action: 'reapply' | 'discard') => {
-    let target: QueueConflict | undefined;
-    setConflicts((c) => {
-      target = c.find((x) => x.intent.idempotencyKey === idempotencyKey);
-      return c.filter((x) => x.intent.idempotencyKey !== idempotencyKey);
-    });
-    if (action === 'discard' || !target) return;
-    // Reaplicar: refetch pra versão FRESCA (o operador escolheu ver o estado e reaplicar). Chave nova (é uma decisão nova).
-    const fresh = await fetchOrder(target.intent.orderId).catch(() => null);
-    if (fresh) await transitionOrder(fresh.id, target.intent.toStatus, fresh.version, target.intent.reason, crypto.randomUUID());
-  }, []);
+  const resolveConflict = useCallback(
+    async (idempotencyKey: string, action: 'reapply' | 'discard') => {
+      const target = conflicts.find((x) => x.intent.idempotencyKey === idempotencyKey);
+      setConflicts((c) => c.filter((x) => x.intent.idempotencyKey !== idempotencyKey));
+      if (action === 'discard' || !target) return;
+      // Reaplicar: refetch pra versão FRESCA (o operador escolheu ver o estado e reaplicar). Chave nova (é uma decisão nova).
+      const fresh = await fetchOrder(target.intent.orderId).catch(() => null);
+      if (fresh) await transitionOrder(fresh.id, target.intent.toStatus, fresh.version, target.intent.reason, crypto.randomUUID());
+    },
+    [conflicts],
+  );
 
   return { pending, conflicts, autoApplied, submit, sync, resolveConflict };
 }

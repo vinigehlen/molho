@@ -74,16 +74,11 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
 
 const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
 
-/** Lazy init: lê a preferência salva só na primeira renderização (evita
- * "piscar" list→grid depois do mount) — mesmo padrão de `use-sidebar-state`. */
-function lerVisualizacaoSalva(): 'list' | 'grid' {
-  if (typeof window === 'undefined') return 'list';
-  return window.localStorage.getItem(VISUALIZACAO_STORAGE_KEY) === 'grid' ? 'grid' : 'list';
-}
-
 export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
-  const [visualizacao, setVisualizacao] = React.useState<'list' | 'grid'>(lerVisualizacaoSalva);
+  // Sempre 'list' no SSR e no primeiro paint (senão a hidratação diverge); lê a
+  // preferência salva logo após o mount — o "flash" de 1 frame é preferível.
+  const [visualizacao, setVisualizacao] = React.useState<'list' | 'grid'>('list');
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
   const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
@@ -93,6 +88,10 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
   const saudacao = customerSession.token ? COPY_SAUDACAO_RECORRENTE : greeting;
   const { address, setAddress } = useAddress(slug);
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (window.localStorage.getItem(VISUALIZACAO_STORAGE_KEY) === 'grid') setVisualizacao('grid');
+  }, []);
 
   // Roda de novo sempre que o CEP mudar (endereço novo salvo, ou já veio de
   // uma visita anterior) — sem isto, o cliente precisaria reabrir o

@@ -21,11 +21,9 @@ export function useSidebarState() {
   }, []);
 
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
-      return next;
-    });
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
   }
 
   return {
