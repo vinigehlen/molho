@@ -74,7 +74,7 @@ export class SignupProvisioningService {
         slug,
         name: input.restaurantName.trim(),
         planId: SIGNUP_PLAN,
-        status: 'active',
+        status: 'trial',
         timezone: 'America/Sao_Paulo',
       },
       select: { id: true, slug: true, name: true },
@@ -88,9 +88,6 @@ export class SignupProvisioningService {
       },
       select: { id: true, name: true },
     });
-    if (process.env.NODE_ENV !== 'production' && process.env.MOLHO_SIGNUP_FORCE_ROLLBACK_EMAIL === email) {
-      throw new Error('Falha forçada de provisionamento do signup.');
-    }
 
     const staffProvisioning = new StaffProvisioningRepository(this.requestContext);
     const identity = existingUser
@@ -152,6 +149,18 @@ export class SignupProvisioningService {
         afterJson: { tenantId: tenant.id, storeId: store.id, plan: SIGNUP_PLAN, status: 'trial' },
       },
     });
+
+    // Gancho de teste: forçado o mais tarde possível (depois da ÚLTIMA escrita
+    // do provisionamento) pra provar rollback de ponta a ponta — se disparasse
+    // logo após tenant.create/store.create, o teste provaria só que os dois
+    // primeiros INSERTs recuam, não que owner/role/entitlements/categoria/
+    // produtos/audit também recuam. A atomicidade real vem da transação por
+    // request do RequestContextService.run() (SET LOCAL + $transaction
+    // envolvendo o handler inteiro) — não há transação própria aqui pra abrir,
+    // e uma aninhada em cima do mesmo `tx` seria redundante.
+    if (process.env.NODE_ENV !== 'production' && process.env.MOLHO_SIGNUP_FORCE_ROLLBACK_EMAIL === email) {
+      throw new Error('Falha forçada de provisionamento do signup.');
+    }
 
     return { accessUser: user, tenant, store, created: true };
   }

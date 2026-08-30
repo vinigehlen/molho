@@ -118,6 +118,7 @@ model ModuleAudit {
 // ─── Tenant / loja ───────────────────────────────────────────────────────────
 
 enum TenantStatus {
+  trial
   active
   suspended
 }

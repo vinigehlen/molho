@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Molho | Release notes interativo</title>
+  <style>
+    :root {
+      --brand: #D63A1E;
+      --brand-strong: #A81E16;
+      --brand-faint: #FEF1EE;
+      --text: #141216;
+      --muted: #585666;
+      --line: #e9e7ee;
+      --surface: #f5f5f7;
+      --card: #ffffff;
+      --success: #12a454;
+      --warning: #f5a623;
+      --danger: #c62f3b;
+      --info: #3d5afe;
+      --pix: #32bcad;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      letter-spacing: 0;
+    }
+    button, input { font: inherit; }
+    .shell { min-height: 100vh; }
+    .hero {
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+    .hero-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 20px 28px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+      gap: 28px;
+      align-items: end;
+    }
+    .eyebrow {
+      color: var(--brand-strong);
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+    h1 {
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.02;
+      margin: 0;
+      max-width: 820px;
+    }
+    .lead {
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.55;
+      max-width: 780px;
+    }
+    .hero-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: var(--surface);
+    }
+    .hero-panel h2, .hero-panel p { margin: 0; }
+    .hero-panel h2 { font-size: 16px; }
+    .hero-panel p { color: var(--muted); line-height: 1.5; margin-top: 8px; }
+    .metrics {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px 20px 28px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .metric strong {
+      display: block;
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(245, 245, 247, .94);
+      backdrop-filter: blur(14px);
+    }
+    .toolbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      overflow-x: auto;
+    }
+    .filter {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--text);
+      padding: 9px 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .filter[aria-pressed="true"] {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand);
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px 56px;
+    }
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 28px 0 14px;
+    }
+    .section-title h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .section-title p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .feature {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--card);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .feature[hidden] { display: none; }
+    .shot {
+      height: 174px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      overflow: hidden;
+      cursor: zoom-in;
+    }
+    .shot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .feature-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--brand-strong);
+      background: var(--brand-faint);
+      border-radius: 999px;
+      padding: 5px 8px;
+    }
+    .feature h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.48;
+      font-size: 14px;
+    }
+    .bullets {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.48;
+    }
+    .mock {
+      width: 100%;
+      height: 174px;
+      padding: 12px;
+      background: linear-gradient(180deg, #fff 0, #f5f5f7 100%);
+      color: var(--text);
+    }
+    .mock-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pill {
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: var(--brand);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+    .lane {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px;
+      min-height: 118px;
+    }
+    .lane h4 {
+      margin: 0 0 7px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .order-mini {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px;
+      margin-bottom: 6px;
+      background: var(--surface);
+      font-size: 10px;
+      line-height: 1.25;
+    }
+    .money { font-variant-numeric: tabular-nums; font-weight: 800; }
+    .form-mock {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .field {
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 10px;
+      padding: 7px;
+    }
+    .field.wide { grid-column: 1 / -1; }
+    .zone-list {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 10px;
+    }
+    .timeline {
+      display: grid;
+      gap: 8px;
+    }
+    .time-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 8px;
+      align-items: center;
+      font-size: 10px;
+    }
+    .bar {
+      height: 16px;
+      border-radius: 999px;
+      background: var(--brand);
+    }
+    .print-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .print-metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px 8px;
+      min-height: 72px;
+    }
+    .print-metric b { display:block; font-size:22px; }
+    .print-metric span { color:var(--muted); font-size:10px; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .flow-step {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 9px;
+      font-size: 10px;
+      min-height: 70px;
+    }
+    .flow-step b { display:block; margin-bottom:5px; }
+    .architecture {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+    .arch-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .arch-row strong { color: var(--brand-strong); }
+    .arch-row p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(20, 18, 22, .72);
+    }
+    .modal.open { display: flex; }
+    .modal img {
+      max-width: min(1100px, 94vw);
+      max-height: 86vh;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .modal button {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .footer {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 34px;
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+    }
+    @media (max-width: 920px) {
+      .hero-inner { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .arch-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .metrics, .grid { grid-template-columns: 1fr; }
+      .section-title { align-items: start; flex-direction: column; }
+      .flow { grid-template-columns: 1fr; }
+      .kanban { grid-template-columns: repeat(2, 1fr); }
+      .shot, .mock { height: 220px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">Molho · release notes do build atual</p>
+          <h1>Um SaaS de delivery próprio já com base operacional de ponta a ponta.</h1>
+          <p class="lead">Esta revisão consolida o que está disponível no monorepo: storefront, checkout, gestão realtime, impressão, módulos, auth, anti-abuso e o novo signup self-service do Épico 13.</p>
+        </div>
+        <aside class="hero-panel">
+          <h2>Leitura geral</h2>
+          <p>O sistema já parece um produto piloto operável: o cliente consegue montar pedido, o lojista consegue acompanhar a fila, e a plataforma já tem fundações fortes de multi-tenant, RBAC, RLS e entitlements. O que ainda aparece como scaffolding é billing real, trial enforcement e partes futuras como domínio próprio, cupons, fidelidade e integrações pagas.</p>
+        </aside>
+      </div>
+      <div class="metrics" aria-label="Resumo do release">
+        <div class="metric"><strong>5</strong><span>áreas de produto navegáveis</span></div>
+        <div class="metric"><strong>21</strong><span>features disponíveis listadas</span></div>
+        <div class="metric"><strong>7</strong><span>testes e2e novos do signup</span></div>
+        <div class="metric"><strong>0</strong><span>pagamento real no billing, por escopo</span></div>
+      </div>
+    </header>
+
+    <nav class="toolbar" aria-label="Filtros de release notes">
+      <div class="toolbar-inner">
+        <button class="filter" type="button" data-filter="all" aria-pressed="true">Tudo</button>
+        <button class="filter" type="button" data-filter="cliente">Cliente final</button>
+        <button class="filter" type="button" data-filter="lojista">Lojista</button>
+        <button class="filter" type="button" data-filter="plataforma">Plataforma</button>
+        <button class="filter" type="button" data-filter="infra">Infra e segurança</button>
+      </div>
+    </nav>
+
+    <main>
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Jornada Principal</h2>
+            <p>Do cadastro público ao pedido em preparo.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="feature" data-group="lojista plataforma">
+            <button class="shot" type="button" data-image="assets/signup.png" aria-label="Ampliar signup">
+              <img src="assets/signup.png" alt="Tela de signup self-service do Molho">
+            </button>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 13</span><span class="tag">público</span></div>
+              <h3>Signup self-service por e-mail</h3>
+              <p>O dono cria a própria loja sem humano do Molho. O cadastro pede e-mail, envia OTP e só provisiona depois da verificação.</p>
+              <ul class="bullets">
+                <li>Não cria tenant nem user no request do OTP.</li>
+                <li>Signup nasce em Standard trial por 7 dias.</li>
+                <li>Retorna sessão staff e entra direto no backoffice.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista">
+            <button class="shot" type="button" data-image="assets/login.png" aria-label="Ampliar login">
+              <img src="assets/login.png" alt="Tela de login por OTP do backoffice">
+            </button>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Auth 9b</span><span class="tag">staff</span></div>
+              <h3>Login diário de staff</h3>
+              <p>Backoffice sem senha: OTP por canal configurado, access token em memória e refresh rotativo em cookie seguro.</p>
+              <ul class="bullets">
+                <li>Seleção de tenant quando o staff tem mais de um vínculo.</li>
+                <li>Refresh com retry depois de 401.</li>
+                <li>Logout revoga sessão e limpa cookie.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="cliente lojista">
+            <div class="mock" role="img" aria-label="Prévia do fluxo de checkout">
+              <div class="mock-top"><span>Checkout</span><span class="pill">PIX estático</span></div>
+              <div class="flow">
+                <div class="flow-step"><b>Carrinho</b>itens e observações</div>
+                <div class="flow-step"><b>Endereço</b>CEP, número, zona</div>
+                <div class="flow-step"><b>Revalidação</b>preço fresco</div>
+                <div class="flow-step"><b>Pagamento</b>PIX ou entrega</div>
+                <div class="flow-step"><b>Pedido</b>entra recebido</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épicos 5-8</span><span class="tag">checkout</span></div>
+              <h3>Checkout com revalidação segura</h3>
+              <p>O pedido só nasce depois de o servidor revalidar preço, disponibilidade, zona, horário, mínimo e método de pagamento.</p>
+              <ul class="bullets">
+                <li>Preço subiu ou item sumiu: revisão obrigatória.</li>
+                <li>PIX estático com confirmação manual.</li>
+                <li>Dinheiro/cartão na entrega e troco em centavos.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Storefront</h2>
+            <p>Experiência do cliente final e cardápio white-label.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="feature" data-group="cliente">
+            <button class="shot" type="button" data-image="assets/storefront-home.png" aria-label="Ampliar storefront">
+              <img src="assets/storefront-home.png" alt="Home pública do storefront com link para criar restaurante">
+            </button>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">storefront</span><span class="tag">aquisição</span></div>
+              <h3>Entrada pública com CTA de aquisição</h3>
+              <p>A home pública aponta o caminho “Crie seu restaurante”, conectando a vitrine Molho ao signup self-service.</p>
+              <ul class="bullets">
+                <li>Fallback local para backoffice em desenvolvimento.</li>
+                <li>Link configurável por `NEXT_PUBLIC_BACKOFFICE_URL`.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="cliente">
+            <div class="mock" role="img" aria-label="Prévia de cardápio">
+              <div class="mock-top"><span>Demo Burger</span><span class="pill">Aberto</span></div>
+              <div class="form-mock">
+                <div class="field wide">Categorias: Lanches · Bebidas · Porções</div>
+                <div class="field wide">X-Salada da casa · R$ 28,90</div>
+                <div class="field wide">Batata crocante · R$ 14,90</div>
+                <div class="field">Carrinho · 2 itens</div>
+                <div class="field money">R$ 43,80</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">cardápio</span><span class="tag">mobile-first</span></div>
+              <h3>Cardápio, carrinho e bottom sheets</h3>
+              <p>Storefront por slug com categorias, produtos, modificadores, carrinho persistente e fluxo pensado para celular.</p>
+              <ul class="bullets">
+                <li>Produtos com foto via R2 quando configurado.</li>
+                <li>Modificadores e observações por item.</li>
+                <li>Estado salvo no navegador até o checkout.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="cliente infra">
+            <div class="mock" role="img" aria-label="Prévia de endereço e zona">
+              <div class="mock-top"><span>Entrega</span><span class="pill">Portão/RS</span></div>
+              <div class="zone-list">
+                <b>Centro e arredores</b><br>
+                Taxa: R$ 6,00 · ETA: 30-50 min<br><br>
+                CEP verificado: sim<br>
+                Fora da área: fallback para retirada
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 6</span><span class="tag">geo</span></div>
+              <h3>Endereço e área de entrega</h3>
+              <p>O cliente informa endereço no checkout; a API resolve CEP/geocoding antes da transação do pedido e calcula zona, taxa e ETA.</p>
+              <ul class="bullets">
+                <li>Rate-limit antes de I/O externo.</li>
+                <li>Zona por cidade e suporte vivo a polígono/raio.</li>
+                <li>Endereço só vira dado persistido ao criar pedido.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Backoffice do Lojista</h2>
+            <p>Operação de pedidos, entrega, impressão e balcão.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="feature" data-group="lojista">
+            <div class="mock" role="img" aria-label="Prévia do gestor de pedidos">
+              <div class="mock-top"><span>Pedidos · Demo Burger</span><span class="pill">tempo real</span></div>
+              <div class="kanban">
+                <div class="lane"><h4>Recebidos (1)</h4><div class="order-mini"><b>Ana</b><br><span class="money">R$ 34,90</span><br>PIX a confirmar</div></div>
+                <div class="lane"><h4>Preparando (1)</h4><div class="order-mini"><b>Bruno</b><br><span class="money">R$ 42,90</span><br>troco p/ R$ 50</div></div>
+                <div class="lane"><h4>Prontos (1)</h4><div class="order-mini"><b>Carla</b><br><span class="money">R$ 28,90</span><br>cartão entrega</div></div>
+                <div class="lane"><h4>Saíram (1)</h4><div class="order-mini"><b>Diego</b><br><span class="money">R$ 55,90</span><br>pago</div></div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 9</span><span class="tag">SSE</span></div>
+              <h3>Gestor realtime de pedidos</h3>
+              <p>Board por status com REST inicial, SSE para cutuques, som de pedido novo, wake lock e fila offline para mudanças de status.</p>
+              <ul class="bullets">
+                <li>Máquina de estados centralizada.</li>
+                <li>Gates de pagamento para preparar/concluir.</li>
+                <li>Reconexão e refetch quando o stream cai.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista">
+            <div class="mock" role="img" aria-label="Prévia de zonas e horários">
+              <div class="mock-top"><span>Zonas e horários</span><span class="pill">1 loja</span></div>
+              <div class="form-mock">
+                <div class="field wide">Loja ativa: Demo Burger Centro</div>
+                <div class="field">Cidade: Portão</div>
+                <div class="field">Taxa: R$ 6,00</div>
+                <div class="field">ETA mín: 30</div>
+                <div class="field">ETA máx: 50</div>
+                <div class="field wide">Sexta e sábado · 18:00-23:59</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">entrega</span><span class="tag">horários</span></div>
+              <h3>Configuração de entrega</h3>
+              <p>O gestor permite escolher loja, cadastrar zonas por cidade, editar taxa/ETA/prioridade e salvar a grade semanal de turnos.</p>
+              <ul class="bullets">
+                <li>Optimistic locking em zonas.</li>
+                <li>Duplicidade cidade+UF protegida.</li>
+                <li>Turnos com validação de sobreposição.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista">
+            <div class="mock" role="img" aria-label="Prévia da impressão">
+              <div class="mock-top"><span>Impressão da cozinha</span><span class="pill">fila</span></div>
+              <div class="print-grid">
+                <div class="print-metric"><b>3</b><span>na fila</span></div>
+                <div class="print-metric"><b>1</b><span>imprimindo</span></div>
+                <div class="print-metric"><b>0</b><span>lease vencido</span></div>
+                <div class="print-metric"><b>0</b><span>falhou</span></div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 10</span><span class="tag">ESC/POS</span></div>
+              <h3>Impressão de comanda</h3>
+              <p>Pedidos geram jobs de impressão; o agente local reivindica a fila e confirma sucesso/falha. O botão do pedido cria segunda via.</p>
+              <ul class="bullets">
+                <li>Claim com lease para evitar duplicidade.</li>
+                <li>Ticket sem preço/PII desnecessária.</li>
+                <li>Fallback por navegador documentado.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista">
+            <div class="mock" role="img" aria-label="Prévia de balcão">
+              <div class="mock-top"><span>Balcão</span><span class="pill">PDV leve</span></div>
+              <div class="form-mock">
+                <div class="field wide">Pedido walk-in · completed</div>
+                <div class="field">Unitário do catálogo</div>
+                <div class="field">Pesável por valor</div>
+                <div class="field">Dinheiro no balcão</div>
+                <div class="field">Cartão no balcão</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">balcão</span><span class="tag">idempotência</span></div>
+              <h3>Pedido de balcão</h3>
+              <p>Fluxo staff-only para venda rápida no caixa, com item unitário vindo do catálogo, item pesável por valor e confirmação imediata.</p>
+              <ul class="bullets">
+                <li>Idempotency-Key obrigatória.</li>
+                <li>RLS impede produto de outro tenant.</li>
+                <li>Recibos e etiquetas de balança testados.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista">
+            <div class="mock" role="img" aria-label="Prévia de ajuste de pedido">
+              <div class="mock-top"><span>Ajustes</span><span class="pill">auditável</span></div>
+              <div class="timeline">
+                <div class="time-row"><span>Adicionar</span><div class="bar" style="width:85%"></div></div>
+                <div class="time-row"><span>Remover</span><div class="bar" style="width:56%; background:var(--warning)"></div></div>
+                <div class="time-row"><span>Qtd.</span><div class="bar" style="width:70%; background:var(--info)"></div></div>
+                <div class="time-row"><span>Total atual</span><div class="bar" style="width:92%; background:var(--success)"></div></div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">edição</span><span class="tag">audit log</span></div>
+              <h3>Ajuste de pedidos em aberto</h3>
+              <p>Staff pode adicionar item, remover item ou alterar quantidade enquanto o pedido ainda permite, recalculando `currentTotalCents`.</p>
+              <ul class="bullets">
+                <li>Preço sempre vem do catálogo ou do item congelado.</li>
+                <li>Pedido finalizado não aceita ajuste.</li>
+                <li>Idempotência ponta a ponta.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="lojista cliente">
+            <div class="mock" role="img" aria-label="Prévia de WhatsApp click-to-chat">
+              <div class="mock-top"><span>WhatsApp</span><span class="pill">humano no loop</span></div>
+              <div class="zone-list">
+                Pedido pronto para Ana<br><br>
+                Mensagem montada pelo Molho<br>
+                Envio final feito pelo lojista no WhatsApp
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 11</span><span class="tag">ctc</span></div>
+              <h3>WhatsApp click-to-chat</h3>
+              <p>O sistema busca telefone sob demanda, monta o texto de status e abre `wa.me`; o lojista revisa e toca em enviar.</p>
+              <ul class="bullets">
+                <li>Sem Cloud API no MVP.</li>
+                <li>PII não trafega no board inteiro.</li>
+                <li>Pedido guest alerta telefone não verificado.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Administração e Plataforma</h2>
+            <p>Fundações de SaaS multi-tenant e governança.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="feature" data-group="plataforma infra">
+            <div class="mock" role="img" aria-label="Prévia de catálogo de módulos">
+              <div class="mock-top"><span>Módulos</span><span class="pill">entitled + enabled + released</span></div>
+              <div class="form-mock">
+                <div class="field wide">catalog · orders · customers · core</div>
+                <div class="field wide">storefront · zonas · impressão · PIX estático</div>
+                <div class="field wide">checkout.guest desligado por padrão</div>
+                <div class="field wide">addons/futuros ficam registrados, não implementados cedo</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">contracts</span><span class="tag">billing-ready</span></div>
+              <h3>Registry de módulos e entitlements</h3>
+              <p>Toda capability vive no registry. O tenant só usa uma feature quando tem direito, configuração ligada e release flag liberada.</p>
+              <ul class="bullets">
+                <li>`defaultModulesForPlan` provisiona o plano.</li>
+                <li>`ModuleService.isModuleActive` é a fonte runtime.</li>
+                <li>Cache invalida com extensão Prisma.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="plataforma">
+            <div class="mock" role="img" aria-label="Prévia de provisionamento de staff">
+              <div class="mock-top"><span>Staff</span><span class="pill">super-admin</span></div>
+              <div class="form-mock">
+                <div class="field wide">email@restaurante.com</div>
+                <div class="field">role: owner</div>
+                <div class="field">scope: tenant</div>
+                <div class="field wide">audit_log: platform.staff_provision</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">Épico 14</span><span class="tag">RBAC</span></div>
+              <h3>Provisionamento de staff</h3>
+              <p>Super-admin cria/reusa `users` e concede `user_roles` em tenant/store. O signup do Épico 13 reaproveita o mesmo motor.</p>
+              <ul class="bullets">
+                <li>Papéis platform não nascem por esse endpoint.</li>
+                <li>Escopo inexistente vira erro claro.</li>
+                <li>Atribuição sensível gera auditoria.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="feature" data-group="plataforma infra">
+            <div class="mock" role="img" aria-label="Prévia de painel de módulos">
+              <div class="mock-top"><span>Painel de módulos</span><span class="pill">manual</span></div>
+              <div class="form-mock">
+                <div class="field wide">notify.whatsapp_ctc · active</div>
+                <div class="field wide">printing.escpos · trialing · +7 dias</div>
+                <div class="field wide">fiscal.nfce · addon · externo</div>
+                <div class="field wide">requires faltando → 409</div>
+              </div>
+            </div>
+            <div class="feature-body">
+              <div class="tags"><span class="tag">super-admin</span><span class="tag">módulos</span></div>
+              <h3>Painel de entitlements</h3>
+              <p>Permite conceder, trialar ou revogar módulos não-core, respeitando dependências do registry e auditando mudanças.</p>
+              <ul class="bullets">
+                <li>Core não é editável.</li>
+                <li>`revoked` traduz para `suspended` no banco.</li>
+                <li>Estado expõe as três camadas.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Segurança e Arquitetura</h2>
+            <p>As partes invisíveis que seguram o produto em produção.</p>
+          </div>
+        </div>
+        <div class="architecture">
+          <div class="arch-row">
+            <strong>Multi-tenancy</strong>
+            <p>Postgres com RLS por `tenant_id`, contexto por request via transação e `SET LOCAL app.tenant_id`. `users` e `user_roles` ficam globais por desenho, sempre filtrados por escopo explícito.</p>
+          </div>
+          <div class="arch-row">
+            <strong>RBAC granular</strong>
+            <p>Permissões vêm de `packages/contracts/permissions.ts`. Backend combina `@RequireModule` e `@RequirePermission`; papéis são conjuntos de permissões, não `if role === ...` espalhado.</p>
+          </div>
+          <div class="arch-row">
+            <strong>LGPD</strong>
+            <p>Telefone e e-mail sensíveis são cifrados em repouso, com HMAC de lookup. Selectores por hash vêm de helpers, nunca de valores nullable lidos do banco.</p>
+          </div>
+          <div class="arch-row">
+            <strong>Anti-abuso</strong>
+            <p>OTP e signup têm rate-limits separados; checkout guest tem cap próprio antes de geocoding; escrita pública não entra direto na transação segurando conexão enquanto faz I/O externo.</p>
+          </div>
+          <div class="arch-row">
+            <strong>Idempotência</strong>
+            <p>Criação/ajuste de pedidos, impressão e provisionamento evitam duplicidade. O signup é idempotente por e-mail e não duplica tenant no segundo verify.</p>
+          </div>
+          <div class="arch-row">
+            <strong>Realtime</strong>
+            <p>Gestor usa SSE + Redis pub/sub e foi desenhado para API Node de vida longa. Shutdown fecha streams com evento próprio para reconexão limpa.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <div>
+            <h2>Fora Desta Versão</h2>
+            <p>Importante para não vender como pronto o que ainda é roadmap.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <article class="feature" data-group="plataforma">
+            <div class="feature-body">
+              <div class="tags"><span class="tag">scaffolding</span></div>
+              <h3>Billing real</h3>
+              <p>O signup grava plano/status/trial, mas não cobra cartão, PIX recorrente, dunning, expiração de trial nem suspensão automática.</p>
+            </div>
+          </article>
+          <article class="feature" data-group="cliente">
+            <div class="feature-body">
+              <div class="tags"><span class="tag">fase futura</span></div>
+              <h3>Promoções, cupons e fidelidade</h3>
+              <p>Os módulos existem no registry, mas a implementação funcional continua fora do MVP atual.</p>
+            </div>
+          </article>
+          <article class="feature" data-group="infra">
+            <div class="feature-body">
+              <div class="tags"><span class="tag">integrações</span></div>
+              <h3>PIX online, cartão online e iFood</h3>
+              <p>Adapters e decisões estão preparados por arquitetura, mas as integrações reais são épicos futuros. O MVP opera com PIX estático/manual e métodos na entrega.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <p class="footer">Gerado a partir do worktree `codex/epico-13-onboarding`. As capturas públicas são screenshots reais locais; as prévias do gestor, entrega, impressão, módulos e plataforma são composições demonstrativas baseadas nas telas e contratos do código, para documentar features sem depender de sessão/API ativa.</p>
+    </main>
+  </div>
+
+  <div class="modal" id="image-modal" aria-hidden="true">
+    <button type="button" id="close-modal">Fechar</button>
+    <img id="modal-image" alt="">
+  </div>
+
+  <script>
+    const filters = Array.from(document.querySelectorAll('.filter'));
+    const cards = Array.from(document.querySelectorAll('.feature'));
+    filters.forEach((button) => {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.filter;
+        filters.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        cards.forEach((card) => {
+          const groups = (card.dataset.group || '').split(' ');
+          card.hidden = selected !== 'all' && !groups.includes(selected);
+        });
+      });
+    });
+
+    const modal = document.getElementById('image-modal');
+    const modalImage = document.getElementById('modal-image');
+    const closeModal = document.getElementById('close-modal');
+    document.querySelectorAll('[data-image]').forEach((button) => {
+      button.addEventListener('click', () => {
+        modalImage.src = button.dataset.image;
+        modalImage.alt = button.querySelector('img')?.alt || 'Tela ampliada';
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+      });
+    });
+    closeModal.addEventListener('click', () => {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalImage.removeAttribute('src');
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal.click();
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('open')) closeModal.click();
+    });
+  </script>
+</body>
+</html>
