@@ -9,6 +9,8 @@ function order(id: string, status: AdminOrder['status'], version = 0): AdminOrde
     version,
     createdAt: '2026-07-26T18:00:00.000Z',
     fulfillmentDeadlineAt: null,
+    flaggedAt: null,
+    flaggedReason: null,
     customerName: 'X',
     customerVerified: true,
     paymentMethod: 'pix',

@@ -21,6 +21,7 @@ function order(status: AdminOrder['status'], over: Partial<AdminOrder> = {}): Ad
     subtotalCents: 100, deliveryFeeCents: 0, totalCents: 100, currentTotalCents: null, fulfillmentType: 'delivery', destination: 'delivery',
     delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
     items: [], ...over, fulfillmentDeadlineAt: over.fulfillmentDeadlineAt ?? null,
+    flaggedAt: over.flaggedAt ?? null, flaggedReason: over.flaggedReason ?? null,
   };
 }
 
