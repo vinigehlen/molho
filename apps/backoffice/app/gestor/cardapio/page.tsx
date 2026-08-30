@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { centsToBRL } from '../../../lib/format';
 import { getStaffSession } from '../../../lib/staff-session';
@@ -35,7 +36,6 @@ import {
   fetchModifiers,
   fetchProductImages,
   fetchProducts,
-  importCatalog,
   linkModifierGroupToProduct,
   reorderProductImage,
   setModifierGroupActive,
@@ -519,19 +519,6 @@ export default function CardapioPage() {
     }
   }
 
-  async function importSpreadsheet(file: File) {
-    setBusy('import');
-    try {
-      await importCatalog(file);
-      await reloadProducts();
-      setMessage('Planilha importada. O cardápio já está atualizado.');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Falha ao importar.');
-    } finally {
-      setBusy(null);
-    }
-  }
-
   /** Pausar/reativar grupo de complementos — mesma ideia do "esgotado" de
    * produto: some pro cliente escolher, mas não apaga (histórico de pedido
    * intacto). Também acessível na aba Complementos. */
@@ -729,21 +716,13 @@ export default function CardapioPage() {
               <Download className="h-4 w-4" aria-hidden="true" />
               Baixar modelo
             </button>
-            <label className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-[14px] border border-border bg-bg-card px-4 text-sm font-semibold transition-colors hover:border-brand hover:text-brand focus-within:shadow-focus">
+            <Link
+              href="/gestor/cardapio/importar"
+              className="inline-flex h-11 items-center gap-2 rounded-[14px] border border-border bg-bg-card px-4 text-sm font-semibold transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:shadow-focus"
+            >
               <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
-              {busy === 'import' ? 'Importando…' : 'Importar planilha'}
-              <input
-                type="file"
-                accept=".csv,.xlsx"
-                className="sr-only"
-                disabled={busy === 'import'}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void importSpreadsheet(file);
-                  event.target.value = '';
-                }}
-              />
-            </label>
+              Importar cardápio
+            </Link>
             <MoButton
               type="button"
               onClick={openProductCreation}
