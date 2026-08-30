@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "pnpm run db:generate && tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "pnpm run db:generate && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "db:generate": "DIRECT_URL=postgresql://generate:generate@localhost:5432/generate prisma generate",
     "db:migrate:dev": "dotenv -e ../../.env.local -- prisma migrate dev",
