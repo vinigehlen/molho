@@ -14,10 +14,10 @@
  *      nunca "O Molho aumentou suas vendas".
  *
  * Regras de escrita (§2.4):
- *   · Sempre "você", informal. Nada de gerundismo ("vamos estar enviando" ❌).
- *   · No máximo 1 emoji por mensagem — e NENHUM em erro crítico, valor
- *     financeiro ou tela fiscal.
- *   · Nunca prometa: "entrega em 30 min garantidos" ❌ → "previsão: 30–40 min" ✅.
+ *   · Sempre "você", informal. Nada de gerundismo ("vamos estar enviando").
+ *   · Nenhum emoji, em mensagem nenhuma (CLAUDE.md, sem exceção) — ícone vem
+ *     da biblioteca de ícones do design system.
+ *   · Nunca prometa: "entrega em 30 min garantidos" → "previsão: 30–40 min".
  *
  * Léxico (§2.2) — o que NÃO escrever:
  *   "a plataforma"/"o sistema" → "seu delivery", "sua casa"
@@ -39,7 +39,7 @@ export const COPY = {
   /** O que o CLIENTE lê — storefront, checkout, acompanhamento. */
   storefront: {
     /** Vars: {nome} */
-    saudacao: 'Oi, {nome} 👋 Bateu a fome?',
+    saudacao: 'Oi, {nome}! Bateu a fome?',
     saudacaoAnonima: 'Bateu a fome?',
 
     /** Loja existe (link válido) mas ainda não tem categoria/produto visível. */
@@ -58,8 +58,8 @@ export const COPY = {
     pedidoConfirmado: 'Pedido na cozinha! A gente te avisa a cada passo.',
 
     /** Vars: {horario} */
-    lojaFechada: 'A cozinha tá descansando 😴 Voltamos {horario}. Dá pra olhar o cardápio e já escolher!',
-    foraDaArea: 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!',
+    lojaFechada: 'A cozinha tá descansando. Voltamos {horario}. Dá pra olhar o cardápio e já escolher!',
+    foraDaArea: 'Ainda não chegamos aí. Mas dá pra retirar no balcão!',
 
     /** Vars: {valor} — pedido mínimo não atingido. */
     pedidoMinimo: 'Faltam {valor} pra fechar o pedido mínimo da casa.',
@@ -79,10 +79,10 @@ export const COPY = {
     pedidosVazioCorpo: 'Assim que cair o primeiro, ele aparece aqui e o som toca.',
 
     pedidoNovo: 'Pedido novo na área!',
-    caixaFechado: 'Caixa fechado no capricho. Bom descanso! 👋',
+    caixaFechado: 'Caixa fechado no capricho. Bom descanso!',
 
     /** A conquista é do lojista, nunca do Molho (§2.1, regra 4). */
-    recordeDeVendas: 'Você bateu seu recorde de vendas 🎉',
+    recordeDeVendas: 'Você bateu seu recorde de vendas!',
     primeiroPedidoDoDia: 'Primeiro pedido do dia. Vamo que vamo!',
 
     semConexao: 'Sem conexão — tentando reconectar. Seus pedidos estão salvos aqui.',

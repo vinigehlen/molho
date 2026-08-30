@@ -131,7 +131,7 @@ export function CartView({
   if (checkout.step.kind === 'success') {
     return (
       <main className="flex min-h-screen flex-col items-center gap-6 p-6 text-center">
-        <h1 className="text-title-lg text-text">Pedido feito! 🎉</h1>
+        <h1 className="text-title-lg text-text">Pedido feito!</h1>
         <p className="text-body font-medium text-text">
           {checkout.step.fulfillmentType === 'pickup' ? 'Retirar até' : 'Entregar até'}:{' '}
           <span className="tabular-nums">

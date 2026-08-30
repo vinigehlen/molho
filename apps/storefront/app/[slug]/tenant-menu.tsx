@@ -33,7 +33,7 @@ const LEGAL_PRIVACY_HREF = 'https://molho.live/privacidade';
  * importa @molho/contracts sem o risco do Fast Refresh (mesma razão de
  * cart-storage.ts) — chega pronta via prop `closedMessage`.
  */
-const COPY_FORA_DA_AREA = 'Ainda não chegamos aí 😕 Mas dá pra retirar no balcão!';
+const COPY_FORA_DA_AREA = 'Ainda não chegamos aí. Mas dá pra retirar no balcão!';
 const COPY_PEDIDO_MINIMO = 'Faltam {valor} pra fechar o pedido mínimo da casa.';
 /** Cliente que já verificou o telefone nesta loja (pediu antes) ganha uma
  * saudação mais quente — sem round-trip pro nome: o token de sessão em

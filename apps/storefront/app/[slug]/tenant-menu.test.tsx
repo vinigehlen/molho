@@ -78,8 +78,8 @@ beforeEach(() => {
 
 describe('TenantMenu — Épico 6', () => {
   it('mostra o banner de loja fechada quando closedMessage vem preenchido', () => {
-    renderTenantMenu({ closedMessage: 'A cozinha tá descansando 😴 Voltamos 12h.' });
-    expect(screen.getByText('A cozinha tá descansando 😴 Voltamos 12h.')).toBeInTheDocument();
+    renderTenantMenu({ closedMessage: 'A cozinha tá descansando. Voltamos 12h.' });
+    expect(screen.getByText('A cozinha tá descansando. Voltamos 12h.')).toBeInTheDocument();
   });
 
   it('sem closedMessage (loja aberta): não mostra banner nenhum de horário', () => {

@@ -12,14 +12,13 @@ function todasAsStrings(obj: object, prefixo = ''): [string, string][] {
 }
 
 const STRINGS = todasAsStrings(COPY);
-const ERROS = todasAsStrings(COPY.erros);
 
 // Emoji: a faixa que importa aqui (pictogramas, símbolos, emoticons).
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
 
 describe('interpolação', () => {
   it('troca as chaves pelos valores', () => {
-    expect(t(COPY.storefront.saudacao, { nome: 'Ana' })).toBe('Oi, Ana 👋 Bateu a fome?');
+    expect(t(COPY.storefront.saudacao, { nome: 'Ana' })).toBe('Oi, Ana! Bateu a fome?');
     expect(t(COPY.storefront.lojaFechada, { horario: 'terça às 18h' })).toContain('terça às 18h');
   });
 
@@ -59,12 +58,8 @@ describe('léxico da marca', () => {
 });
 
 describe('regras de escrita (§2.4)', () => {
-  it.each(STRINGS)('%s usa no máximo 1 emoji', (_caminho, texto) => {
-    expect(texto.match(EMOJI)?.length ?? 0).toBeLessThanOrEqual(1);
-  });
-
-  // Erro com emoji é deboche com quem já está frustrado.
-  it.each(ERROS)('o erro %s não tem emoji nenhum', (_caminho, texto) => {
+  // CLAUDE.md: nenhum emoji em UI ou copy de produto — sem exceção.
+  it.each(STRINGS)('%s não tem emoji nenhum', (_caminho, texto) => {
     expect(texto.match(EMOJI)).toBeNull();
   });
 

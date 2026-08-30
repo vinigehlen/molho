@@ -131,6 +131,7 @@ O único ponto que roda antes do `run()` é **Middleware** (Middleware → Guard
 - Radius 20px em cards, 14px em botões. Espaçamento em escala 4pt.
 - Bottom sheets para modais mobile. Timeline vertical com dots animados para status. Skeletons em todo loading.
 - Microcopy pt-BR informal, com léxico de restaurante ("comanda", "salão", "no capricho"). Ver §2 do doc de marca.
+- **Sem emojis em UI ou copy de produto.** Nenhum emoji em componentes, labels, botões, toasts, mensagens de status, ou texto voltado ao usuário final (storefront e backoffice). Ícones vêm da biblioteca de ícones do design system, não de emoji. Vale também para seeds e dados de exemplo. Exceção: nenhuma.
 
 ## Convenções de trabalho
 
