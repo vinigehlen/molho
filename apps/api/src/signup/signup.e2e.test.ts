@@ -155,7 +155,15 @@ describe('POST /v1/signup', () => {
     await request(app.getHttpServer()).post('/v1/signup/request-otp').send({ email }).expect(429);
   });
 
-  it('rollback remove todos os resquícios se falhar no meio do provisionamento', async () => {
+  // Falha forçada DEPOIS da última escrita do provisionamento (audit_log,
+  // ver signup-provisioning.service.ts) — não logo após tenant/store como
+  // antes. Provar rollback só do primeiro par de INSERTs seria falso
+  // positivo: passaria mesmo se owner/role/entitlements/categoria/produtos/
+  // audit não estivessem na mesma transação. A atomicidade real vem da
+  // transação por request do RequestContextService (não há $transaction
+  // próprio no serviço de provisionamento), e este teste tem que provar
+  // isso olhando TODAS as tabelas que o fluxo escreve.
+  it('rollback remove TODOS os resquícios se falhar no fim do provisionamento', async () => {
     const email = randomEmail();
     process.env.MOLHO_SIGNUP_FORCE_ROLLBACK_EMAIL = email;
     await request(app.getHttpServer()).post('/v1/signup/request-otp').send({ email }).expect(202);
@@ -164,8 +172,17 @@ describe('POST /v1/signup', () => {
       .post('/v1/signup/verify')
       .send({ email, code, restaurantName: 'Rollback Total', ownerName: email })
       .expect(500);
-    expect(await prisma.tenant.count({ where: { name: 'Rollback Total' } })).toBe(0);
+
+    const tenant = await prisma.tenant.findFirst({ where: { name: 'Rollback Total' } });
+    expect(tenant).toBeNull();
     expect(await prisma.store.count({ where: { name: 'Rollback Total' } })).toBe(0);
-    expect(await prisma.user.count({ where: { name: email } })).toBe(0);
+    const user = await prisma.user.findFirst({ where: { name: email } });
+    expect(user).toBeNull();
+    // Sem tenant/user sobreviventes não dá pra filtrar role/entitlement/
+    // categoria/produto/audit por FK — confirma que nenhuma linha do
+    // provisionamento sobrou soltando pelo nome/e-mail que só este teste usa.
+    expect(await prisma.category.count({ where: { name: 'Cardápio', tenant: { name: 'Rollback Total' } } })).toBe(0);
+    expect(await prisma.product.count({ where: { name: 'X-Salada da casa', tenant: { name: 'Rollback Total' } } })).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: 'signup.provision', tenant: { name: 'Rollback Total' } } })).toBe(0);
   });
 });
