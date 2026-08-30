@@ -97,7 +97,7 @@ export default function ImportarCardapioPage() {
         className="mb-4 inline-flex items-center gap-1 text-sm text-text-muted hover:text-brand"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Voltar pro cardápio
+        Voltar ao cardápio
       </Link>
 
       <h1 className="text-xl font-semibold text-text">Importar cardápio</h1>
@@ -270,7 +270,7 @@ export default function ImportarCardapioPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link href="/gestor/cardapio">
-              <MoButton>Ver cardápio</MoButton>
+              <MoButton>Ver cardápio atualizado</MoButton>
             </Link>
             <MoButton variant="ghost" icon={<Upload className="h-5 w-5" />} onClick={reset}>
               Importar outra planilha

@@ -107,6 +107,42 @@ describe('ImportarCardapioPage', () => {
     expect(text()).toContain('2 produtos criados');
   });
 
+  it('oferece "Voltar ao cardápio" a qualquer momento', async () => {
+    await mount();
+    const voltar = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Voltar ao cardápio'));
+    expect(voltar?.getAttribute('href')).toBe('/gestor/cardapio');
+  });
+
+  it('permite trocar o arquivo durante a revisão', async () => {
+    await mount();
+    await pickFile();
+    expect(text()).toContain('Picanha');
+
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => /Trocar arquivo/.test(b.textContent ?? ''))!.click();
+      await Promise.resolve();
+    });
+    expect(text()).not.toContain('Picanha');
+    expect(text()).toContain('Escolher planilha');
+  });
+
+  it('no resultado, leva de volta ao cardápio atualizado', async () => {
+    await mount();
+    await pickFile();
+    const consent = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => {
+      consent.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      commitButton()!.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const ver = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Ver cardápio atualizado'));
+    expect(ver?.getAttribute('href')).toBe('/gestor/cardapio');
+  });
+
   it('mostra erro e mantém a revisão quando o commit falha (permite retry)', async () => {
     mocks.commitCatalogImport.mockRejectedValueOnce(new Error('deu ruim no servidor'));
     await mount();
