@@ -42,7 +42,6 @@ vi.mock('../../../lib/catalog-api', () => ({
   createProduct: mocks.createProduct,
   deleteProduct: vi.fn(),
   downloadCatalogTemplate: vi.fn(),
-  importCatalog: vi.fn(),
   updateProduct: mocks.updateProduct,
   uploadProductImage: mocks.uploadProductImage,
 }));
@@ -588,5 +587,24 @@ describe('CardapioPage — reuso de grupo de complemento (fase 2/4)', () => {
 
     expect(mocks.linkModifierGroupToProduct).toHaveBeenCalledWith('mg-1', 'prod-1');
     expect(container.textContent).toContain('Grupo vinculado.');
+  });
+});
+
+describe('CardapioPage — importação', () => {
+  it('CTA "Importar cardápio" aponta para a rota assistida', async () => {
+    await mount();
+    const cta = [...container.querySelectorAll('a')].find((a) => a.textContent?.includes('Importar cardápio'));
+    expect(cta?.getAttribute('href')).toBe('/gestor/cardapio/importar');
+  });
+
+  it('mantém o botão "Baixar modelo"', async () => {
+    await mount();
+    const baixar = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Baixar modelo'));
+    expect(baixar).toBeDefined();
+  });
+
+  it('não há mais input que importe planilha direto', async () => {
+    await mount();
+    expect(container.querySelector('input[type="file"][accept=".csv,.xlsx"]')).toBeNull();
   });
 });
