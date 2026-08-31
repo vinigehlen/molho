@@ -106,17 +106,21 @@ fotos ou complementos.
 
 ## Estado no momento deste handoff
 
-Implementação e validação local concluídas. Ainda não há commit, push ou PR
-enquanto esta revisão do handoff é escrita.
+Implementação e validação local concluídas em dois commits:
+
+- `26c8e8e` — `fix: estabiliza o typecheck do workspace`;
+- `4eddaea` — `feat: adiciona ofertas em múltiplas categorias`.
+
+O working tree estava limpo depois dos commits. Push, PR, CI e merge ainda
+estavam pendentes enquanto esta revisão do handoff foi escrita.
 
 Pendências, nesta ordem:
 
-1. Fazer a inspeção final do diff e garantir que só os arquivos do 4C estão no
-   commit. Não há migration SQL nova nesta fatia.
-2. Commit em pt-BR, push e PR contra `main`.
-3. Aguardar CI e mesclar somente se verde.
-4. Sincronizar `main`, remover a branch remota/local se aplicável e registrar
-   aqui o commit, PR, CI e merge.
+1. Fazer push da branch e abrir PR contra `main`.
+2. Aguardar CI e mesclar somente se verde.
+3. Sincronizar `main` e remover a branch remota/local se aplicável.
+
+Não há migration SQL nova nesta fatia.
 
 ## Comandos seguros para retomar
 
