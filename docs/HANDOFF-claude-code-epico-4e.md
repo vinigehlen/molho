@@ -2,16 +2,16 @@
 
 Atualizado em 2026-08-31. Este arquivo existe para permitir retomada segura caso a sessão do Codex termine antes do fechamento remoto.
 
-## Estado no checkpoint
+## Estado final
 
-- Branch: `codex/epico-4e-biblioteca-complementos`
-- Base: `origin/main@ee6316d` (inclui o merge do PR #16)
+- Branch de trabalho: `codex/epico-4e-biblioteca-complementos` (removida do remoto após o merge)
+- `main`: `cf089b0`, sincronizada com `origin/main` (0 ahead / 0 behind)
 - Implementação: concluída
 - Revisão visual Impeccable: `disposition: ship`, sem pendência material
 - Migration `20260830143000_modifier_library_epico4e`: aplicada com sucesso no banco dev atual via `db:migrate:deploy`
 - Gate final da raiz, após a última alteração de código: `pnpm lint && pnpm test && pnpm build` verde
 - Contagens relevantes: API 578 testes; backoffice 181; contratos 320; UI 224; storefront 142; build 7/7 tasks
-- PR/CI/merge: preencher na seção final quando concluído
+- PR #22 mesclado em 2026-08-31; detalhes na seção final
 
 ## O que foi entregue
 
@@ -51,13 +51,10 @@ O viewport móvel medido ficou em `innerWidth=390` e `scrollWidth=390`.
 
 ## Se precisar retomar daqui
 
-1. Rode `git status --short` e preserve somente os arquivos já listados no commit/diff deste épico.
-2. Confirme `git diff --check`.
-3. Se houver qualquer alteração de código após este checkpoint, rode novamente, da raiz: `pnpm lint && pnpm test && pnpm build`.
-4. Commit sugerido: `feat: completa biblioteca de complementos do cardápio`.
-5. Push: `git push -u origin codex/epico-4e-biblioteca-complementos`.
-6. Abra PR para `main`, acompanhe o job `quality` e só faça merge com CI verde.
-7. Após merge, sincronize `main` com `git pull --ff-only origin main`, remova a branch local/remota quando seguro e atualize a seção abaixo.
+1. Comece de `main` atualizada e confirme `git status --short --branch`; não há ação restante no Épico 4E.
+2. Consulte `docs/04e-direcao-biblioteca-complementos.md` e `DESIGN.md` antes de estender essa experiência.
+3. Não edite a migration já aplicada; qualquer evolução de schema precisa de uma migration nova.
+4. Se houver nova alteração de código, rode da raiz `pnpm lint && pnpm test && pnpm build` antes de declarar o próximo recorte concluído.
 
 ## Cuidados
 
@@ -68,7 +65,8 @@ O viewport móvel medido ficou em `innerWidth=390` e `scrollWidth=390`.
 
 ## Fechamento remoto
 
-- Commit: pendente
-- PR: pendente
-- CI: pendente
-- Merge em `main`: pendente
+- Commit da feature: `c94e0a1` (`feat: completa biblioteca de complementos do cardápio`)
+- PR: [#22 — Épico 4E: completa biblioteca de complementos](https://github.com/vinigehlen/molho/pull/22), `MERGED`
+- CI: `quality` verde em 22m09s, incluindo 195/195 cenários de contraste; React Doctor 86/100 com 0 erros; os dois deploys Vercel verdes
+- Check externo `Workers Builds: molho-uploads`: falha recorrente e não bloqueante, também presente nos PRs #13–#16; nenhum arquivo do Worker foi alterado no 4E
+- Merge em `main`: `cf089b02ae01496f07d3b88d59b1d603bbb21dfc`, em 2026-08-31 18:06:30 UTC
