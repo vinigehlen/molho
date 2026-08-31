@@ -20,7 +20,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Padrao: Story = {
-  render: (args) => (
+  render: (args: Parameters<typeof MoCard>[0]) => (
     <MoCard {...args} className="max-w-sm">
       <MoCardHeader>
         <MoCardTitle>Filé à parmegiana</MoCardTitle>
@@ -45,7 +45,7 @@ export const Interativo: Story = {
 };
 
 export const ComRodape: Story = {
-  render: (args) => (
+  render: (args: Parameters<typeof MoCard>[0]) => (
     <MoCard {...args} padding="lg" className="max-w-sm">
       <MoCardHeader>
         <MoCardTitle>Comanda #1042</MoCardTitle>
