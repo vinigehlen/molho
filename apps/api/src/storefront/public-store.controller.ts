@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, Inject, Post, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Inject, Post, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { RequestWithGeocode } from '../geo/geocode.middleware';
 import { resolveAddress } from '../geo/resolve-address';
 import { RequireModule } from '../auth/guards/require-module.decorator';
@@ -50,8 +50,8 @@ export class PublicStoreController {
    */
   @Get(':slug')
   @Header('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
-  getStorefront() {
-    return this.storefront.getStorefront();
+  getStorefront(@Query('catalog') catalog?: string) {
+    return this.storefront.getStorefront({ catalogOffers: catalog === 'offers' });
   }
 
   /**

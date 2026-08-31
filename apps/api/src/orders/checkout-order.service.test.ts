@@ -55,6 +55,7 @@ function happyRevalidation(overrides: Partial<RevalidatedCheckout> = {}): Revali
     items: [
       {
         productId: 'product-1',
+        offerId: null,
         name: 'X-Burger',
         available: true,
         unitBasePriceCents: 2890,
@@ -98,6 +99,7 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   createOrderCalls: CreateOrderParams[] = [];
   createOrderItemsCalls: unknown[] = [];
   lockProductsForUpdateCalls: string[][] = [];
+  lockOffersForUpdateCalls: Array<ReadonlyArray<{ productId: string; offerId?: string }>> = [];
 
   async findCustomer() {
     return this.customer;
@@ -107,6 +109,9 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   }
   async lockProductsForUpdate(productIds: readonly string[]) {
     this.lockProductsForUpdateCalls.push([...productIds]);
+  }
+  async lockOffersForUpdate(items: readonly { productId: string; offerId?: string }[]) {
+    this.lockOffersForUpdateCalls.push(items.map((item) => ({ ...item })));
   }
   claimCouponResult: { couponId: string; couponCodeSnapshot: string } | null = { couponId: 'coupon-1', couponCodeSnapshot: 'PROMO10' };
   claimCouponCalls: string[] = [];
@@ -225,12 +230,16 @@ describe('CheckoutOrderService.createOrder', () => {
     expect(repo.createOrderCalls).toHaveLength(0);
   });
 
-  it('6) trava as linhas de produto (ids únicos) ANTES de revalidar — fecha a janela de corrida em preço/disponibilidade', async () => {
+  it('6) trava produto e oferta ANTES de revalidar — fecha a janela de corrida em preço/disponibilidade', async () => {
     const { repo, revalidationService, service } = setup();
     const ordem: string[] = [];
     repo.lockProductsForUpdate = async (productIds: readonly string[]) => {
-      ordem.push('lock');
+      ordem.push('lock-product');
       repo.lockProductsForUpdateCalls.push([...productIds]);
+    };
+    repo.lockOffersForUpdate = async (items) => {
+      ordem.push('lock-offer');
+      repo.lockOffersForUpdateCalls.push(items.map((item) => ({ ...item })));
     };
     revalidationService.revalidate.mockImplementation(async () => {
       ordem.push('revalidate');
@@ -244,8 +253,9 @@ describe('CheckoutOrderService.createOrder', () => {
 
     await service.createOrder('tenant-1', 'customer-1', requestComItemRepetido, RESOLVED);
 
-    expect(ordem).toEqual(['lock', 'revalidate']);
+    expect(ordem).toEqual(['lock-product', 'lock-offer', 'revalidate']);
     expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']); // dedup — 2 linhas, 1 produto só
+    expect(repo.lockOffersForUpdateCalls[0]).toHaveLength(2);
   });
 
   it('5) caminho feliz (pix): cria endereço, pedido, itens, grava order_status_history e devolve o QR', async () => {

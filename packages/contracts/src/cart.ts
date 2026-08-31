@@ -55,6 +55,10 @@ export const cartItemSchema = z.strictObject({
    */
   lineId: z.uuid(),
   productId: z.uuid(),
+  /** Ausente em carrinhos gravados antes do Épico 4C ou quando o storefront
+   * novo degrada contra uma API antiga. O checkout resolve esses itens pela
+   * oferta principal, sem invalidar o carrinho. */
+  offerId: z.uuid().optional(),
   /** Snapshots de exibição — ver aviso no topo do arquivo. */
   name: z.string(),
   description: z.string().nullable(),

@@ -2,12 +2,26 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
-import { SetProductOfferAvailabilityDto, UpdateProductOfferDto } from './product-offer.dto';
+import {
+  CreateProductOfferDto,
+  SetProductOfferAvailabilityDto,
+  UpdateProductOfferDto,
+} from './product-offer.dto';
 
 /** Validação direta: o transform do Vitest não emite a metadata que o
  * ValidationPipe usa em testes HTTP simulados. O servidor compilado pelo tsc
  * emite; ver docs/07-aprendizados.md e product-image.dto.test.ts. */
 describe('DTOs de ProductOffer', () => {
+  it('aceita criação secundária com preço inteiro', async () => {
+    const dto = plainToInstance(CreateProductOfferDto, {
+      productId: '018f47de-7e33-7c6a-8b2a-b65dc8a35e66',
+      categoryId: '018f47de-7e33-7c6a-8b2a-b65dc8a35e67',
+      priceCents: 2590,
+      available: true,
+    });
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
   it('aceita edição válida de preço/categoria/PDV/ordem', async () => {
     const dto = plainToInstance(UpdateProductOfferDto, {
       version: 0,

@@ -17,6 +17,7 @@ const ACTOR = { userId: 'owner-1', role: 'owner', ip: '127.0.0.1' } as const;
 class FakeProductRepository implements ProductRepository {
   rows = new Map<string, ProductRecord>();
   categoryIds = new Set<string>(['cat-1']);
+  secondaryCategoryIds = new Set<string>();
   private nextId = 1;
 
   async listByCategory(categoryId: string): Promise<ProductRecord[]> {
@@ -29,6 +30,10 @@ class FakeProductRepository implements ProductRepository {
 
   async categoryExists(categoryId: string): Promise<boolean> {
     return this.categoryIds.has(categoryId);
+  }
+
+  async secondaryOfferExists(_productId: string, categoryId: string): Promise<boolean> {
+    return this.secondaryCategoryIds.has(categoryId);
   }
 
   async create(input: CreateProductInput): Promise<ProductRecord> {
@@ -97,6 +102,21 @@ describe('ProductService', () => {
     });
     expect(created.name).toBe('X-Burger');
     expect(created.available).toBe(true);
+  });
+
+  it('não move a oferta principal para uma categoria já usada por uma secundária', async () => {
+    const { repo, service } = setup();
+    repo.categoryIds.add('cat-2');
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'X-Burger',
+      basePriceCents: 2500,
+    });
+    repo.secondaryCategoryIds.add('cat-2');
+
+    await expect(
+      service.update(created.id, created.version, { categoryId: 'cat-2' }, ACTOR),
+    ).rejects.toThrow('Este produto já está disponível nesta categoria.');
   });
 
   it('2) create() rejeita categoria inexistente sem chamar o repositório', async () => {

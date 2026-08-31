@@ -22,6 +22,7 @@ function cart(overrides: Partial<Cart> = {}): Cart {
       {
         lineId: '0193f1a0-0000-7000-8000-000000000001',
         productId: '0193f1a0-0000-7000-8000-000000000002',
+        offerId: '0193f1a0-0000-7000-8000-000000000003',
         name: 'X-Burger',
         description: null,
         imageUrl: null,
@@ -60,6 +61,7 @@ function review(overrides: Partial<CheckoutReview> = {}): CheckoutReview {
     items: [
       {
         productId: '0193f1a0-0000-7000-8000-000000000002',
+        offerId: '0193f1a0-0000-7000-8000-000000000003',
         name: 'X-Burger',
         available: true,
         unitBasePriceCents: 2890,
@@ -92,6 +94,7 @@ describe('buildCheckoutRequestFromCart', () => {
     expect(body.items).toEqual([
       {
         productId: '0193f1a0-0000-7000-8000-000000000002',
+        offerId: '0193f1a0-0000-7000-8000-000000000003',
         unitBasePriceCents: 2890,
         modifiers: [{ modifierId: '0193f1a0-0000-7000-8000-0000000000a1', priceDeltaCents: 400 }],
         quantity: 2,
@@ -119,6 +122,7 @@ describe('buildCheckoutRequestFromReview', () => {
     expect(body.items).toEqual([
       {
         productId: '0193f1a0-0000-7000-8000-000000000002',
+        offerId: '0193f1a0-0000-7000-8000-000000000003',
         unitBasePriceCents: 2890,
         modifiers: [{ modifierId: '0193f1a0-0000-7000-8000-0000000000a1', priceDeltaCents: 400 }],
         quantity: 2,
@@ -128,6 +132,15 @@ describe('buildCheckoutRequestFromReview', () => {
     expect(body.address?.expectedDeliveryFeeCents).toBe(800);
     expect(body.paymentMethod).toBe('pix');
     expect('changeForCents' in body).toBe(false);
+  });
+
+  it('mantém compatibilidade com carrinho legado sem offerId', () => {
+    const legacy = cart();
+    delete legacy.items[0]?.offerId;
+
+    expect(buildCheckoutRequestFromCart(legacy, 'pickup', null).items[0]).not.toHaveProperty(
+      'offerId',
+    );
   });
 
   it('pickup: fulfillmentType pickup, address null mesmo com a revalidação trazendo endereço no state', () => {
@@ -143,6 +156,7 @@ describe('buildCheckoutRequestFromReview', () => {
         ...review().items,
         {
           productId: 'produto-esgotado',
+          offerId: 'oferta-esgotada',
           name: 'X-Bacon',
           available: false,
           unitBasePriceCents: 3200,

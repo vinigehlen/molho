@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { centsToBRL } from '../../../lib/format';
+import { ProductOffersEditor } from './product-offers-editor';
+import { brlToCents, centsToBRL } from '../../../lib/format';
 import { getStaffSession } from '../../../lib/staff-session';
 import {
   createCategory,
@@ -59,11 +60,6 @@ const ICON_BUTTON_CLASS =
 type ProductFormStep = 0 | 1 | 2;
 
 const PRODUCT_FORM_STEPS = ['Informações', 'Venda', 'Foto e revisão'] as const;
-
-function brlToCents(value: string): number {
-  const normalized = value.replace(/[^\d,]/g, '').replace(',', '.');
-  return Math.max(0, Math.round(Number(normalized || '0') * 100));
-}
 
 function isMoneyDraftValid(value: string): boolean {
   const cents = brlToCents(value);
@@ -1381,6 +1377,15 @@ export default function CardapioPage() {
                                     placeholder="Ex.: 1042"
                                   />
                                 </label>
+                                <ProductOffersEditor
+                                  product={selectedProduct}
+                                  categories={categories}
+                                  primaryDraft={{
+                                    categoryId: editDraft.categoryId,
+                                    price: editDraft.price,
+                                    pdvCode: editDraft.pdvCode,
+                                  }}
+                                />
                                 {!editSaleValid && (
                                   <p className="text-sm text-text-muted">
                                     Informe o preço para seguir. Valor zero também é aceito.

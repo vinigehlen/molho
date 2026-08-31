@@ -27,7 +27,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
 export const getStorefront = cache(async (slug: string): Promise<StorefrontPayload | null> => {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}`, {
+    // Opt-in de expansão 4C: API antiga ignora a query e continua servindo a
+    // oferta principal; API nova só adiciona `offerId`/secundárias a clientes
+    // preparados. Como a URL varia, o CDN nunca mistura os dois contratos.
+    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}?catalog=offers`, {
       // Mesma janela de 30s que a API já promete na borda (Cache-Control
       // s-maxage=30, Épico 5 commit 2) — o Next não tem por que cachear por
       // mais tempo do que a própria API considera fresco.

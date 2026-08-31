@@ -5,7 +5,7 @@ import type { DeliveryLocation, DeliveryZoneMatch, DeliveryMatchRepository } fro
 import type { Weekday } from '../storefront/store-hours';
 import type {
   CheckoutCouponRecord,
-  CheckoutProductRecord,
+  CheckoutOfferRecord,
   CheckoutRepository,
   CheckoutSchedulingSlotRecord,
   CheckoutStoreHoursRecord,
@@ -21,12 +21,21 @@ const OPEN_ALL_WEEK: CheckoutStoreHoursRecord[] = WEEKDAYS.map((dayOfWeek) => ({
 }));
 const FIXED_NOW = new Date('2026-07-22T15:00:00Z'); // 12h em America/Sao_Paulo
 
-const PRODUCT: CheckoutProductRecord = {
-  id: 'product-1',
+const PRODUCT: CheckoutOfferRecord = {
+  id: 'offer-1',
+  productId: 'product-1',
+  isPrimary: true,
   name: 'X-Burger',
   basePriceCents: 2890,
   available: true,
   modifiers: [{ id: 'mod-bacon', name: 'Bacon', priceDeltaCents: 500 }],
+};
+
+const SECONDARY_OFFER: CheckoutOfferRecord = {
+  ...PRODUCT,
+  id: 'offer-2',
+  isPrimary: false,
+  basePriceCents: 2390,
 };
 
 const ZONE_MATCH: DeliveryZoneMatch = { name: 'Centro', feeCents: 800, etaMinMinutes: 30, etaMaxMinutes: 50 };
@@ -34,7 +43,7 @@ const ZONE_MATCH: DeliveryZoneMatch = { name: 'Centro', feeCents: 800, etaMinMin
 class FakeCheckoutRepository implements CheckoutRepository {
   store: CheckoutStoreRecord | null = { minOrderCents: 3000, timezone: 'America/Sao_Paulo' };
   hours: CheckoutStoreHoursRecord[] = OPEN_ALL_WEEK;
-  products: CheckoutProductRecord[] = [PRODUCT];
+  products: CheckoutOfferRecord[] = [PRODUCT];
 
   async findStore() {
     return this.store;
@@ -42,8 +51,12 @@ class FakeCheckoutRepository implements CheckoutRepository {
   async listStoreHours() {
     return this.hours;
   }
-  async findProductsByIds(productIds: readonly string[]) {
-    return this.products.filter((p) => productIds.includes(p.id));
+  async findOffersForItems(items: readonly { productId: string; offerId?: string }[]) {
+    return this.products.filter((offer) =>
+      items.some((item) =>
+        item.offerId ? item.offerId === offer.id : item.productId === offer.productId && offer.isPrimary,
+      ),
+    );
   }
   coupon: CheckoutCouponRecord | null = null;
   async findCoupon(_code: string) {
@@ -211,6 +224,55 @@ describe('CheckoutRevalidationService.revalidate', () => {
     expect(result.items[0]).toMatchObject({ priceChanged: true });
     expect(result.hasUnfavorableDivergence).toBe(false);
     expect(result.canSubmit).toBe(true);
+  });
+
+  it('8.1) precifica pela oferta secundária escolhida, não pela principal', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.products = [PRODUCT, SECONDARY_OFFER];
+    checkoutRepo.store = { minOrderCents: 0, timezone: 'America/Sao_Paulo' };
+
+    const result = await service.revalidate(
+      baseRequest({
+        items: [
+          {
+            ...baseRequest().items[0]!,
+            offerId: 'offer-2',
+            unitBasePriceCents: 2390,
+          },
+        ],
+      }),
+      RESOLVED,
+    );
+
+    expect(result.items[0]).toMatchObject({
+      productId: 'product-1',
+      offerId: 'offer-2',
+      unitBasePriceCents: 2390,
+      lineTotalCents: 2890,
+      priceChanged: false,
+    });
+  });
+
+  it('8.2) cliente antigo sem offerId continua usando a oferta principal', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.products = [PRODUCT, SECONDARY_OFFER];
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]).toMatchObject({ offerId: 'offer-1', unitBasePriceCents: 2890 });
+  });
+
+  it('8.3) rejeita oferta de outro produto mesmo quando o id da oferta existe', async () => {
+    const { service } = setup();
+    const result = await service.revalidate(
+      baseRequest({
+        items: [{ ...baseRequest().items[0]!, productId: 'product-2', offerId: 'offer-1' }],
+      }),
+      RESOLVED,
+    );
+
+    expect(result.items[0]).toMatchObject({ available: false, lineTotalCents: 0 });
+    expect(result.hasUnfavorableDivergence).toBe(true);
   });
 
   it('9) taxa de entrega subiu em relação à esperada: divergência desfavorável', async () => {

@@ -85,6 +85,8 @@ function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): Storefron
     products: [
       {
         id: UUID,
+        offerId: UUID,
+        isPrimary: true,
         name: 'X-Burger',
         description: 'Pão brioche, blend 180g.',
         basePriceCents: 2890,
@@ -172,6 +174,53 @@ describe('StorefrontService', () => {
 
     expect(primeiro(payload.categories, 'categoria').products).toHaveLength(1);
     expect(primeiroProduto(payload).available).toBe(false);
+  });
+
+  it('mantém a mesma identidade em duas categorias com oferta e preço próprios', async () => {
+    const principal = categoria();
+    const secundaria = categoria({
+      id: '0193f1a0-0000-7000-8000-000000000010',
+      name: 'Destaques',
+      products: [
+        {
+          ...primeiro(principal.products, 'produto'),
+          offerId: '0193f1a0-0000-7000-8000-000000000011',
+          isPrimary: false,
+          basePriceCents: 2590,
+        },
+      ],
+    });
+    repository.menu = [principal, secundaria];
+
+    const payload = await buildService(repository).getStorefront({ catalogOffers: true });
+
+    const [first, second] = payload.categories.map((category) => primeiro(category.products, 'produto'));
+    expect(first?.id).toBe(second?.id);
+    expect(first?.offerId).not.toBe(second?.offerId);
+    expect([first?.basePriceCents, second?.basePriceCents]).toEqual([2890, 2590]);
+  });
+
+  it('mantém resposta legada sem campo extra nem ofertas secundárias durante o rollout', async () => {
+    const principal = categoria();
+    repository.menu = [
+      principal,
+      categoria({
+        id: '0193f1a0-0000-7000-8000-000000000010',
+        name: 'Destaques',
+        products: [
+          {
+            ...primeiro(principal.products, 'produto'),
+            offerId: '0193f1a0-0000-7000-8000-000000000011',
+            isPrimary: false,
+          },
+        ],
+      }),
+    ];
+
+    const payload = await buildService(repository).getStorefront();
+
+    expect(payload.categories[1]?.products).toEqual([]);
+    expect(primeiroProduto(payload).offerId).toBeUndefined();
   });
 
   it('responde 404 quando o tenant sumiu entre a resolução do slug e a leitura', async () => {

@@ -89,6 +89,7 @@ describe('revalidatedCheckoutSchema', () => {
       items: [
         {
           productId: UUID,
+          offerId: UUID,
           name: 'X-Burger',
           available: true,
           unitBasePriceCents: 2890,

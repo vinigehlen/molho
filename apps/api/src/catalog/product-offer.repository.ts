@@ -1,6 +1,7 @@
+import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { CatalogActor } from './catalog-actor';
-import { CatalogNotFoundError } from './catalog-errors';
+import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
 import { assertOptimisticUpdate } from './optimistic-update.util';
 
 export interface ProductOfferRecord {
@@ -27,10 +28,22 @@ export interface UpdateProductOfferInput {
   sortOrder?: number;
 }
 
+export interface CreateProductOfferInput {
+  productId: string;
+  categoryId: string;
+  priceCents: number;
+  available?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
+}
+
 export interface ProductOfferRepository {
   list(filter: ProductOfferFilter): Promise<ProductOfferRecord[]>;
   findById(id: string): Promise<ProductOfferRecord | null>;
+  productExists(productId: string): Promise<boolean>;
   categoryExists(categoryId: string): Promise<boolean>;
+  offerExists(productId: string, categoryId: string, excludingId?: string): Promise<boolean>;
+  create(input: CreateProductOfferInput, actor: CatalogActor): Promise<ProductOfferRecord>;
   update(
     id: string,
     expectedVersion: number,
@@ -42,6 +55,7 @@ export interface ProductOfferRepository {
     expectedVersion: number,
     available: boolean,
   ): Promise<ProductOfferRecord>;
+  softDelete(id: string, expectedVersion: number): Promise<void>;
 }
 
 const SELECT = {
@@ -78,12 +92,75 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
     });
   }
 
+  async productExists(productId: string): Promise<boolean> {
+    const product = await this.requestContext.getClient().product.findFirst({
+      where: { id: productId, deletedAt: null },
+      select: { id: true },
+    });
+    return product !== null;
+  }
+
   async categoryExists(categoryId: string): Promise<boolean> {
     const category = await this.requestContext.getClient().category.findFirst({
       where: { id: categoryId, deletedAt: null },
       select: { id: true },
     });
     return category !== null;
+  }
+
+  async offerExists(productId: string, categoryId: string, excludingId?: string): Promise<boolean> {
+    const offer = await this.requestContext.getClient().productOffer.findFirst({
+      where: {
+        productId,
+        categoryId,
+        deletedAt: null,
+        ...(excludingId ? { id: { not: excludingId } } : {}),
+      },
+      select: { id: true },
+    });
+    return offer !== null;
+  }
+
+  async create(input: CreateProductOfferInput, actor: CatalogActor): Promise<ProductOfferRecord> {
+    try {
+      const client = this.requestContext.getClient();
+      const created = await client.productOffer.create({
+        data: {
+          tenantId: this.requestContext.getTenantId(),
+          productId: input.productId,
+          categoryId: input.categoryId,
+          priceCents: input.priceCents,
+          available: input.available ?? true,
+          pdvCode: input.pdvCode ?? null,
+          sortOrder: input.sortOrder ?? 0,
+          isPrimary: false,
+        },
+        select: SELECT,
+      });
+      await client.auditLog.create({
+        data: {
+          tenantId: this.requestContext.getTenantId(),
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'catalog.offer_create',
+          entity: 'product_offer',
+          afterJson: {
+            offerId: created.id,
+            productId: created.productId,
+            categoryId: created.categoryId,
+            priceCents: created.priceCents,
+            available: created.available,
+          },
+          ip: actor.ip,
+        },
+      });
+      return created;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new CatalogValidationError('Este produto já está disponível nesta categoria.');
+      }
+      throw error;
+    }
   }
 
   async update(
@@ -96,10 +173,18 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
     const before = await this.findById(id);
     if (!before) throw new CatalogNotFoundError('Oferta');
 
-    const result = await client.productOffer.updateMany({
-      where: { id, version: expectedVersion, deletedAt: null },
-      data: { ...input, version: { increment: 1 } },
-    });
+    let result: { count: number };
+    try {
+      result = await client.productOffer.updateMany({
+        where: { id, version: expectedVersion, deletedAt: null },
+        data: { ...input, version: { increment: 1 } },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new CatalogValidationError('Este produto já está disponível nesta categoria.');
+      }
+      throw error;
+    }
     await assertOptimisticUpdate(
       'Oferta',
       result.count,
@@ -141,6 +226,18 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
       async () => (await this.findById(id)) !== null,
     );
     return this.findByIdOrThrow(id);
+  }
+
+  async softDelete(id: string, expectedVersion: number): Promise<void> {
+    const result = await this.requestContext.getClient().productOffer.updateMany({
+      where: { id, version: expectedVersion, deletedAt: null },
+      data: { deletedAt: new Date(), version: { increment: 1 } },
+    });
+    await assertOptimisticUpdate(
+      'Oferta',
+      result.count,
+      async () => (await this.findById(id)) !== null,
+    );
   }
 
   private async findByIdOrThrow(id: string): Promise<ProductOfferRecord> {

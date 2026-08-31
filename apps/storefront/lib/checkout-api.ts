@@ -15,6 +15,7 @@ export type { FulfillmentType };
 export interface CheckoutRequestBody {
   items: {
     productId: string;
+    offerId?: string;
     unitBasePriceCents: number;
     modifiers: { modifierId: string; priceDeltaCents: number }[];
     quantity: number;
@@ -49,6 +50,7 @@ export interface CheckoutReviewModifier {
 
 export interface CheckoutReviewItem {
   productId: string;
+  offerId: string | null;
   name: string;
   available: boolean;
   unitBasePriceCents: number;
@@ -259,6 +261,7 @@ export function buildCheckoutRequestFromCart(
   return {
     items: cart.items.map((item) => ({
       productId: item.productId,
+      ...(item.offerId ? { offerId: item.offerId } : {}),
       unitBasePriceCents: item.unitBasePriceCents,
       modifiers: item.modifiers.map((modifier) => ({ modifierId: modifier.id, priceDeltaCents: modifier.priceDeltaCents })),
       quantity: item.quantity,
@@ -293,6 +296,7 @@ export function buildCheckoutRequestFromReview(
       .filter((item) => item.available)
       .map((item) => ({
         productId: item.productId,
+        ...(item.offerId ? { offerId: item.offerId } : {}),
         unitBasePriceCents: item.unitBasePriceCents,
         modifiers: item.modifiers.map((modifier) => ({ modifierId: modifier.modifierId, priceDeltaCents: modifier.priceDeltaCents })),
         quantity: item.quantity,

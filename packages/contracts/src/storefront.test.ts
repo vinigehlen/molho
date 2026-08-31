@@ -25,6 +25,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
         products: [
           {
             id: UUID,
+            offerId: UUID,
             name: 'X-Burger',
             description: 'Pão brioche, blend 180g, queijo e salada.',
             basePriceCents: 2890,
@@ -105,6 +106,7 @@ describe('storefrontProductSchema — dinheiro', () => {
   function product(overrides: Record<string, unknown> = {}) {
     return {
       id: UUID,
+      offerId: UUID,
       name: 'X-Burger',
       description: null,
       basePriceCents: 2890,
@@ -130,6 +132,11 @@ describe('storefrontProductSchema — dinheiro', () => {
 
   it('aceita produto de graça (0 centavos)', () => {
     expect(storefrontProductSchema.safeParse(product({ basePriceCents: 0 })).success).toBe(true);
+  });
+
+  it('aceita resposta legada sem offerId durante a expansão 4C', () => {
+    const { offerId: _offerId, ...legacy } = product();
+    expect(storefrontProductSchema.safeParse(legacy).success).toBe(true);
   });
 
   it('rejeita imageUrl que não é URL', () => {

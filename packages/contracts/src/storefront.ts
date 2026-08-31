@@ -44,6 +44,9 @@ export const storefrontModifierGroupSchema = z.strictObject({
 
 export const storefrontProductSchema = z.strictObject({
   id: z.uuid(),
+  /** Apresentação escolhida nesta categoria. `id` continua sendo a identidade
+   * do produto; `offerId` carrega preço/disponibilidade/ordem desta vitrine. */
+  offerId: z.uuid().optional(),
   name: z.string(),
   description: z.string().nullable(),
   basePriceCents: centsSchema,

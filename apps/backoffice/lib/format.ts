@@ -3,6 +3,27 @@ export function centsToBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Campo monetário pt-BR → centavos. Aceita tanto a saída de `centsToBRL`
+ * (`R$ 1.234,56`) quanto ponto decimal digitado por teclados móveis. */
+export function brlToCents(value: string): number {
+  const clean = value.replace(/[^\d.,]/g, '');
+  if (!clean) return 0;
+
+  const commaIndex = clean.lastIndexOf(',');
+  let normalized: string;
+  if (commaIndex >= 0) {
+    const integer = clean.slice(0, commaIndex).replace(/[.,]/g, '');
+    const decimal = clean.slice(commaIndex + 1).replace(/[.,]/g, '');
+    normalized = `${integer || '0'}.${decimal}`;
+  } else {
+    const dotCount = (clean.match(/\./g) ?? []).length;
+    const decimalDigits = clean.length - clean.lastIndexOf('.') - 1;
+    normalized = dotCount === 1 && decimalDigits <= 2 ? clean : clean.replace(/\./g, '');
+  }
+
+  return Math.max(0, Math.round(Number(normalized) * 100));
+}
+
 /** ISO → "18:42" (horário local) — o gestor pensa em "que horas entrou o pedido". */
 export function isoToTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

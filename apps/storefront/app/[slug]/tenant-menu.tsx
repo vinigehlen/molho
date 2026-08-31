@@ -149,6 +149,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
     cart.addItem({
       lineId: crypto.randomUUID(),
       productId: produto.id,
+      ...(produto.offerId ? { offerId: produto.offerId } : {}),
       name: produto.name,
       description: produto.description,
       imageUrl: produto.imageUrl,
@@ -174,6 +175,7 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
     cart.addItem({
       lineId: crypto.randomUUID(),
       productId: produto.id,
+      ...(produto.offerId ? { offerId: produto.offerId } : {}),
       name: produto.name,
       description: produto.description,
       imageUrl: produto.imageUrl,

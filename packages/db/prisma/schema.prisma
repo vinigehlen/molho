@@ -450,11 +450,10 @@ model Product {
 /// a identidade reutilizável (nome, descrição e mídia); preço, categoria,
 /// disponibilidade, código PDV e ordem pertencem à oferta.
 ///
-/// Épico 4B é uma expansão compatível: `Product` ainda mantém as colunas
+/// Épicos 4B/4C usam expansão compatível: `Product` ainda mantém as colunas
 /// antigas e a migration sincroniza a oferta primária nos dois sentidos.
-/// `isPrimary` identifica essa ponte temporária. Ofertas secundárias só serão
-/// abertas pela API no próximo épico, depois de a UI representar o mesmo
-/// produto em mais de uma categoria.
+/// `isPrimary` identifica essa ponte temporária; as demais apresentações já
+/// podem variar categoria, preço, disponibilidade, PDV e ordem.
 model ProductOffer {
   id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId   String    @map("tenant_id") @db.Uuid

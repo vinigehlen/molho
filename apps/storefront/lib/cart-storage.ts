@@ -38,6 +38,7 @@ const cartModifierSchema = z.object({
 export const cartItemSchema = z.object({
   lineId: z.uuid(),
   productId: z.uuid(),
+  offerId: z.uuid().optional(),
   name: z.string(),
   description: z.string().nullable(),
   imageUrl: z.url().nullable(),

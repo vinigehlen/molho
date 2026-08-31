@@ -18,8 +18,10 @@ export interface CheckoutModifierRecord {
   priceDeltaCents: number;
 }
 
-export interface CheckoutProductRecord {
+export interface CheckoutOfferRecord {
   id: string;
+  productId: string;
+  isPrimary: boolean;
   name: string;
   basePriceCents: number;
   available: boolean;
@@ -59,7 +61,9 @@ export interface CheckoutSchedulingSlotRecord {
 export interface CheckoutRepository {
   findStore(): Promise<CheckoutStoreRecord | null>;
   listStoreHours(): Promise<CheckoutStoreHoursRecord[]>;
-  findProductsByIds(productIds: readonly string[]): Promise<CheckoutProductRecord[]>;
+  findOffersForItems(
+    items: readonly { productId: string; offerId?: string }[],
+  ): Promise<CheckoutOfferRecord[]>;
   /** `mode: 'insensitive'` — mesma comparação do índice único parcial em upper(code) (packages/db). */
   findCoupon(code: string): Promise<CheckoutCouponRecord | null>;
   listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]>;
@@ -96,31 +100,46 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     });
   }
 
-  async findProductsByIds(productIds: readonly string[]): Promise<CheckoutProductRecord[]> {
-    if (productIds.length === 0) return [];
-    const rows = await this.requestContext.getClient().product.findMany({
-      where: { id: { in: [...productIds] }, deletedAt: null },
+  async findOffersForItems(
+    items: readonly { productId: string; offerId?: string }[],
+  ): Promise<CheckoutOfferRecord[]> {
+    if (items.length === 0) return [];
+    const offerIds = [...new Set(items.flatMap((item) => (item.offerId ? [item.offerId] : [])))];
+    const fallbackProductIds = [
+      ...new Set(items.filter((item) => !item.offerId).map((item) => item.productId)),
+    ];
+    const rows = await this.requestContext.getClient().productOffer.findMany({
+      where: {
+        deletedAt: null,
+        product: { deletedAt: null },
+        OR: [
+          ...(offerIds.length > 0 ? [{ id: { in: offerIds } }] : []),
+          ...(fallbackProductIds.length > 0
+            ? [{ productId: { in: fallbackProductIds }, isPrimary: true }]
+            : []),
+        ],
+      },
       select: {
         id: true,
-        name: true,
-        basePriceCents: true,
+        productId: true,
+        isPrimary: true,
+        priceCents: true,
         available: true,
-        // Reuso (exceção MVP 2026-08-28, fase 2/4): a allowlist de
-        // modificadores válidos PRA ESTE produto vem do VÍNCULO
-        // (product_modifier_groups), não da relação direta `modifierGroups`
-        // (que só sabe do dono/criador do grupo) — sem isso, um grupo
-        // reaproveitado num segundo produto validaria certo no storefront
-        // mas o checkout rejeitaria o modificador como "não pertence ao
-        // produto". Grupo pausado (`active: false`) também não é comprável,
-        // mesma regra do storefront.
-        productModifierGroups: {
-          where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
+        product: {
           select: {
-            modifierGroup: {
+            name: true,
+            // A allowlist de modificadores continua na identidade do
+            // produto; todas as apresentações compartilham a composição.
+            productModifierGroups: {
+              where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
               select: {
-                modifiers: {
-                  where: { deletedAt: null, active: true },
-                  select: { id: true, name: true, priceDeltaCents: true },
+                modifierGroup: {
+                  select: {
+                    modifiers: {
+                      where: { deletedAt: null, active: true },
+                      select: { id: true, name: true, priceDeltaCents: true },
+                    },
+                  },
                 },
               },
             },
@@ -130,10 +149,14 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     });
     return rows.map((row) => ({
       id: row.id,
-      name: row.name,
-      basePriceCents: row.basePriceCents,
+      productId: row.productId,
+      isPrimary: row.isPrimary,
+      name: row.product.name,
+      basePriceCents: row.priceCents,
       available: row.available,
-      modifiers: row.productModifierGroups.flatMap((link) => link.modifierGroup.modifiers),
+      modifiers: row.product.productModifierGroups.flatMap(
+        (link) => link.modifierGroup.modifiers,
+      ),
     }));
   }
 

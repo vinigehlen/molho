@@ -44,6 +44,8 @@ export interface StorefrontModifierGroupRecord {
 
 export interface StorefrontProductRecord {
   id: string;
+  offerId: string;
+  isPrimary: boolean;
   name: string;
   description: string | null;
   basePriceCents: number;
@@ -144,46 +146,48 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
       select: {
         id: true,
         name: true,
-        products: {
-          where: { deletedAt: null },
+        offers: {
+          where: { deletedAt: null, product: { deletedAt: null } },
           orderBy: { sortOrder: 'asc' },
           select: {
             id: true,
-            name: true,
-            description: true,
-            basePriceCents: true,
-            imageKey: true,
-            images: {
-              where: { deletedAt: null },
-              orderBy: { position: 'asc' },
-              select: { imageKey: true },
-            },
+            isPrimary: true,
+            priceCents: true,
             available: true,
-            // Reuso (exceção MVP 2026-08-28, fase 2/4): "grupos deste
-            // produto" é sempre o VÍNCULO (product_modifier_groups), não
-            // mais `product.modifierGroups` (a relação direta só sabe do
-            // dono/criador). `active: false` é pausa, não soft-delete —
-            // grupo continua existindo (histórico de pedido não quebra),
-            // mas nunca aparece pro cliente escolher.
-            productModifierGroups: {
-              where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
-              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            product: {
               select: {
-                modifierGroup: {
+                id: true,
+                name: true,
+                description: true,
+                imageKey: true,
+                images: {
+                  where: { deletedAt: null },
+                  orderBy: { position: 'asc' },
+                  select: { imageKey: true },
+                },
+                // Reuso (exceção MVP 2026-08-28, fase 2/4): "grupos deste
+                // produto" é sempre o VÍNCULO (product_modifier_groups).
+                productModifierGroups: {
+                  where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
+                  orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
                   select: {
-                    id: true,
-                    name: true,
-                    min: true,
-                    max: true,
-                    modifiers: {
-                      where: { deletedAt: null, active: true },
-                      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                    modifierGroup: {
                       select: {
                         id: true,
                         name: true,
-                        description: true,
-                        imageKey: true,
-                        priceDeltaCents: true,
+                        min: true,
+                        max: true,
+                        modifiers: {
+                          where: { deletedAt: null, active: true },
+                          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                          select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                            imageKey: true,
+                            priceDeltaCents: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -195,10 +199,19 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
       },
     });
     return categories.map((category) => ({
-      ...category,
-      products: category.products.map(({ productModifierGroups, ...product }) => ({
-        ...product,
-        modifierGroups: productModifierGroups.map((link) => link.modifierGroup),
+      id: category.id,
+      name: category.name,
+      products: category.offers.map((offer) => ({
+        id: offer.product.id,
+        offerId: offer.id,
+        isPrimary: offer.isPrimary,
+        name: offer.product.name,
+        description: offer.product.description,
+        basePriceCents: offer.priceCents,
+        imageKey: offer.product.imageKey,
+        images: offer.product.images,
+        available: offer.available,
+        modifierGroups: offer.product.productModifierGroups.map((link) => link.modifierGroup),
       })),
     }));
   }

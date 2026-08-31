@@ -1,6 +1,32 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
+export class CreateProductOfferDto {
+  @IsUUID(7)
+  productId!: string;
+
+  @IsUUID(7)
+  categoryId!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  priceCents!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  available?: boolean;
+
+  @IsOptional()
+  @IsString()
+  pdvCode?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sortOrder?: number;
+}
+
 export class UpdateProductOfferDto {
   @Type(() => Number)
   @IsInt()

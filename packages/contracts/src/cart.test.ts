@@ -92,6 +92,14 @@ describe('parseStoredCart', () => {
     expect(cartItemCount(restored)).toBe(2);
   });
 
+  it('preserva offerId novo e aceita item legado sem o campo', () => {
+    const offerId = '0193f1a0-0000-7000-8000-000000000005';
+    expect(
+      parseStoredCart(JSON.stringify(cart([item({ offerId })])), slug).items[0]?.offerId,
+    ).toBe(offerId);
+    expect(parseStoredCart(JSON.stringify(cart([item()])), slug).items[0]?.offerId).toBeUndefined();
+  });
+
   it('devolve carrinho vazio quando não há nada salvo', () => {
     expect(parseStoredCart(null, slug).items).toEqual([]);
   });

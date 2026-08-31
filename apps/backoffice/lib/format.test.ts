@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { fulfillmentDeadline } from './format';
+import { brlToCents, fulfillmentDeadline } from './format';
+
+describe('brlToCents', () => {
+  it.each([
+    ['R$ 1.234,56', 123456],
+    ['12,34', 1234],
+    ['12.34', 1234],
+    ['1.234', 123400],
+  ])('converte %s sem perder separador de milhar', (value, expected) => {
+    expect(brlToCents(value)).toBe(expected);
+  });
+});
 
 describe('fulfillmentDeadline', () => {
   it('formata entrega e marca prazo vencido (severity critical)', () => {

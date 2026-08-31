@@ -63,6 +63,7 @@ function review(overrides: Partial<CheckoutReview> = {}): CheckoutReview {
     items: [
       {
         productId: 'produto-1',
+        offerId: 'oferta-1',
         name: 'X-Burger',
         available: true,
         unitBasePriceCents: 2890,
