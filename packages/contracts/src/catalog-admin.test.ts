@@ -5,6 +5,8 @@ import {
   copyCatalogModifierGroupForProductSchema,
   createCatalogModifierSchema,
   createCatalogProductOfferSchema,
+  createCatalogProductSchema,
+  updateCatalogProductSchema,
   reorderCatalogModifiersSchema,
   setCatalogProductOfferAvailabilitySchema,
   updateCatalogModifierSchema,
@@ -15,6 +17,25 @@ const OFFER_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e65';
 const PRODUCT_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e66';
 const CATEGORY_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e67';
 const GROUP_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e68';
+
+describe('contrato de Product.kind (combo fase 3)', () => {
+  const base = { categoryId: CATEGORY_ID, name: 'Coca lata', basePriceCents: 700 };
+
+  it('não exige kind na criação', () => {
+    expect(createCatalogProductSchema.parse(base).kind).toBeUndefined();
+  });
+
+  it('aceita os três valores válidos', () => {
+    for (const kind of ['prepared', 'industrialized', 'combo'] as const) {
+      expect(createCatalogProductSchema.parse({ ...base, kind }).kind).toBe(kind);
+    }
+  });
+
+  it('rejeita kind fora do enum', () => {
+    expect(createCatalogProductSchema.safeParse({ ...base, kind: 'bebida' }).success).toBe(false);
+    expect(updateCatalogProductSchema.safeParse({ version: 0, kind: 'bebida' }).success).toBe(false);
+  });
+});
 
 describe('contratos de ProductOffer', () => {
   it('aceita uma oferta primária completa', () => {

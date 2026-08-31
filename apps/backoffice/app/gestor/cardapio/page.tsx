@@ -50,7 +50,19 @@ import {
   type ModifierGroupWithProduct,
   type Product,
   type ProductImage,
+  type ProductKind,
 } from '../../../lib/catalog-api';
+
+/** Fase 3 do combo (exceção MVP 2026-08-28): `combo` existe no schema mas só
+ * é criável na fase 4 — o gestor escolhe entre prato feito e industrializado. */
+const CATALOG_PRODUCT_KINDS: { value: ProductKind; label: string }[] = [
+  { value: 'prepared', label: 'Preparado na cozinha' },
+  { value: 'industrialized', label: 'Industrializado (revenda)' },
+];
+
+function productKindLabel(kind: ProductKind): string {
+  return CATALOG_PRODUCT_KINDS.find((option) => option.value === kind)?.label ?? 'Combo';
+}
 
 const FIELD_CLASS =
   'w-full rounded-[14px] border border-border bg-bg-card px-3 text-sm outline-none transition-colors placeholder:text-text-muted focus-visible:border-brand focus-visible:shadow-focus';
@@ -106,6 +118,7 @@ export default function CardapioPage() {
     description: '',
     price: '',
     pdvCode: '',
+    kind: 'prepared' as ProductKind,
     photo: null as File | null,
   });
   const [editDraft, setEditDraft] = useState({
@@ -114,6 +127,7 @@ export default function CardapioPage() {
     description: '',
     price: '',
     pdvCode: '',
+    kind: 'prepared' as ProductKind,
   });
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
   const [groupDraft, setGroupDraft] = useState({ name: '', min: '0', max: '1', pdvCode: '' });
@@ -234,7 +248,14 @@ export default function CardapioPage() {
 
   useEffect(() => {
     if (!selectedProduct) {
-      setEditDraft({ categoryId: '', name: '', description: '', price: '', pdvCode: '' });
+      setEditDraft({
+        categoryId: '',
+        name: '',
+        description: '',
+        price: '',
+        pdvCode: '',
+        kind: 'prepared',
+      });
       return;
     }
     setEditDraft({
@@ -243,6 +264,7 @@ export default function CardapioPage() {
       description: selectedProduct.description ?? '',
       price: centsToBRL(selectedProduct.basePriceCents),
       pdvCode: selectedProduct.pdvCode ?? '',
+      kind: selectedProduct.kind,
     });
   }, [selectedProduct]);
 
@@ -302,6 +324,7 @@ export default function CardapioPage() {
         description: productDraft.description.trim() || undefined,
         basePriceCents: brlToCents(productDraft.price),
         pdvCode: productDraft.pdvCode.trim() || null,
+        kind: productDraft.kind,
         sortOrder: products.length,
       });
       if (productDraft.photo) await uploadProductImage(created.id, productDraft.photo);
@@ -314,6 +337,7 @@ export default function CardapioPage() {
         description: '',
         price: '',
         pdvCode: '',
+        kind: 'prepared',
         photo: null,
       });
       setCatalogMessage(`Item "${created.name}" adicionado ao cardápio.`);
@@ -337,6 +361,7 @@ export default function CardapioPage() {
         description: editDraft.description.trim() || null,
         basePriceCents: brlToCents(editDraft.price),
         pdvCode: editDraft.pdvCode.trim() || null,
+        kind: editDraft.kind,
       });
       await reloadProducts(updated.id);
       setCatalogMessage(`Item "${updated.name}" atualizado.`);
@@ -898,6 +923,10 @@ export default function CardapioPage() {
                           placeholder="Ex.: Xis coração"
                         />
                       </label>
+                      <ProductKindPicker
+                        value={productDraft.kind}
+                        onChange={(kind) => setProductDraft((prev) => ({ ...prev, kind }))}
+                      />
                       <label className="grid gap-1.5 text-sm font-semibold">
                         <span className="flex items-center justify-between gap-3">
                           <span>
@@ -1000,6 +1029,7 @@ export default function CardapioPage() {
                         name={productDraft.name}
                         price={centsToBRL(brlToCents(productDraft.price))}
                         pdvCode={productDraft.pdvCode}
+                        kind={productDraft.kind}
                       />
                       <div className="grid gap-1.5 text-sm font-semibold">
                         <p>
@@ -1298,6 +1328,19 @@ export default function CardapioPage() {
                                     placeholder="Nome do item"
                                   />
                                 </label>
+                                {selectedProduct.kind === 'combo' ? (
+                                  <p className="text-sm text-text-muted">
+                                    Tipo do item: Combo. A edição de combo entra numa próxima
+                                    atualização.
+                                  </p>
+                                ) : (
+                                  <ProductKindPicker
+                                    value={editDraft.kind}
+                                    onChange={(kind) =>
+                                      setEditDraft((prev) => ({ ...prev, kind }))
+                                    }
+                                  />
+                                )}
                                 <label className="grid gap-1.5 text-sm font-semibold">
                                   <span className="flex items-center justify-between gap-3">
                                     <span>
@@ -1417,6 +1460,7 @@ export default function CardapioPage() {
                                     name={editDraft.name}
                                     price={centsToBRL(brlToCents(editDraft.price))}
                                     pdvCode={editDraft.pdvCode}
+                                    kind={editDraft.kind}
                                   />
                                   <div className="flex gap-2">
                                     <button
@@ -1951,19 +1995,61 @@ function ProductDraftReview({
   name,
   price,
   pdvCode,
+  kind,
 }: {
   category: string;
   name: string;
   price: string;
   pdvCode: string;
+  kind: ProductKind;
 }) {
   return (
     <dl className="divide-y divide-border border-y border-border text-sm">
       <ReviewRow label="Item" value={name} />
       <ReviewRow label="Categoria" value={category} />
+      <ReviewRow label="Tipo" value={productKindLabel(kind)} />
       <ReviewRow label="Preço" value={price} tabular />
       <ReviewRow label="Código no PDV" value={pdvCode || 'Não informado'} />
     </dl>
+  );
+}
+
+/** Fase 3 do combo — prato feito × industrializado. `combo` é escolhido pelo
+ * fluxo de combo (fase 4), não por aqui. */
+function ProductKindPicker({
+  value,
+  onChange,
+}: {
+  value: ProductKind;
+  onChange: (kind: ProductKind) => void;
+}) {
+  return (
+    <div className="grid gap-1.5 text-sm font-semibold">
+      Tipo do item
+      <div
+        role="radiogroup"
+        aria-label="Tipo do item"
+        className="grid grid-cols-2 gap-2"
+      >
+        {CATALOG_PRODUCT_KINDS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              'min-h-11 rounded-[14px] border px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus',
+              value === option.value
+                ? 'border-brand bg-brand text-on-brand'
+                : 'border-border bg-bg-card text-text',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

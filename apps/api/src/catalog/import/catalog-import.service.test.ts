@@ -87,6 +87,7 @@ class FakeProductRepository implements ProductRepository {
       imageKey: null,
       available: true,
       pdvCode: input.pdvCode ?? null,
+      kind: input.kind ?? 'prepared',
       sortOrder: input.sortOrder ?? 0,
       version: 0,
     };

@@ -1,5 +1,8 @@
+import type { ProductKind } from '@molho/contracts';
 import { apiFetch } from './api-client';
 import { compressProductImage } from './image-compression';
+
+export type { ProductKind };
 
 export interface Category {
   id: string;
@@ -19,6 +22,8 @@ export interface Product {
   available: boolean;
   /** Código do item no PDV do lojista — texto livre, opcional. */
   pdvCode: string | null;
+  /** Natureza do item (fase 3 do combo). `combo` só é criável na fase 4. */
+  kind: ProductKind;
   sortOrder: number;
   version: number;
 }
@@ -105,6 +110,7 @@ export async function createProduct(input: {
   description?: string;
   basePriceCents: number;
   pdvCode?: string | null;
+  kind?: ProductKind;
   sortOrder?: number;
 }): Promise<Product> {
   const res = await apiFetch('/v1/admin/products', {
@@ -118,7 +124,9 @@ export async function createProduct(input: {
 
 export async function updateProduct(
   product: Product,
-  input: Partial<Pick<Product, 'categoryId' | 'name' | 'description' | 'basePriceCents' | 'pdvCode' | 'sortOrder'>>,
+  input: Partial<
+    Pick<Product, 'categoryId' | 'name' | 'description' | 'basePriceCents' | 'pdvCode' | 'kind' | 'sortOrder'>
+  >,
 ): Promise<Product> {
   const res = await apiFetch(`/v1/admin/products/${encodeURIComponent(product.id)}`, {
     method: 'PATCH',

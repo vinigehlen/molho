@@ -27,6 +27,13 @@ export const updateCatalogCategorySchema = z.strictObject({
 
 const pdvCodeSchema = z.string().trim().max(60).nullable();
 
+/** Natureza do produto (exceção MVP 2026-08-28, CLAUDE.md — fase 3/4 do
+ * combo). `combo` é aceito no contrato, mas a criação de combo de verdade
+ * (com itens) só chega na fase 4 — até lá o gestor só oferece
+ * `prepared`/`industrialized`. */
+export const productKindSchema = z.enum(['prepared', 'industrialized', 'combo']);
+export type ProductKind = z.infer<typeof productKindSchema>;
+
 export const catalogProductSchema = z.strictObject({
   id: z.uuid(),
   categoryId: z.uuid(),
@@ -38,6 +45,7 @@ export const catalogProductSchema = z.strictObject({
   /** Código do item no PDV do lojista — texto livre opcional, nunca
    * interpretado por nós (exceção MVP 2026-08-28, CLAUDE.md). */
   pdvCode: pdvCodeSchema,
+  kind: productKindSchema,
   sortOrder: sortOrderSchema,
   version: versionSchema,
 });
@@ -48,6 +56,7 @@ export const createCatalogProductSchema = z.strictObject({
   description: z.string().trim().max(500).optional(),
   basePriceCents: centsSchema,
   pdvCode: pdvCodeSchema.optional(),
+  kind: productKindSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });
 
@@ -58,6 +67,7 @@ export const updateCatalogProductSchema = z.strictObject({
   description: z.string().trim().max(500).nullable().optional(),
   basePriceCents: centsSchema.optional(),
   pdvCode: pdvCodeSchema.optional(),
+  kind: productKindSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });
 
