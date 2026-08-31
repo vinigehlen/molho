@@ -33,7 +33,12 @@ export class ProductService {
   ): Promise<ProductRecord> {
     if (input.name !== undefined) this.assertValidName(input.name);
     if (input.basePriceCents !== undefined) this.assertValidPrice(input.basePriceCents);
-    if (input.categoryId !== undefined) await this.assertCategoryExists(input.categoryId);
+    if (input.categoryId !== undefined) {
+      await this.assertCategoryExists(input.categoryId);
+      if (await this.repo.secondaryOfferExists(id, input.categoryId)) {
+        throw new CatalogValidationError('Este produto já está disponível nesta categoria.');
+      }
+    }
     return this.repo.update(id, expectedVersion, input, actor);
   }
 

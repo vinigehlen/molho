@@ -42,12 +42,10 @@ export class CheckoutRevalidationService {
    */
   async revalidate(request: CheckoutRequest, resolved: ResolvedAddress | null): Promise<RevalidatedCheckout> {
     const isPickup = request.fulfillmentType === 'pickup';
-    const uniqueProductIds = [...new Set(request.items.map((item) => item.productId))];
-
-    const [store, hours, products, zoneMatch, coupon, schedulingSlots] = await Promise.all([
+    const [store, hours, offers, zoneMatch, coupon, schedulingSlots] = await Promise.all([
       this.checkoutRepo.findStore(),
       this.checkoutRepo.listStoreHours(),
-      this.checkoutRepo.findProductsByIds(uniqueProductIds),
+      this.checkoutRepo.findOffersForItems(request.items),
       // Cidade E ponto: a zona por cidade decide a taxa da Cabanhas, a por
       // polígono continua valendo pra quem cobra por raio. `resolved` só é
       // `null` em pickup (invariante do controller) — sem zona nenhuma a checar.
@@ -66,7 +64,10 @@ export class CheckoutRevalidationService {
       request.scheduledFor ? this.checkoutRepo.listSchedulingSlots() : Promise.resolve<CheckoutSchedulingSlotRecord[]>([]),
     ]);
 
-    const productById = new Map(products.map((product) => [product.id, product]));
+    const offerById = new Map(offers.map((offer) => [offer.id, offer]));
+    const primaryOfferByProductId = new Map(
+      offers.filter((offer) => offer.isPrimary).map((offer) => [offer.productId, offer]),
+    );
     const { isOpenNow, nextOpensAt } = computeStoreOpenState(hours, store?.timezone ?? FALLBACK_TIMEZONE, this.now());
     const withinZone = isPickup || zoneMatch !== null;
 
@@ -83,13 +84,20 @@ export class CheckoutRevalidationService {
     }
 
     const items: RevalidatedItem[] = request.items.map((input) => {
-      const product = productById.get(input.productId);
-      if (!product || !product.available) {
+      const offer = input.offerId
+        ? offerById.get(input.offerId)
+        : primaryOfferByProductId.get(input.productId);
+      const validOffer = offer?.productId === input.productId ? offer : undefined;
+      if (!validOffer || !validOffer.available) {
         hasUnfavorableDivergence = true;
-        return unavailableItem(input, product?.name ?? null, product?.basePriceCents ?? input.unitBasePriceCents);
+        return unavailableItem(
+          input,
+          validOffer?.name ?? null,
+          validOffer?.basePriceCents ?? input.unitBasePriceCents,
+        );
       }
 
-      const modifierById = new Map(product.modifiers.map((modifier) => [modifier.id, modifier]));
+      const modifierById = new Map(validOffer.modifiers.map((modifier) => [modifier.id, modifier]));
       const resolvedModifiers: RevalidatedItem['modifiers'] = [];
       for (const inputModifier of input.modifiers) {
         const modifier = modifierById.get(inputModifier.modifierId);
@@ -98,21 +106,22 @@ export class CheckoutRevalidationService {
         // composição, item some igual a produto indisponível.
         if (!modifier) {
           hasUnfavorableDivergence = true;
-          return unavailableItem(input, product.name, product.basePriceCents);
+          return unavailableItem(input, validOffer.name, validOffer.basePriceCents);
         }
         resolvedModifiers.push({ modifierId: modifier.id, name: modifier.name, priceDeltaCents: modifier.priceDeltaCents });
       }
 
-      const unitCents = product.basePriceCents + resolvedModifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
+      const unitCents = validOffer.basePriceCents + resolvedModifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
       const clientUnitCents = input.unitBasePriceCents + input.modifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
       const priceChanged = unitCents !== clientUnitCents;
       if (unitCents > clientUnitCents) hasUnfavorableDivergence = true;
 
       return {
-        productId: product.id,
-        name: product.name,
+        productId: validOffer.productId,
+        offerId: validOffer.id,
+        name: validOffer.name,
         available: true,
-        unitBasePriceCents: product.basePriceCents,
+        unitBasePriceCents: validOffer.basePriceCents,
         modifiers: resolvedModifiers,
         quantity: input.quantity,
         notes: input.notes,
@@ -244,6 +253,7 @@ function unavailableItem(
 ): RevalidatedItem {
   return {
     productId: input.productId,
+    offerId: input.offerId ?? null,
     name: name ?? '(produto removido do cardápio)',
     available: false,
     unitBasePriceCents,

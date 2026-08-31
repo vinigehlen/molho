@@ -66,9 +66,9 @@ export const setCatalogProductAvailabilitySchema = z.strictObject({
   available: z.boolean(),
 });
 
-/** Apresentação comercial de um produto numa categoria. Durante a expansão
- * do Épico 4B toda linha existente é `isPrimary=true` e permanece sincronizada
- * com os campos legados de Product para deploy sem downtime. */
+/** Apresentação comercial de um produto numa categoria. A linha
+ * `isPrimary=true` permanece sincronizada com os campos legados de Product;
+ * as demais permitem apresentar a mesma identidade em outras categorias. */
 export const catalogProductOfferSchema = z.strictObject({
   id: z.uuid(),
   productId: z.uuid(),
@@ -81,8 +81,17 @@ export const catalogProductOfferSchema = z.strictObject({
   version: versionSchema,
 });
 
-/** Não cria ofertas secundárias ainda: este contrato só edita a oferta
- * compatível que já nasceu no backfill. */
+/** Cria apenas uma apresentação secundária. A oferta principal continua
+ * nascendo junto com Product pelo caminho legado durante a expansão. */
+export const createCatalogProductOfferSchema = z.strictObject({
+  productId: z.uuid(),
+  categoryId: z.uuid(),
+  priceCents: centsSchema,
+  available: z.boolean().optional(),
+  pdvCode: pdvCodeSchema.optional(),
+  sortOrder: sortOrderSchema.optional(),
+});
+
 export const updateCatalogProductOfferSchema = z.strictObject({
   version: versionSchema,
   categoryId: z.uuid().optional(),
@@ -208,6 +217,7 @@ export type SetCatalogProductAvailabilityInput = z.infer<
   typeof setCatalogProductAvailabilitySchema
 >;
 export type CatalogProductOffer = z.infer<typeof catalogProductOfferSchema>;
+export type CreateCatalogProductOfferInput = z.infer<typeof createCatalogProductOfferSchema>;
 export type UpdateCatalogProductOfferInput = z.infer<typeof updateCatalogProductOfferSchema>;
 export type SetCatalogProductOfferAvailabilityInput = z.infer<
   typeof setCatalogProductOfferAvailabilitySchema

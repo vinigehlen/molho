@@ -23,6 +23,18 @@ export interface Product {
   version: number;
 }
 
+export interface ProductOffer {
+  id: string;
+  productId: string;
+  categoryId: string;
+  priceCents: number;
+  available: boolean;
+  pdvCode: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  version: number;
+}
+
 export interface ModifierGroup {
   id: string;
   productId: string;
@@ -132,6 +144,73 @@ export async function setProductAvailability(product: Product, available: boolea
   });
   if (!res.ok) throw new Error(`Falha ao atualizar disponibilidade (${res.status})`);
   return (await res.json()) as Product;
+}
+
+async function offerApiError(response: Response, fallback: string): Promise<Error> {
+  const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
+  return new Error(typeof body?.message === 'string' ? body.message : `${fallback} (${response.status})`);
+}
+
+export async function fetchProductOffers(productId: string): Promise<ProductOffer[]> {
+  const res = await apiFetch(
+    `/v1/admin/product-offers?productId=${encodeURIComponent(productId)}`,
+  );
+  if (!res.ok) throw await offerApiError(res, 'Falha ao carregar apresentações');
+  return (await res.json()) as ProductOffer[];
+}
+
+export async function createProductOffer(input: {
+  productId: string;
+  categoryId: string;
+  priceCents: number;
+  available?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
+}): Promise<ProductOffer> {
+  const res = await apiFetch('/v1/admin/product-offers', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await offerApiError(res, 'Falha ao adicionar apresentação');
+  return (await res.json()) as ProductOffer;
+}
+
+export async function updateProductOffer(
+  offer: ProductOffer,
+  input: Partial<Pick<ProductOffer, 'categoryId' | 'priceCents' | 'pdvCode' | 'sortOrder'>>,
+): Promise<ProductOffer> {
+  const res = await apiFetch(`/v1/admin/product-offers/${encodeURIComponent(offer.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: offer.version, ...input }),
+  });
+  if (!res.ok) throw await offerApiError(res, 'Falha ao atualizar apresentação');
+  return (await res.json()) as ProductOffer;
+}
+
+export async function setProductOfferAvailability(
+  offer: ProductOffer,
+  available: boolean,
+): Promise<ProductOffer> {
+  const res = await apiFetch(
+    `/v1/admin/product-offers/${encodeURIComponent(offer.id)}/availability`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: offer.version, available }),
+    },
+  );
+  if (!res.ok) throw await offerApiError(res, 'Falha ao atualizar disponibilidade');
+  return (await res.json()) as ProductOffer;
+}
+
+export async function deleteProductOffer(offer: ProductOffer): Promise<void> {
+  const res = await apiFetch(
+    `/v1/admin/product-offers/${encodeURIComponent(offer.id)}?version=${encodeURIComponent(offer.version)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw await offerApiError(res, 'Falha ao remover apresentação');
 }
 
 export async function fetchModifierGroups(productId: string): Promise<ModifierGroup[]> {

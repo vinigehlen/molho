@@ -24,7 +24,9 @@ export class StorefrontService {
     private readonly guestGate: CheckoutGuestGate,
   ) {}
 
-  async getStorefront(): Promise<StorefrontPayload> {
+  async getStorefront(
+    { catalogOffers = false }: { catalogOffers?: boolean } = {},
+  ): Promise<StorefrontPayload> {
     const [tenant, store, categories, hours] = await Promise.all([
       this.repository.findTenant(),
       this.repository.findStore(),
@@ -74,43 +76,46 @@ export class StorefrontService {
       categories: categories.map((category) => ({
         id: category.id,
         name: category.name,
-        products: category.products.map((product) => {
-          // Galeria (Épico conversão, C1). Produto que nunca migrou pra
-          // ProductImage (ou nasceu antes do C1) cai no fallback do
-          // imageKey único, na frente da galeria vazia — nunca um produto
-          // com foto vira "sem foto" só porque a linha em product_images
-          // ainda não existe.
-          const galleryKeys = product.images.length > 0 ? product.images.map((img) => img.imageKey) : product.imageKey ? [product.imageKey] : [];
-          const images = galleryKeys
-            .map((key) => resolvePublicImageUrl(key, this.publicImageBaseUrl))
-            .filter((url): url is string => url !== null);
+        products: category.products
+          .filter((product) => catalogOffers || product.isPrimary)
+          .map((product) => {
+            // Galeria (Épico conversão, C1). Produto que nunca migrou pra
+            // ProductImage (ou nasceu antes do C1) cai no fallback do
+            // imageKey único, na frente da galeria vazia — nunca um produto
+            // com foto vira "sem foto" só porque a linha em product_images
+            // ainda não existe.
+            const galleryKeys = product.images.length > 0 ? product.images.map((img) => img.imageKey) : product.imageKey ? [product.imageKey] : [];
+            const images = galleryKeys
+              .map((key) => resolvePublicImageUrl(key, this.publicImageBaseUrl))
+              .filter((url): url is string => url !== null);
 
-          return {
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            basePriceCents: product.basePriceCents,
-            /** Capa: primeira foto da galeria resolvida, `null` = produto sem foto nenhuma. */
-            imageUrl: images[0] ?? null,
-            images: images.map((url) => ({ url })),
-            available: product.available,
-            modifierGroups: product.modifierGroups.map((group) => ({
-              id: group.id,
-              name: group.name,
-              min: group.min,
-              max: group.max,
-              modifiers: group.modifiers.map((modifier) => ({
-                id: modifier.id,
-                name: modifier.name,
-                description: modifier.description,
-                imageUrl: modifier.imageKey
-                  ? resolvePublicImageUrl(modifier.imageKey, this.publicImageBaseUrl)
-                  : null,
-                priceDeltaCents: modifier.priceDeltaCents,
+            return {
+              id: product.id,
+              ...(catalogOffers ? { offerId: product.offerId } : {}),
+              name: product.name,
+              description: product.description,
+              basePriceCents: product.basePriceCents,
+              /** Capa: primeira foto da galeria resolvida, `null` = produto sem foto nenhuma. */
+              imageUrl: images[0] ?? null,
+              images: images.map((url) => ({ url })),
+              available: product.available,
+              modifierGroups: product.modifierGroups.map((group) => ({
+                id: group.id,
+                name: group.name,
+                min: group.min,
+                max: group.max,
+                modifiers: group.modifiers.map((modifier) => ({
+                  id: modifier.id,
+                  name: modifier.name,
+                  description: modifier.description,
+                  imageUrl: modifier.imageKey
+                    ? resolvePublicImageUrl(modifier.imageKey, this.publicImageBaseUrl)
+                    : null,
+                  priceDeltaCents: modifier.priceDeltaCents,
+                })),
               })),
-            })),
-          };
-        }),
+            };
+          }),
       })),
     };
   }

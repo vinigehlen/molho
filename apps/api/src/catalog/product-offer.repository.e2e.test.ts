@@ -206,6 +206,46 @@ describe('ProductOffer — expansão compatível', () => {
     ).toBe(900);
   });
 
+  it('cria e remove uma oferta secundária sem alterar a ponte principal de Product', async () => {
+    const beforeProduct = await migrator.product.findUniqueOrThrow({ where: { id: productA } });
+    const created = await asTenant(tenantA, async (tx) => {
+      const repo = new PrismaProductOfferRepository(contextFor(tx, tenantA));
+      return repo.create(
+        {
+          productId: productA,
+          categoryId: categoryA,
+          priceCents: 2490,
+          pdvCode: 'A-SEC',
+        },
+        actor,
+      );
+    });
+
+    expect(created).toMatchObject({ isPrimary: false, categoryId: categoryA, priceCents: 2490 });
+    expect(await migrator.product.findUniqueOrThrow({ where: { id: productA } })).toMatchObject({
+      categoryId: beforeProduct.categoryId,
+      basePriceCents: beforeProduct.basePriceCents,
+    });
+    expect(
+      await migrator.auditLog.count({
+        where: { tenantId: tenantA, actorId, action: 'catalog.offer_create' },
+      }),
+    ).toBe(1);
+
+    await asTenant(tenantA, async (tx) => {
+      const repo = new PrismaProductOfferRepository(contextFor(tx, tenantA));
+      await repo.softDelete(created.id, created.version);
+    });
+    expect(
+      await migrator.productOffer.findFirst({ where: { id: created.id, deletedAt: null } }),
+    ).toBeNull();
+    expect(
+      await migrator.productOffer.count({
+        where: { productId: productA, isPrimary: true, deletedAt: null },
+      }),
+    ).toBe(1);
+  });
+
   it('FK composta recusa produto de outro tenant mesmo com IDs válidos', async () => {
     await expect(
       migrator.productOffer.create({

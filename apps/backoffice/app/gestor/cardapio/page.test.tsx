@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   fetchCategories: vi.fn(),
   fetchProducts: vi.fn(),
   fetchProductImages: vi.fn(),
+  fetchProductOffers: vi.fn(),
   fetchAllModifierGroups: vi.fn(),
   fetchModifierGroups: vi.fn(),
   linkModifierGroupToProduct: vi.fn(),
@@ -20,6 +21,10 @@ const mocks = vi.hoisted(() => ({
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
   uploadProductImage: vi.fn(),
+  createProductOffer: vi.fn(),
+  updateProductOffer: vi.fn(),
+  setProductOfferAvailability: vi.fn(),
+  deleteProductOffer: vi.fn(),
 }));
 
 vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession }));
@@ -30,6 +35,7 @@ vi.mock('../../../lib/catalog-api', () => ({
   fetchAllModifierGroups: mocks.fetchAllModifierGroups,
   fetchModifiers: vi.fn().mockResolvedValue([]),
   fetchProductImages: mocks.fetchProductImages,
+  fetchProductOffers: mocks.fetchProductOffers,
   reorderProductImage: mocks.reorderProductImage,
   deleteProductImage: mocks.deleteProductImage,
   setProductAvailability: mocks.setProductAvailability,
@@ -44,6 +50,10 @@ vi.mock('../../../lib/catalog-api', () => ({
   downloadCatalogTemplate: vi.fn(),
   updateProduct: mocks.updateProduct,
   uploadProductImage: mocks.uploadProductImage,
+  createProductOffer: mocks.createProductOffer,
+  updateProductOffer: mocks.updateProductOffer,
+  setProductOfferAvailability: mocks.setProductOfferAvailability,
+  deleteProductOffer: mocks.deleteProductOffer,
 }));
 
 const CATEGORY = { id: 'cat-1', name: 'Carnes', sortOrder: 0, visible: true, version: 0 };
@@ -114,6 +124,19 @@ beforeEach(() => {
   mocks.fetchCategories.mockResolvedValue([CATEGORY]);
   mocks.fetchProducts.mockResolvedValue([PICANHA, COSTELA]);
   mocks.fetchProductImages.mockResolvedValue([]);
+  mocks.fetchProductOffers.mockResolvedValue([
+    {
+      id: 'offer-primary',
+      productId: 'prod-1',
+      categoryId: 'cat-1',
+      priceCents: 9500,
+      available: true,
+      pdvCode: '101',
+      sortOrder: 0,
+      isPrimary: true,
+      version: 0,
+    },
+  ]);
   mocks.fetchAllModifierGroups.mockResolvedValue([]);
   mocks.fetchModifierGroups.mockResolvedValue([]);
   mocks.createProduct.mockResolvedValue({ ...PICANHA, id: 'prod-new', name: 'Xis coração' });

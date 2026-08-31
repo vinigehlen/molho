@@ -6,6 +6,7 @@ import {
   CatalogValidationError,
 } from './catalog-errors';
 import type {
+  CreateProductOfferInput,
   ProductOfferFilter,
   ProductOfferRecord,
   ProductOfferRepository,
@@ -47,8 +48,33 @@ class FakeProductOfferRepository implements ProductOfferRepository {
     return this.rows.get(id) ?? null;
   }
 
+  async productExists(productId: string): Promise<boolean> {
+    return productId === 'product-1';
+  }
+
   async categoryExists(categoryId: string): Promise<boolean> {
     return this.categoryIds.has(categoryId);
+  }
+
+  async offerExists(productId: string, categoryId: string, excludingId?: string): Promise<boolean> {
+    return [...this.rows.values()].some(
+      (row) => row.productId === productId && row.categoryId === categoryId && row.id !== excludingId,
+    );
+  }
+
+  async create(input: CreateProductOfferInput, actor: CatalogActor): Promise<ProductOfferRecord> {
+    const created: ProductOfferRecord = {
+      id: `offer-${this.rows.size + 1}`,
+      ...input,
+      available: input.available ?? true,
+      pdvCode: input.pdvCode ?? null,
+      sortOrder: input.sortOrder ?? 0,
+      isPrimary: false,
+      version: 0,
+    };
+    this.rows.set(created.id, created);
+    this.lastActor = actor;
+    return created;
   }
 
   async update(
@@ -78,6 +104,13 @@ class FakeProductOfferRepository implements ProductOfferRepository {
     this.rows.set(id, updated);
     return updated;
   }
+
+  async softDelete(id: string, expectedVersion: number): Promise<void> {
+    const current = this.rows.get(id);
+    if (!current) throw new CatalogNotFoundError('Oferta');
+    if (current.version !== expectedVersion) throw new CatalogConflictError('Oferta');
+    this.rows.delete(id);
+  }
 }
 
 function setup() {
@@ -91,6 +124,35 @@ describe('ProductOfferService', () => {
     const rows = await service.list({ productId: 'product-1' });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ categoryId: 'category-1', priceCents: 2500, isPrimary: true });
+  });
+
+  it('cria uma oferta secundária numa categoria ainda não usada pelo produto', async () => {
+    const { repo, service } = setup();
+    const created = await service.create(
+      {
+        productId: 'product-1',
+        categoryId: 'category-2',
+        priceCents: 2390,
+      },
+      ACTOR,
+    );
+    expect(created).toMatchObject({
+      productId: 'product-1',
+      categoryId: 'category-2',
+      priceCents: 2390,
+      isPrimary: false,
+    });
+    expect(repo.lastActor).toEqual(ACTOR);
+  });
+
+  it('rejeita produto inexistente e categoria repetida', async () => {
+    const { service } = setup();
+    await expect(
+      service.create({ productId: 'missing', categoryId: 'category-2', priceCents: 2390 }, ACTOR),
+    ).rejects.toThrow(CatalogNotFoundError);
+    await expect(
+      service.create({ productId: 'product-1', categoryId: 'category-1', priceCents: 2390 }, ACTOR),
+    ).rejects.toThrow('Este produto já está disponível nesta categoria.');
   });
 
   it('edita preço em centavos e preserva o ator da auditoria', async () => {
@@ -127,6 +189,23 @@ describe('ProductOfferService', () => {
     const { service } = setup();
     await expect(service.update('offer-1', 4, { priceCents: 2790 }, ACTOR)).rejects.toThrow(
       CatalogConflictError,
+    );
+  });
+
+  it('remove apenas oferta secundária e preserva a principal', async () => {
+    const { repo, service } = setup();
+    const secondary = await service.create(
+      {
+        productId: 'product-1',
+        categoryId: 'category-2',
+        priceCents: 2390,
+      },
+      ACTOR,
+    );
+    await service.remove(secondary.id, secondary.version);
+    expect(repo.rows.has(secondary.id)).toBe(false);
+    await expect(service.remove('offer-1', 0)).rejects.toThrow(
+      'A oferta principal não pode ser removida.',
     );
   });
 });

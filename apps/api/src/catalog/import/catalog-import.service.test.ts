@@ -73,6 +73,10 @@ class FakeProductRepository implements ProductRepository {
     return this.categoryIds.has(categoryId);
   }
 
+  async secondaryOfferExists(): Promise<boolean> {
+    return false;
+  }
+
   async create(input: CreateProductInput): Promise<ProductRecord> {
     const record: ProductRecord = {
       id: `prod-${this.nextId++}`,

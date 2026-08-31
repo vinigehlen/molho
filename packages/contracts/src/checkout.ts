@@ -51,6 +51,9 @@ export const checkoutLegalAcceptanceSchema = z.strictObject({
  */
 export const checkoutItemInputSchema = z.strictObject({
   productId: z.uuid(),
+  /** Compatibilidade de expansão: clientes antigos omitem e recebem a oferta
+   * principal; clientes 4C enviam a apresentação tocada na vitrine. */
+  offerId: z.uuid().optional(),
   unitBasePriceCents: z.int().nonnegative(),
   modifiers: z.array(z.strictObject({ modifierId: z.uuid(), priceDeltaCents: z.int().nonnegative() })),
   quantity: z.int().positive(),
@@ -190,6 +193,9 @@ export const checkoutRequestSchema = z
 
 export const revalidatedItemSchema = z.strictObject({
   productId: z.uuid(),
+  /** Oferta selecionada/precificada. `null` identifica apenas um cliente
+   * legado sem oferta quando nem a principal pôde ser resolvida. */
+  offerId: z.uuid().nullable(),
   name: z.string(),
   /** `false` = sumiu do carrinho nesta revalidação (esgotado, ou removido do catálogo). */
   available: z.boolean(),

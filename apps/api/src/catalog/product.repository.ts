@@ -1,6 +1,7 @@
+import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { CatalogActor } from './catalog-actor';
-import { CatalogNotFoundError } from './catalog-errors';
+import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
 import { assertOptimisticUpdate } from './optimistic-update.util';
 
 export interface ProductRecord {
@@ -42,6 +43,7 @@ export interface ProductRepository {
   listByCategory(categoryId: string): Promise<ProductRecord[]>;
   findById(id: string): Promise<ProductRecord | null>;
   categoryExists(categoryId: string): Promise<boolean>;
+  secondaryOfferExists(productId: string, categoryId: string): Promise<boolean>;
   create(input: CreateProductInput): Promise<ProductRecord>;
   update(
     id: string,
@@ -99,6 +101,14 @@ export class PrismaProductRepository implements ProductRepository {
     return category !== null;
   }
 
+  async secondaryOfferExists(productId: string, categoryId: string): Promise<boolean> {
+    const offer = await this.requestContext.getClient().productOffer.findFirst({
+      where: { productId, categoryId, isPrimary: false, deletedAt: null },
+      select: { id: true },
+    });
+    return offer !== null;
+  }
+
   async create(input: CreateProductInput): Promise<ProductRecord> {
     return this.requestContext.getClient().product.create({
       data: {
@@ -123,10 +133,21 @@ export class PrismaProductRepository implements ProductRepository {
     const client = this.requestContext.getClient();
     const before = await this.findById(id);
     if (!before) throw new CatalogNotFoundError('Produto');
-    const result = await client.product.updateMany({
-      where: { id, version: expectedVersion, deletedAt: null },
-      data: { ...input, version: { increment: 1 } },
-    });
+    let result: { count: number };
+    try {
+      result = await client.product.updateMany({
+        where: { id, version: expectedVersion, deletedAt: null },
+        data: { ...input, version: { increment: 1 } },
+      });
+    } catch (error) {
+      // A trigger legado → oferta pode perder a corrida contra a criação de
+      // uma secundária na categoria de destino. O índice parcial fecha a
+      // consistência; esta tradução preserva o contrato HTTP legível.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new CatalogValidationError('Este produto já está disponível nesta categoria.');
+      }
+      throw error;
+    }
     await assertOptimisticUpdate(
       'Produto',
       result.count,

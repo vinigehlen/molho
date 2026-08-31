@@ -4,6 +4,7 @@ import {
   catalogProductOfferSchema,
   copyCatalogModifierGroupForProductSchema,
   createCatalogModifierSchema,
+  createCatalogProductOfferSchema,
   reorderCatalogModifiersSchema,
   setCatalogProductOfferAvailabilitySchema,
   updateCatalogModifierSchema,
@@ -30,6 +31,30 @@ describe('contratos de ProductOffer', () => {
         version: 0,
       }),
     ).toMatchObject({ priceCents: 2590, isPrimary: true });
+  });
+
+  it('aceita a criação de uma apresentação secundária sem expor isPrimary', () => {
+    expect(
+      createCatalogProductOfferSchema.parse({
+        productId: PRODUCT_ID,
+        categoryId: CATEGORY_ID,
+        priceCents: 2390,
+        available: true,
+      }),
+    ).toEqual({
+      productId: PRODUCT_ID,
+      categoryId: CATEGORY_ID,
+      priceCents: 2390,
+      available: true,
+    });
+    expect(
+      createCatalogProductOfferSchema.safeParse({
+        productId: PRODUCT_ID,
+        categoryId: CATEGORY_ID,
+        priceCents: 2390,
+        isPrimary: true,
+      }).success,
+    ).toBe(false);
   });
 
   it.each([-1, 25.5])('rejeita preço fora da regra de centavos: %s', (priceCents) => {

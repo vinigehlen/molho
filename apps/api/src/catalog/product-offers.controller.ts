@@ -1,11 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   Req,
   UseFilters,
@@ -22,12 +26,16 @@ import { TenantContextInterceptor } from '../auth/guards/tenant-context.intercep
 import { resolveCatalogActor } from './catalog-actor';
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { PRODUCT_OFFER_SERVICE } from './catalog.tokens';
-import { SetProductOfferAvailabilityDto, UpdateProductOfferDto } from './dto/product-offer.dto';
+import { VersionQueryDto } from './dto/category.dto';
+import {
+  CreateProductOfferDto,
+  SetProductOfferAvailabilityDto,
+  UpdateProductOfferDto,
+} from './dto/product-offer.dto';
 import type { ProductOfferService } from './product-offer.service';
 
-/** API de transição do Épico 4B. Só lê/edita ofertas já existentes; criar uma
- * segunda apresentação do mesmo produto fica bloqueado até a UI do 4C poder
- * representá-la sem ambiguidade. */
+/** Apresentações comerciais do produto. A linha principal preserva a ponte
+ * com Product; criar/remover aqui opera somente as apresentações secundárias. */
 @Controller('v1/admin/product-offers')
 @UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
 @UseInterceptors(TenantContextInterceptor)
@@ -48,6 +56,14 @@ export class ProductOffersController {
     return record;
   }
 
+  @Post()
+  @RequirePermission('catalog.product.update')
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() dto: CreateProductOfferDto, @Req() req: RequestWithUser) {
+    const tenantId = requireTenantIdHeader(req);
+    return this.offers.create(dto, resolveCatalogActor(req, tenantId));
+  }
+
   @Patch(':id')
   @RequirePermission('catalog.product.update')
   update(@Param('id') id: string, @Body() dto: UpdateProductOfferDto, @Req() req: RequestWithUser) {
@@ -60,5 +76,12 @@ export class ProductOffersController {
   @RequirePermission('catalog.product.mark_unavailable')
   setAvailable(@Param('id') id: string, @Body() dto: SetProductOfferAvailabilityDto) {
     return this.offers.setAvailable(id, dto.version, dto.available);
+  }
+
+  @Delete(':id')
+  @RequirePermission('catalog.product.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id') id: string, @Query() query: VersionQueryDto) {
+    return this.offers.remove(id, query.version);
   }
 }

@@ -38,6 +38,7 @@ const CATEGORIAS: StorefrontCategory[] = [
     products: [
       {
         id: '0193f1a0-0000-7000-8000-000000000002',
+        offerId: '0193f1a0-0000-7000-8000-000000000003',
         name: 'Smash Clássico',
         description: null,
         basePriceCents: 2800,

@@ -107,6 +107,11 @@ export interface CheckoutOrderRepository {
    * de propósito, como débito tolerável sob READ COMMITTED).
    */
   lockProductsForUpdate(productIds: readonly string[]): Promise<void>;
+  /** Trava as apresentações que carregam preço/disponibilidade. Itens de
+   * clientes antigos sem offerId travam a oferta principal do produto. */
+  lockOffersForUpdate(
+    items: readonly { productId: string; offerId?: string }[],
+  ): Promise<void>;
   /**
    * Incremento ATÔMICO de `uses_count` (Épico conversão, C2, docs/handoff
    * A2) — `UPDATE ... WHERE uses_count < max_uses`, mesmo padrão do
@@ -183,6 +188,26 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     if (productIds.length === 0) return;
     await this.requestContext.getClient().$queryRaw`
       SELECT "id" FROM "products" WHERE "id" = ANY(${productIds}::uuid[]) AND "deleted_at" IS NULL FOR UPDATE
+    `;
+  }
+
+  async lockOffersForUpdate(
+    items: readonly { productId: string; offerId?: string }[],
+  ): Promise<void> {
+    if (items.length === 0) return;
+    const offerIds = [...new Set(items.flatMap((item) => (item.offerId ? [item.offerId] : [])))];
+    const fallbackProductIds = [
+      ...new Set(items.filter((item) => !item.offerId).map((item) => item.productId)),
+    ];
+    await this.requestContext.getClient().$queryRaw`
+      SELECT "id" FROM "product_offers"
+      WHERE "deleted_at" IS NULL
+        AND (
+          "id" = ANY(${offerIds}::uuid[])
+          OR ("is_primary" = true AND "product_id" = ANY(${fallbackProductIds}::uuid[]))
+        )
+      ORDER BY "id"
+      FOR UPDATE
     `;
   }
 

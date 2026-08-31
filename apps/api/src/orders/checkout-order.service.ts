@@ -159,6 +159,7 @@ export class CheckoutOrderService {
     // (débito documentado: baixa mutabilidade, consequência tolerável).
     const productIds = [...new Set(request.items.map((item) => item.productId))];
     await this.repo.lockProductsForUpdate(productIds);
+    await this.repo.lockOffersForUpdate(request.items);
 
     // Nunca reaproveita o resultado de /checkout/revalidate — revalida de
     // novo aqui dentro, contra o estado FRESCO do banco (regra 14).
