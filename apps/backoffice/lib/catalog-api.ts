@@ -73,6 +73,17 @@ export interface Modifier {
   version: number;
 }
 
+/** Item de um combo (exceção MVP 2026-08-28, fase 4.1a) — produto-filho + quantidade. */
+export interface ComboItem {
+  id: string;
+  comboProductId: string;
+  childProductId: string;
+  childName: string;
+  quantity: number;
+  sortOrder: number;
+  version: number;
+}
+
 export interface ProductImage {
   id: string;
   productId: string;
@@ -313,6 +324,50 @@ export async function unlinkModifierGroupFromProduct(groupId: string, productId:
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Falha ao desvincular o grupo (${res.status})`);
+}
+
+// ─── Combo (exceção MVP 2026-08-28, fase 4.1a) ───────────────────────────────
+
+export async function fetchComboItems(comboProductId: string): Promise<ComboItem[]> {
+  const res = await apiFetch(`/v1/admin/combo-items?comboProductId=${encodeURIComponent(comboProductId)}`);
+  if (!res.ok) throw new Error(`Falha ao carregar itens do combo (${res.status})`);
+  return (await res.json()) as ComboItem[];
+}
+
+export async function createComboItem(input: {
+  comboProductId: string;
+  childProductId: string;
+  quantity?: number;
+  sortOrder?: number;
+}): Promise<ComboItem> {
+  const res = await apiFetch('/v1/admin/combo-items', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Falha ao adicionar item ao combo (${res.status})`);
+  return (await res.json()) as ComboItem;
+}
+
+export async function updateComboItem(
+  item: ComboItem,
+  input: Partial<Pick<ComboItem, 'quantity' | 'sortOrder'>>,
+): Promise<ComboItem> {
+  const res = await apiFetch(`/v1/admin/combo-items/${encodeURIComponent(item.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: item.version, ...input }),
+  });
+  if (!res.ok) throw new Error(`Falha ao atualizar item do combo (${res.status})`);
+  return (await res.json()) as ComboItem;
+}
+
+export async function deleteComboItem(item: ComboItem): Promise<void> {
+  const res = await apiFetch(
+    `/v1/admin/combo-items/${encodeURIComponent(item.id)}?version=${encodeURIComponent(item.version)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw new Error(`Falha ao remover item do combo (${res.status})`);
 }
 
 export async function fetchModifiers(groupId: string): Promise<Modifier[]> {

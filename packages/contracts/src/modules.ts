@@ -81,7 +81,9 @@ export const MODULES = {
   // ─── Crescimento ────────────────────────────────────────────────────────────
   coupons: { plans: ['pro', 'premium'] },
   promotions: { plans: ['pro', 'premium'] },
-  combos: { plans: ['pro', 'premium'] },
+  // Exceção MVP 2026-08-28 (CLAUDE.md): combo entra no MVP fora de ordem.
+  // `default: true` = nasce ligado em todo tenant com direito (pro/premium).
+  combos: { plans: ['pro', 'premium'], default: true },
   loyalty: { plans: ['pro', 'premium'] },
   reviews: { plans: ['pro', 'premium'] },
   campaigns: { plans: ['premium'], metered: true },

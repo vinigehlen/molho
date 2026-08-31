@@ -23,11 +23,15 @@ import { PrismaProductOfferRepository } from './product-offer.repository';
 import { ProductImagesController } from './product-images.controller';
 import { ProductImageService } from './product-image.service';
 import { PrismaProductImageRepository } from './product-image.repository';
+import { ComboItemsController } from './combo-items.controller';
+import { ComboItemService } from './combo-item.service';
+import { PrismaComboItemRepository } from './combo-item.repository';
 import { CatalogImportController } from './import/catalog-import.controller';
 import { CatalogImportService } from './import/catalog-import.service';
 import {
   CATALOG_IMPORT_SERVICE,
   CATEGORY_SERVICE,
+  COMBO_ITEM_SERVICE,
   MODIFIER_GROUP_SERVICE,
   MODIFIER_SERVICE,
   PRODUCT_IMAGE_SERVICE,
@@ -42,6 +46,7 @@ export {
   MODIFIER_GROUP_SERVICE,
   MODIFIER_SERVICE,
   PRODUCT_IMAGE_SERVICE,
+  COMBO_ITEM_SERVICE,
   CATALOG_IMPORT_SERVICE,
 };
 
@@ -69,6 +74,7 @@ export {
     ModifierGroupsController,
     ModifiersController,
     ProductImagesController,
+    ComboItemsController,
     CatalogImportController,
   ],
   providers: [
@@ -109,6 +115,12 @@ export {
         new ProductImageService(new PrismaProductImageRepository(requestContext)),
     },
     {
+      provide: COMBO_ITEM_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): ComboItemService =>
+        new ComboItemService(new PrismaComboItemRepository(requestContext)),
+    },
+    {
       provide: CATALOG_IMPORT_SERVICE,
       inject: [CATEGORY_SERVICE, PRODUCT_SERVICE],
       useFactory: (categories: CategoryService, products: ProductService): CatalogImportService =>
@@ -122,6 +134,7 @@ export {
     MODIFIER_GROUP_SERVICE,
     MODIFIER_SERVICE,
     PRODUCT_IMAGE_SERVICE,
+    COMBO_ITEM_SERVICE,
     CATALOG_IMPORT_SERVICE,
   ],
 })
