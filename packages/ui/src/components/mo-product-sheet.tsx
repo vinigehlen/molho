@@ -22,6 +22,8 @@ export interface MoProductSheetProduct {
   imageUrl?: string | null;
   basePriceCents: number;
   modifierGroups: MoProductSheetModifierGroup[];
+  /** Combo (fase 4.1b): o que vem dentro. Exibição pura — o preço é `basePriceCents` (fixo). */
+  comboItems?: { name: string; quantity: number }[];
 }
 
 export interface MoProductSheetSelectedModifier {
@@ -144,6 +146,20 @@ function MoProductSheetInner({
       ) : null}
 
       {product.description ? <p className="mb-6 text-body text-text-muted">{product.description}</p> : null}
+
+      {product.comboItems && product.comboItems.length > 0 ? (
+        <div className="mb-6 rounded-[14px] border border-border p-4">
+          <p className="mb-2 text-body-strong text-text">Vem com</p>
+          <ul className="flex flex-col gap-1 text-body text-text-muted">
+            {product.comboItems.map((item, index) => (
+              <li key={`${item.name}-${index}`}>
+                {item.quantity > 1 ? `${item.quantity}× ` : ''}
+                {item.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-6 pb-6">
         {product.modifierGroups.map((grupo) => (

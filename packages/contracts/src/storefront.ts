@@ -70,6 +70,13 @@ export const storefrontProductSchema = z.strictObject({
   /** "Esgotado manual" (definicoes-v1 §5.4): item aparece no cardápio, mas não entra no carrinho. */
   available: z.boolean(),
   modifierGroups: z.array(storefrontModifierGroupSchema),
+  /**
+   * Composição do combo (exceção MVP 2026-08-28, fase 4.1b) — só em produto
+   * `kind = 'combo'`, e só quando o storefront pede `?catalog=offers` (mesma
+   * negociação opt-in do 4C que introduz `offerId`). Exibição pura: "vem com
+   * 2× Xis, 1× Refri". O preço é o de `basePriceCents` (fixo).
+   */
+  comboItems: z.array(z.strictObject({ name: z.string(), quantity: z.int().positive() })).optional(),
 });
 
 export const storefrontCategorySchema = z.strictObject({

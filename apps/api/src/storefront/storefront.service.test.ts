@@ -93,6 +93,8 @@ function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): Storefron
         imageKey: 'produtos/x-burger.jpg',
         images: [],
         available: true,
+        kind: 'prepared',
+        comboItems: [],
         modifierGroups: [
           {
             id: UUID,

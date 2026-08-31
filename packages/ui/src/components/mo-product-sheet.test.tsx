@@ -65,6 +65,28 @@ describe('MoProductSheet', () => {
     expect(screen.getByText('Adicionais')).toBeInTheDocument();
   });
 
+  it('combo: lista "Vem com" a partir de comboItems, com quantidade só quando > 1', () => {
+    render(
+      <MoProductSheet
+        open
+        onOpenChange={() => {}}
+        product={{
+          ...PRODUTO,
+          modifierGroups: [],
+          comboItems: [
+            { name: 'Xis', quantity: 2 },
+            { name: 'Batata', quantity: 1 },
+          ],
+        }}
+        onAddToCart={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Vem com')).toBeInTheDocument();
+    expect(screen.getByText('2× Xis')).toBeInTheDocument();
+    expect(screen.getByText('Batata')).toBeInTheDocument();
+  });
+
   it('botão de adicionar começa com o preço BASE, e desabilitado (grupo obrigatório vazio)', () => {
     render(<MoProductSheet open onOpenChange={() => {}} product={PRODUTO} onAddToCart={() => {}} />);
 

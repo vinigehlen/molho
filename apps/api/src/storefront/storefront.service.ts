@@ -99,6 +99,11 @@ export class StorefrontService {
               imageUrl: images[0] ?? null,
               images: images.map((url) => ({ url })),
               available: product.available,
+              // Composição do combo (fase 4.1b) — só no storefront opt-in,
+              // mesma negociação do `offerId` (4C), e só quando há filhos.
+              ...(catalogOffers && product.kind === 'combo' && product.comboItems.length > 0
+                ? { comboItems: product.comboItems }
+                : {}),
               modifierGroups: product.modifierGroups.map((group) => ({
                 id: group.id,
                 name: group.name,
