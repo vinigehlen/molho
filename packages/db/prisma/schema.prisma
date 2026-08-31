@@ -149,6 +149,7 @@ model Tenant {
   productImages         ProductImage[]
   modifierGroups        ModifierGroup[]
   productModifierGroups ProductModifierGroup[]
+  comboItems            ComboItem[]
   modifiers             Modifier[]
   addresses             Address[]
   deliveryZones         DeliveryZone[]
@@ -451,6 +452,10 @@ model Product {
   orderItems            OrderItem[]
   images                ProductImage[]
   offers                ProductOffer[]
+  /// Filhos deste combo — só populado quando `kind = combo` (fase 4).
+  comboItems            ComboItem[]            @relation("ComboParent")
+  /// Combos que INCLUEM este produto como filho.
+  comboMemberships      ComboItem[]            @relation("ComboChild")
 
   // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
   // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
@@ -579,6 +584,41 @@ model ProductModifierGroup {
   @@index([tenantId, productId])
   @@index([tenantId, modifierGroupId])
   @@map("product_modifier_groups")
+}
+
+/// Item de um combo (exceção MVP 2026-08-28, CLAUDE.md — fase 4/4). O combo
+/// É um `Product` com `kind = combo`: nome, descrição, foto e preço (na
+/// oferta primária) vivem lá. Esta tabela só diz QUAIS produtos do catálogo
+/// vêm dentro e em que quantidade.
+///
+/// Fase 4.1: preço FIXO (o da oferta do combo) — os filhos entram só como
+/// composição/exibição e, na fase 4.1b, cascata de disponibilidade no
+/// checkout. Sem combo aninhado (filho nunca é `kind = combo`), sem
+/// modificador de filho, sem preço "a partir de" — tudo isso é 4.2.
+model ComboItem {
+  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  comboProductId String    @map("combo_product_id") @db.Uuid
+  childProductId String    @map("child_product_id") @db.Uuid
+  /// CHECK quantity > 0 à mão na migration.
+  quantity       Int       @default(1)
+  sortOrder      Int       @default(0) @map("sort_order")
+  version        Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  comboProduct Product @relation("ComboParent", fields: [comboProductId], references: [id])
+  childProduct Product @relation("ComboChild", fields: [childProductId], references: [id])
+
+  // FKs compostas (combo_product_id, tenant_id) e (child_product_id,
+  // tenant_id) → products(id, tenant_id) na migration. Único parcial
+  // (combo_product_id, child_product_id) WHERE deleted_at IS NULL e CHECK
+  // combo_product_id <> child_product_id também na migration.
+  @@index([tenantId, comboProductId, sortOrder])
+  @@index([tenantId, childProductId])
+  @@map("combo_items")
 }
 
 model Modifier {

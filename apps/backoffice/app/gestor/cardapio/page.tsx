@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ComboItemsEditor } from './combo-items-editor';
 import { ProductOffersEditor } from './product-offers-editor';
 import { brlToCents, centsToBRL } from '../../../lib/format';
 import { getStaffSession } from '../../../lib/staff-session';
@@ -53,15 +54,18 @@ import {
   type ProductKind,
 } from '../../../lib/catalog-api';
 
-/** Fase 3 do combo (exceção MVP 2026-08-28): `combo` existe no schema mas só
- * é criável na fase 4 — o gestor escolhe entre prato feito e industrializado. */
+/** Combo (exceção MVP 2026-08-28): fase 3 abriu o `kind`; fase 4.1a torna
+ * `combo` criável e liga a seção "Itens do combo". Gating do módulo `combos`
+ * no front fica pro painel de módulos (épico 14) — hoje nada no backoffice é
+ * gateado; a API já barra com `@RequireModule('combos')`. */
 const CATALOG_PRODUCT_KINDS: { value: ProductKind; label: string }[] = [
   { value: 'prepared', label: 'Preparado na cozinha' },
   { value: 'industrialized', label: 'Industrializado (revenda)' },
+  { value: 'combo', label: 'Combo (agrupa produtos)' },
 ];
 
 function productKindLabel(kind: ProductKind): string {
-  return CATALOG_PRODUCT_KINDS.find((option) => option.value === kind)?.label ?? 'Combo';
+  return CATALOG_PRODUCT_KINDS.find((option) => option.value === kind)?.label ?? kind;
 }
 
 const FIELD_CLASS =
@@ -1328,19 +1332,12 @@ export default function CardapioPage() {
                                     placeholder="Nome do item"
                                   />
                                 </label>
-                                {selectedProduct.kind === 'combo' ? (
-                                  <p className="text-sm text-text-muted">
-                                    Tipo do item: Combo. A edição de combo entra numa próxima
-                                    atualização.
-                                  </p>
-                                ) : (
-                                  <ProductKindPicker
-                                    value={editDraft.kind}
-                                    onChange={(kind) =>
-                                      setEditDraft((prev) => ({ ...prev, kind }))
-                                    }
-                                  />
-                                )}
+                                <ProductKindPicker
+                                  value={editDraft.kind}
+                                  onChange={(kind) =>
+                                    setEditDraft((prev) => ({ ...prev, kind }))
+                                  }
+                                />
                                 <label className="grid gap-1.5 text-sm font-semibold">
                                   <span className="flex items-center justify-between gap-3">
                                     <span>
@@ -1574,6 +1571,12 @@ export default function CardapioPage() {
                                     </button>
                                   </div>
                                 </div>
+                                {selectedProduct.kind === 'combo' && (
+                                  <ComboItemsEditor
+                                    comboProductId={selectedProduct.id}
+                                    categories={categories}
+                                  />
+                                )}
                                 <div className="mt-5">
                                   <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
@@ -1945,7 +1948,7 @@ function ProductFormProgress({
               >
                 <span
                   className={cn(
-                    'flex h-6 w-6 items-center justify-center rounded-full border text-[11px] tabular-nums',
+                    'flex h-6 w-6 items-center justify-center rounded-full border text-xs tabular-nums',
                     active || complete
                       ? 'border-brand bg-brand text-on-brand'
                       : 'border-border bg-bg-card',
@@ -2029,7 +2032,7 @@ function ProductKindPicker({
       <div
         role="radiogroup"
         aria-label="Tipo do item"
-        className="grid grid-cols-2 gap-2"
+        className="grid gap-2 sm:grid-cols-3"
       >
         {CATALOG_PRODUCT_KINDS.map((option) => (
           <button
