@@ -7,6 +7,8 @@ import { cn } from '../lib/cn';
 export interface MoModifierOption {
   id: string;
   name: string;
+  description?: string | null;
+  imageUrl?: string | null;
   priceDeltaCents: number;
 }
 
@@ -33,22 +35,10 @@ function regraDoGrupo(min: number, max: number): string {
 /**
  * MoModifierGroup — doc de marca §5.2.
  *
- * Escolha única (`max === 1`) usa `<input type="radio">` NATIVO, agrupado
- * por `name` — é o mecanismo padrão do HTML pra grupo de opções mutuamente
- * exclusivas, com navegação por seta e leitor de tela anunciando "opção
- * rádio, 1 de 3" de graça. Uma primeira versão tentou simular isso com
- * `<input type="checkbox" role="radio">` pra suportar desmarcar num grupo
- * OPCIONAL (clicar um radio já marcado não dispara `change` em navegador
- * nenhum) — o axe reprovou (`aria-allowed-role`: `role="radio"` não é
- * permitido em elemento cujo papel implícito é checkbox). Corrigido para o
- * elemento nativo certo.
- *
- * Limitação aceita como consequência: um grupo OPCIONAL de escolha única
- * (`min === 0, max === 1`) não pode voltar para "nada selecionado" clicando
- * de novo na opção marcada — limitação do próprio `<input type="radio">`,
- * não deste componente. Quem precisar de um estado "nenhum" nesse tipo de
- * grupo modela como um modificador explícito na lista (ex.: "Sem troca",
- * delta R$ 0) — é dado do lojista, não comportamento do componente.
+ * Escolha única usa o radio nativo para preservar navegação por setas e a
+ * semântica anunciada por leitores de tela. Quando o grupo é opcional, uma
+ * ação explícita permite voltar ao estado sem escolha sem inventar uma opção
+ * falsa no cardápio do lojista.
  */
 export function MoModifierGroup({
   name,
@@ -101,7 +91,7 @@ export function MoModifierGroup({
                 desabilitado ? 'cursor-not-allowed' : 'cursor-pointer',
               )}
             >
-              <span className="flex items-center gap-3">
+              <span className="flex min-w-0 items-center gap-3">
                 <input
                   type={escolhaUnica ? 'radio' : 'checkbox'}
                   name={escolhaUnica ? nomeDoGrupoNativo : undefined}
@@ -115,8 +105,27 @@ export function MoModifierGroup({
                     'disabled:cursor-not-allowed',
                   )}
                 />
-                <span className={cn('text-body', desabilitado ? 'text-disabled-text' : 'text-text')}>
-                  {opcao.name}
+                {opcao.imageUrl ? (
+                  <img
+                    src={opcao.imageUrl}
+                    alt=""
+                    className="h-11 w-11 shrink-0 rounded-md object-cover"
+                  />
+                ) : null}
+                <span className="min-w-0">
+                  <span className={cn('block text-body', desabilitado ? 'text-disabled-text' : 'text-text')}>
+                    {opcao.name}
+                  </span>
+                  {opcao.description ? (
+                    <span
+                      className={cn(
+                        'mt-0.5 block text-caption',
+                        desabilitado ? 'text-disabled-text' : 'text-text-muted',
+                      )}
+                    >
+                      {opcao.description}
+                    </span>
+                  ) : null}
                 </span>
               </span>
 
@@ -127,6 +136,16 @@ export function MoModifierGroup({
           );
         })}
       </div>
+
+      {escolhaUnica && min === 0 && selectedIds.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="mt-2 min-h-11 rounded-[14px] px-3 text-caption font-semibold text-brand-strong focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          Remover escolha
+        </button>
+      ) : null}
     </fieldset>
   );
 }

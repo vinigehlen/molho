@@ -97,7 +97,15 @@ function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): Storefron
             name: 'Adicionais',
             min: 0,
             max: 2,
-            modifiers: [{ id: UUID, name: 'Bacon', priceDeltaCents: 400 }],
+            modifiers: [
+              {
+                id: UUID,
+                name: 'Bacon',
+                description: null,
+                imageKey: null,
+                priceDeltaCents: 400,
+              },
+            ],
           },
         ],
       },

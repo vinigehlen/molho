@@ -27,6 +27,8 @@ const centsSchema = z.int().nonnegative();
 export const storefrontModifierSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
+  description: z.string().nullable().optional(),
+  imageUrl: z.url().nullable().optional(),
   /** Complemento nunca reduz o preço base — CHECK >= 0 no banco. */
   priceDeltaCents: centsSchema,
 });

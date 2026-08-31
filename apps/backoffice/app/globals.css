@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+.complementos-page button:focus-visible,
+.complementos-page input:focus-visible,
+.complementos-page select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.complementos-page input,
+.complementos-page select {
+  border-color: var(--border-strong);
+}
+
 /* Comanda de cozinha (fallback universal do Épico 10, docs/02 §6) — só a
    comanda sai no papel, o board inteiro (colunas, botões, painel de
    conflitos) fica de fora. #kitchen-ticket vive dentro de <main>, não como

@@ -15,10 +15,12 @@ export class ModifierService {
   async create(input: CreateModifierInput): Promise<ModifierRecord> {
     this.assertValidName(input.name);
     this.assertValidPriceDelta(input.priceDeltaCents);
+    if (input.sortOrder !== undefined) this.assertValidSortOrder(input.sortOrder);
     if (!(await this.repo.groupExists(input.groupId))) {
       throw new CatalogNotFoundError('Grupo de complementos');
     }
-    return this.repo.create(input);
+    const sortOrder = input.sortOrder ?? (await this.repo.maxSortOrder(input.groupId)) + 1;
+    return this.repo.create({ ...input, sortOrder });
   }
 
   // async: sem isso, o throw síncrono de assertValidName/assertValidPriceDelta
@@ -27,7 +29,20 @@ export class ModifierService {
   async update(id: string, expectedVersion: number, input: UpdateModifierInput): Promise<ModifierRecord> {
     if (input.name !== undefined) this.assertValidName(input.name);
     if (input.priceDeltaCents !== undefined) this.assertValidPriceDelta(input.priceDeltaCents);
+    if (input.sortOrder !== undefined) this.assertValidSortOrder(input.sortOrder);
     return this.repo.update(id, expectedVersion, input);
+  }
+
+  async reorder(groupId: string, items: Array<{ id: string; version: number }>): Promise<ModifierRecord[]> {
+    if (new Set(items.map((item) => item.id)).size !== items.length) {
+      throw new CatalogValidationError('Cada complemento pode aparecer uma vez na ordenação.');
+    }
+    const current = await this.repo.listByGroup(groupId);
+    const currentIds = new Set(current.map((item) => item.id));
+    if (current.length !== items.length || items.some((item) => !currentIds.has(item.id))) {
+      throw new CatalogValidationError('A ordenação precisa incluir todos os complementos do grupo.');
+    }
+    return this.repo.reorder(groupId, items);
   }
 
   delete(id: string, expectedVersion: number): Promise<void> {
@@ -44,6 +59,12 @@ export class ModifierService {
   private assertValidPriceDelta(cents: number): void {
     if (!Number.isInteger(cents) || cents < 0) {
       throw new CatalogValidationError('price_delta_cents precisa ser um inteiro >= 0.');
+    }
+  }
+
+  private assertValidSortOrder(value: number): void {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new CatalogValidationError('sort_order precisa ser um inteiro não negativo.');
     }
   }
 }

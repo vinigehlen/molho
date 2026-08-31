@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  catalogModifierSchema,
   catalogProductOfferSchema,
+  copyCatalogModifierGroupForProductSchema,
+  createCatalogModifierSchema,
+  reorderCatalogModifiersSchema,
   setCatalogProductOfferAvailabilitySchema,
+  updateCatalogModifierSchema,
   updateCatalogProductOfferSchema,
 } from './catalog-admin';
 
 const OFFER_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e65';
 const PRODUCT_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e66';
 const CATEGORY_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e67';
+const GROUP_ID = '018f47de-7e33-7c6a-8b2a-b65dc8a35e68';
 
 describe('contratos de ProductOffer', () => {
   it('aceita uma oferta primária completa', () => {
@@ -41,5 +47,51 @@ describe('contratos de ProductOffer', () => {
       version: 0,
       available: false,
     });
+  });
+});
+
+describe('contratos da biblioteca de complementos', () => {
+  it('aceita opção completa com conteúdo, disponibilidade, PDV e ordem', () => {
+    expect(
+      catalogModifierSchema.parse({
+        id: OFFER_ID,
+        groupId: GROUP_ID,
+        name: 'Bacon crocante',
+        description: 'Duas fatias.',
+        imageKey: 'products/tenant/bacon.webp',
+        imageUrl: 'https://cdn.example.com/bacon.webp',
+        priceDeltaCents: 500,
+        active: true,
+        pdvCode: 'BAC-01',
+        sortOrder: 2,
+        version: 0,
+      }),
+    ).toMatchObject({ active: true, sortOrder: 2 });
+  });
+
+  it('mantém os campos avançados opcionais na criação e rejeita preço negativo', () => {
+    expect(
+      createCatalogModifierSchema.parse({ groupId: GROUP_ID, name: 'Sem cebola', priceDeltaCents: 0 }),
+    ).toEqual({ groupId: GROUP_ID, name: 'Sem cebola', priceDeltaCents: 0 });
+    expect(
+      updateCatalogModifierSchema.safeParse({ version: 0, priceDeltaCents: -1 }).success,
+    ).toBe(false);
+  });
+
+  it('exige o produto ao separar uma cópia de grupo reutilizado', () => {
+    expect(copyCatalogModifierGroupForProductSchema.parse({ productId: PRODUCT_ID })).toEqual({
+      productId: PRODUCT_ID,
+    });
+    expect(copyCatalogModifierGroupForProductSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('exige grupo e versões otimistas ao reordenar opções', () => {
+    expect(
+      reorderCatalogModifiersSchema.parse({
+        groupId: GROUP_ID,
+        items: [{ id: OFFER_ID, version: 3 }],
+      }),
+    ).toEqual({ groupId: GROUP_ID, items: [{ id: OFFER_ID, version: 3 }] });
+    expect(reorderCatalogModifiersSchema.safeParse({ groupId: GROUP_ID, items: [] }).success).toBe(false);
   });
 });

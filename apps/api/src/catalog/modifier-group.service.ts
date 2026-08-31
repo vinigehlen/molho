@@ -70,6 +70,19 @@ export class ModifierGroupService {
     await this.repo.unlinkFromProduct(groupId, productId);
   }
 
+  async copyForProduct(groupId: string, productId: string): Promise<ModifierGroupRecord> {
+    const linkedProductIds = await this.repo.listLinkedProductIds(groupId);
+    if (!linkedProductIds.includes(productId)) {
+      throw new CatalogNotFoundError('Vínculo entre grupo e produto');
+    }
+    if (linkedProductIds.length < 2) {
+      throw new CatalogValidationError(
+        'Este grupo só está em um produto. Edite diretamente ou reutilize antes de separar uma cópia.',
+      );
+    }
+    return this.repo.copyForProduct(groupId, productId);
+  }
+
   private assertValidName(name: string): void {
     if (name.trim().length === 0) {
       throw new CatalogValidationError('Nome do grupo de complementos não pode ser vazio.');

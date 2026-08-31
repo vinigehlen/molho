@@ -151,7 +151,7 @@ export class PrismaOrderAdjustmentRepository implements OrderAdjustmentRepositor
   async findModifiers(modifierIds: readonly string[]): Promise<Map<string, CatalogModifier>> {
     if (modifierIds.length === 0) return new Map();
     const rows = await this.requestContext.getClient().modifier.findMany({
-      where: { id: { in: [...modifierIds] }, deletedAt: null },
+      where: { id: { in: [...modifierIds] }, deletedAt: null, active: true },
       select: { id: true, name: true, priceDeltaCents: true },
     });
     return new Map(rows.map((row) => [row.id, row]));
