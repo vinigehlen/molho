@@ -25,8 +25,18 @@ import { TenantContextInterceptor } from '../auth/guards/tenant-context.intercep
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { MODIFIER_SERVICE } from './catalog.tokens';
 import { VersionQueryDto } from './dto/category.dto';
-import { CreateModifierDto, UpdateModifierDto } from './dto/modifier.dto';
+import { CreateModifierDto, ReorderModifiersDto, UpdateModifierDto } from './dto/modifier.dto';
 import type { ModifierService } from './modifier.service';
+import { resolvePublicImageUrl } from '../storage/public-url';
+
+function withPublicImageUrl<T extends { imageKey: string | null }>(modifier: T) {
+  return {
+    ...modifier,
+    imageUrl: modifier.imageKey
+      ? resolvePublicImageUrl(modifier.imageKey, process.env.S3_PUBLIC_URL)
+      : null,
+  };
+}
 
 /** Mesmo raciocínio de ModifierGroupsController: reaproveita catalog.product.{create,update,delete} — sem permissão própria pra "modifier" na matriz. */
 @Controller('v1/admin/modifiers')
@@ -38,29 +48,35 @@ export class ModifiersController {
   constructor(@Inject(MODIFIER_SERVICE) private readonly modifiers: ModifierService) {}
 
   @Get()
-  list(@Query('groupId') groupId?: string) {
+  async list(@Query('groupId') groupId?: string) {
     if (!groupId) throw new BadRequestException('Query param groupId é obrigatório.');
-    return this.modifiers.listByGroup(groupId);
+    return (await this.modifiers.listByGroup(groupId)).map(withPublicImageUrl);
   }
 
   @Get(':id')
   async get(@Param('id') id: string) {
     const record = await this.modifiers.get(id);
     if (!record) throw new NotFoundException('Complemento não encontrado.');
-    return record;
+    return withPublicImageUrl(record);
   }
 
   @Post()
   @RequirePermission('catalog.product.create')
-  create(@Body() dto: CreateModifierDto) {
-    return this.modifiers.create(dto);
+  async create(@Body() dto: CreateModifierDto) {
+    return withPublicImageUrl(await this.modifiers.create(dto));
+  }
+
+  @Patch('reorder')
+  @RequirePermission('catalog.product.update')
+  async reorder(@Body() dto: ReorderModifiersDto) {
+    return (await this.modifiers.reorder(dto.groupId, dto.items)).map(withPublicImageUrl);
   }
 
   @Patch(':id')
   @RequirePermission('catalog.product.update')
-  update(@Param('id') id: string, @Body() dto: UpdateModifierDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdateModifierDto) {
     const { version, ...input } = dto;
-    return this.modifiers.update(id, version, input);
+    return withPublicImageUrl(await this.modifiers.update(id, version, input));
   }
 
   @Delete(':id')

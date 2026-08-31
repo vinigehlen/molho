@@ -574,8 +574,18 @@ model Modifier {
   tenantId        String    @map("tenant_id") @db.Uuid
   groupId         String    @map("group_id") @db.Uuid
   name            String
+  description     String?
+  /// Foto opcional da escolha. Reusa o fluxo de upload seguro do catálogo;
+  /// a API pública resolve a URL, nunca o cliente monta URL de bucket.
+  imageKey        String?   @map("image_key")
   /// Sempre >= 0 (CHECK na migration) — complemento nunca reduz o preço base.
   priceDeltaCents Int       @map("price_delta_cents")
+  /// Estoque manual da opção: false esconde a escolha do storefront sem
+  /// apagar o histórico de pedidos que já a usaram.
+  active          Boolean   @default(true)
+  /// Código livre do item no PDV do restaurante, mesma semântica de Product.
+  pdvCode         String?   @map("pdv_code")
+  sortOrder       Int       @default(0) @map("sort_order")
   version         Int       @default(0)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
@@ -587,6 +597,7 @@ model Modifier {
 
   // FK composta (group_id, tenant_id) → modifier_groups(id, tenant_id) na migration.
   @@index([tenantId, groupId])
+  @@index([tenantId, groupId, sortOrder])
   @@map("modifiers")
 }
 

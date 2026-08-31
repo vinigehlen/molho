@@ -24,7 +24,12 @@ import { TenantContextInterceptor } from '../auth/guards/tenant-context.intercep
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { MODIFIER_GROUP_SERVICE } from './catalog.tokens';
 import { VersionQueryDto } from './dto/category.dto';
-import { CreateModifierGroupDto, LinkModifierGroupDto, UpdateModifierGroupDto } from './dto/modifier-group.dto';
+import {
+  CopyModifierGroupForProductDto,
+  CreateModifierGroupDto,
+  LinkModifierGroupDto,
+  UpdateModifierGroupDto,
+} from './dto/modifier-group.dto';
 import type { ModifierGroupService } from './modifier-group.service';
 
 /**
@@ -97,5 +102,11 @@ export class ModifierGroupsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async unlink(@Param('id') id: string, @Param('productId') productId: string): Promise<void> {
     await this.modifierGroups.unlink(id, productId);
+  }
+
+  @Post(':id/copy-for-product')
+  @RequirePermission('catalog.product.update')
+  copyForProduct(@Param('id') id: string, @Body() dto: CopyModifierGroupForProductDto) {
+    return this.modifierGroups.copyForProduct(id, dto.productId);
   }
 }

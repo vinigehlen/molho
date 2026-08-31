@@ -130,20 +130,54 @@ export const catalogModifierSchema = z.strictObject({
   id: z.uuid(),
   groupId: z.uuid(),
   name: z.string(),
+  description: z.string().nullable(),
+  imageKey: z.string().nullable(),
+  imageUrl: z.url().nullable().optional(),
   priceDeltaCents: centsSchema,
+  active: z.boolean(),
+  pdvCode: pdvCodeSchema,
+  sortOrder: sortOrderSchema,
   version: versionSchema,
 });
 
 export const createCatalogModifierSchema = z.strictObject({
   groupId: z.uuid(),
   name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(240).nullable().optional(),
+  imageKey: z.string().trim().min(1).nullable().optional(),
   priceDeltaCents: centsSchema,
+  active: z.boolean().optional(),
+  pdvCode: pdvCodeSchema.optional(),
+  sortOrder: sortOrderSchema.optional(),
 });
 
 export const updateCatalogModifierSchema = z.strictObject({
   version: versionSchema,
   name: z.string().trim().min(1).max(80).optional(),
+  description: z.string().trim().max(240).nullable().optional(),
+  imageKey: z.string().trim().min(1).nullable().optional(),
   priceDeltaCents: centsSchema.optional(),
+  active: z.boolean().optional(),
+  pdvCode: pdvCodeSchema.optional(),
+  sortOrder: sortOrderSchema.optional(),
+});
+
+export const reorderCatalogModifiersSchema = z.strictObject({
+  groupId: z.uuid(),
+  items: z
+    .array(
+      z.strictObject({
+        id: z.uuid(),
+        version: versionSchema,
+      }),
+    )
+    .min(1),
+});
+
+/** Separa um produto de um grupo reutilizado: clona grupo + opções e troca
+ * apenas o vínculo escolhido, de forma atômica no request transacional. */
+export const copyCatalogModifierGroupForProductSchema = z.strictObject({
+  productId: z.uuid(),
 });
 
 export const catalogProductImageSchema = z.strictObject({
@@ -184,6 +218,10 @@ export type UpdateCatalogModifierGroupInput = z.infer<typeof updateCatalogModifi
 export type CatalogModifier = z.infer<typeof catalogModifierSchema>;
 export type CreateCatalogModifierInput = z.infer<typeof createCatalogModifierSchema>;
 export type UpdateCatalogModifierInput = z.infer<typeof updateCatalogModifierSchema>;
+export type ReorderCatalogModifiersInput = z.infer<typeof reorderCatalogModifiersSchema>;
+export type CopyCatalogModifierGroupForProductInput = z.infer<
+  typeof copyCatalogModifierGroupForProductSchema
+>;
 export type CatalogProductImage = z.infer<typeof catalogProductImageSchema>;
 export type AddCatalogProductImageInput = z.infer<typeof addCatalogProductImageSchema>;
 export type UpdateCatalogProductImageInput = z.infer<typeof updateCatalogProductImageSchema>;

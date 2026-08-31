@@ -6,27 +6,44 @@ export interface ModifierRecord {
   id: string;
   groupId: string;
   name: string;
+  description: string | null;
+  imageKey: string | null;
   priceDeltaCents: number;
+  active: boolean;
+  pdvCode: string | null;
+  sortOrder: number;
   version: number;
 }
 
 export interface CreateModifierInput {
   groupId: string;
   name: string;
+  description?: string | null;
+  imageKey?: string | null;
   priceDeltaCents: number;
+  active?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
 }
 
 export interface UpdateModifierInput {
   name?: string;
+  description?: string | null;
+  imageKey?: string | null;
   priceDeltaCents?: number;
+  active?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
 }
 
 export interface ModifierRepository {
   listByGroup(groupId: string): Promise<ModifierRecord[]>;
   findById(id: string): Promise<ModifierRecord | null>;
   groupExists(groupId: string): Promise<boolean>;
+  maxSortOrder(groupId: string): Promise<number>;
   create(input: CreateModifierInput): Promise<ModifierRecord>;
   update(id: string, expectedVersion: number, input: UpdateModifierInput): Promise<ModifierRecord>;
+  reorder(groupId: string, items: Array<{ id: string; version: number }>): Promise<ModifierRecord[]>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
 }
 
@@ -34,7 +51,12 @@ const SELECT = {
   id: true,
   groupId: true,
   name: true,
+  description: true,
+  imageKey: true,
   priceDeltaCents: true,
+  active: true,
+  pdvCode: true,
+  sortOrder: true,
   version: true,
 } as const;
 
@@ -42,7 +64,11 @@ export class PrismaModifierRepository implements ModifierRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
   async listByGroup(groupId: string): Promise<ModifierRecord[]> {
-    return this.requestContext.getClient().modifier.findMany({ where: { groupId, deletedAt: null }, select: SELECT });
+    return this.requestContext.getClient().modifier.findMany({
+      where: { groupId, deletedAt: null },
+      select: SELECT,
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
   }
 
   async findById(id: string): Promise<ModifierRecord | null> {
@@ -56,13 +82,27 @@ export class PrismaModifierRepository implements ModifierRepository {
     return group !== null;
   }
 
+  async maxSortOrder(groupId: string): Promise<number> {
+    const top = await this.requestContext.getClient().modifier.findFirst({
+      where: { groupId, deletedAt: null },
+      select: { sortOrder: true },
+      orderBy: { sortOrder: 'desc' },
+    });
+    return top?.sortOrder ?? -1;
+  }
+
   async create(input: CreateModifierInput): Promise<ModifierRecord> {
     return this.requestContext.getClient().modifier.create({
       data: {
         tenantId: this.requestContext.getTenantId(),
         groupId: input.groupId,
         name: input.name,
+        description: input.description ?? null,
+        imageKey: input.imageKey ?? null,
         priceDeltaCents: input.priceDeltaCents,
+        active: input.active ?? true,
+        pdvCode: input.pdvCode ?? null,
+        sortOrder: input.sortOrder ?? 0,
       },
       select: SELECT,
     });
@@ -76,6 +116,18 @@ export class PrismaModifierRepository implements ModifierRepository {
     });
     await assertOptimisticUpdate('Complemento', result.count, async () => (await this.findById(id)) !== null);
     return this.findByIdOrThrow(id);
+  }
+
+  async reorder(groupId: string, items: Array<{ id: string; version: number }>): Promise<ModifierRecord[]> {
+    const client = this.requestContext.getClient();
+    for (const [sortOrder, item] of items.entries()) {
+      const result = await client.modifier.updateMany({
+        where: { id: item.id, groupId, version: item.version, deletedAt: null },
+        data: { sortOrder, version: { increment: 1 } },
+      });
+      await assertOptimisticUpdate('Complemento', result.count, async () => (await this.findById(item.id)) !== null);
+    }
+    return this.listByGroup(groupId);
   }
 
   async softDelete(id: string, expectedVersion: number): Promise<void> {

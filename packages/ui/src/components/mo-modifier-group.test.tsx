@@ -70,6 +70,30 @@ describe('MoModifierGroup', () => {
     expect(screen.getByText('Grátis')).toBeInTheDocument();
   });
 
+  it('mostra descrição e foto quando a opção traz conteúdo rico', () => {
+    render(
+      <Controlado
+        min={0}
+        max={1}
+        options={[
+          {
+            id: 'bacon',
+            name: 'Bacon',
+            description: 'Duas fatias crocantes.',
+            imageUrl: 'https://cdn.example.com/bacon.webp',
+            priceDeltaCents: 400,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Duas fatias crocantes.')).toBeInTheDocument();
+    expect(document.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/bacon.webp',
+    );
+  });
+
   it('mostra o progresso da seleção (selecionados/max)', async () => {
     render(<Controlado min={0} max={2} options={ADICIONAIS} />);
 
@@ -89,15 +113,16 @@ describe('MoModifierGroup', () => {
     expect(screen.getByRole('radio', { name: /Mal passado/ })).not.toBeChecked();
   });
 
-  it('escolha única: clicar na opção já selecionada não muda nada (limitação do <input type="radio"> nativo, documentada no componente)', async () => {
+  it('escolha única opcional: permite remover a seleção explicitamente', async () => {
     render(<Controlado min={0} max={1} options={PONTOS} />);
 
     const malPassado = screen.getByRole('radio', { name: /Mal passado/ });
     await userEvent.click(malPassado);
     expect(malPassado).toBeChecked();
 
-    await userEvent.click(malPassado);
-    expect(malPassado).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Remover escolha' }));
+    expect(malPassado).not.toBeChecked();
+    expect(screen.getByText('0/1')).toBeInTheDocument();
   });
 
   it('escolha única OBRIGATÓRIA (min=1): clicar na já selecionada NÃO desmarca (grupo não pode ficar vazio)', async () => {

@@ -29,6 +29,8 @@ export interface StorefrontHoursRecord {
 export interface StorefrontModifierRecord {
   id: string;
   name: string;
+  description: string | null;
+  imageKey: string | null;
   priceDeltaCents: number;
 }
 
@@ -131,9 +133,9 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
    * cardápio menor, e o card esgotado é um padrão explícito do design system
    * (MoProductCard, doc de marca §5.2).
    *
-   * Grupos e modificadores saem ordenados por `createdAt` — não existe
-   * `sortOrder` neles no schema, e a ordem de criação é a que o lojista
-   * montou no backoffice.
+   * Grupos seguem a ordem do vínculo com o produto. As opções seguem o
+   * `sortOrder` editável da biblioteca, com `createdAt` como desempate para
+   * dados antigos migrados com a mesma posição.
    */
   async listMenu(): Promise<StorefrontCategoryRecord[]> {
     const categories = await this.requestContext.getClient().category.findMany({
@@ -165,7 +167,7 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
             // mas nunca aparece pro cliente escolher.
             productModifierGroups: {
               where: { deletedAt: null, modifierGroup: { deletedAt: null, active: true } },
-              orderBy: { createdAt: 'asc' },
+              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
               select: {
                 modifierGroup: {
                   select: {
@@ -174,9 +176,15 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
                     min: true,
                     max: true,
                     modifiers: {
-                      where: { deletedAt: null },
-                      orderBy: { createdAt: 'asc' },
-                      select: { id: true, name: true, priceDeltaCents: true },
+                      where: { deletedAt: null, active: true },
+                      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                      select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        imageKey: true,
+                        priceDeltaCents: true,
+                      },
                     },
                   },
                 },

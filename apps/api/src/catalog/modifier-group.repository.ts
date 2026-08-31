@@ -54,6 +54,10 @@ export interface ModifierGroupRepository {
   linkToProduct(groupId: string, productId: string): Promise<void>;
   /** Desvincula (soft delete só do vínculo) — o grupo em si continua existindo. */
   unlinkFromProduct(groupId: string, productId: string): Promise<void>;
+  /** Produtos ligados ao grupo, usados para bloquear uma separação sem reuso. */
+  listLinkedProductIds(groupId: string): Promise<string[]>;
+  /** Clona grupo + opções e substitui o vínculo do produto escolhido. */
+  copyForProduct(groupId: string, productId: string): Promise<ModifierGroupRecord>;
   create(input: CreateModifierGroupInput): Promise<ModifierGroupRecord>;
   update(id: string, expectedVersion: number, input: UpdateModifierGroupInput): Promise<ModifierGroupRecord>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
@@ -83,7 +87,7 @@ export class PrismaModifierGroupRepository implements ModifierGroupRepository {
 
   async listAll(): Promise<ModifierGroupWithProductRecord[]> {
     const links = await this.requestContext.getClient().productModifierGroup.findMany({
-      where: { deletedAt: null, modifierGroup: { deletedAt: null } },
+      where: { deletedAt: null, product: { deletedAt: null }, modifierGroup: { deletedAt: null } },
       select: {
         productId: true,
         product: { select: { name: true } },
@@ -141,6 +145,73 @@ export class PrismaModifierGroupRepository implements ModifierGroupRepository {
       where: { modifierGroupId: groupId, productId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async listLinkedProductIds(groupId: string): Promise<string[]> {
+    const links = await this.requestContext.getClient().productModifierGroup.findMany({
+      where: { modifierGroupId: groupId, deletedAt: null },
+      select: { productId: true },
+    });
+    return links.map((link) => link.productId);
+  }
+
+  async copyForProduct(groupId: string, productId: string): Promise<ModifierGroupRecord> {
+    const client = this.requestContext.getClient();
+    const source = await client.modifierGroup.findFirst({
+      where: { id: groupId, deletedAt: null },
+      select: {
+        ...SELECT,
+        modifiers: {
+          where: { deletedAt: null },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          select: {
+            name: true,
+            description: true,
+            imageKey: true,
+            priceDeltaCents: true,
+            active: true,
+            pdvCode: true,
+            sortOrder: true,
+          },
+        },
+      },
+    });
+    if (!source) throw new CatalogNotFoundError('Grupo de complementos');
+
+    const suffix = ' (cópia)';
+    const created = await client.modifierGroup.create({
+      data: {
+        tenantId: this.requestContext.getTenantId(),
+        productId,
+        name: `${source.name.slice(0, 80 - suffix.length)}${suffix}`,
+        min: source.min,
+        max: source.max,
+        active: source.active,
+        pdvCode: source.pdvCode,
+      },
+      select: SELECT,
+    });
+    await client.productModifierGroup.create({
+      data: {
+        tenantId: this.requestContext.getTenantId(),
+        productId,
+        modifierGroupId: created.id,
+      },
+    });
+    if (source.modifiers.length > 0) {
+      await client.modifier.createMany({
+        data: source.modifiers.map((modifier) => ({
+          tenantId: this.requestContext.getTenantId(),
+          groupId: created.id,
+          ...modifier,
+        })),
+      });
+    }
+    await client.productModifierGroup.updateMany({
+      where: { modifierGroupId: groupId, productId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+    return created;
   }
 
   async create(input: CreateModifierGroupInput): Promise<ModifierGroupRecord> {

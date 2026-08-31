@@ -102,6 +102,10 @@ export class StorefrontService {
               modifiers: group.modifiers.map((modifier) => ({
                 id: modifier.id,
                 name: modifier.name,
+                description: modifier.description,
+                imageUrl: modifier.imageKey
+                  ? resolvePublicImageUrl(modifier.imageKey, this.publicImageBaseUrl)
+                  : null,
                 priceDeltaCents: modifier.priceDeltaCents,
               })),
             })),

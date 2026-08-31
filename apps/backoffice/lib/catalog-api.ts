@@ -46,7 +46,13 @@ export interface Modifier {
   id: string;
   groupId: string;
   name: string;
+  description?: string | null;
+  imageKey?: string | null;
+  imageUrl?: string | null;
   priceDeltaCents: number;
+  active?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
   version: number;
 }
 
@@ -177,6 +183,32 @@ export async function updateModifierGroup(
   return (await res.json()) as ModifierGroup;
 }
 
+export async function deleteModifierGroup(group: ModifierGroup): Promise<void> {
+  const res = await apiFetch(
+    `/v1/admin/modifier-groups/${encodeURIComponent(group.id)}?version=${encodeURIComponent(group.version)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw new Error(`Falha ao remover o grupo (${res.status})`);
+}
+
+/** Separa um produto de um grupo reutilizado. O backend clona grupo e itens
+ * e troca o vínculo na mesma transação. */
+export async function copyModifierGroupForProduct(
+  groupId: string,
+  productId: string,
+): Promise<ModifierGroup> {
+  const res = await apiFetch(
+    `/v1/admin/modifier-groups/${encodeURIComponent(groupId)}/copy-for-product`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ productId }),
+    },
+  );
+  if (!res.ok) throw new Error(`Falha ao criar a cópia do grupo (${res.status})`);
+  return (await res.json()) as ModifierGroup;
+}
+
 /** Reuso (exceção MVP 2026-08-28, fase 2/4): vincula um grupo EXISTENTE a
  * outro produto, sem recriar. Idempotente — vincular de novo não dá erro. */
 export async function linkModifierGroupToProduct(groupId: string, productId: string): Promise<void> {
@@ -202,7 +234,16 @@ export async function fetchModifiers(groupId: string): Promise<Modifier[]> {
   return (await res.json()) as Modifier[];
 }
 
-export async function createModifier(input: { groupId: string; name: string; priceDeltaCents: number }): Promise<Modifier> {
+export async function createModifier(input: {
+  groupId: string;
+  name: string;
+  description?: string | null;
+  imageKey?: string | null;
+  priceDeltaCents: number;
+  active?: boolean;
+  pdvCode?: string | null;
+  sortOrder?: number;
+}): Promise<Modifier> {
   const res = await apiFetch('/v1/admin/modifiers', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -210,6 +251,70 @@ export async function createModifier(input: { groupId: string; name: string; pri
   });
   if (!res.ok) throw new Error(`Falha ao criar complemento (${res.status})`);
   return (await res.json()) as Modifier;
+}
+
+export async function updateModifier(
+  modifier: Modifier,
+  input: Partial<
+    Pick<
+      Modifier,
+      'name' | 'description' | 'imageKey' | 'priceDeltaCents' | 'active' | 'pdvCode' | 'sortOrder'
+    >
+  >,
+): Promise<Modifier> {
+  const res = await apiFetch(`/v1/admin/modifiers/${encodeURIComponent(modifier.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: modifier.version, ...input }),
+  });
+  if (!res.ok) throw new Error(`Falha ao atualizar o complemento (${res.status})`);
+  return (await res.json()) as Modifier;
+}
+
+export async function reorderModifiers(groupId: string, items: Modifier[]): Promise<Modifier[]> {
+  const res = await apiFetch('/v1/admin/modifiers/reorder', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      groupId,
+      items: items.map(({ id, version }) => ({ id, version })),
+    }),
+  });
+  if (!res.ok) throw new Error(`Falha ao reordenar complementos (${res.status})`);
+  return (await res.json()) as Modifier[];
+}
+
+export async function deleteModifier(modifier: Modifier): Promise<void> {
+  const res = await apiFetch(
+    `/v1/admin/modifiers/${encodeURIComponent(modifier.id)}?version=${encodeURIComponent(modifier.version)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw new Error(`Falha ao remover o complemento (${res.status})`);
+}
+
+export async function uploadModifierImage(
+  modifier: Modifier,
+  ownerProductId: string,
+  file: File,
+): Promise<Modifier> {
+  const uploadFile = await compressProductImage(file);
+  const uploadUrlRes = await apiFetch(
+    `/v1/admin/products/${encodeURIComponent(ownerProductId)}/image/upload-url`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contentType: uploadFile.type, contentLength: uploadFile.size }),
+    },
+  );
+  if (!uploadUrlRes.ok) throw new Error(`Falha ao preparar upload (${uploadUrlRes.status})`);
+  const upload = (await uploadUrlRes.json()) as { uploadUrl: string; key: string };
+  const putRes = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    headers: { 'content-type': uploadFile.type },
+    body: uploadFile,
+  });
+  if (!putRes.ok) throw new Error(`Falha ao enviar foto (${putRes.status})`);
+  return updateModifier(modifier, { imageKey: upload.key });
 }
 
 export async function fetchProductImages(productId: string): Promise<ProductImage[]> {

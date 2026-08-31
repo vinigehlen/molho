@@ -118,7 +118,10 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
           select: {
             modifierGroup: {
               select: {
-                modifiers: { where: { deletedAt: null }, select: { id: true, name: true, priceDeltaCents: true } },
+                modifiers: {
+                  where: { deletedAt: null, active: true },
+                  select: { id: true, name: true, priceDeltaCents: true },
+                },
               },
             },
           },

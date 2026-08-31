@@ -55,6 +55,26 @@ class FakeModifierGroupRepository implements ModifierGroupRepository {
     this.links = this.links.filter((l) => !(l.groupId === groupId && l.productId === productId));
   }
 
+  async listLinkedProductIds(groupId: string): Promise<string[]> {
+    return this.links.filter((link) => link.groupId === groupId).map((link) => link.productId);
+  }
+
+  async copyForProduct(groupId: string, productId: string): Promise<ModifierGroupRecord> {
+    const source = this.rows.get(groupId);
+    if (!source) throw new CatalogNotFoundError('Grupo de complementos');
+    const copy = await this.create({
+      productId,
+      name: `${source.name} (cópia)`,
+      min: source.min,
+      max: source.max,
+      pdvCode: source.pdvCode,
+    });
+    this.links = this.links.filter(
+      (link) => !(link.groupId === groupId && link.productId === productId),
+    );
+    return copy;
+  }
+
   async create(input: CreateModifierGroupInput): Promise<ModifierGroupRecord> {
     const record: ModifierGroupRecord = {
       id: `mg-${this.nextId++}`,
@@ -222,5 +242,26 @@ describe('ModifierGroupService', () => {
 
     expect(paused.active).toBe(false);
     expect(repo.rows.has(created.id)).toBe(true);
+  });
+
+  it('14) copyForProduct() separa só um produto de grupo reutilizado', async () => {
+    const { service, repo } = setup();
+    repo.productIds.add('prod-2');
+    const original = await service.create({ productId: 'prod-1', name: 'Molhos', min: 0, max: 2 });
+    await service.link(original.id, 'prod-2');
+
+    const copy = await service.copyForProduct(original.id, 'prod-2');
+
+    expect(copy.name).toContain('(cópia)');
+    expect((await service.listByProduct('prod-1')).map((group) => group.id)).toEqual([original.id]);
+    expect((await service.listByProduct('prod-2')).map((group) => group.id)).toEqual([copy.id]);
+  });
+
+  it('15) copyForProduct() exige reuso e vínculo existente', async () => {
+    const { service } = setup();
+    const original = await service.create({ productId: 'prod-1', name: 'Molhos', min: 0, max: 2 });
+
+    await expect(service.copyForProduct(original.id, 'prod-1')).rejects.toThrow(CatalogValidationError);
+    await expect(service.copyForProduct(original.id, 'prod-2')).rejects.toThrow(CatalogNotFoundError);
   });
 });
