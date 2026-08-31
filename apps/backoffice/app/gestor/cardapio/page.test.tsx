@@ -65,6 +65,7 @@ const PICANHA = {
   basePriceCents: 9500,
   imageKey: null,
   pdvCode: '101',
+  kind: 'prepared' as const,
   sortOrder: 0,
   available: true,
   version: 0,
@@ -77,6 +78,7 @@ const COSTELA = {
   basePriceCents: 7600,
   imageKey: null,
   pdvCode: '202',
+  kind: 'prepared' as const,
   sortOrder: 1,
   available: false,
   version: 0,
@@ -404,6 +406,7 @@ describe('CardapioPage — fluxo guiado de cadastro e edição', () => {
       description: 'Com queijo e coração',
       basePriceCents: 2990,
       pdvCode: '1042',
+      kind: 'prepared',
       sortOrder: 2,
     });
   });
@@ -430,6 +433,7 @@ describe('CardapioPage — fluxo guiado de cadastro e edição', () => {
       description: 'Na brasa com fritas',
       basePriceCents: 9990,
       pdvCode: '101',
+      kind: 'prepared',
     });
   });
 

@@ -32,6 +32,7 @@ const PRODUCT: Product = {
   imageKey: null,
   available: true,
   pdvCode: '101',
+  kind: 'prepared',
   sortOrder: 0,
   version: 0,
 };

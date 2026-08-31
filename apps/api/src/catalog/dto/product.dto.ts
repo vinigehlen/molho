@@ -1,5 +1,17 @@
+import { productKindSchema, type ProductKind } from '@molho/contracts';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+
+const PRODUCT_KINDS = [...productKindSchema.options];
 
 export class CreateProductDto {
   @IsUUID(7)
@@ -22,6 +34,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   pdvCode?: string | null;
+
+  @IsOptional()
+  @IsIn(PRODUCT_KINDS)
+  kind?: ProductKind;
 
   @IsOptional()
   @Type(() => Number)
@@ -57,6 +73,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   pdvCode?: string | null;
+
+  @IsOptional()
+  @IsIn(PRODUCT_KINDS)
+  kind?: ProductKind;
 
   @IsOptional()
   @Type(() => Number)

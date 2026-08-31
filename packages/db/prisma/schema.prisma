@@ -399,6 +399,14 @@ model Category {
   @@map("categories")
 }
 
+/// Natureza do produto — ver comentário em `Product.kind`. Valores em
+/// minúsculo pra casar com o enum nativo do Postgres criado à mão na migration.
+enum ProductKind {
+  prepared
+  industrialized
+  combo
+}
+
 model Product {
   id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid
@@ -421,6 +429,11 @@ model Product {
   /// nós: é só o número/código que o sistema de caixa do lojista já usa,
   /// pra ele bater cardápio digital × PDV sem digitar duas vezes.
   pdvCode        String?   @map("pdv_code")
+  /// Natureza do item (exceção MVP 2026-08-28, CLAUDE.md — fase 3/4 do combo).
+  /// `prepared` (prato feito na cozinha, default) · `industrialized` (item
+  /// revendido, ex.: refrigerante em lata) · `combo` (agrupa outros produtos —
+  /// comportamento de combo só entra na fase 4; a fase 3 só grava o rótulo).
+  kind           ProductKind @default(prepared)
   sortOrder      Int       @default(0) @map("sort_order")
   version        Int       @default(0)
   createdAt      DateTime  @default(now()) @map("created_at")

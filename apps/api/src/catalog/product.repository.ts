@@ -1,3 +1,4 @@
+import type { ProductKind } from '@molho/contracts';
 import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import type { CatalogActor } from './catalog-actor';
@@ -15,6 +16,8 @@ export interface ProductRecord {
   /** Código do item no PDV do lojista — texto livre opcional, nunca
    * interpretado por nós (exceção MVP 2026-08-28, CLAUDE.md). */
   pdvCode: string | null;
+  /** Natureza do item (exceção MVP 2026-08-28, CLAUDE.md — fase 3 do combo). */
+  kind: ProductKind;
   sortOrder: number;
   version: number;
 }
@@ -25,6 +28,7 @@ export interface CreateProductInput {
   description?: string;
   basePriceCents: number;
   pdvCode?: string | null;
+  kind?: ProductKind;
   sortOrder?: number;
 }
 
@@ -34,6 +38,7 @@ export interface UpdateProductInput {
   description?: string | null;
   basePriceCents?: number;
   pdvCode?: string | null;
+  kind?: ProductKind;
   sortOrder?: number;
   /** Confirma o upload feito via presigned PUT (StorageProvider) — nunca gerado a partir de input livre do cliente. */
   imageKey?: string;
@@ -65,6 +70,7 @@ const SELECT = {
   imageKey: true,
   available: true,
   pdvCode: true,
+  kind: true,
   sortOrder: true,
   version: true,
 } as const;
@@ -118,6 +124,7 @@ export class PrismaProductRepository implements ProductRepository {
         description: input.description,
         basePriceCents: input.basePriceCents,
         pdvCode: input.pdvCode ?? null,
+        kind: input.kind ?? 'prepared',
         sortOrder: input.sortOrder ?? 0,
       },
       select: SELECT,
