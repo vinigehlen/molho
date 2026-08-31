@@ -106,19 +106,29 @@ fotos ou complementos.
 
 ## Estado no momento deste handoff
 
-Implementação e validação local concluídas em dois commits:
+Implementação e validação concluídas nos commits:
 
 - `26c8e8e` — `fix: estabiliza o typecheck do workspace`;
-- `4eddaea` — `feat: adiciona ofertas em múltiplas categorias`.
+- `4eddaea` — `feat: adiciona ofertas em múltiplas categorias`;
+- `a59e9fe` — `docs: atualiza o handoff do épico 4C`.
 
-O working tree estava limpo depois dos commits. Push, PR, CI e merge ainda
-estavam pendentes enquanto esta revisão do handoff foi escrita.
+- PR [#24](https://github.com/vinigehlen/molho/pull/24) mesclado em `main` no
+  commit `2b1b3f0` em 2026-08-31.
+- CI `quality` verde por completo: auditoria, lint, typecheck, testes, build,
+  Storybook e contraste nos quatro temas.
+- React Doctor verde (`77/100`, zero erro), previews Vercel do produto e do
+  backoffice verdes.
+- O check externo `Workers Builds: molho-uploads` ficou vermelho, mas é falha
+  anterior e idêntica em `main@fa7bf6f` e `main@cf089b0`; não bloqueia o CI
+  `quality` nem veio do 4C.
+- Branch de feature remota/local removida; `main` sincronizada com
+  `origin/main` (`0 ahead / 0 behind`) e working tree limpo após o merge.
 
-Pendências, nesta ordem:
+## Encerramento
 
-1. Fazer push da branch e abrir PR contra `main`.
-2. Aguardar CI e mesclar somente se verde.
-3. Sincronizar `main` e remover a branch remota/local se aplicável.
+Não resta implementação do Épico 4C. A próxima fatia do plano de cardápio deve
+partir de `main@2b1b3f0` (ou de um commit posterior da `main`) e preservar a
+estratégia expand/rollback descrita em `docs/04c-catalogo-multicategoria.md`.
 
 Não há migration SQL nova nesta fatia.
 
