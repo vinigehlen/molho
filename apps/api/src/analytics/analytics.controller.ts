@@ -1,6 +1,8 @@
 import { BadRequestException, Controller, Get, Inject, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import type { AnalyticsFulfillment, AnalyticsGranularity, AnalyticsTopItemsSort } from '@molho/contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RequireModule } from '../auth/guards/require-module.decorator';
+import { RequireModuleGuard } from '../auth/guards/require-module.guard';
 import { RequirePermission } from '../auth/guards/require-permission.decorator';
 import { RequirePermissionGuard } from '../auth/guards/require-permission.guard';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
@@ -43,8 +45,9 @@ function parseLimit(value: QueryValue, fallback: number, max = 100): number {
 }
 
 @Controller('v1/admin/stores/:storeId/analytics')
-@UseGuards(JwtAuthGuard, RequirePermissionGuard)
+@UseGuards(JwtAuthGuard, RequireModuleGuard, RequirePermissionGuard)
 @UseInterceptors(TenantContextInterceptor)
+@RequireModule('dashboard.basic')
 export class AnalyticsController {
   constructor(@Inject(ANALYTICS_SERVICE) private readonly analytics: AnalyticsService) {}
 
