@@ -26,15 +26,20 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | 4.2B — personalização (add/remove filho, taxa extra) | ⬜ não iniciada | — | pendente de recorte com o PM |
 | 4.2C — combo aninhado | ⬜ recomendação: manter bloqueado | — | — |
 
-`main` em `345a443` (`origin/main` sincronizada).
+`main` em `674ec8f` (local; push pro `origin/main` ainda pendente).
 
 > **Processo:** `c50c6c3`, `9a04b00` e `345a443` foram empurrados direto pra
 > `main`, sem PR e sem rodar o CI. Revisão pós-fato (2026-09-01): gates da raiz
 > verdes localmente (`pnpm lint` · `typecheck` 10/10 · `test` 9/9 — API 605,
 > contratos 331 · `build` 7/7); o desenho do lock (P1.3) e o cálculo
-> `sum_of_items` estão corretos. **Falta rodar `pnpm test:e2e`** (precisa
-> Redis + Postgres reais) pra confirmar os testes de concorrência de
-> `checkout.e2e.test.ts` — não foi possível localmente nesta revisão.
+> `sum_of_items` estão corretos. `pnpm test:e2e` rodado localmente (Redis via
+> Docker, Postgres Neon real) em 2026-09-01, duas rodadas:
+> `checkout.e2e.test.ts` **passou nas duas** (129/131 e 129/131) — confirma a
+> concorrência do lock em P1.3/4.2A. Duas falhas em ambas as rodadas, sem
+> relação com combo/checkout: `auth.e2e.test.ts` ("2º login do MESMO telefone")
+> estoura timeout de 70s de forma reprodutível; `printing.e2e.test.ts` (RLS
+> cross-tenant) deu timeout numa rodada e "Connection terminated unexpectedly"
+> (Neon) na outra — flaky, débito pré-existente, fora do escopo desta fase.
 
 > Nota de infra: entre a fase 3 e a 4.1a, 4 PRs do dependabot (#18–#21)
 > quebraram o CI (TS 5.9→7 sem suporte do typescript-eslint, `pnpm/action-setup@v6`
