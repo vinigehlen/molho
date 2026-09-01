@@ -401,6 +401,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
             name: component.name,
             quantity: component.quantity,
             unitPriceCents: component.unitBasePriceCents ?? null,
+            removed: component.removed,
           })),
         });
       }

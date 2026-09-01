@@ -64,6 +64,11 @@ export const cartItemSchema = z.strictObject({
   description: z.string().nullable(),
   imageUrl: z.url().nullable(),
   unitBasePriceCents: z.int().nonnegative(),
+  /**
+   * Combo 4.2B: filhos que o cliente removeu. Opcional para manter carrinhos
+   * salvos no formato anterior válidos sem subir CART_SCHEMA_VERSION.
+   */
+  removedChildIds: z.array(z.uuid()).optional(),
   modifiers: z.array(cartModifierSchema),
   quantity: z.int().positive(),
   /** "Sem cebola, por favor" — texto livre do cliente, vai pra comanda. */

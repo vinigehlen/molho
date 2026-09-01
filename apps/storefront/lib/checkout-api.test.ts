@@ -27,6 +27,7 @@ function cart(overrides: Partial<Cart> = {}): Cart {
         description: null,
         imageUrl: null,
         unitBasePriceCents: 2890,
+        removedChildIds: ['0193f1a0-0000-7000-8000-0000000000b1'],
         modifiers: [
           { id: '0193f1a0-0000-7000-8000-0000000000a1', groupId: '0193f1a0-0000-7000-8000-0000000000a0', name: 'Bacon', priceDeltaCents: 400 },
         ],
@@ -95,6 +96,7 @@ describe('buildCheckoutRequestFromCart', () => {
       {
         productId: '0193f1a0-0000-7000-8000-000000000002',
         offerId: '0193f1a0-0000-7000-8000-000000000003',
+        removedChildIds: ['0193f1a0-0000-7000-8000-0000000000b1'],
         unitBasePriceCents: 2890,
         modifiers: [{ modifierId: '0193f1a0-0000-7000-8000-0000000000a1', priceDeltaCents: 400 }],
         quantity: 2,
@@ -117,12 +119,35 @@ describe('buildCheckoutRequestFromCart', () => {
 
 describe('buildCheckoutRequestFromReview', () => {
   it('monta o body a partir da revalidação — nunca do carrinho — e usa a taxa revalidada como esperada', () => {
-    const body = buildCheckoutRequestFromReview(review(), 'delivery', address(), 'pix', null);
+    const body = buildCheckoutRequestFromReview(
+      review({
+        items: [
+          {
+            ...review().items[0]!,
+            comboComponents: [
+              {
+                childProductId: '0193f1a0-0000-7000-8000-0000000000b1',
+                name: 'Refri',
+                quantity: 1,
+                removable: true,
+                removed: true,
+                unitBasePriceCents: 500,
+              },
+            ],
+          },
+        ],
+      }),
+      'delivery',
+      address(),
+      'pix',
+      null,
+    );
 
     expect(body.items).toEqual([
       {
         productId: '0193f1a0-0000-7000-8000-000000000002',
         offerId: '0193f1a0-0000-7000-8000-000000000003',
+        removedChildIds: ['0193f1a0-0000-7000-8000-0000000000b1'],
         unitBasePriceCents: 2890,
         modifiers: [{ modifierId: '0193f1a0-0000-7000-8000-0000000000a1', priceDeltaCents: 400 }],
         quantity: 2,

@@ -615,6 +615,8 @@ model ComboItem {
   childProductId String    @map("child_product_id") @db.Uuid
   /// CHECK quantity > 0 à mão na migration.
   quantity       Int       @default(1)
+  /// 4.2B: cliente pode remover este filho no combo. Default fechado.
+  removable      Boolean   @default(false)
   sortOrder      Int       @default(0) @map("sort_order")
   version        Int       @default(0)
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -1167,6 +1169,8 @@ model OrderItemComponent {
   name           String
   quantity       Int
   unitPriceCents Int?   @map("unit_price_cents")
+  /// 4.2B: filho fazia parte da composição original, mas o cliente removeu.
+  removed        Boolean @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
 

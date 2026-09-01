@@ -82,6 +82,7 @@ export interface ComboItem {
   childProductId: string;
   childName: string;
   quantity: number;
+  removable: boolean;
   sortOrder: number;
   version: number;
 }
@@ -343,6 +344,7 @@ export async function createComboItem(input: {
   comboProductId: string;
   childProductId: string;
   quantity?: number;
+  removable?: boolean;
   sortOrder?: number;
 }): Promise<ComboItem> {
   const res = await apiFetch('/v1/admin/combo-items', {
@@ -356,7 +358,7 @@ export async function createComboItem(input: {
 
 export async function updateComboItem(
   item: ComboItem,
-  input: Partial<Pick<ComboItem, 'quantity' | 'sortOrder'>>,
+  input: Partial<Pick<ComboItem, 'quantity' | 'removable' | 'sortOrder'>>,
 ): Promise<ComboItem> {
   const res = await apiFetch(`/v1/admin/combo-items/${encodeURIComponent(item.id)}`, {
     method: 'PATCH',

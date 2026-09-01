@@ -9,6 +9,7 @@ export interface ComboItemRecord {
   childProductId: string;
   childName: string;
   quantity: number;
+  removable: boolean;
   sortOrder: number;
   version: number;
 }
@@ -17,11 +18,13 @@ export interface CreateComboItemInput {
   comboProductId: string;
   childProductId: string;
   quantity: number;
+  removable?: boolean;
   sortOrder?: number;
 }
 
 export interface UpdateComboItemInput {
   quantity?: number;
+  removable?: boolean;
   sortOrder?: number;
 }
 
@@ -44,6 +47,7 @@ const SELECT = {
   comboProductId: true,
   childProductId: true,
   quantity: true,
+  removable: true,
   sortOrder: true,
   version: true,
   childProduct: { select: { name: true } },
@@ -54,6 +58,7 @@ function toRecord(row: {
   comboProductId: string;
   childProductId: string;
   quantity: number;
+  removable: boolean;
   sortOrder: number;
   version: number;
   childProduct: { name: string };
@@ -64,6 +69,7 @@ function toRecord(row: {
     childProductId: row.childProductId,
     childName: row.childProduct.name,
     quantity: row.quantity,
+    removable: row.removable,
     sortOrder: row.sortOrder,
     version: row.version,
   };
@@ -102,6 +108,7 @@ export class PrismaComboItemRepository implements ComboItemRepository {
           comboProductId: input.comboProductId,
           childProductId: input.childProductId,
           quantity: input.quantity,
+          removable: input.removable ?? false,
           sortOrder: input.sortOrder ?? 0,
         },
         select: SELECT,

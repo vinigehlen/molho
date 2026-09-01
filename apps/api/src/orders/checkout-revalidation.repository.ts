@@ -24,6 +24,8 @@ export interface CheckoutComboComponentRecord {
   childProductId: string;
   name: string;
   quantity: number;
+  /** Cliente pode remover este filho do combo (4.2B). */
+  removable: boolean;
   /** Preço da oferta principal viva do filho, usado quando o combo é `sum_of_items`. */
   unitBasePriceCents: number | null;
   /** `childProduct.available` E oferta principal do filho disponível. */
@@ -169,6 +171,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
               orderBy: { sortOrder: 'asc' },
               select: {
                 quantity: true,
+                removable: true,
                 childProductId: true,
                 childProduct: {
                   select: {
@@ -202,6 +205,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         childProductId: item.childProductId,
         name: item.childProduct.name,
         quantity: item.quantity,
+        removable: item.removable,
         unitBasePriceCents: item.childProduct.offers[0]?.priceCents ?? null,
         available: item.childProduct.available && item.childProduct.offers[0]?.available === true,
       })),

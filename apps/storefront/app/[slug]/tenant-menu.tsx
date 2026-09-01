@@ -69,7 +69,10 @@ export interface TenantMenuProps {
 
 /** Nenhum grupo obrigatório: dá pra adicionar com o "+" sem abrir o detalhe. */
 function podeAdicionarRapido(produto: StorefrontProduct): boolean {
-  return produto.modifierGroups.every((grupo) => grupo.min === 0);
+  return (
+    produto.modifierGroups.every((grupo) => grupo.min === 0) &&
+    !produto.comboItems?.some((item) => item.removable)
+  );
 }
 
 const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
@@ -153,7 +156,10 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
       name: produto.name,
       description: produto.description,
       imageUrl: produto.imageUrl,
-      unitBasePriceCents: produto.basePriceCents,
+      unitBasePriceCents: selecao.unitBasePriceCents,
+      ...(selecao.removedChildIds && selecao.removedChildIds.length > 0
+        ? { removedChildIds: selecao.removedChildIds }
+        : {}),
       modifiers: selecao.modifiers,
       quantity: selecao.quantity,
       notes: selecao.notes,

@@ -76,9 +76,21 @@ export const storefrontProductSchema = z.strictObject({
    * negociação opt-in do 4C que introduz `offerId`). Exibição pura: "vem com
    * 2× Xis, 1× Refri". O preço mostrado continua vindo de
    * `basePriceCents`; em ofertas `sum_of_items`, a API já devolve ali a soma
-   * atual dos filhos.
+   * atual dos filhos. `removable`/`unitBasePriceCents` sustentam a remoção de
+   * filho no sheet sem fazer o cliente esperar a revalidação para ver o total.
    */
-  comboItems: z.array(z.strictObject({ name: z.string(), quantity: z.int().positive() })).optional(),
+  comboItems: z
+    .array(
+      z.strictObject({
+        childProductId: z.uuid(),
+        name: z.string(),
+        quantity: z.int().positive(),
+        removable: z.boolean(),
+        unitBasePriceCents: centsSchema.nullable().optional(),
+      }),
+    )
+    .optional(),
+  comboPricingMode: z.enum(['fixed', 'sum_of_items']).optional(),
 });
 
 export const storefrontCategorySchema = z.strictObject({

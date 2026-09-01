@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 export class CreateComboItemDto {
   @IsUUID(7)
@@ -14,6 +14,10 @@ export class CreateComboItemDto {
   @Min(1)
   @Max(99)
   quantity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  removable?: boolean;
 
   @IsOptional()
   @Type(() => Number)
@@ -33,6 +37,10 @@ export class UpdateComboItemDto {
   @Min(1)
   @Max(99)
   quantity?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  removable?: boolean;
 
   @IsOptional()
   @Type(() => Number)

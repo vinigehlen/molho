@@ -9,6 +9,8 @@
  * Fase 4.1a: preço fixo (o da oferta do combo), sem combo aninhado, sem
  * modificador de filho, sem preço "a partir de" — tudo isso é 4.2. Gateado
  * atrás de `@RequireModule('combos')`.
+ * Fase 4.2B: `removable` marca quais filhos o cliente pode tirar no
+ * storefront. Default fechado.
  */
 
 import { z } from 'zod';
@@ -24,6 +26,7 @@ export const comboItemSchema = z.strictObject({
   /** Snapshot de exibição — o nome vive no `Product` filho. */
   childName: z.string(),
   quantity: quantitySchema,
+  removable: z.boolean(),
   sortOrder: sortOrderSchema,
   version: versionSchema,
 });
@@ -32,12 +35,14 @@ export const createComboItemSchema = z.strictObject({
   comboProductId: z.uuid(),
   childProductId: z.uuid(),
   quantity: quantitySchema.default(1),
+  removable: z.boolean().default(false),
   sortOrder: sortOrderSchema.optional(),
 });
 
 export const updateComboItemSchema = z.strictObject({
   version: versionSchema,
   quantity: quantitySchema.optional(),
+  removable: z.boolean().optional(),
   sortOrder: sortOrderSchema.optional(),
 });
 
