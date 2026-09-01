@@ -201,6 +201,19 @@ Com D8–D13 fechados, a fatia está pronta pra virar handoff de implementação
 (schema → contratos → API → checkout → backoffice/storefront), no mesmo
 padrão de commit+gate+deploy separado das fases anteriores.
 
+> **Handoff aberto pro Codex (2026-09-01):** 4.2B está pronta pra codar —
+> nenhuma decisão de produto pendente. Implementar nesta ordem: migration
+> `removable boolean default false` em `combo_items` + `removed boolean
+> default false` em `order_item_components` (idempotentes, aditivas) →
+> contratos (`combo-admin.ts`, cart schema com `removedChildIds?` opcional,
+> `revalidatedItemSchema`) → `ComboItemService`/`ComboItemsController`
+> (CRUD de `removable`) → `CheckoutOrderService`/`findOffersForItems` (D11 +
+> D13) → `createOrderItems` (D12) → backoffice (`ComboItemsEditor` ganha
+> toggle "removível") → storefront (`MoProductSheet`, checkbox por filho
+> removível). Cada trecho é commit+gate separado, PR normal (não push direto
+> em `main`). Dúvida de escopo que não esteja em D8–D13: perguntar antes de
+> codar, não assumir.
+
 ### 4.2C — combo aninhado
 
 Hoje barrado só em `ComboItemService.create()` (filho `kind='combo'` é
