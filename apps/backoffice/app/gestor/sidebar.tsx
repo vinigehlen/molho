@@ -12,6 +12,7 @@ import {
   Printer,
   Settings,
   Store,
+  Ticket,
   UtensilsCrossed,
   X,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/gestor/balcao', label: 'Balcão', icon: Store },
   { href: '/gestor/entrega', label: 'Entrega', icon: MapPin },
   { href: '/gestor/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/gestor/cupons', label: 'Cupons', icon: Ticket },
   { href: '/gestor/impressao', label: 'Impressão', icon: Printer },
   { href: '/gestor/configuracao', label: 'Configuração', icon: Settings },
 ];

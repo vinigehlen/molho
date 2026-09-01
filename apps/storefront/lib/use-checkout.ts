@@ -47,6 +47,9 @@ export interface UseCheckoutResult {
   /** Só relevante quando paymentMethod === 'cash_on_delivery'. */
   changeForCents: number | null;
   setChangeForCents: (cents: number | null) => void;
+  /** Revalida o carrinho de novo com o código informado — mesma tela de revisão, review atualizado. */
+  applyCoupon: (code: string) => Promise<void>;
+  couponLoading: boolean;
 }
 
 const ERRO_REVALIDACAO = 'Não deu pra conferir seu pedido agora. Tenta de novo.';
@@ -77,6 +80,7 @@ export function useCheckout(
   const lastReviewRef = React.useRef<CheckoutReview | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<CheckoutPaymentMethod>('pix');
   const [changeForCents, setChangeForCents] = React.useState<number | null>(null);
+  const [couponLoading, setCouponLoading] = React.useState(false);
 
   const submitOrder = React.useCallback(
     async (identity: CheckoutIdentity) => {
@@ -124,6 +128,28 @@ export function useCheckout(
         : { kind: 'review', review: null, errorMessage: ERRO_REVALIDACAO, submitting: false },
     );
   }, [address, cart, fulfillmentType, slug]);
+
+  // Reaplica a revalidação com o código de cupom — mesma tela de revisão já
+  // aberta, só troca o `review` por baixo. `couponValid`/`discountCents`
+  // sempre vêm do servidor (regra 14): nunca confia que um código digitado é
+  // válido só porque o cliente apertou "Aplicar".
+  const applyCoupon = React.useCallback(
+    async (code: string) => {
+      if (fulfillmentType === 'delivery' && (!address || !address.postalCode || !address.number)) return;
+      setCouponLoading(true);
+      try {
+        const body = buildCheckoutRequestFromCart(cart, fulfillmentType, address, code);
+        const review = await revalidateCheckout(slug, body);
+        if (review) {
+          lastReviewRef.current = review;
+          setStep({ kind: 'review', review, errorMessage: null, submitting: false });
+        }
+      } finally {
+        setCouponLoading(false);
+      }
+    },
+    [address, cart, fulfillmentType, slug],
+  );
 
   const confirmReview = React.useCallback(() => {
     if (!lastReviewRef.current) return;
@@ -194,5 +220,7 @@ export function useCheckout(
     setPaymentMethod,
     changeForCents,
     setChangeForCents,
+    applyCoupon,
+    couponLoading,
   };
 }

@@ -48,6 +48,12 @@ export interface MoCheckoutReviewData {
   isOpenNow: boolean;
   nextOpensAt: string | null;
   minOrderCents: number;
+  /** Cupom (Épico conversão, C2). `null` = cliente não mandou nenhum código. */
+  couponCode: string | null;
+  /** Só relevante quando `couponCode` não é `null`. */
+  couponValid: boolean;
+  /** Sempre `0` sem cupom válido. */
+  discountCents: number;
   totalCents: number | null;
   /** `true` → regra 14: qualquer coisa que precise de confirmação ativa aconteceu (item sumiu, preço/taxa subiu, fora da zona/horário/mínimo). */
   hasUnfavorableDivergence: boolean;
@@ -82,6 +88,9 @@ export interface MoCheckoutReviewSheetProps {
   onLegalAcceptedChange?: (accepted: boolean) => void;
   termsHref?: string;
   privacyHref?: string;
+  /** Aplica/reaplica o cupom digitado — servidor sempre revalida, nunca confia no código sozinho. */
+  onApplyCoupon?: (code: string) => void;
+  couponLoading?: boolean;
 }
 
 /**
@@ -112,7 +121,10 @@ export function MoCheckoutReviewSheet({
   onLegalAcceptedChange,
   termsHref = '/termos',
   privacyHref = '/privacidade',
+  onApplyCoupon,
+  couponLoading = false,
 }: MoCheckoutReviewSheetProps) {
+  const [couponInput, setCouponInput] = React.useState('');
   // Corrige o método selecionado sempre que a lista de disponíveis não bate
   // com ele — sozinho se sobrar só 1 (pré-seleção), ou se o método atual
   // (ex.: default 'pix' do consumidor) nem estiver na lista que a loja
@@ -150,11 +162,43 @@ export function MoCheckoutReviewSheet({
               ))}
             </div>
 
+            {onApplyCoupon ? (
+              <div className="flex flex-col gap-2 border-t border-border pt-4">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <MoInput
+                      label="Cupom de desconto"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.currentTarget.value.toUpperCase())}
+                      placeholder="Código"
+                    />
+                  </div>
+                  <MoButton
+                    variant="secondary"
+                    loading={couponLoading}
+                    disabled={!couponInput.trim()}
+                    onClick={() => onApplyCoupon(couponInput.trim())}
+                  >
+                    Aplicar
+                  </MoButton>
+                </div>
+                {review.couponCode && !review.couponValid ? (
+                  <p className="text-caption font-semibold text-critical-strong">Esse cupom não é válido pra esse pedido.</p>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-2 border-t border-border pt-4">
               <div className="flex items-center justify-between text-body text-text">
                 <span>Subtotal</span>
                 <span className="tnum">{formatCents(review.subtotalCents)}</span>
               </div>
+              {review.discountCents > 0 ? (
+                <div className="flex items-center justify-between text-body text-positive">
+                  <span>Desconto ({review.couponCode})</span>
+                  <span className="tnum">-{formatCents(review.discountCents)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between text-body text-text">
                 <span>Taxa de entrega</span>
                 <span className="tnum">{review.deliveryFeeCents !== null ? formatCents(review.deliveryFeeCents) : '—'}</span>

@@ -40,6 +40,8 @@ export interface CheckoutRequestBody {
   paymentMethod: CheckoutPaymentMethod;
   /** Só presente (mesmo objeto, `JSON.stringify` derruba `undefined`) quando paymentMethod === 'cash_on_delivery'. */
   changeForCents?: number | null;
+  /** Cupom de desconto. Ausente = sem cupom — o servidor sempre revalida (existe/ativo/mínimo/uso). */
+  couponCode?: string;
 }
 
 export interface CheckoutReviewModifier {
@@ -72,6 +74,12 @@ export interface CheckoutReview {
   isOpenNow: boolean;
   nextOpensAt: string | null;
   minOrderCents: number;
+  /** Cupom (Épico conversão, C2). `null` = cliente não mandou nenhum. */
+  couponCode: string | null;
+  /** Só relevante quando `couponCode` não é `null`. */
+  couponValid: boolean;
+  /** Sempre `0` sem cupom válido. */
+  discountCents: number;
   totalCents: number | null;
   hasUnfavorableDivergence: boolean;
   canSubmit: boolean;
@@ -85,6 +93,8 @@ function isCheckoutReview(value: unknown): value is CheckoutReview {
     typeof v.subtotalCents === 'number' &&
     typeof v.withinZone === 'boolean' &&
     typeof v.isOpenNow === 'boolean' &&
+    typeof v.couponValid === 'boolean' &&
+    typeof v.discountCents === 'number' &&
     typeof v.hasUnfavorableDivergence === 'boolean' &&
     typeof v.canSubmit === 'boolean'
   );
@@ -257,6 +267,8 @@ export function buildCheckoutRequestFromCart(
   cart: Cart,
   fulfillmentType: FulfillmentType,
   address: CustomerAddress | null,
+  /** Código digitado pelo cliente na revisão. Servidor sempre revalida — nunca confia que existe/vale. */
+  couponCode?: string,
 ): CheckoutRequestBody {
   return {
     items: cart.items.map((item) => ({
@@ -270,6 +282,7 @@ export function buildCheckoutRequestFromCart(
     fulfillmentType,
     address: fulfillmentType === 'pickup' ? null : addressBody(address as CustomerAddress, null),
     paymentMethod: 'pix',
+    ...(couponCode ? { couponCode } : {}),
   };
 }
 
@@ -306,5 +319,9 @@ export function buildCheckoutRequestFromReview(
     address: fulfillmentType === 'pickup' ? null : addressBody(address as CustomerAddress, review.deliveryFeeCents),
     paymentMethod,
     ...(paymentMethod === 'cash_on_delivery' ? { changeForCents } : {}),
+    // Ecoa o cupom que a revalidação já confirmou — nunca reconstrói a partir
+    // de um input solto (mesmo racional do resto desta função: sempre parte
+    // do que o servidor já validou, nunca do estado bruto do cliente).
+    ...(review.couponCode ? { couponCode: review.couponCode } : {}),
   };
 }

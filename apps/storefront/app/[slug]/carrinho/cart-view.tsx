@@ -352,6 +352,8 @@ export function CartView({
         onPaymentMethodChange={checkout.setPaymentMethod}
         changeForCents={checkout.changeForCents}
         onChangeForCentsChange={checkout.setChangeForCents}
+        onApplyCoupon={checkout.applyCoupon}
+        couponLoading={checkout.couponLoading}
         legalAccepted={legalAccepted}
         onLegalAcceptedChange={setLegalAccepted}
         termsHref={LEGAL_TERMS_HREF}
