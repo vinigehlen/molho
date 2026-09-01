@@ -23,7 +23,7 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | correções pré-4.2 (P1.1–P1.3, P2.4–P2.5) | ✅ em `main` | `c50c6c3` | — |
 | 4.2A — `combo_pricing_mode` / `sum_of_items` | ✅ em `main` | `9a04b00` | `20260901110000_combo_pricing_product_offer_4_2a` |
 | bloqueio de troca de `kind` com filhos vivos | ✅ em `main` | `345a443` | — |
-| 4.2B — personalização (add/remove filho, taxa extra) | ⬜ não iniciada | — | pendente de recorte com o PM |
+| 4.2B — personalização (remover filho, D8–D13 travadas) | ⬜ não iniciada | — | recorte fechado, pronta pra codar |
 | 4.2C — combo aninhado | ⬜ recomendação: manter bloqueado | — | — |
 
 `main` em `674ec8f` (local; push pro `origin/main` ainda pendente).
@@ -183,30 +183,23 @@ Correção pós-4.2A: trocar `kind` de um combo com filhos vivos fica bloqueado
 até o lojista remover a composição. Isso evita esconder `combo_items` vivos por
 uma mudança acidental de tipo.
 
-### 4.2B — personalização (não iniciada — precisa recorte do PM)
+### 4.2B — personalização (recorte travado com o PM em 2026-09-01)
 
-Escopo bruto (CLAUDE.md): "adicionar/remover item do combo, taxa extra". Antes
-de codar, fechar com o PM item a item (mesmo processo D1–D7):
+Escopo bruto (CLAUDE.md): "adicionar/remover item do combo, taxa extra".
+Recorte fechado item a item (mesmo processo D1–D7):
 
-1. **O que o cliente pode fazer?** só remover um filho, ou também trocar por
-   outro produto, ou também adicionar um extra pago? (recomendação: remover +
-   trocar na 4.2B; adicionar extra numa 4.2B-2)
-2. **Mecanismo.** A personalização do combo é um `ModifierGroup` no
-   produto-combo (reusa toda a infra de 4.1/4E), ou um mecanismo próprio em
-   `combo_items` (ex.: `swappable`, `removable`, `extra_fee_cents` por linha)?
-3. **Carrinho.** Hoje o item de combo no carrinho é só
-   `{productId, offerId, quantity}`. Personalização quase certamente **sobe
-   `CART_SCHEMA_VERSION`** (descarta carrinhos salvos) — confirmar que é
-   aceitável.
-4. **Preço.** Como a troca/remoção interage com `fixed` vs `sum_of_items`?
-   Remover um filho de um combo `fixed` abate quanto? Em `sum_of_items` é a
-   diferença das ofertas.
-5. **Snapshot.** `order_item_components` precisa registrar substituições e
-   remoções (hoje só grava o que veio). Coluna nova (`removed`, `swapped_from`)
-   ou linhas com `quantity: 0`?
-6. **Revalidação.** A composição personalizada tem que ser revalidada contra o
-   `combo_items` fresco (regra 14) — o filho trocado ainda existe? o extra
-   ainda está disponível?
+| # | Decisão |
+| --- | --- |
+| D8 | Cliente só pode **remover** um filho. Sem troca por outro produto, sem extra pago nesta fatia — fica pra uma 4.2B-2 se pedido. |
+| D9 | Mecanismo: coluna `removable boolean` em `combo_items` (não `ModifierGroup`). Lojista marca no cadastro do combo quais filhos são removíveis. |
+| D10 | **Sem bump de `CART_SCHEMA_VERSION`.** Carrinho tem que ficar retrocompatível — campo novo (ex.: `removedChildIds?: string[]`) opcional no item de combo existente, nunca invalida carrinho salvo. |
+| D11 | Preço: remover filho de combo `fixed` **não abate nada** (mesmo tratamento de modificador sem custo hoje). Em `sum_of_items`, abate exatamente o `unit_price_cents` daquele filho. |
+| D12 | Snapshot: `order_item_components` grava a linha do filho normalmente com **coluna `removed boolean`** (não `quantity: 0`) — mantém histórico da composição original do combo. |
+| D13 | Revalidação: filho pedido pra remoção que não é `removable` no `combo_items` fresco (ou não existe mais) é **divergência desfavorável** — cai na tela de revisão obrigatória da regra 14, nunca ignorado silenciosamente. |
+
+Com D8–D13 fechados, a fatia está pronta pra virar handoff de implementação
+(schema → contratos → API → checkout → backoffice/storefront), no mesmo
+padrão de commit+gate+deploy separado das fases anteriores.
 
 ### 4.2C — combo aninhado
 
