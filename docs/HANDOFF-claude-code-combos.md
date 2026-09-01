@@ -221,6 +221,10 @@ rejeitado). **Recomendação: manter bloqueado** — YAGNI até pedido explícit
 PM. Se liberar: profundidade máxima, detecção de ciclo, explosão do
 cálculo de preço/disponibilidade, snapshot recursivo.
 
+> **Confirmado com o PM em 2026-09-01: continua bloqueado.** Sem
+> desbloqueio agora — Codex só avalia/decide isso se e quando vier um pedido
+> real, não implementar por conta própria.
+
 ## Comandos seguros para retomar
 
 ```bash
