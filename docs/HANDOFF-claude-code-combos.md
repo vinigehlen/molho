@@ -20,7 +20,8 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | 4.1a | ✅ mesclada | PR #29 → `a81f822` | `20260831130000_combo_items_epico_combos_4a` |
 | 4.1b | ✅ mesclada | PR #30 → `694c5b7` | `20260831140000_order_item_components_combo_4b` |
 | handoff 4.2 | ✅ mesclado | PR #31 → `ade4c04` | — |
-| 4.2 | ⬜ não iniciada | — | (preço "a partir de", personalização, combo aninhado) |
+| 4.2A | ✅ local | `9a04b00` | `20260901110000_combo_pricing_product_offer_4_2a` |
+| 4.2B+ | ⬜ não iniciada | — | (personalização, combo aninhado se aprovado) |
 
 `main` sincronizada com `origin/main` após o merge do PR #31 (`ade4c04`).
 
@@ -157,6 +158,14 @@ Decisão de ownership registrada na 4.2A: `combo_pricing_mode` mora em
 `ProductOffer`, com valores `fixed | sum_of_items`. Cada apresentação comercial
 pode escolher o modo; `ComboItem` só guarda dados por filho (composição,
 quantidade, contribuição futura), não uma flag agregada do combo.
+
+Entregue na 4.2A: migration expansiva, contratos/admin API, backoffice mínimo,
+storefront com `basePriceCents` consolidado e checkout recalculando
+`sum_of_items` com snapshot `order_item_components.unit_price_cents`.
+
+Correção pós-4.2A: trocar `kind` de um combo com filhos vivos fica bloqueado
+até o lojista remover a composição. Isso evita esconder `combo_items` vivos por
+uma mudança acidental de tipo.
 
 ## Comandos seguros para retomar
 

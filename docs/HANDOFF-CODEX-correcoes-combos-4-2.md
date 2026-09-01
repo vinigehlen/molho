@@ -138,6 +138,10 @@ das opções antes da 4.2:
 
 Não implementar limpeza silenciosa sem decisão, pois seria destrutiva.
 
+**Decisão implementada após 4.2A:** bloquear a troca de `kind` quando o combo
+tem filhos vivos. O lojista precisa remover os itens do combo antes de mudar o
+tipo do produto.
+
 ### 6. Corrigir as alternativas de ownership de `combo_pricing`
 
 `combo_items` representa composição por filho; não é um bom owner para uma

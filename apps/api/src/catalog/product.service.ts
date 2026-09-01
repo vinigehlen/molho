@@ -33,10 +33,24 @@ export class ProductService {
   ): Promise<ProductRecord> {
     if (input.name !== undefined) this.assertValidName(input.name);
     if (input.basePriceCents !== undefined) this.assertValidPrice(input.basePriceCents);
+    let current: ProductRecord | undefined;
     if (input.categoryId !== undefined) {
       await this.assertCategoryExists(input.categoryId);
       if (await this.repo.secondaryOfferExists(id, input.categoryId)) {
         throw new CatalogValidationError('Este produto já está disponível nesta categoria.');
+      }
+    }
+    if (input.kind !== undefined) {
+      current = (await this.repo.findById(id)) ?? undefined;
+      if (current === undefined) throw new CatalogNotFoundError('Produto');
+      if (
+        current.kind === 'combo' &&
+        input.kind !== 'combo' &&
+        (await this.repo.comboItemExists(id))
+      ) {
+        throw new CatalogValidationError(
+          'Remova os itens do combo antes de trocar o tipo do produto.',
+        );
       }
     }
     return this.repo.update(id, expectedVersion, input, actor);

@@ -30,7 +30,8 @@ instrução ativa e já registra a exceção de combos no MVP. Este arquivo só 
 | 4.1a — fundação: `ComboItem` + CRUD admin + UI no gestor | ✅ | PR #29 |
 | 4.1b — combo no checkout: cascata de disponibilidade + snapshot | ✅ | PR #30 → `694c5b7` |
 | handoff 4.2 — estado e próximos eixos | ✅ | PR #31 → `ade4c04` |
-| **4.2** — preço "a partir de", personalização, combo aninhado | ⬜ | — |
+| 4.2A — preço "a partir de" por `ProductOffer` | ✅ | `9a04b00` |
+| **4.2B+** — personalização, combo aninhado se aprovado | ⬜ | — |
 
 `main` sincronizada com `origin/main` após o merge do PR #31 (`ade4c04`).
 
@@ -108,6 +109,9 @@ tem três eixos independentes, e cada um pode virar uma fatia própria
 - A 4.2A adiciona `order_item_components.unit_price_cents` nullable como
   snapshot por filho; em `sum_of_items`, `lineTotalCents` do combo passa a
   refletir a soma dos filhos.
+- Entregue localmente no commit `9a04b00`: migration, contratos/admin API,
+  backoffice mínimo, storefront com preço consolidado e checkout recalculando
+  `sum_of_items`.
 
 ### Eixo B — personalização (add/remove item do combo, taxa extra)
 
@@ -131,8 +135,8 @@ tem três eixos independentes, e cada um pode virar uma fatia própria
 
 - Tela de revisão do checkout (`apps/storefront`) listar *qual* filho do combo
   ficou indisponível, em vez da mensagem genérica.
-- Decidir o comportamento de trocar `kind` de um combo com itens (bloquear?
-  avisar? limpar os itens?).
+- Decisão implementada após 4.2A: trocar `kind` de um combo com itens vivos é
+  bloqueado; o lojista precisa remover a composição antes de mudar o tipo.
 
 ## Comandos seguros para retomar
 

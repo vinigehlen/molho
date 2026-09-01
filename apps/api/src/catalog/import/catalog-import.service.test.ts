@@ -77,6 +77,10 @@ class FakeProductRepository implements ProductRepository {
     return false;
   }
 
+  async comboItemExists(): Promise<boolean> {
+    return false;
+  }
+
   async create(input: CreateProductInput): Promise<ProductRecord> {
     const record: ProductRecord = {
       id: `prod-${this.nextId++}`,

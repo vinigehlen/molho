@@ -49,6 +49,7 @@ export interface ProductRepository {
   findById(id: string): Promise<ProductRecord | null>;
   categoryExists(categoryId: string): Promise<boolean>;
   secondaryOfferExists(productId: string, categoryId: string): Promise<boolean>;
+  comboItemExists(comboProductId: string): Promise<boolean>;
   create(input: CreateProductInput): Promise<ProductRecord>;
   update(
     id: string,
@@ -113,6 +114,14 @@ export class PrismaProductRepository implements ProductRepository {
       select: { id: true },
     });
     return offer !== null;
+  }
+
+  async comboItemExists(comboProductId: string): Promise<boolean> {
+    const item = await this.requestContext.getClient().comboItem.findFirst({
+      where: { comboProductId, deletedAt: null },
+      select: { id: true },
+    });
+    return item !== null;
   }
 
   async create(input: CreateProductInput): Promise<ProductRecord> {

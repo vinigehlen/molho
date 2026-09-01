@@ -18,6 +18,7 @@ class FakeProductRepository implements ProductRepository {
   rows = new Map<string, ProductRecord>();
   categoryIds = new Set<string>(['cat-1']);
   secondaryCategoryIds = new Set<string>();
+  comboProductIds = new Set<string>();
   private nextId = 1;
 
   async listByCategory(categoryId: string): Promise<ProductRecord[]> {
@@ -34,6 +35,10 @@ class FakeProductRepository implements ProductRepository {
 
   async secondaryOfferExists(_productId: string, categoryId: string): Promise<boolean> {
     return this.secondaryCategoryIds.has(categoryId);
+  }
+
+  async comboItemExists(comboProductId: string): Promise<boolean> {
+    return this.comboProductIds.has(comboProductId);
   }
 
   async create(input: CreateProductInput): Promise<ProductRecord> {
@@ -118,6 +123,40 @@ describe('ProductService', () => {
     await expect(
       service.update(created.id, created.version, { categoryId: 'cat-2' }, ACTOR),
     ).rejects.toThrow('Este produto já está disponível nesta categoria.');
+  });
+
+  it('não troca combo com filhos vivos para outro tipo sem remover a composição', async () => {
+    const { repo, service } = setup();
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'Combo casal',
+      basePriceCents: 5990,
+      kind: 'combo',
+    });
+    repo.comboProductIds.add(created.id);
+
+    await expect(
+      service.update(created.id, created.version, { kind: 'prepared' }, ACTOR),
+    ).rejects.toThrow('Remova os itens do combo antes de trocar o tipo do produto.');
+  });
+
+  it('permite trocar tipo quando o combo não tem filhos vivos', async () => {
+    const { service } = setup();
+    const created = await service.create({
+      categoryId: 'cat-1',
+      name: 'Combo vazio',
+      basePriceCents: 5990,
+      kind: 'combo',
+    });
+
+    const updated = await service.update(
+      created.id,
+      created.version,
+      { kind: 'prepared' },
+      ACTOR,
+    );
+
+    expect(updated.kind).toBe('prepared');
   });
 
   it('2) create() rejeita categoria inexistente sem chamar o repositório', async () => {
