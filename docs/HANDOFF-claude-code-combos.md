@@ -1,6 +1,6 @@
 # Handoff para Claude Code — Combos (exceção MVP 2026-08-28)
 
-Atualizado em 2026-08-31.
+Atualizado em 2026-09-01.
 
 Sequência aprovada pelo PM (ver CLAUDE.md § "EXCEÇÃO decidida em 2026-08-28"),
 em quatro fases, cada uma commit + gate + deploy separado:
@@ -18,10 +18,11 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | 2 | ✅ mesclada | `23429fb` | `20260828233000_product_modifier_group_reuse` |
 | 3 | ✅ mesclada | PR #26 → `3155f33` | `20260831120000_product_kind_combo_fase3` |
 | 4.1a | ✅ mesclada | PR #29 → `a81f822` | `20260831130000_combo_items_epico_combos_4a` |
-| 4.1b | 🔧 em revisão | esta branch | `20260831140000_order_item_components_combo_4b` |
+| 4.1b | ✅ mesclada | PR #30 → `694c5b7` | `20260831140000_order_item_components_combo_4b` |
+| handoff 4.2 | ✅ mesclado | PR #31 → `ade4c04` | — |
 | 4.2 | ⬜ não iniciada | — | (preço "a partir de", personalização, combo aninhado) |
 
-`main` sincronizada com `origin/main` após o merge da fase 3.
+`main` sincronizada com `origin/main` após o merge do PR #31 (`ade4c04`).
 
 > Nota de infra: entre a fase 3 e a 4.1a, 4 PRs do dependabot (#18–#21)
 > quebraram o CI (TS 5.9→7 sem suporte do typescript-eslint, `pnpm/action-setup@v6`
@@ -66,10 +67,10 @@ checkout: nenhuma coluna existente muda de tipo/semântica e o default
 
 `20260831120000_product_kind_combo_fase3` (fase 3),
 `20260831130000_combo_items_epico_combos_4a` (4.1a) e
-`20260831140000_order_item_components_combo_4b` (4.1b) **ainda não foram
-aplicadas em nenhum banco** — seguem o padrão das fases 1/2 (o `migrations/`
-local está atrás do banco dev real; aplicar via `db:migrate:deploy` ou no
-deploy da API). Todas idempotentes e aditivas.
+`20260831140000_order_item_components_combo_4b` (4.1b) estavam pendentes em
+2026-09-01 no Neon apontado pelo `.env.local` local. Isso não afirma staging
+nem produção — conferir cada ambiente separadamente antes de deploy. Todas
+idempotentes e aditivas.
 
 ## Fase 4 — combo de verdade
 
@@ -89,14 +90,15 @@ opcional. Quebrada em fatias porque toca o caminho de dinheiro do checkout.
 | D6 | Revalidação (4.1b): `lockProductsForUpdate` passa a travar os filhos; filho indisponível/reprecificado → combo indisponível / tela de revisão. |
 | D7 | `combos: { plans: ['pro','premium'], default: true }` — nasce ligado em quem tem direito. Gating do módulo no front fica pro painel de módulos (épico 14). |
 
-### 4.1a — fundação (esta branch)
+### 4.1a — fundação
 
 Aditivo, zero risco pro checkout — combo ainda não é wireado no `/checkout`.
 
 - **schema**: `ComboItem` + migration `20260831130000_combo_items_epico_combos_4a`
   (RLS `tenant_isolation`, FKs compostas `(*, tenant_id) → products`, único
   parcial `(combo_product_id, child_product_id)`, CHECK `quantity > 0` e
-  `combo_product_id <> child_product_id`).
+  CHECK `combo_product_id <> child_product_id` apenas contra autorreferência
+  direta; combo aninhado é validação somente na aplicação em 4.1).
 - **contratos**: `combo-admin.ts` (`comboItemSchema` / create / update). +4 testes.
 - **API**: `ComboItemsController` em `/v1/admin/combo-items`,
   `@RequireModule('combos')` + `catalog.product.update`. Service valida:
@@ -109,9 +111,12 @@ Aditivo, zero risco pro checkout — combo ainda não é wireado no `/checkout`.
 
 Ceilings da 4.1a (`ponytail:`): sem combo aninhado, sem modificador de filho,
 sem preço "a partir de", sem gating de módulo no front. Trocar `kind` de um
-combo com itens deixa `combo_items` órfãos (soft) — tolerável até a 4.2.
+combo com itens deixa as linhas vivas em `combo_items`; elas ficam ignoradas
+enquanto o pai não é combo e reaparecem se o tipo voltar para `combo`. A 4.2
+precisa decidir se isso será bloqueado, confirmado com soft-delete explícito,
+ou preservado de propósito.
 
-### 4.1b — checkout (esta branch)
+### 4.1b — checkout
 
 Combo entra no caminho de dinheiro. Preço continua fixo (o da oferta do
 combo) — os filhos só decidem disponibilidade e viram snapshot.
@@ -127,9 +132,10 @@ combo) — os filhos só decidem disponibilidade e viram snapshot.
   qualquer filho indisponível — ou sem filho nenhum — volta `available:
   false` → tela de revisão obrigatória (regra 14). Combo disponível carrega
   `comboComponents` no item.
-- **lock**: `CheckoutOrderService` chama `findComboChildProductIds` antes de
-  travar e amplia `lockProductsForUpdate` + `lockOffersForUpdate` pros filhos
-  — a disponibilidade do filho fica estável pela mesma janela do combo.
+- **lock**: `CheckoutOrderService` trava primeiro os produtos-pai solicitados,
+  depois trava as linhas vivas de `combo_items` desses pais e só então amplia
+  `lockProductsForUpdate` + `lockOffersForUpdate` pros filhos — a composição,
+  quantidade e disponibilidade do filho ficam estáveis pela mesma janela.
 - **snapshot**: `createOrderItems` grava `order_item_components` a partir de
   `item.comboComponents`.
 - **storefront**: `comboItems` no payload público (só com `catalog=offers` e
@@ -146,6 +152,11 @@ ajuste de UI posterior.
 
 Preço "a partir de" (`ProductOffer.priceCents` vs soma dos filhos),
 personalização (add/remove item do combo, taxa extra), combo aninhado.
+
+Antes de criar migration de preço, registrar a decisão de ownership: `Product`
+se o modo (`fixed`/`sum`) for global para o combo inteiro; `ProductOffer` se
+cada apresentação comercial puder escolher o modo; `ComboItem` só deve guardar
+dados por filho (contribuição, inclusão, taxa), não uma flag agregada do combo.
 
 ## Comandos seguros para retomar
 

@@ -2,8 +2,10 @@
 
 Data: 2026-09-01
 Fonte da verdade detalhada: `docs/HANDOFF-claude-code-combos.md` (D1–D7, estado
-das fatias, migrations pendentes). Este arquivo só diz **o que falta** e em que
-ordem. Divergência → `docs/HANDOFF-claude-code-combos.md` e `CLAUDE.md` vencem.
+das fatias, migrations pendentes). Para sessões Codex, `AGENTS.md` é a primeira
+instrução ativa e já registra a exceção de combos no MVP. Este arquivo só diz
+**o que falta** e em que ordem. Divergência de combo → `AGENTS.md` +
+`docs/HANDOFF-claude-code-combos.md` vencem.
 
 ## Antes de tocar em qualquer arquivo
 
@@ -26,10 +28,11 @@ ordem. Divergência → `docs/HANDOFF-claude-code-combos.md` e `CLAUDE.md` vence
 | 2 — grupos de complemento reutilizáveis (N:N) | ✅ | `23429fb` |
 | 3 — `Product.kind` (`prepared`/`industrialized`/`combo`) | ✅ | PR #26 |
 | 4.1a — fundação: `ComboItem` + CRUD admin + UI no gestor | ✅ | PR #29 |
-| 4.1b — combo no checkout: cascata de disponibilidade + snapshot | ✅ | PR #30 |
+| 4.1b — combo no checkout: cascata de disponibilidade + snapshot | ✅ | PR #30 → `694c5b7` |
+| handoff 4.2 — estado e próximos eixos | ✅ | PR #31 → `ade4c04` |
 | **4.2** — preço "a partir de", personalização, combo aninhado | ⬜ | — |
 
-`main` sincronizada com `origin/main` após o merge do PR #30 (`694c5b7`).
+`main` sincronizada com `origin/main` após o merge do PR #31 (`ade4c04`).
 
 ### Cuidados de infra (não redescobrir)
 
@@ -44,11 +47,11 @@ ordem. Divergência → `docs/HANDOFF-claude-code-combos.md` e `CLAUDE.md` vence
 
 `20260831120000_product_kind_combo_fase3`,
 `20260831130000_combo_items_epico_combos_4a`,
-`20260831140000_order_item_components_combo_4b` — **nenhuma aplicada em banco
-nenhum** (mesmo débito das fases 1/2: `migrations/` local atrás do banco dev
-real). Todas idempotentes e aditivas; aplicar via `db:migrate:deploy` ou no
-deploy da API. **Não editar essas migrations** — evolução de schema pede
-migration nova.
+`20260831140000_order_item_components_combo_4b` — pendentes em 2026-09-01 no
+Neon apontado pelo `.env.local` local. Isso não afirma staging nem produção;
+conferir cada ambiente separadamente antes de deploy. Todas idempotentes e
+aditivas; aplicar via `db:migrate:deploy` ou no deploy da API. **Não editar
+essas migrations** — evolução de schema pede migration nova.
 
 ## O que a 4.1a/4.1b deixou pronto (para a 4.2 construir em cima)
 
@@ -73,15 +76,16 @@ migration nova.
 
 - preço do combo é **fixo** (o da oferta primária do combo);
 - filho não tem modificador próprio no combo;
-- **sem combo aninhado** (filho nunca é `kind='combo'` — barrado no service e
-  por CHECK implícito da regra de negócio);
+- **sem combo aninhado** (filho nunca é `kind='combo'` — barrado no service;
+  o CHECK do banco barra apenas autorreferência direta);
 - tela de revisão do checkout não detalha *qual* filho faltou (cai na revisão
   genérica de "item indisponível");
 - gating do módulo `combos` no **front** não existe — depende do painel de
   módulos (épico 14). A API já barra com `@RequireModule('combos')`.
-- Trocar `kind` de um combo que já tem itens deixa `combo_items` órfãos
-  (soft-deleted por consequência, não por ação) — tolerável até a 4.2 decidir
-  o comportamento.
+- Trocar `kind` de um combo que já tem itens preserva as linhas vivas de
+  `combo_items`; elas ficam ignoradas enquanto o pai não é combo e reaparecem
+  se o tipo voltar para `combo`. A 4.2 precisa decidir se bloqueia a troca,
+  exige confirmação com soft-delete explícito, ou preserva isso de propósito.
 
 ## Fase 4.2 — escopo (CLAUDE.md: "preço total fixo OU por complemento")
 
@@ -93,9 +97,10 @@ tem três eixos independentes, e cada um pode virar uma fatia própria
 
 - Hoje o preço do combo é `ProductOffer.priceCents` (fixo). Adicionar um modo
   onde o preço = soma da oferta primária de cada filho × `quantity`.
-- Decisão de modelagem em aberto: flag `combo_pricing` (`fixed` | `sum`) em
-  `Product` ou em `combo_items`? Interação com `ProductOffer.priceCents` do
-  combo (ignora? vira piso?).
+- Decisão de modelagem em aberto: `combo_pricing` (`fixed` | `sum`) pertence a
+  `Product` se o modo for global, ou a `ProductOffer` se cada apresentação
+  comercial puder escolher. `ComboItem` só deve guardar dados por filho, como
+  contribuição, inclusão ou taxa, não a flag agregada do combo.
 - Checkout: no modo `sum`, o preço do combo **depende** do preço dos filhos —
   a revalidação passa a comparar preço de filho, não só disponibilidade
   (regra 14: preço subiu = tela de revisão). O lock dos filhos já existe.

@@ -114,9 +114,9 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
     this.lockOffersForUpdateCalls.push(items.map((item) => ({ ...item })));
   }
   comboChildProductIds: string[] = [];
-  findComboChildProductIdsCalls: string[][] = [];
-  async findComboChildProductIds(comboProductIds: readonly string[]) {
-    this.findComboChildProductIdsCalls.push([...comboProductIds]);
+  lockComboItemsForUpdateCalls: string[][] = [];
+  async lockComboItemsForUpdate(comboProductIds: readonly string[]) {
+    this.lockComboItemsForUpdateCalls.push([...comboProductIds]);
     return this.comboChildProductIds;
   }
   claimCouponResult: { couponId: string; couponCodeSnapshot: string } | null = { couponId: 'coupon-1', couponCodeSnapshot: 'PROMO10' };
@@ -236,12 +236,17 @@ describe('CheckoutOrderService.createOrder', () => {
     expect(repo.createOrderCalls).toHaveLength(0);
   });
 
-  it('6) trava produto e oferta ANTES de revalidar — fecha a janela de corrida em preço/disponibilidade', async () => {
+  it('6) trava produto, composição de combo e oferta ANTES de revalidar — fecha corrida em dinheiro/disponibilidade', async () => {
     const { repo, revalidationService, service } = setup();
     const ordem: string[] = [];
     repo.lockProductsForUpdate = async (productIds: readonly string[]) => {
-      ordem.push('lock-product');
+      ordem.push(`lock-product:${productIds.join(',') || 'empty'}`);
       repo.lockProductsForUpdateCalls.push([...productIds]);
+    };
+    repo.lockComboItemsForUpdate = async (comboProductIds: readonly string[]) => {
+      ordem.push('lock-combo-items');
+      repo.lockComboItemsForUpdateCalls.push([...comboProductIds]);
+      return repo.comboChildProductIds;
     };
     repo.lockOffersForUpdate = async (items) => {
       ordem.push('lock-offer');
@@ -259,7 +264,7 @@ describe('CheckoutOrderService.createOrder', () => {
 
     await service.createOrder('tenant-1', 'customer-1', requestComItemRepetido, RESOLVED);
 
-    expect(ordem).toEqual(['lock-product', 'lock-offer', 'revalidate']);
+    expect(ordem).toEqual(['lock-product:product-1', 'lock-combo-items', 'lock-offer', 'revalidate']);
     expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']); // dedup — 2 linhas, 1 produto só
     expect(repo.lockOffersForUpdateCalls[0]).toHaveLength(2);
   });
@@ -270,8 +275,9 @@ describe('CheckoutOrderService.createOrder', () => {
 
     await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
 
-    expect(repo.findComboChildProductIdsCalls[0]).toEqual(['product-1']);
-    expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1', 'child-a', 'child-b']);
+    expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']);
+    expect(repo.lockComboItemsForUpdateCalls[0]).toEqual(['product-1']);
+    expect(repo.lockProductsForUpdateCalls[1]).toEqual(['child-a', 'child-b']);
     // 1 item do request + as ofertas principais dos 2 filhos
     const lockedOffers = repo.lockOffersForUpdateCalls[0]!;
     expect(lockedOffers).toHaveLength(3);

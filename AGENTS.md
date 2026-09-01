@@ -53,7 +53,9 @@ A `apps/api` (NestJS) é um **processo Node de vida longa** — não roda server
 
 **Dentro:** cardápio · importação CSV/XLSX · storefront (menu, carrinho, bottom sheets) · endereços com zonas de entrega (polígonos) · horários e pedido mínimo · checkout com **PIX estático** (confirmação manual) · gestor de pedidos realtime com push/som/fila offline · impressão ESC/POS com wizard · **WhatsApp click-to-chat** · página de acompanhamento · onboarding self-service · **4 templates de tema** · **assinatura e billing** (trial 7 dias, dunning) · super-admin.
 
-**Fora do MVP** (módulos DESLIGADOS, não implementar): cupons, fidelidade, promoções, combos, cartão online, KDS, PDV, caixa, garçom, motoboy, iFood, NFC-e, campanhas, franquias. Fases 2–4.
+**Fora do MVP** (módulos DESLIGADOS, não implementar): cupons, fidelidade, promoções, cartão online, KDS, PDV, caixa, garçom, motoboy, iFood, NFC-e, campanhas, franquias. Fases 2–4.
+
+**EXCEÇÃO decidida em 2026-08-28 (aprovação explícita do PM):** **combos entra no MVP**, fora de ordem — pedido direto do PM pra aproximar o cadastro de cardápio da experiência do novo cardápio iFood (`docs/12-plano-pre-lancamento.md` tem o link de referência). Sequência combinada: (1) código PDV + pausar grupo de complemento + aba "Complementos" própria no gestor — aditivo, sem risco de checkout; (2) grupos de complemento REUTILIZÁVEIS entre produtos (hoje `ModifierGroup.productId` é 1:1 — vira N:N via tabela de junção, produto passa a linkar grupos existentes em vez de recriar); (3) `Product.kind` (`prepared`/`industrialized`/`combo`); (4) combo de verdade — item que agrupa outros produtos do catálogo, preço total fixo OU por complemento ("a partir de"), com personalização opcional (adicionar/remover item do combo, taxa extra). Cada fase é commit+gate+deploy separado — não dá pra fazer de uma vez sem risco de quebrar checkout (order snapshot depende de `ModifierGroup`/`Modifier` hoje).
 
 ## Regras críticas (não-negociáveis)
 

@@ -13,6 +13,8 @@ import type {
  * - o "pai" tem que ser um `Product` com `kind = 'combo'` (fase 3);
  * - o filho tem que existir e NÃO pode ser outro combo (sem aninhamento);
  * - filho ≠ pai (o CHECK do banco também barra, isto é só pro 400 legível).
+ *   Combo aninhado é validação somente da aplicação em 4.1; CHECK comum não
+ *   consulta `Product.kind` de outra linha.
  * Preço "a partir de", modificador de filho e combo aninhado ficam pra 4.2.
  */
 export class ComboItemService {

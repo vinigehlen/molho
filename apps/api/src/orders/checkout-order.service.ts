@@ -158,12 +158,15 @@ export class CheckoutOrderService {
     // horário/mínimo continuam sob READ COMMITTED normal, de propósito
     // (débito documentado: baixa mutabilidade, consequência tolerável).
     const requestedProductIds = [...new Set(request.items.map((item) => item.productId))];
-    // Combo (fase 4.1b): trava também os produtos-filho e as ofertas
-    // principais deles — a disponibilidade do filho decide a do combo na
-    // revalidação, então precisa ficar estável pela mesma janela.
-    const comboChildProductIds = await this.repo.findComboChildProductIds(requestedProductIds);
-    const productIds = [...new Set([...requestedProductIds, ...comboChildProductIds])];
-    await this.repo.lockProductsForUpdate(productIds);
+    await this.repo.lockProductsForUpdate(requestedProductIds);
+    // Combo (fase 4.1b, corrigido antes da 4.2): o pai travado faz INSERT em
+    // `combo_items` esperar via FK; travar as linhas vivas da composição
+    // serializa quantidade e soft-delete já existentes. Só depois disso os
+    // filhos e suas ofertas entram no conjunto estável da revalidação.
+    const comboChildProductIds = await this.repo.lockComboItemsForUpdate(requestedProductIds);
+    if (comboChildProductIds.length > 0) {
+      await this.repo.lockProductsForUpdate(comboChildProductIds);
+    }
     await this.repo.lockOffersForUpdate([
       ...request.items,
       ...comboChildProductIds.map((productId) => ({ productId })),

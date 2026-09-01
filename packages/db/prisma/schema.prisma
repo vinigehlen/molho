@@ -618,7 +618,8 @@ model ComboItem {
   // FKs compostas (combo_product_id, tenant_id) e (child_product_id,
   // tenant_id) → products(id, tenant_id) na migration. Único parcial
   // (combo_product_id, child_product_id) WHERE deleted_at IS NULL e CHECK
-  // combo_product_id <> child_product_id também na migration.
+  // combo_product_id <> child_product_id também na migration. Esse CHECK
+  // barra só autorreferência direta; combo aninhado é validação da aplicação.
   @@index([tenantId, comboProductId, sortOrder])
   @@index([tenantId, childProductId])
   @@map("combo_items")

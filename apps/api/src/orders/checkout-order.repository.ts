@@ -113,11 +113,13 @@ export interface CheckoutOrderRepository {
     items: readonly { productId: string; offerId?: string }[],
   ): Promise<void>;
   /**
-   * Produtos-filho dos combos entre `comboProductIds` (fase 4.1b). Leitura
-   * SEM lock — só serve pra ampliar o conjunto que `lockProductsForUpdate`/
-   * `lockOffersForUpdate` vão travar, fechando a corrida de disponibilidade
-   * do filho igual à do combo. Vazio se nenhum dos ids é combo. */
-  findComboChildProductIds(comboProductIds: readonly string[]): Promise<string[]>;
+   * Trava as linhas vivas de `combo_items` dos pais já travados e devolve os
+   * produtos-filho. A ordem de checkout é: pai `products` FOR UPDATE →
+   * composição `combo_items` FOR UPDATE → filhos/ofertas FOR UPDATE. O lock
+   * do pai faz INSERT concorrente esperar via FK; este lock serializa
+   * update/soft-delete/quantity das linhas já existentes.
+   */
+  lockComboItemsForUpdate(comboProductIds: readonly string[]): Promise<string[]>;
   /**
    * Incremento ATÔMICO de `uses_count` (Épico conversão, C2, docs/handoff
    * A2) — `UPDATE ... WHERE uses_count < max_uses`, mesmo padrão do
@@ -193,7 +195,10 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
   async lockProductsForUpdate(productIds: readonly string[]): Promise<void> {
     if (productIds.length === 0) return;
     await this.requestContext.getClient().$queryRaw`
-      SELECT "id" FROM "products" WHERE "id" = ANY(${productIds}::uuid[]) AND "deleted_at" IS NULL FOR UPDATE
+      SELECT "id" FROM "products"
+      WHERE "id" = ANY(${productIds}::uuid[]) AND "deleted_at" IS NULL
+      ORDER BY "id"
+      FOR UPDATE
     `;
   }
 
@@ -217,18 +222,24 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     `;
   }
 
-  async findComboChildProductIds(comboProductIds: readonly string[]): Promise<string[]> {
+  async lockComboItemsForUpdate(comboProductIds: readonly string[]): Promise<string[]> {
     if (comboProductIds.length === 0) return [];
-    const rows = await this.requestContext.getClient().comboItem.findMany({
-      where: {
-        comboProductId: { in: [...comboProductIds] },
-        deletedAt: null,
-        comboProduct: { kind: 'combo', deletedAt: null },
-        childProduct: { deletedAt: null },
-      },
-      select: { childProductId: true },
-    });
-    return [...new Set(rows.map((row) => row.childProductId))];
+    const tenantId = this.requestContext.getTenantId();
+    const rows = await this.requestContext.getClient().$queryRaw<{ childProductId: string }[]>`
+      SELECT ci."child_product_id" AS "childProductId"
+      FROM "combo_items" ci
+      INNER JOIN "products" p
+        ON p."id" = ci."combo_product_id"
+       AND p."tenant_id" = ci."tenant_id"
+      WHERE ci."tenant_id" = ${tenantId}::uuid
+        AND ci."combo_product_id" = ANY(${comboProductIds}::uuid[])
+        AND ci."deleted_at" IS NULL
+        AND p."kind" = 'combo'
+        AND p."deleted_at" IS NULL
+      ORDER BY ci."combo_product_id", ci."sort_order", ci."id"
+      FOR UPDATE OF ci
+    `;
+    return [...new Set(rows.map((row) => row.childProductId))].sort();
   }
 
   async claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null> {

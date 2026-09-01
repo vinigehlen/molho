@@ -52,6 +52,7 @@ function extractCode(message: string): string {
 
 let app: INestApplication;
 let migratorPrisma: PrismaClient;
+let runtimePrisma: PrismaClient;
 let redis: Redis | null = null;
 
 const slug = `e2e-checkout-${Date.now()}`;
@@ -138,6 +139,7 @@ beforeAll(async () => {
   await app.init();
 
   migratorPrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL }) });
+  runtimePrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
   const tenant = await migratorPrisma.tenant.create({
     data: { slug, name: 'Checkout E2E', timezone: 'America/Sao_Paulo' },
@@ -228,29 +230,39 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (migratorPrisma) {
-    await migratorPrisma.orderItemModifier.deleteMany({ where: { tenantId } });
-    await migratorPrisma.orderItem.deleteMany({ where: { tenantId } });
-    await migratorPrisma.orderStatusHistory.deleteMany({ where: { tenantId } });
-    await migratorPrisma.order.deleteMany({ where: { tenantId } });
-    await migratorPrisma.address.deleteMany({ where: { tenantId } });
-    await migratorPrisma.$executeRaw`DELETE FROM delivery_zones WHERE tenant_id = ${tenantId}::uuid`;
-    await migratorPrisma.storeHours.deleteMany({ where: { tenantId } });
-    await migratorPrisma.modifier.deleteMany({ where: { tenantId } });
-    await migratorPrisma.productModifierGroup.deleteMany({ where: { tenantId } });
-    await migratorPrisma.modifierGroup.deleteMany({ where: { tenantId } });
-    await migratorPrisma.product.deleteMany({ where: { tenantId } });
-    await migratorPrisma.category.deleteMany({ where: { tenantId } });
-    await migratorPrisma.customer.deleteMany({ where: { tenantId } });
-    await migratorPrisma.store.deleteMany({ where: { tenantId } });
-    await migratorPrisma.tenantSetting.deleteMany({ where: { tenantId } });
-    await migratorPrisma.tenantEntitlement.deleteMany({ where: { tenantId } });
-    await migratorPrisma.tenant.delete({ where: { id: tenantId } }).catch(() => {});
+    const primaryTenantId = typeof tenantId === 'string' ? tenantId : null;
+    const secondaryTenantId = typeof otherTenantId === 'string' ? otherTenantId : null;
+    if (primaryTenantId) {
+      await migratorPrisma.orderItemComponent.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.orderItemModifier.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.orderItem.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.orderStatusHistory.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.order.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.address.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.$executeRaw`DELETE FROM delivery_zones WHERE tenant_id = ${primaryTenantId}::uuid`;
+      await migratorPrisma.storeHours.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.modifier.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.productModifierGroup.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.modifierGroup.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.comboItem.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.productOffer.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.product.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.category.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.customer.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.store.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.tenantSetting.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.tenantEntitlement.deleteMany({ where: { tenantId: primaryTenantId } });
+      await migratorPrisma.tenant.delete({ where: { id: primaryTenantId } }).catch(() => {});
+    }
 
-    await migratorPrisma.customer.deleteMany({ where: { tenantId: otherTenantId } });
-    await migratorPrisma.tenant.delete({ where: { id: otherTenantId } }).catch(() => {});
+    if (secondaryTenantId) {
+      await migratorPrisma.customer.deleteMany({ where: { tenantId: secondaryTenantId } });
+      await migratorPrisma.tenant.delete({ where: { id: secondaryTenantId } }).catch(() => {});
+    }
 
     await migratorPrisma.$disconnect();
   }
+  await runtimePrisma?.$disconnect();
   if (redis) {
     const keys = await redis.keys(`storefront:rl:${slug}:*`);
     if (keys.length) await redis.del(...keys);
@@ -461,6 +473,31 @@ describe('PrismaCheckoutOrderRepository.lockProductsForUpdate — corrida real n
     return new PrismaCheckoutOrderRepository(fakeRequestContext);
   }
 
+  async function setTenantRls(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+    await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function createComboLockFixture(label: string) {
+    const combo = await migratorPrisma.product.create({
+      data: { tenantId, categoryId, name: `Combo corrida ${label}`, basePriceCents: 1000, available: true, kind: 'combo' },
+    });
+    const childA = await migratorPrisma.product.create({
+      data: { tenantId, categoryId, name: `Filho A corrida ${label}`, basePriceCents: 400, available: true },
+    });
+    const childB = await migratorPrisma.product.create({
+      data: { tenantId, categoryId, name: `Filho B corrida ${label}`, basePriceCents: 500, available: true },
+    });
+    const item = await migratorPrisma.comboItem.create({
+      data: { tenantId, comboProductId: combo.id, childProductId: childA.id, quantity: 1 },
+    });
+    return { combo, childA, childB, item };
+  }
+
   it('transação B fica bloqueada em FOR UPDATE até A commitar, e então enxerga preço/disponibilidade JÁ ATUALIZADOS', async () => {
     const product = await migratorPrisma.product.create({
       data: { tenantId, categoryId, name: 'Produto da corrida', basePriceCents: 1000, available: true },
@@ -474,8 +511,7 @@ describe('PrismaCheckoutOrderRepository.lockProductsForUpdate — corrida real n
     let bUnblocked = false;
 
     const txA = migratorPrisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
-      await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
+      await setTenantRls(tx);
       await repositoryFor(tx).lockProductsForUpdate([product.id]);
       // Muda preço E disponibilidade DENTRO da transação, ainda sem commitar.
       await tx.product.update({ where: { id: product.id }, data: { basePriceCents: 5000, available: false } });
@@ -483,18 +519,17 @@ describe('PrismaCheckoutOrderRepository.lockProductsForUpdate — corrida real n
     });
 
     // Dá tempo real (round-trip Neon) pra A garantidamente já ter o lock antes de B tentar.
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await sleep(800);
 
     const txB = migratorPrisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
-      await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
+      await setTenantRls(tx);
       await repositoryFor(tx).lockProductsForUpdate([product.id]); // deve BLOQUEAR aqui até A liberar
       bUnblocked = true;
       return tx.product.findUniqueOrThrow({ where: { id: product.id } });
     });
 
     // Prova que B continua bloqueado enquanto A segura o lock.
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await sleep(1000);
     expect(bUnblocked).toBe(false);
 
     releaseA();
@@ -504,5 +539,126 @@ describe('PrismaCheckoutOrderRepository.lockProductsForUpdate — corrida real n
     expect(bUnblocked).toBe(true);
     expect(productSeenByB.basePriceCents).toBe(5000);
     expect(productSeenByB.available).toBe(false);
+  }, 20_000);
+
+  it('combo: INSERT de novo filho espera o lock do produto-pai via FK e não aparece na composição já travada', async () => {
+    const { combo, childA, childB } = await createComboLockFixture('insert');
+
+    let releaseA: () => void = () => {};
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let bUnblocked = false;
+
+    const txA = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const repo = repositoryFor(tx);
+      await repo.lockProductsForUpdate([combo.id]);
+      const lockedChildren = await repo.lockComboItemsForUpdate([combo.id]);
+      expect(lockedChildren).toEqual([childA.id]);
+      await heldUntilReleased;
+    });
+
+    await sleep(800);
+
+    const txB = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const inserted = await tx.comboItem.create({
+        data: { tenantId, comboProductId: combo.id, childProductId: childB.id, quantity: 1 },
+      });
+      bUnblocked = true;
+      return inserted;
+    });
+
+    await sleep(1000);
+    expect(bUnblocked).toBe(false);
+
+    releaseA();
+    await txA;
+    await txB;
+
+    expect(bUnblocked).toBe(true);
+  }, 20_000);
+
+  it('combo: alteração de quantity espera o lock da linha de combo_items', async () => {
+    const { combo, childA, item } = await createComboLockFixture('quantity');
+
+    let releaseA: () => void = () => {};
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let bUnblocked = false;
+
+    const txA = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const repo = repositoryFor(tx);
+      await repo.lockProductsForUpdate([combo.id]);
+      const lockedChildren = await repo.lockComboItemsForUpdate([combo.id]);
+      expect(lockedChildren).toEqual([childA.id]);
+      await heldUntilReleased;
+    });
+
+    await sleep(800);
+
+    const txB = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const updated = await tx.comboItem.update({
+        where: { id: item.id },
+        data: { quantity: 3, version: { increment: 1 } },
+      });
+      bUnblocked = true;
+      return updated;
+    });
+
+    await sleep(1000);
+    expect(bUnblocked).toBe(false);
+
+    releaseA();
+    await txA;
+    const updated = await txB;
+
+    expect(bUnblocked).toBe(true);
+    expect(updated.quantity).toBe(3);
+  }, 20_000);
+
+  it('combo: soft-delete de filho espera o lock da linha de combo_items', async () => {
+    const { combo, childA, item } = await createComboLockFixture('delete');
+
+    let releaseA: () => void = () => {};
+    const heldUntilReleased = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let bUnblocked = false;
+
+    const txA = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const repo = repositoryFor(tx);
+      await repo.lockProductsForUpdate([combo.id]);
+      const lockedChildren = await repo.lockComboItemsForUpdate([combo.id]);
+      expect(lockedChildren).toEqual([childA.id]);
+      await heldUntilReleased;
+    });
+
+    await sleep(800);
+
+    const txB = runtimePrisma.$transaction(async (tx) => {
+      await setTenantRls(tx);
+      const removed = await tx.comboItem.update({
+        where: { id: item.id },
+        data: { deletedAt: new Date('2026-09-01T12:00:00.000Z'), version: { increment: 1 } },
+      });
+      bUnblocked = true;
+      return removed;
+    });
+
+    await sleep(1000);
+    expect(bUnblocked).toBe(false);
+
+    releaseA();
+    await txA;
+    const removed = await txB;
+
+    expect(bUnblocked).toBe(true);
+    expect(removed.deletedAt).not.toBeNull();
   }, 20_000);
 });
