@@ -28,7 +28,9 @@ const PRODUCT: CheckoutOfferRecord = {
   name: 'X-Burger',
   basePriceCents: 2890,
   available: true,
+  productKind: 'prepared',
   modifiers: [{ id: 'mod-bacon', name: 'Bacon', priceDeltaCents: 500 }],
+  comboComponents: [],
 };
 
 const SECONDARY_OFFER: CheckoutOfferRecord = {
@@ -597,5 +599,68 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
     await service.revalidate(baseRequest({ scheduledFor: '2026-07-22T13:00:00.000Z' }), RESOLVED);
 
     expect(checkoutRepo.scheduledCounts).toHaveLength(0);
+  });
+
+  describe('combo (fase 4.1b)', () => {
+    const COMBO: CheckoutOfferRecord = {
+      id: 'offer-combo',
+      productId: 'product-combo',
+      isPrimary: true,
+      name: 'Combo Casal',
+      basePriceCents: 5990,
+      available: true,
+      productKind: 'combo',
+      modifiers: [],
+      comboComponents: [
+        { childProductId: 'child-xis', name: 'Xis', quantity: 2, available: true },
+        { childProductId: 'child-refri', name: 'Refri', quantity: 2, available: true },
+      ],
+    };
+    const comboRequest = () =>
+      baseRequest({
+        items: [{ productId: 'product-combo', unitBasePriceCents: 5990, modifiers: [], quantity: 1, notes: null }],
+      });
+
+    it('todos os filhos disponíveis: item disponível, preço fixo da oferta, comboComponents no snapshot', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [COMBO];
+
+      const result = await service.revalidate(comboRequest(), RESOLVED);
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        lineTotalCents: 5990,
+        priceChanged: false,
+        comboComponents: [
+          { childProductId: 'child-xis', name: 'Xis', quantity: 2 },
+          { childProductId: 'child-refri', name: 'Refri', quantity: 2 },
+        ],
+      });
+      expect(result.canSubmit).toBe(true);
+    });
+
+    it('um filho esgotado: combo inteiro indisponível, divergência desfavorável, sem comboComponents', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [
+        { ...COMBO, comboComponents: [{ ...COMBO.comboComponents[0]!, available: false }, COMBO.comboComponents[1]!] },
+      ];
+
+      const result = await service.revalidate(comboRequest(), RESOLVED);
+
+      expect(result.items[0]).toMatchObject({ available: false, lineTotalCents: 0 });
+      expect(result.items[0]!.comboComponents).toBeUndefined();
+      expect(result.hasUnfavorableDivergence).toBe(true);
+      expect(result.canSubmit).toBe(false);
+    });
+
+    it('combo sem nenhum filho vivo: indisponível', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [{ ...COMBO, comboComponents: [] }];
+
+      const result = await service.revalidate(comboRequest(), RESOLVED);
+
+      expect(result.items[0]).toMatchObject({ available: false });
+      expect(result.canSubmit).toBe(false);
+    });
   });
 });

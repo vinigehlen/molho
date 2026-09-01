@@ -157,9 +157,17 @@ export class CheckoutOrderService {
     // commitar ou abortar — o que lemos abaixo fica estável até lá. Zona/
     // horário/mínimo continuam sob READ COMMITTED normal, de propósito
     // (débito documentado: baixa mutabilidade, consequência tolerável).
-    const productIds = [...new Set(request.items.map((item) => item.productId))];
+    const requestedProductIds = [...new Set(request.items.map((item) => item.productId))];
+    // Combo (fase 4.1b): trava também os produtos-filho e as ofertas
+    // principais deles — a disponibilidade do filho decide a do combo na
+    // revalidação, então precisa ficar estável pela mesma janela.
+    const comboChildProductIds = await this.repo.findComboChildProductIds(requestedProductIds);
+    const productIds = [...new Set([...requestedProductIds, ...comboChildProductIds])];
     await this.repo.lockProductsForUpdate(productIds);
-    await this.repo.lockOffersForUpdate(request.items);
+    await this.repo.lockOffersForUpdate([
+      ...request.items,
+      ...comboChildProductIds.map((productId) => ({ productId })),
+    ]);
 
     // Nunca reaproveita o resultado de /checkout/revalidate — revalida de
     // novo aqui dentro, contra o estado FRESCO do banco (regra 14).

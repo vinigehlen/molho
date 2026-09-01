@@ -208,6 +208,16 @@ export const revalidatedItemSchema = z.strictObject({
   lineTotalCents: centsSchema,
   /** Preço (produto ou modificador) mudou desde o que o cliente mandou. */
   priceChanged: z.boolean(),
+  /**
+   * Composição do combo (exceção MVP 2026-08-28, fase 4.1b) — presente só
+   * quando o produto é `kind = 'combo'`. Snapshot de exibição/pedido; não
+   * entra em `lineTotalCents` (combo é preço fixo na fase 4.1). Um combo com
+   * qualquer filho indisponível volta como `available: false`, sem este
+   * campo.
+   */
+  comboComponents: z
+    .array(z.strictObject({ childProductId: z.uuid(), name: z.string(), quantity: z.int().positive() }))
+    .optional(),
 });
 
 export const revalidatedCheckoutSchema = z.strictObject({

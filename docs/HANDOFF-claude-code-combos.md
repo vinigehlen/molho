@@ -17,8 +17,8 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | 1 | ✅ mesclada | `2ef03c2` | `20260828230000_product_modifier_group_pdv_pause` |
 | 2 | ✅ mesclada | `23429fb` | `20260828233000_product_modifier_group_reuse` |
 | 3 | ✅ mesclada | PR #26 → `3155f33` | `20260831120000_product_kind_combo_fase3` |
-| 4.1a | 🔧 em revisão | esta branch | `20260831130000_combo_items_epico_combos_4a` |
-| 4.1b | ⬜ não iniciada | — | (checkout: cascata de disponibilidade + snapshot) |
+| 4.1a | ✅ mesclada | PR #29 → `a81f822` | `20260831130000_combo_items_epico_combos_4a` |
+| 4.1b | 🔧 em revisão | esta branch | `20260831140000_order_item_components_combo_4b` |
 | 4.2 | ⬜ não iniciada | — | (preço "a partir de", personalização, combo aninhado) |
 
 `main` sincronizada com `origin/main` após o merge da fase 3.
@@ -64,11 +64,12 @@ checkout: nenhuma coluna existente muda de tipo/semântica e o default
 
 ### Migrations pendentes de aplicação
 
-`20260831120000_product_kind_combo_fase3` (fase 3) e
-`20260831130000_combo_items_epico_combos_4a` (fase 4.1a) **ainda não foram
+`20260831120000_product_kind_combo_fase3` (fase 3),
+`20260831130000_combo_items_epico_combos_4a` (4.1a) e
+`20260831140000_order_item_components_combo_4b` (4.1b) **ainda não foram
 aplicadas em nenhum banco** — seguem o padrão das fases 1/2 (o `migrations/`
 local está atrás do banco dev real; aplicar via `db:migrate:deploy` ou no
-deploy da API). As duas são idempotentes e aditivas.
+deploy da API). Todas idempotentes e aditivas.
 
 ## Fase 4 — combo de verdade
 
@@ -110,13 +111,36 @@ Ceilings da 4.1a (`ponytail:`): sem combo aninhado, sem modificador de filho,
 sem preço "a partir de", sem gating de módulo no front. Trocar `kind` de um
 combo com itens deixa `combo_items` órfãos (soft) — tolerável até a 4.2.
 
-### 4.1b — checkout (não iniciada)
+### 4.1b — checkout (esta branch)
 
-- `combo_items` + ofertas dos filhos entram no `lockProductsForUpdate`;
-- revalidação: combo indisponível se qualquer filho sumiu/esgotou (regra 14);
-- tabela `order_item_components` + snapshot na criação do pedido;
-- storefront: composição do combo no payload público (opt-in `catalog=offers`),
-  card e bottom sheet, tela de revisão lista o que vem dentro.
+Combo entra no caminho de dinheiro. Preço continua fixo (o da oferta do
+combo) — os filhos só decidem disponibilidade e viram snapshot.
+
+- **schema**: `OrderItemComponent` + migration
+  `20260831140000_order_item_components_combo_4b` (append-only, RLS, FKs
+  compostas). Não entra em `lineTotalCents`.
+- **contratos**: `revalidatedItemSchema.comboComponents` (opcional, só em
+  combo disponível); `storefrontProductSchema.comboItems` (opcional, opt-in
+  `catalog=offers`).
+- **revalidação**: `findOffersForItems` carrega `kind` + os filhos com
+  disponibilidade resolvida (produto E oferta principal do filho). Combo com
+  qualquer filho indisponível — ou sem filho nenhum — volta `available:
+  false` → tela de revisão obrigatória (regra 14). Combo disponível carrega
+  `comboComponents` no item.
+- **lock**: `CheckoutOrderService` chama `findComboChildProductIds` antes de
+  travar e amplia `lockProductsForUpdate` + `lockOffersForUpdate` pros filhos
+  — a disponibilidade do filho fica estável pela mesma janela do combo.
+- **snapshot**: `createOrderItems` grava `order_item_components` a partir de
+  `item.comboComponents`.
+- **storefront**: `comboItems` no payload público (só com `catalog=offers` e
+  só em `kind='combo'` com filhos); `MoProductSheet` mostra a seção "Vem
+  com" (exibição pura, sem seleção).
+
+Ceilings mantidos: preço fixo, sem modificador de filho, sem combo aninhado.
+Tela de revisão do checkout (`apps/storefront`) ainda não lista os
+componentes explicitamente — o item de combo indisponível já cai na revisão
+genérica de "item indisponível"; detalhar "qual filho faltou" fica pra um
+ajuste de UI posterior.
 
 ### 4.2 — não iniciada
 

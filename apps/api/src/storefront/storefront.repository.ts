@@ -58,6 +58,10 @@ export interface StorefrontProductRecord {
   images: { imageKey: string }[];
   available: boolean;
   modifierGroups: StorefrontModifierGroupRecord[];
+  /** `combo` (fase 3). Só o storefront novo (opt-in) lê isto. */
+  kind: 'prepared' | 'industrialized' | 'combo';
+  /** Filhos do combo (fase 4.1b) — vazio em produto não-combo. */
+  comboItems: { name: string; quantity: number }[];
 }
 
 export interface StorefrontCategoryRecord {
@@ -159,11 +163,20 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
                 id: true,
                 name: true,
                 description: true,
+                kind: true,
                 imageKey: true,
                 images: {
                   where: { deletedAt: null },
                   orderBy: { position: 'asc' },
                   select: { imageKey: true },
+                },
+                // Composição do combo (fase 4.1b) — exibição pura. Filho
+                // esgotado/removido não some da lista aqui; quem barra o
+                // pedido é a revalidação do checkout.
+                comboItems: {
+                  where: { deletedAt: null, childProduct: { deletedAt: null } },
+                  orderBy: { sortOrder: 'asc' },
+                  select: { quantity: true, childProduct: { select: { name: true } } },
                 },
                 // Reuso (exceção MVP 2026-08-28, fase 2/4): "grupos deste
                 // produto" é sempre o VÍNCULO (product_modifier_groups).
@@ -212,6 +225,11 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
         images: offer.product.images,
         available: offer.available,
         modifierGroups: offer.product.productModifierGroups.map((link) => link.modifierGroup),
+        kind: offer.product.kind,
+        comboItems: offer.product.comboItems.map((item) => ({
+          name: item.childProduct.name,
+          quantity: item.quantity,
+        })),
       })),
     }));
   }

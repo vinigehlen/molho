@@ -113,6 +113,12 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   async lockOffersForUpdate(items: readonly { productId: string; offerId?: string }[]) {
     this.lockOffersForUpdateCalls.push(items.map((item) => ({ ...item })));
   }
+  comboChildProductIds: string[] = [];
+  findComboChildProductIdsCalls: string[][] = [];
+  async findComboChildProductIds(comboProductIds: readonly string[]) {
+    this.findComboChildProductIdsCalls.push([...comboProductIds]);
+    return this.comboChildProductIds;
+  }
   claimCouponResult: { couponId: string; couponCodeSnapshot: string } | null = { couponId: 'coupon-1', couponCodeSnapshot: 'PROMO10' };
   claimCouponCalls: string[] = [];
   async claimCoupon(code: string) {
@@ -256,6 +262,21 @@ describe('CheckoutOrderService.createOrder', () => {
     expect(ordem).toEqual(['lock-product', 'lock-offer', 'revalidate']);
     expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']); // dedup — 2 linhas, 1 produto só
     expect(repo.lockOffersForUpdateCalls[0]).toHaveLength(2);
+  });
+
+  it('4b) combo (fase 4.1b): trava também os produtos-filho e as ofertas deles antes de revalidar', async () => {
+    const { repo, service } = setup();
+    repo.comboChildProductIds = ['child-a', 'child-b'];
+
+    await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(repo.findComboChildProductIdsCalls[0]).toEqual(['product-1']);
+    expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1', 'child-a', 'child-b']);
+    // 1 item do request + as ofertas principais dos 2 filhos
+    const lockedOffers = repo.lockOffersForUpdateCalls[0]!;
+    expect(lockedOffers).toHaveLength(3);
+    expect(lockedOffers).toContainEqual({ productId: 'child-a' });
+    expect(lockedOffers).toContainEqual({ productId: 'child-b' });
   });
 
   it('5) caminho feliz (pix): cria endereço, pedido, itens, grava order_status_history e devolve o QR', async () => {

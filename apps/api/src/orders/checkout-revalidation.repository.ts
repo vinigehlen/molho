@@ -18,6 +18,16 @@ export interface CheckoutModifierRecord {
   priceDeltaCents: number;
 }
 
+/** Um filho de combo, já com a disponibilidade resolvida (produto + oferta
+ * principal). Só preenchido quando `CheckoutOfferRecord.productKind === 'combo'`. */
+export interface CheckoutComboComponentRecord {
+  childProductId: string;
+  name: string;
+  quantity: number;
+  /** `childProduct.available` E oferta principal do filho disponível. */
+  available: boolean;
+}
+
 export interface CheckoutOfferRecord {
   id: string;
   productId: string;
@@ -25,6 +35,8 @@ export interface CheckoutOfferRecord {
   name: string;
   basePriceCents: number;
   available: boolean;
+  /** Natureza do produto (fase 3). `combo` liga a cascata de disponibilidade. */
+  productKind: 'prepared' | 'industrialized' | 'combo';
   /**
    * Achatado de todos os grupos do produto — o checkout confere apenas
    * "este modificador pertence a este produto e este é o preço dele agora",
@@ -35,6 +47,8 @@ export interface CheckoutOfferRecord {
    * pontos pedidos pro Épico 7.
    */
   modifiers: CheckoutModifierRecord[];
+  /** Filhos do combo (fase 4.1b). Vazio em produto não-combo. */
+  comboComponents: CheckoutComboComponentRecord[];
 }
 
 /** Recorte de Coupon que o checkout precisa pra decidir aplicabilidade (Épico conversão, C2) — nunca o Coupon inteiro. */
@@ -128,6 +142,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         product: {
           select: {
             name: true,
+            kind: true,
             // A allowlist de modificadores continua na identidade do
             // produto; todas as apresentações compartilham a composição.
             productModifierGroups: {
@@ -138,6 +153,26 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
                     modifiers: {
                       where: { deletedAt: null, active: true },
                       select: { id: true, name: true, priceDeltaCents: true },
+                    },
+                  },
+                },
+              },
+            },
+            // Filhos do combo (fase 4.1b) — disponibilidade do filho =
+            // produto disponível E oferta principal do filho disponível.
+            comboItems: {
+              where: { deletedAt: null, childProduct: { deletedAt: null } },
+              orderBy: { sortOrder: 'asc' },
+              select: {
+                quantity: true,
+                childProductId: true,
+                childProduct: {
+                  select: {
+                    name: true,
+                    available: true,
+                    offers: {
+                      where: { isPrimary: true, deletedAt: null },
+                      select: { available: true },
                     },
                   },
                 },
@@ -154,9 +189,16 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       name: row.product.name,
       basePriceCents: row.priceCents,
       available: row.available,
+      productKind: row.product.kind,
       modifiers: row.product.productModifierGroups.flatMap(
         (link) => link.modifierGroup.modifiers,
       ),
+      comboComponents: row.product.comboItems.map((item) => ({
+        childProductId: item.childProductId,
+        name: item.childProduct.name,
+        quantity: item.quantity,
+        available: item.childProduct.available && item.childProduct.offers[0]?.available === true,
+      })),
     }));
   }
 

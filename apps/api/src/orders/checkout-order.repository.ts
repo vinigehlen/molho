@@ -113,6 +113,12 @@ export interface CheckoutOrderRepository {
     items: readonly { productId: string; offerId?: string }[],
   ): Promise<void>;
   /**
+   * Produtos-filho dos combos entre `comboProductIds` (fase 4.1b). Leitura
+   * SEM lock — só serve pra ampliar o conjunto que `lockProductsForUpdate`/
+   * `lockOffersForUpdate` vão travar, fechando a corrida de disponibilidade
+   * do filho igual à do combo. Vazio se nenhum dos ids é combo. */
+  findComboChildProductIds(comboProductIds: readonly string[]): Promise<string[]>;
+  /**
    * Incremento ATÔMICO de `uses_count` (Épico conversão, C2, docs/handoff
    * A2) — `UPDATE ... WHERE uses_count < max_uses`, mesmo padrão do
    * optimistic lock de zona (P1.2). `null` = perdeu a corrida (outro pedido
@@ -209,6 +215,20 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       ORDER BY "id"
       FOR UPDATE
     `;
+  }
+
+  async findComboChildProductIds(comboProductIds: readonly string[]): Promise<string[]> {
+    if (comboProductIds.length === 0) return [];
+    const rows = await this.requestContext.getClient().comboItem.findMany({
+      where: {
+        comboProductId: { in: [...comboProductIds] },
+        deletedAt: null,
+        comboProduct: { kind: 'combo', deletedAt: null },
+        childProduct: { deletedAt: null },
+      },
+      select: { childProductId: true },
+    });
+    return [...new Set(rows.map((row) => row.childProductId))];
   }
 
   async claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null> {
@@ -348,16 +368,30 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         },
         select: { id: true },
       });
-      if (item.modifiers.length === 0) continue;
-      await client.orderItemModifier.createMany({
-        data: item.modifiers.map((modifier) => ({
-          tenantId,
-          orderItemId: createdItem.id,
-          modifierId: modifier.modifierId,
-          name: modifier.name,
-          priceDeltaCents: modifier.priceDeltaCents,
-        })),
-      });
+      if (item.modifiers.length > 0) {
+        await client.orderItemModifier.createMany({
+          data: item.modifiers.map((modifier) => ({
+            tenantId,
+            orderItemId: createdItem.id,
+            modifierId: modifier.modifierId,
+            name: modifier.name,
+            priceDeltaCents: modifier.priceDeltaCents,
+          })),
+        });
+      }
+      // Combo (fase 4.1b) — snapshot dos filhos. Só existe em item de combo;
+      // não afeta lineTotalCents (preço fixo).
+      if (item.comboComponents && item.comboComponents.length > 0) {
+        await client.orderItemComponent.createMany({
+          data: item.comboComponents.map((component) => ({
+            tenantId,
+            orderItemId: createdItem.id,
+            childProductId: component.childProductId,
+            name: component.name,
+            quantity: component.quantity,
+          })),
+        });
+      }
     }
   }
 }

@@ -150,6 +150,7 @@ model Tenant {
   modifierGroups        ModifierGroup[]
   productModifierGroups ProductModifierGroup[]
   comboItems            ComboItem[]
+  orderItemComponents   OrderItemComponent[]
   modifiers             Modifier[]
   addresses             Address[]
   deliveryZones         DeliveryZone[]
@@ -456,6 +457,8 @@ model Product {
   comboItems            ComboItem[]            @relation("ComboParent")
   /// Combos que INCLUEM este produto como filho.
   comboMemberships      ComboItem[]            @relation("ComboChild")
+  /// Linhas de pedido onde este produto entrou como componente de um combo.
+  orderItemComponents   OrderItemComponent[]   @relation("OrderItemComponentChild")
 
   // FK composta (category_id, tenant_id) → categories(id, tenant_id) vive na
   // migration SQL — Prisma não expressa FK composta parcial no DSL a partir
@@ -1123,16 +1126,46 @@ model OrderItem {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order       Order               @relation(fields: [orderId], references: [id])
-  product     Product             @relation(fields: [productId], references: [id])
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order       Order                @relation(fields: [orderId], references: [id])
+  product     Product              @relation(fields: [productId], references: [id])
   modifiers   OrderItemModifier[]
+  components  OrderItemComponent[]
   adjustments OrderAdjustment[]
 
   // FKs compostas (order_id, tenant_id) → orders(id, tenant_id) e
   // (product_id, tenant_id) → products(id, tenant_id) na migration.
   @@index([tenantId, orderId])
   @@map("order_items")
+}
+
+/// Filhos de um combo, congelados no pedido (exceção MVP 2026-08-28,
+/// CLAUDE.md — fase 4/4, fatia 4.1b). Append-only, mesmo tratamento de
+/// OrderItemModifier: o combo vira UM `order_item` (preço fixo da oferta) e
+/// esta tabela guarda o que veio dentro, só como snapshot — não entra no
+/// cálculo de `lineTotalCents` (preço fixo, fase 4.1). O `order_item` pai só
+/// tem componentes quando o produto era `kind = 'combo'`.
+model OrderItemComponent {
+  id          String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  orderItemId String @map("order_item_id") @db.Uuid
+  /// Produto-filho — nunca hard-deletado, FK sempre válida.
+  childProductId String @map("child_product_id") @db.Uuid
+
+  /// Snapshot do nome do filho no momento do pedido.
+  name     String
+  quantity Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem @relation(fields: [orderItemId], references: [id])
+  childProduct Product   @relation("OrderItemComponentChild", fields: [childProductId], references: [id])
+
+  // FKs compostas (order_item_id, tenant_id) → order_items(id, tenant_id) e
+  // (child_product_id, tenant_id) → products(id, tenant_id) na migration.
+  @@index([tenantId, orderItemId])
+  @@map("order_item_components")
 }
 
 /// Append-only, mesmo tratamento de OrderItem.

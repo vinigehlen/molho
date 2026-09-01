@@ -97,6 +97,26 @@ export class CheckoutRevalidationService {
         );
       }
 
+      // Combo (fase 4.1b): preço FIXO (o da oferta do combo) — os filhos só
+      // entram como composição. Combo fica indisponível (regra 14: tela de
+      // revisão, não toast) se perdeu qualquer filho ou algum filho esgotou
+      // — o cliente não recebe "meio combo".
+      let comboComponents: RevalidatedItem['comboComponents'];
+      if (validOffer.productKind === 'combo') {
+        if (
+          validOffer.comboComponents.length === 0 ||
+          validOffer.comboComponents.some((component) => !component.available)
+        ) {
+          hasUnfavorableDivergence = true;
+          return unavailableItem(input, validOffer.name, validOffer.basePriceCents);
+        }
+        comboComponents = validOffer.comboComponents.map((component) => ({
+          childProductId: component.childProductId,
+          name: component.name,
+          quantity: component.quantity,
+        }));
+      }
+
       const modifierById = new Map(validOffer.modifiers.map((modifier) => [modifier.id, modifier]));
       const resolvedModifiers: RevalidatedItem['modifiers'] = [];
       for (const inputModifier of input.modifiers) {
@@ -127,6 +147,7 @@ export class CheckoutRevalidationService {
         notes: input.notes,
         lineTotalCents: unitCents * input.quantity,
         priceChanged,
+        ...(comboComponents ? { comboComponents } : {}),
       };
     });
 
