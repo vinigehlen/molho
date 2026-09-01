@@ -10,6 +10,11 @@ describe('contrato de ComboItem (combo fase 4.1a)', () => {
     expect(createComboItemSchema.parse(base).quantity).toBe(1);
   });
 
+  it('removable default false e aceita true explícito', () => {
+    expect(createComboItemSchema.parse(base).removable).toBe(false);
+    expect(createComboItemSchema.parse({ ...base, removable: true }).removable).toBe(true);
+  });
+
   it('rejeita quantidade zero ou negativa', () => {
     expect(createComboItemSchema.safeParse({ ...base, quantity: 0 }).success).toBe(false);
     expect(createComboItemSchema.safeParse({ ...base, quantity: -2 }).success).toBe(false);
@@ -22,6 +27,10 @@ describe('contrato de ComboItem (combo fase 4.1a)', () => {
 
   it('update exige version e aceita campos parciais', () => {
     expect(updateComboItemSchema.safeParse({ quantity: 2 }).success).toBe(false);
-    expect(updateComboItemSchema.parse({ version: 0, quantity: 2 })).toEqual({ version: 0, quantity: 2 });
+    expect(updateComboItemSchema.parse({ version: 0, quantity: 2, removable: true })).toEqual({
+      version: 0,
+      quantity: 2,
+      removable: true,
+    });
   });
 });

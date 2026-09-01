@@ -21,9 +21,16 @@ export interface MoProductSheetProduct {
   description?: string | null;
   imageUrl?: string | null;
   basePriceCents: number;
+  comboPricingMode?: 'fixed' | 'sum_of_items';
   modifierGroups: MoProductSheetModifierGroup[];
-  /** Combo: o que vem dentro. Exibição pura — o preço já vem consolidado em `basePriceCents`. */
-  comboItems?: { name: string; quantity: number }[];
+  /** Combo: o que vem dentro. O preço já vem consolidado em `basePriceCents`. */
+  comboItems?: {
+    childProductId: string;
+    name: string;
+    quantity: number;
+    removable: boolean;
+    unitBasePriceCents?: number | null;
+  }[];
 }
 
 export interface MoProductSheetSelectedModifier {
@@ -37,6 +44,10 @@ export interface MoProductSheetSelection {
   quantity: number;
   notes: string | null;
   modifiers: MoProductSheetSelectedModifier[];
+  /** Base unitária efetiva depois de remoções de combo permitidas. */
+  unitBasePriceCents: number;
+  /** Filhos de combo que o cliente pediu para tirar. */
+  removedChildIds?: string[];
   /** (base + soma dos deltas) × quantidade — o mesmo número já exibido no botão. */
   totalCents: number;
 }
@@ -84,6 +95,7 @@ function MoProductSheetInner({
   const [quantidade, setQuantidade] = React.useState(1);
   const [observacoes, setObservacoes] = React.useState('');
   const [selecoes, setSelecoes] = React.useState<Record<string, string[]>>({});
+  const [removedChildIds, setRemovedChildIds] = React.useState<string[]>([]);
   const observacoesId = React.useId();
 
   const grupoIncompleto = product.modifierGroups.some(
@@ -99,7 +111,19 @@ function MoProductSheetInner({
       ),
     0,
   );
-  const totalCents = (product.basePriceCents + deltaSelecionado) * quantidade;
+  const removedChildIdSet = new Set(removedChildIds);
+  const removedComboDiscountCents =
+    product.comboPricingMode === 'sum_of_items'
+      ? (product.comboItems ?? []).reduce(
+          (sum, item) =>
+            item.removable && removedChildIdSet.has(item.childProductId)
+              ? sum + (item.unitBasePriceCents ?? 0) * item.quantity
+              : sum,
+          0,
+        )
+      : 0;
+  const unitBasePriceCents = Math.max(0, product.basePriceCents - removedComboDiscountCents);
+  const totalCents = (unitBasePriceCents + deltaSelecionado) * quantidade;
 
   function handleAdicionar() {
     const modifiers: MoProductSheetSelectedModifier[] = product.modifierGroups.flatMap((grupo) =>
@@ -118,8 +142,20 @@ function MoProductSheetInner({
       quantity: quantidade,
       notes: observacoes.trim() ? observacoes.trim() : null,
       modifiers,
+      unitBasePriceCents,
+      ...(removedChildIds.length > 0 ? { removedChildIds } : {}),
       totalCents,
     });
+  }
+
+  function toggleComboChild(childProductId: string, checked: boolean) {
+    setRemovedChildIds((current) =>
+      checked
+        ? current.includes(childProductId)
+          ? current
+          : [...current, childProductId]
+        : current.filter((id) => id !== childProductId),
+    );
   }
 
   return (
@@ -150,11 +186,28 @@ function MoProductSheetInner({
       {product.comboItems && product.comboItems.length > 0 ? (
         <div className="mb-6 rounded-[14px] border border-border p-4">
           <p className="mb-2 text-body-strong text-text">Vem com</p>
-          <ul className="flex flex-col gap-1 text-body text-text-muted">
+          <ul className="flex flex-col gap-2 text-body text-text-muted">
             {product.comboItems.map((item, index) => (
-              <li key={`${item.name}-${index}`}>
-                {item.quantity > 1 ? `${item.quantity}× ` : ''}
-                {item.name}
+              <li key={item.childProductId || `${item.name}-${index}`}>
+                {item.removable ? (
+                  <label className="flex min-h-11 items-center gap-3 rounded-[10px] px-2 py-1 transition-colors hover:bg-bg">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 rounded border-border-strong accent-[var(--brand)]"
+                      checked={removedChildIdSet.has(item.childProductId)}
+                      onChange={(event) => toggleComboChild(item.childProductId, event.target.checked)}
+                    />
+                    <span className={removedChildIdSet.has(item.childProductId) ? 'line-through' : undefined}>
+                      {item.quantity > 1 ? `${item.quantity}× ` : ''}
+                      {item.name}
+                    </span>
+                  </label>
+                ) : (
+                  <>
+                    {item.quantity > 1 ? `${item.quantity}× ` : ''}
+                    {item.name}
+                  </>
+                )}
               </li>
             ))}
           </ul>

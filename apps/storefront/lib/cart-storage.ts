@@ -43,6 +43,7 @@ export const cartItemSchema = z.object({
   description: z.string().nullable(),
   imageUrl: z.url().nullable(),
   unitBasePriceCents: centsSchema,
+  removedChildIds: z.array(z.uuid()).optional(),
   modifiers: z.array(cartModifierSchema),
   quantity: z.int().positive(),
   notes: z.string().max(280).nullable(),

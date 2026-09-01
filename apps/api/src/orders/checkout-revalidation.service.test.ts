@@ -614,8 +614,8 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
       productKind: 'combo',
       modifiers: [],
       comboComponents: [
-        { childProductId: 'child-xis', name: 'Xis', quantity: 2, unitBasePriceCents: 2490, available: true },
-        { childProductId: 'child-refri', name: 'Refri', quantity: 2, unitBasePriceCents: 500, available: true },
+        { childProductId: 'child-xis', name: 'Xis', quantity: 2, removable: false, unitBasePriceCents: 2490, available: true },
+        { childProductId: 'child-refri', name: 'Refri', quantity: 2, removable: true, unitBasePriceCents: 500, available: true },
       ],
     };
     const comboRequest = () =>
@@ -635,7 +635,7 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
         priceChanged: false,
         comboComponents: [
           { childProductId: 'child-xis', name: 'Xis', quantity: 2 },
-          { childProductId: 'child-refri', name: 'Refri', quantity: 2 },
+          { childProductId: 'child-refri', name: 'Refri', quantity: 2, removable: true, removed: false },
         ],
       });
       expect(result.canSubmit).toBe(true);
@@ -706,6 +706,121 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
         priceChanged: true,
       });
       expect(result.hasUnfavorableDivergence).toBe(true);
+    });
+
+    it('fixed: remoção permitida marca componente removido sem abater preço', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [COMBO];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [
+            {
+              productId: 'product-combo',
+              removedChildIds: ['child-refri'],
+              unitBasePriceCents: 5990,
+              modifiers: [],
+              quantity: 1,
+              notes: null,
+            },
+          ],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        unitBasePriceCents: 5990,
+        lineTotalCents: 5990,
+        priceChanged: false,
+        comboComponents: [
+          { childProductId: 'child-xis', removed: false },
+          { childProductId: 'child-refri', removed: true },
+        ],
+      });
+      expect(result.hasUnfavorableDivergence).toBe(false);
+    });
+
+    it('sum_of_items: remoção permitida abate o preço do filho removido', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [{ ...COMBO, comboPricingMode: 'sum_of_items' }];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [
+            {
+              productId: 'product-combo',
+              removedChildIds: ['child-refri'],
+              unitBasePriceCents: 4980,
+              modifiers: [],
+              quantity: 1,
+              notes: null,
+            },
+          ],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        unitBasePriceCents: 4980,
+        lineTotalCents: 4980,
+        priceChanged: false,
+        comboComponents: [
+          { childProductId: 'child-xis', removed: false, unitBasePriceCents: 2490 },
+          { childProductId: 'child-refri', removed: true, unitBasePriceCents: 500 },
+        ],
+      });
+      expect(result.hasUnfavorableDivergence).toBe(false);
+    });
+
+    it('remoção pedida para filho não removível vira divergência desfavorável e não remove', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [COMBO];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [
+            {
+              productId: 'product-combo',
+              removedChildIds: ['child-xis'],
+              unitBasePriceCents: 5990,
+              modifiers: [],
+              quantity: 1,
+              notes: null,
+            },
+          ],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.items[0]?.comboComponents?.[0]).toMatchObject({ childProductId: 'child-xis', removed: false });
+      expect(result.hasUnfavorableDivergence).toBe(true);
+      expect(result.canSubmit).toBe(true);
+    });
+
+    it('remoção pedida para filho que não existe mais vira divergência desfavorável', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [COMBO];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [
+            {
+              productId: 'product-combo',
+              removedChildIds: ['child-sumiu'],
+              unitBasePriceCents: 5990,
+              modifiers: [],
+              quantity: 1,
+              notes: null,
+            },
+          ],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.hasUnfavorableDivergence).toBe(true);
+      expect(result.canSubmit).toBe(true);
     });
   });
 });

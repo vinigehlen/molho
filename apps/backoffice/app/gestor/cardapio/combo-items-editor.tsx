@@ -102,6 +102,19 @@ export function ComboItemsEditor({ comboProductId, categories }: ComboItemsEdito
     }
   }
 
+  async function changeRemovable(item: ComboItem, removable: boolean) {
+    setBusy(item.id);
+    setError(null);
+    try {
+      const updated = await updateComboItem(item, { removable });
+      setItems((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a remoção do item.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeItem(item: ComboItem) {
     if (!window.confirm(`Remover "${item.childName}" do combo?`)) return;
     setBusy(item.id);
@@ -142,6 +155,16 @@ export function ComboItemsEditor({ comboProductId, categories }: ComboItemsEdito
                 className="flex items-center gap-2 rounded-[14px] border border-border bg-bg-card px-3 py-2"
               >
                 <span className="flex-1 text-sm font-semibold">{item.childName}</span>
+                <label className="flex min-h-11 items-center gap-2 text-xs font-normal text-text-muted">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border-strong accent-[var(--brand)]"
+                    checked={item.removable}
+                    disabled={busy === item.id}
+                    onChange={(event) => void changeRemovable(item, event.target.checked)}
+                  />
+                  Cliente pode tirar
+                </label>
                 <label className="text-xs font-normal text-text-muted">
                   Qtd
                   <input

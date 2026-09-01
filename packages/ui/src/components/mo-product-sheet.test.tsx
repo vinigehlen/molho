@@ -74,8 +74,8 @@ describe('MoProductSheet', () => {
           ...PRODUTO,
           modifierGroups: [],
           comboItems: [
-            { name: 'Xis', quantity: 2 },
-            { name: 'Batata', quantity: 1 },
+            { childProductId: 'child-xis', name: 'Xis', quantity: 2, removable: false },
+            { childProductId: 'child-batata', name: 'Batata', quantity: 1, removable: false },
           ],
         }}
         onAddToCart={() => {}}
@@ -85,6 +85,71 @@ describe('MoProductSheet', () => {
     expect(screen.getByText('Vem com')).toBeInTheDocument();
     expect(screen.getByText('2× Xis')).toBeInTheDocument();
     expect(screen.getByText('Batata')).toBeInTheDocument();
+  });
+
+  it('combo sum_of_items: filho removível abatido entra em removedChildIds e reduz o total', async () => {
+    const onAddToCart = vi.fn();
+    render(
+      <MoProductSheet
+        open
+        onOpenChange={() => {}}
+        product={{
+          ...PRODUTO,
+          basePriceCents: 5480,
+          comboPricingMode: 'sum_of_items',
+          modifierGroups: [],
+          comboItems: [
+            { childProductId: 'child-xis', name: 'Xis', quantity: 2, removable: false, unitBasePriceCents: 2490 },
+            { childProductId: 'child-refri', name: 'Refri', quantity: 1, removable: true, unitBasePriceCents: 500 },
+          ],
+        }}
+        onAddToCart={onAddToCart}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /Refri/ }));
+    expect(botaoAdicionar()).toHaveTextContent('R$ 49,80');
+    await userEvent.click(botaoAdicionar());
+
+    expect(onAddToCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unitBasePriceCents: 4980,
+        removedChildIds: ['child-refri'],
+        totalCents: 4980,
+      }),
+    );
+  });
+
+  it('combo fixed: filho removível não muda o preço', async () => {
+    const onAddToCart = vi.fn();
+    render(
+      <MoProductSheet
+        open
+        onOpenChange={() => {}}
+        product={{
+          ...PRODUTO,
+          basePriceCents: 5990,
+          comboPricingMode: 'fixed',
+          modifierGroups: [],
+          comboItems: [
+            { childProductId: 'child-batata', name: 'Batata', quantity: 1, removable: true, unitBasePriceCents: 1200 },
+          ],
+        }}
+        onAddToCart={onAddToCart}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /Batata/ }));
+    expect(botaoAdicionar()).toHaveTextContent('R$ 59,90');
+    await userEvent.click(botaoAdicionar());
+
+    expect(onAddToCart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unitBasePriceCents: 5990,
+        removedChildIds: ['child-batata'],
+        totalCents: 5990,
+      }),
+    );
   });
 
   it('botão de adicionar começa com o preço BASE, e desabilitado (grupo obrigatório vazio)', () => {
@@ -130,6 +195,7 @@ describe('MoProductSheet', () => {
         { id: 'mal', groupId: 'ponto', name: 'Mal passado', priceDeltaCents: 0 },
         { id: 'bacon', groupId: 'adicionais', name: 'Bacon', priceDeltaCents: 400 },
       ],
+      unitBasePriceCents: 2890,
       totalCents: 6580,
     });
   });
@@ -142,7 +208,7 @@ describe('MoProductSheet', () => {
     await userEvent.type(screen.getByLabelText('Alguma observação?'), '   ');
     await userEvent.click(botaoAdicionar());
 
-    expect(onAddToCart).toHaveBeenCalledWith(expect.objectContaining({ notes: null }));
+    expect(onAddToCart).toHaveBeenCalledWith(expect.objectContaining({ notes: null, unitBasePriceCents: 2890 }));
   });
 
   it('trocar de produto com o sheet aberto reseta quantidade, observação e seleção', async () => {

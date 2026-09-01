@@ -54,6 +54,11 @@ export const checkoutItemInputSchema = z.strictObject({
   /** Compatibilidade de expansão: clientes antigos omitem e recebem a oferta
    * principal; clientes 4C enviam a apresentação tocada na vitrine. */
   offerId: z.uuid().optional(),
+  /**
+   * Combo 4.2B: IDs dos filhos que o cliente pediu para remover. Opcional
+   * para preservar carrinho/request antigo.
+   */
+  removedChildIds: z.array(z.uuid()).optional(),
   unitBasePriceCents: z.int().nonnegative(),
   modifiers: z.array(z.strictObject({ modifierId: z.uuid(), priceDeltaCents: z.int().nonnegative() })),
   quantity: z.int().positive(),
@@ -221,6 +226,8 @@ export const revalidatedItemSchema = z.strictObject({
         childProductId: z.uuid(),
         name: z.string(),
         quantity: z.int().positive(),
+        removable: z.boolean(),
+        removed: z.boolean(),
         unitBasePriceCents: centsSchema.optional(),
       }),
     )

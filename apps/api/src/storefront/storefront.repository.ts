@@ -62,7 +62,7 @@ export interface StorefrontProductRecord {
   /** `combo` (fase 3). Só o storefront novo (opt-in) lê isto. */
   kind: 'prepared' | 'industrialized' | 'combo';
   /** Filhos do combo (fase 4.1b) — vazio em produto não-combo. */
-  comboItems: { name: string; quantity: number; unitBasePriceCents: number | null }[];
+  comboItems: { childProductId: string; name: string; quantity: number; removable: boolean; unitBasePriceCents: number | null }[];
 }
 
 export interface StorefrontCategoryRecord {
@@ -179,7 +179,9 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
                   where: { deletedAt: null, childProduct: { deletedAt: null } },
                   orderBy: { sortOrder: 'asc' },
                   select: {
+                    childProductId: true,
                     quantity: true,
+                    removable: true,
                     childProduct: {
                       select: {
                         name: true,
@@ -241,8 +243,10 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
         modifierGroups: offer.product.productModifierGroups.map((link) => link.modifierGroup),
         kind: offer.product.kind,
         comboItems: offer.product.comboItems.map((item) => ({
+          childProductId: item.childProductId,
           name: item.childProduct.name,
           quantity: item.quantity,
+          removable: item.removable,
           unitBasePriceCents: item.childProduct.offers[0]?.priceCents ?? null,
         })),
       })),

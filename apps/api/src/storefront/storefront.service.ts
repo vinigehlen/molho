@@ -103,9 +103,13 @@ export class StorefrontService {
               // mesma negociação do `offerId` (4C), e só quando há filhos.
               ...(catalogOffers && product.kind === 'combo' && product.comboItems.length > 0
                 ? {
+                    comboPricingMode: product.comboPricingMode,
                     comboItems: product.comboItems.map((item) => ({
+                      childProductId: item.childProductId,
                       name: item.name,
                       quantity: item.quantity,
+                      removable: item.removable,
+                      unitBasePriceCents: item.unitBasePriceCents,
                     })),
                   }
                 : {}),

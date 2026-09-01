@@ -16,6 +16,7 @@ export interface CheckoutRequestBody {
   items: {
     productId: string;
     offerId?: string;
+    removedChildIds?: string[];
     unitBasePriceCents: number;
     modifiers: { modifierId: string; priceDeltaCents: number }[];
     quantity: number;
@@ -59,6 +60,14 @@ export interface CheckoutReviewItem {
   notes: string | null;
   lineTotalCents: number;
   priceChanged: boolean;
+  comboComponents?: {
+    childProductId: string;
+    name: string;
+    quantity: number;
+    removable: boolean;
+    removed: boolean;
+    unitBasePriceCents?: number;
+  }[];
 }
 
 /** Espelha `revalidatedCheckoutSchema`. */
@@ -262,6 +271,7 @@ export function buildCheckoutRequestFromCart(
     items: cart.items.map((item) => ({
       productId: item.productId,
       ...(item.offerId ? { offerId: item.offerId } : {}),
+      ...(item.removedChildIds && item.removedChildIds.length > 0 ? { removedChildIds: item.removedChildIds } : {}),
       unitBasePriceCents: item.unitBasePriceCents,
       modifiers: item.modifiers.map((modifier) => ({ modifierId: modifier.id, priceDeltaCents: modifier.priceDeltaCents })),
       quantity: item.quantity,
@@ -297,6 +307,9 @@ export function buildCheckoutRequestFromReview(
       .map((item) => ({
         productId: item.productId,
         ...(item.offerId ? { offerId: item.offerId } : {}),
+        ...(item.comboComponents?.some((component) => component.removed)
+          ? { removedChildIds: item.comboComponents.filter((component) => component.removed).map((component) => component.childProductId) }
+          : {}),
         unitBasePriceCents: item.unitBasePriceCents,
         modifiers: item.modifiers.map((modifier) => ({ modifierId: modifier.modifierId, priceDeltaCents: modifier.priceDeltaCents })),
         quantity: item.quantity,

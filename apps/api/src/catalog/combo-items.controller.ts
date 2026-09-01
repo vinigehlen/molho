@@ -64,6 +64,7 @@ export class ComboItemsController {
       comboProductId: dto.comboProductId,
       childProductId: dto.childProductId,
       quantity: dto.quantity ?? 1,
+      removable: dto.removable ?? false,
       sortOrder: dto.sortOrder,
     });
   }

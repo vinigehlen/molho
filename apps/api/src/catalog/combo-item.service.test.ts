@@ -49,6 +49,7 @@ class FakeComboItemRepository implements ComboItemRepository {
       childProductId: input.childProductId,
       childName: this.names.get(input.childProductId) ?? input.childProductId,
       quantity: input.quantity,
+      removable: input.removable ?? false,
       sortOrder: input.sortOrder ?? 0,
       version: 0,
     };
@@ -81,8 +82,8 @@ function make() {
 describe('ComboItemService (combo fase 4.1a)', () => {
   it('adiciona um filho a um combo', async () => {
     const { service } = make();
-    const item = await service.create({ comboProductId: 'combo-1', childProductId: 'child-1', quantity: 2 });
-    expect(item).toMatchObject({ childName: 'Xis', quantity: 2 });
+    const item = await service.create({ comboProductId: 'combo-1', childProductId: 'child-1', quantity: 2, removable: true });
+    expect(item).toMatchObject({ childName: 'Xis', quantity: 2, removable: true });
   });
 
   it('rejeita quando o pai não é um combo', async () => {
@@ -121,11 +122,11 @@ describe('ComboItemService (combo fase 4.1a)', () => {
     ).rejects.toThrow(CatalogValidationError);
   });
 
-  it('atualiza quantidade sob optimistic lock', async () => {
+  it('atualiza quantidade e removable sob optimistic lock', async () => {
     const { service } = make();
     const item = await service.create({ comboProductId: 'combo-1', childProductId: 'child-1', quantity: 1 });
-    const updated = await service.update(item.id, 0, { quantity: 3 });
-    expect(updated.quantity).toBe(3);
+    const updated = await service.update(item.id, 0, { quantity: 3, removable: true });
+    expect(updated).toMatchObject({ quantity: 3, removable: true });
     await expect(service.update(item.id, 0, { quantity: 4 })).rejects.toThrow(CatalogConflictError);
   });
 });

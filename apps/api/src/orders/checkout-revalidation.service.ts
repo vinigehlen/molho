@@ -98,17 +98,34 @@ export class CheckoutRevalidationService {
       }
 
       // Combo: `fixed` preserva o preço da oferta; `sum_of_items` deriva a
-      // base pelas ofertas principais dos filhos. Em ambos, perder qualquer
-      // filho derruba o combo inteiro (regra 14: revisão obrigatória).
+      // base pelas ofertas principais dos filhos não removidos. Perder filho
+      // que continua no combo derruba o item inteiro (regra 14).
       let unitBasePriceCents = validOffer.basePriceCents;
       let comboComponents: RevalidatedItem['comboComponents'];
+      const requestedRemovedChildIds = new Set(input.removedChildIds ?? []);
+      if (validOffer.productKind !== 'combo' && requestedRemovedChildIds.size > 0) {
+        hasUnfavorableDivergence = true;
+      }
       if (validOffer.productKind === 'combo') {
+        const componentByChildId = new Map(
+          validOffer.comboComponents.map((component) => [component.childProductId, component]),
+        );
+        for (const childProductId of requestedRemovedChildIds) {
+          const component = componentByChildId.get(childProductId);
+          if (!component || !component.removable) {
+            hasUnfavorableDivergence = true;
+          }
+        }
+        const allowedRemovedChildIds = new Set(
+          [...requestedRemovedChildIds].filter((childProductId) => componentByChildId.get(childProductId)?.removable === true),
+        );
         if (
           validOffer.comboComponents.length === 0 ||
           validOffer.comboComponents.some(
             (component) =>
-              !component.available ||
+              (!allowedRemovedChildIds.has(component.childProductId) && !component.available) ||
               (validOffer.comboPricingMode === 'sum_of_items' &&
+                !allowedRemovedChildIds.has(component.childProductId) &&
                 component.unitBasePriceCents === null),
           )
         ) {
@@ -117,7 +134,10 @@ export class CheckoutRevalidationService {
         }
         if (validOffer.comboPricingMode === 'sum_of_items') {
           unitBasePriceCents = validOffer.comboComponents.reduce(
-            (sum, component) => sum + (component.unitBasePriceCents ?? 0) * component.quantity,
+            (sum, component) =>
+              allowedRemovedChildIds.has(component.childProductId)
+                ? sum
+                : sum + (component.unitBasePriceCents ?? 0) * component.quantity,
             0,
           );
         }
@@ -125,8 +145,10 @@ export class CheckoutRevalidationService {
           childProductId: component.childProductId,
           name: component.name,
           quantity: component.quantity,
-          ...(validOffer.comboPricingMode === 'sum_of_items'
-            ? { unitBasePriceCents: component.unitBasePriceCents ?? 0 }
+          removable: component.removable,
+          removed: allowedRemovedChildIds.has(component.childProductId),
+          ...(validOffer.comboPricingMode === 'sum_of_items' && component.unitBasePriceCents !== null
+            ? { unitBasePriceCents: component.unitBasePriceCents }
             : {}),
         }));
       }

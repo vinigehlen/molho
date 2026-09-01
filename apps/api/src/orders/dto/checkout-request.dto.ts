@@ -36,6 +36,15 @@ class CheckoutItemInputDto {
   @IsUUID()
   productId!: string;
 
+  @IsOptional()
+  @IsUUID()
+  offerId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  removedChildIds?: string[];
+
   @IsInt()
   @Min(0)
   unitBasePriceCents!: number;
