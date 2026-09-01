@@ -20,10 +20,21 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | 4.1a | ✅ mesclada | PR #29 → `a81f822` | `20260831130000_combo_items_epico_combos_4a` |
 | 4.1b | ✅ mesclada | PR #30 → `694c5b7` | `20260831140000_order_item_components_combo_4b` |
 | handoff 4.2 | ✅ mesclado | PR #31 → `ade4c04` | — |
-| 4.2A | ✅ local | `9a04b00` | `20260901110000_combo_pricing_product_offer_4_2a` |
-| 4.2B+ | ⬜ não iniciada | — | (personalização, combo aninhado se aprovado) |
+| correções pré-4.2 (P1.1–P1.3, P2.4–P2.5) | ✅ em `main` | `c50c6c3` | — |
+| 4.2A — `combo_pricing_mode` / `sum_of_items` | ✅ em `main` | `9a04b00` | `20260901110000_combo_pricing_product_offer_4_2a` |
+| bloqueio de troca de `kind` com filhos vivos | ✅ em `main` | `345a443` | — |
+| 4.2B — personalização (add/remove filho, taxa extra) | ⬜ não iniciada | — | pendente de recorte com o PM |
+| 4.2C — combo aninhado | ⬜ recomendação: manter bloqueado | — | — |
 
-`main` sincronizada com `origin/main` após o merge do PR #31 (`ade4c04`).
+`main` em `345a443` (`origin/main` sincronizada).
+
+> **Processo:** `c50c6c3`, `9a04b00` e `345a443` foram empurrados direto pra
+> `main`, sem PR e sem rodar o CI. Revisão pós-fato (2026-09-01): gates da raiz
+> verdes localmente (`pnpm lint` · `typecheck` 10/10 · `test` 9/9 — API 605,
+> contratos 331 · `build` 7/7); o desenho do lock (P1.3) e o cálculo
+> `sum_of_items` estão corretos. **Falta rodar `pnpm test:e2e`** (precisa
+> Redis + Postgres reais) pra confirmar os testes de concorrência de
+> `checkout.e2e.test.ts` — não foi possível localmente nesta revisão.
 
 > Nota de infra: entre a fase 3 e a 4.1a, 4 PRs do dependabot (#18–#21)
 > quebraram o CI (TS 5.9→7 sem suporte do typescript-eslint, `pnpm/action-setup@v6`
@@ -166,6 +177,38 @@ storefront com `basePriceCents` consolidado e checkout recalculando
 Correção pós-4.2A: trocar `kind` de um combo com filhos vivos fica bloqueado
 até o lojista remover a composição. Isso evita esconder `combo_items` vivos por
 uma mudança acidental de tipo.
+
+### 4.2B — personalização (não iniciada — precisa recorte do PM)
+
+Escopo bruto (CLAUDE.md): "adicionar/remover item do combo, taxa extra". Antes
+de codar, fechar com o PM item a item (mesmo processo D1–D7):
+
+1. **O que o cliente pode fazer?** só remover um filho, ou também trocar por
+   outro produto, ou também adicionar um extra pago? (recomendação: remover +
+   trocar na 4.2B; adicionar extra numa 4.2B-2)
+2. **Mecanismo.** A personalização do combo é um `ModifierGroup` no
+   produto-combo (reusa toda a infra de 4.1/4E), ou um mecanismo próprio em
+   `combo_items` (ex.: `swappable`, `removable`, `extra_fee_cents` por linha)?
+3. **Carrinho.** Hoje o item de combo no carrinho é só
+   `{productId, offerId, quantity}`. Personalização quase certamente **sobe
+   `CART_SCHEMA_VERSION`** (descarta carrinhos salvos) — confirmar que é
+   aceitável.
+4. **Preço.** Como a troca/remoção interage com `fixed` vs `sum_of_items`?
+   Remover um filho de um combo `fixed` abate quanto? Em `sum_of_items` é a
+   diferença das ofertas.
+5. **Snapshot.** `order_item_components` precisa registrar substituições e
+   remoções (hoje só grava o que veio). Coluna nova (`removed`, `swapped_from`)
+   ou linhas com `quantity: 0`?
+6. **Revalidação.** A composição personalizada tem que ser revalidada contra o
+   `combo_items` fresco (regra 14) — o filho trocado ainda existe? o extra
+   ainda está disponível?
+
+### 4.2C — combo aninhado
+
+Hoje barrado só em `ComboItemService.create()` (filho `kind='combo'` é
+rejeitado). **Recomendação: manter bloqueado** — YAGNI até pedido explícito do
+PM. Se liberar: profundidade máxima, detecção de ciclo, explosão do
+cálculo de preço/disponibilidade, snapshot recursivo.
 
 ## Comandos seguros para retomar
 
