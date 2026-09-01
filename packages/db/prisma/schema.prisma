@@ -409,38 +409,45 @@ enum ProductKind {
   combo
 }
 
+/// Modo de preço da oferta de combo. Minúsculo para casar com o enum nativo
+/// do Postgres criado à mão na migration.
+enum ComboPricingMode {
+  fixed
+  sum_of_items
+}
+
 model Product {
-  id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  categoryId     String    @map("category_id") @db.Uuid
+  id             String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  categoryId     String      @map("category_id") @db.Uuid
   name           String
   description    String?
   /// Sempre inteiro em centavos, nunca float (CLAUDE.md regra 4). CHECK >= 0
   /// à mão na migration (Prisma não expressa CHECK no DSL).
-  basePriceCents Int       @map("base_price_cents")
+  basePriceCents Int         @map("base_price_cents")
   /// Chave do objeto no R2 — nasce nula, preenchida pelo upload (commit 6).
   /// Épico conversão (C1): vira DERIVADO da foto de `position=0` em
   /// `ProductImage` assim que o produto tiver pelo menos uma linha lá — a
   /// coluna em si continua existindo (compat de quem ainda lê `imageKey`
   /// direto), mas o storefront/admin escrevem em `ProductImage`, não aqui.
-  imageKey       String?   @map("image_key")
+  imageKey       String?     @map("image_key")
   /// "Esgotado manual" (§5.4 definicoes-v1) — toggle direto, sem contador.
-  available      Boolean   @default(true)
+  available      Boolean     @default(true)
   /// Código do item no PDV do lojista (Épico combos/PDV, exceção MVP
   /// 2026-08-28) — texto livre, opcional, nunca validado/interpretado por
   /// nós: é só o número/código que o sistema de caixa do lojista já usa,
   /// pra ele bater cardápio digital × PDV sem digitar duas vezes.
-  pdvCode        String?   @map("pdv_code")
+  pdvCode        String?     @map("pdv_code")
   /// Natureza do item (exceção MVP 2026-08-28, CLAUDE.md — fase 3/4 do combo).
   /// `prepared` (prato feito na cozinha, default) · `industrialized` (item
   /// revendido, ex.: refrigerante em lata) · `combo` (agrupa outros produtos —
   /// comportamento de combo só entra na fase 4; a fase 3 só grava o rótulo).
   kind           ProductKind @default(prepared)
-  sortOrder      Int       @default(0) @map("sort_order")
-  version        Int       @default(0)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
+  sortOrder      Int         @default(0) @map("sort_order")
+  version        Int         @default(0)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  deletedAt      DateTime?   @map("deleted_at")
 
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category              Category               @relation(fields: [categoryId], references: [id])
@@ -476,19 +483,22 @@ model Product {
 /// `isPrimary` identifica essa ponte temporária; as demais apresentações já
 /// podem variar categoria, preço, disponibilidade, PDV e ordem.
 model ProductOffer {
-  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId   String    @map("tenant_id") @db.Uuid
-  productId  String    @map("product_id") @db.Uuid
-  categoryId String    @map("category_id") @db.Uuid
-  priceCents Int       @map("price_cents")
-  available  Boolean   @default(true)
-  pdvCode    String?   @map("pdv_code")
-  sortOrder  Int       @default(0) @map("sort_order")
-  isPrimary  Boolean   @default(false) @map("is_primary")
-  version    Int       @default(0)
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  deletedAt  DateTime? @map("deleted_at")
+  id               String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId         String           @map("tenant_id") @db.Uuid
+  productId        String           @map("product_id") @db.Uuid
+  categoryId       String           @map("category_id") @db.Uuid
+  priceCents       Int              @map("price_cents")
+  available        Boolean          @default(true)
+  /// `fixed`: usa `price_cents` da oferta. `sum_of_items`: checkout deriva
+  /// a base pela soma das ofertas principais dos filhos do combo.
+  comboPricingMode ComboPricingMode @default(fixed) @map("combo_pricing_mode")
+  pdvCode          String?          @map("pdv_code")
+  sortOrder        Int              @default(0) @map("sort_order")
+  isPrimary        Boolean          @default(false) @map("is_primary")
+  version          Int              @default(0)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1142,20 +1152,21 @@ model OrderItem {
 
 /// Filhos de um combo, congelados no pedido (exceção MVP 2026-08-28,
 /// CLAUDE.md — fase 4/4, fatia 4.1b). Append-only, mesmo tratamento de
-/// OrderItemModifier: o combo vira UM `order_item` (preço fixo da oferta) e
-/// esta tabela guarda o que veio dentro, só como snapshot — não entra no
-/// cálculo de `lineTotalCents` (preço fixo, fase 4.1). O `order_item` pai só
-/// tem componentes quando o produto era `kind = 'combo'`.
+/// OrderItemModifier: o combo vira UM `order_item` e esta tabela guarda o que
+/// veio dentro. Em ofertas `sum_of_items`, também congela o preço unitário do
+/// filho usado para formar a base do combo; em combos fixos/legados pode ficar
+/// nulo porque o componente não explicava o total.
 model OrderItemComponent {
-  id          String @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  tenantId    String @map("tenant_id") @db.Uuid
-  orderItemId String @map("order_item_id") @db.Uuid
+  id             String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  orderItemId    String @map("order_item_id") @db.Uuid
   /// Produto-filho — nunca hard-deletado, FK sempre válida.
   childProductId String @map("child_product_id") @db.Uuid
 
   /// Snapshot do nome do filho no momento do pedido.
-  name     String
-  quantity Int
+  name           String
+  quantity       Int
+  unitPriceCents Int?   @map("unit_price_cents")
 
   createdAt DateTime @default(now()) @map("created_at")
 

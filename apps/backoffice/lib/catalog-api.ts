@@ -1,8 +1,9 @@
-import type { ProductKind } from '@molho/contracts';
+import type { ComboPricingMode, ProductKind } from '@molho/contracts';
 import { apiFetch } from './api-client';
 import { compressProductImage } from './image-compression';
 
 export type { ProductKind };
+export type { ComboPricingMode };
 
 export interface Category {
   id: string;
@@ -34,6 +35,7 @@ export interface ProductOffer {
   categoryId: string;
   priceCents: number;
   available: boolean;
+  comboPricingMode: ComboPricingMode;
   pdvCode: string | null;
   sortOrder: number;
   isPrimary: boolean;
@@ -183,6 +185,7 @@ export async function createProductOffer(input: {
   categoryId: string;
   priceCents: number;
   available?: boolean;
+  comboPricingMode?: ComboPricingMode;
   pdvCode?: string | null;
   sortOrder?: number;
 }): Promise<ProductOffer> {
@@ -197,7 +200,9 @@ export async function createProductOffer(input: {
 
 export async function updateProductOffer(
   offer: ProductOffer,
-  input: Partial<Pick<ProductOffer, 'categoryId' | 'priceCents' | 'pdvCode' | 'sortOrder'>>,
+  input: Partial<
+    Pick<ProductOffer, 'categoryId' | 'priceCents' | 'comboPricingMode' | 'pdvCode' | 'sortOrder'>
+  >,
 ): Promise<ProductOffer> {
   const res = await apiFetch(`/v1/admin/product-offers/${encodeURIComponent(offer.id)}`, {
     method: 'PATCH',

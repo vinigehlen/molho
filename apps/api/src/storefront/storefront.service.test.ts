@@ -90,6 +90,7 @@ function categoria(overrides: Partial<StorefrontCategoryRecord> = {}): Storefron
         name: 'X-Burger',
         description: 'Pão brioche, blend 180g.',
         basePriceCents: 2890,
+        comboPricingMode: 'fixed',
         imageKey: 'produtos/x-burger.jpg',
         images: [],
         available: true,

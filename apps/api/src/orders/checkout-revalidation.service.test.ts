@@ -28,6 +28,7 @@ const PRODUCT: CheckoutOfferRecord = {
   name: 'X-Burger',
   basePriceCents: 2890,
   available: true,
+  comboPricingMode: 'fixed',
   productKind: 'prepared',
   modifiers: [{ id: 'mod-bacon', name: 'Bacon', priceDeltaCents: 500 }],
   comboComponents: [],
@@ -609,11 +610,12 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
       name: 'Combo Casal',
       basePriceCents: 5990,
       available: true,
+      comboPricingMode: 'fixed',
       productKind: 'combo',
       modifiers: [],
       comboComponents: [
-        { childProductId: 'child-xis', name: 'Xis', quantity: 2, available: true },
-        { childProductId: 'child-refri', name: 'Refri', quantity: 2, available: true },
+        { childProductId: 'child-xis', name: 'Xis', quantity: 2, unitBasePriceCents: 2490, available: true },
+        { childProductId: 'child-refri', name: 'Refri', quantity: 2, unitBasePriceCents: 500, available: true },
       ],
     };
     const comboRequest = () =>
@@ -661,6 +663,49 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
 
       expect(result.items[0]).toMatchObject({ available: false });
       expect(result.canSubmit).toBe(false);
+    });
+
+    it('sum_of_items usa a soma das ofertas principais dos filhos como preço base', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [{ ...COMBO, comboPricingMode: 'sum_of_items' }];
+
+      const result = await service.revalidate(comboRequest(), RESOLVED);
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        unitBasePriceCents: 5980,
+        lineTotalCents: 5980,
+        priceChanged: true,
+        comboComponents: [
+          { childProductId: 'child-xis', quantity: 2, unitBasePriceCents: 2490 },
+          { childProductId: 'child-refri', quantity: 2, unitBasePriceCents: 500 },
+        ],
+      });
+      expect(result.hasUnfavorableDivergence).toBe(false);
+      expect(result.canSubmit).toBe(true);
+    });
+
+    it('sum_of_items marca divergência desfavorável quando a soma atual ficou maior', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [
+        {
+          ...COMBO,
+          comboPricingMode: 'sum_of_items',
+          comboComponents: [
+            { ...COMBO.comboComponents[0]!, unitBasePriceCents: 2890 },
+            COMBO.comboComponents[1]!,
+          ],
+        },
+      ];
+
+      const result = await service.revalidate(comboRequest(), RESOLVED);
+
+      expect(result.items[0]).toMatchObject({
+        unitBasePriceCents: 6780,
+        lineTotalCents: 6780,
+        priceChanged: true,
+      });
+      expect(result.hasUnfavorableDivergence).toBe(true);
     });
   });
 });

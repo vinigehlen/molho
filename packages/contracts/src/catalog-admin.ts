@@ -34,6 +34,12 @@ const pdvCodeSchema = z.string().trim().max(60).nullable();
 export const productKindSchema = z.enum(['prepared', 'industrialized', 'combo']);
 export type ProductKind = z.infer<typeof productKindSchema>;
 
+/** Como uma oferta de combo calcula seu preço no checkout. `fixed` preserva
+ * o preço próprio da apresentação; `sum_of_items` deriva a base da soma dos
+ * filhos atuais do combo. */
+export const comboPricingModeSchema = z.enum(['fixed', 'sum_of_items']);
+export type ComboPricingMode = z.infer<typeof comboPricingModeSchema>;
+
 export const catalogProductSchema = z.strictObject({
   id: z.uuid(),
   categoryId: z.uuid(),
@@ -85,6 +91,7 @@ export const catalogProductOfferSchema = z.strictObject({
   categoryId: z.uuid(),
   priceCents: centsSchema,
   available: z.boolean(),
+  comboPricingMode: comboPricingModeSchema,
   pdvCode: pdvCodeSchema,
   sortOrder: sortOrderSchema,
   isPrimary: z.boolean(),
@@ -98,6 +105,7 @@ export const createCatalogProductOfferSchema = z.strictObject({
   categoryId: z.uuid(),
   priceCents: centsSchema,
   available: z.boolean().optional(),
+  comboPricingMode: comboPricingModeSchema.optional(),
   pdvCode: pdvCodeSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });
@@ -106,6 +114,7 @@ export const updateCatalogProductOfferSchema = z.strictObject({
   version: versionSchema,
   categoryId: z.uuid().optional(),
   priceCents: centsSchema.optional(),
+  comboPricingMode: comboPricingModeSchema.optional(),
   pdvCode: pdvCodeSchema.optional(),
   sortOrder: sortOrderSchema.optional(),
 });

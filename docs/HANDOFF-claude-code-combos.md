@@ -148,15 +148,15 @@ componentes explicitamente — o item de combo indisponível já cai na revisão
 genérica de "item indisponível"; detalhar "qual filho faltou" fica pra um
 ajuste de UI posterior.
 
-### 4.2 — não iniciada
+### 4.2 — iniciada pela fatia 4.2A
 
 Preço "a partir de" (`ProductOffer.priceCents` vs soma dos filhos),
 personalização (add/remove item do combo, taxa extra), combo aninhado.
 
-Antes de criar migration de preço, registrar a decisão de ownership: `Product`
-se o modo (`fixed`/`sum`) for global para o combo inteiro; `ProductOffer` se
-cada apresentação comercial puder escolher o modo; `ComboItem` só deve guardar
-dados por filho (contribuição, inclusão, taxa), não uma flag agregada do combo.
+Decisão de ownership registrada na 4.2A: `combo_pricing_mode` mora em
+`ProductOffer`, com valores `fixed | sum_of_items`. Cada apresentação comercial
+pode escolher o modo; `ComboItem` só guarda dados por filho (composição,
+quantidade, contribuição futura), não uma flag agregada do combo.
 
 ## Comandos seguros para retomar
 

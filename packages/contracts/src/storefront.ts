@@ -74,7 +74,9 @@ export const storefrontProductSchema = z.strictObject({
    * Composição do combo (exceção MVP 2026-08-28, fase 4.1b) — só em produto
    * `kind = 'combo'`, e só quando o storefront pede `?catalog=offers` (mesma
    * negociação opt-in do 4C que introduz `offerId`). Exibição pura: "vem com
-   * 2× Xis, 1× Refri". O preço é o de `basePriceCents` (fixo).
+   * 2× Xis, 1× Refri". O preço mostrado continua vindo de
+   * `basePriceCents`; em ofertas `sum_of_items`, a API já devolve ali a soma
+   * atual dos filhos.
    */
   comboItems: z.array(z.strictObject({ name: z.string(), quantity: z.int().positive() })).optional(),
 });

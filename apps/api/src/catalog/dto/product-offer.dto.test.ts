@@ -27,6 +27,7 @@ describe('DTOs de ProductOffer', () => {
       version: 0,
       categoryId: '018f47de-7e33-7c6a-8b2a-b65dc8a35e67',
       priceCents: 2790,
+      comboPricingMode: 'sum_of_items',
       pdvCode: 'PDV-42',
       sortOrder: 2,
     });
@@ -37,6 +38,15 @@ describe('DTOs de ProductOffer', () => {
     const dto = plainToInstance(UpdateProductOfferDto, { version: 0, priceCents });
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'priceCents')).toBe(true);
+  });
+
+  it('rejeita modo de preço inválido', async () => {
+    const dto = plainToInstance(UpdateProductOfferDto, {
+      version: 0,
+      comboPricingMode: 'por_pessoa',
+    });
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'comboPricingMode')).toBe(true);
   });
 
   it('rejeita versão negativa no toggle de disponibilidade', async () => {

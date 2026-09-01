@@ -49,6 +49,7 @@ const PRIMARY: ProductOffer = {
   categoryId: 'category-1',
   priceCents: 2890,
   available: true,
+  comboPricingMode: 'fixed',
   pdvCode: '101',
   sortOrder: 0,
   isPrimary: true,
@@ -67,6 +68,19 @@ const PRIMARY_DRAFT = {
   categoryId: PRODUCT.categoryId,
   price: 'R$ 28,90',
   pdvCode: '101',
+};
+
+const COMBO_PRODUCT: Product = {
+  ...PRODUCT,
+  id: 'product-combo',
+  name: 'Combo Casal',
+  kind: 'combo',
+};
+
+const COMBO_PRIMARY: ProductOffer = {
+  ...PRIMARY,
+  id: 'offer-combo',
+  productId: COMBO_PRODUCT.id,
 };
 
 let container: HTMLDivElement;
@@ -213,5 +227,39 @@ describe('ProductOffersEditor', () => {
 
     expect(container.textContent).toContain('Mais pedidos');
     expect(container.textContent).toMatch(/R\$\s31,50 · PDV 202/);
+  });
+
+  it('salva o modo de preço da oferta principal quando o produto é combo', async () => {
+    mocks.fetchProductOffers.mockResolvedValue([COMBO_PRIMARY]);
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <ProductOffersEditor
+          product={COMBO_PRODUCT}
+          categories={CATEGORIES}
+          primaryDraft={{ ...PRIMARY_DRAFT, categoryId: COMBO_PRODUCT.categoryId }}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const select = container.querySelector<HTMLSelectElement>('#combo-pricing-offer-combo');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(
+        select,
+        'sum_of_items',
+      );
+      select?.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.updateProductOffer).toHaveBeenCalledWith(COMBO_PRIMARY, {
+      comboPricingMode: 'sum_of_items',
+    });
   });
 });

@@ -49,6 +49,7 @@ export interface StorefrontProductRecord {
   name: string;
   description: string | null;
   basePriceCents: number;
+  comboPricingMode: 'fixed' | 'sum_of_items';
   imageKey: string | null;
   /**
    * Galeria (Épico conversão, C1), já em ordem de `position`. Pode vir vazia
@@ -61,7 +62,7 @@ export interface StorefrontProductRecord {
   /** `combo` (fase 3). Só o storefront novo (opt-in) lê isto. */
   kind: 'prepared' | 'industrialized' | 'combo';
   /** Filhos do combo (fase 4.1b) — vazio em produto não-combo. */
-  comboItems: { name: string; quantity: number }[];
+  comboItems: { name: string; quantity: number; unitBasePriceCents: number | null }[];
 }
 
 export interface StorefrontCategoryRecord {
@@ -158,6 +159,7 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
             isPrimary: true,
             priceCents: true,
             available: true,
+            comboPricingMode: true,
             product: {
               select: {
                 id: true,
@@ -176,7 +178,18 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
                 comboItems: {
                   where: { deletedAt: null, childProduct: { deletedAt: null } },
                   orderBy: { sortOrder: 'asc' },
-                  select: { quantity: true, childProduct: { select: { name: true } } },
+                  select: {
+                    quantity: true,
+                    childProduct: {
+                      select: {
+                        name: true,
+                        offers: {
+                          where: { isPrimary: true, deletedAt: null },
+                          select: { priceCents: true },
+                        },
+                      },
+                    },
+                  },
                 },
                 // Reuso (exceção MVP 2026-08-28, fase 2/4): "grupos deste
                 // produto" é sempre o VÍNCULO (product_modifier_groups).
@@ -220,7 +233,8 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
         isPrimary: offer.isPrimary,
         name: offer.product.name,
         description: offer.product.description,
-        basePriceCents: offer.priceCents,
+        basePriceCents: storefrontOfferBasePriceCents(offer),
+        comboPricingMode: offer.comboPricingMode,
         imageKey: offer.product.imageKey,
         images: offer.product.images,
         available: offer.available,
@@ -229,8 +243,37 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
         comboItems: offer.product.comboItems.map((item) => ({
           name: item.childProduct.name,
           quantity: item.quantity,
+          unitBasePriceCents: item.childProduct.offers[0]?.priceCents ?? null,
         })),
       })),
     }));
   }
+}
+
+function storefrontOfferBasePriceCents(offer: {
+  priceCents: number;
+  comboPricingMode: 'fixed' | 'sum_of_items';
+  product: {
+    kind: 'prepared' | 'industrialized' | 'combo';
+    comboItems: readonly {
+      quantity: number;
+      childProduct: { offers: readonly { priceCents: number }[] };
+    }[];
+  };
+}): number {
+  if (
+    offer.product.kind !== 'combo' ||
+    offer.comboPricingMode !== 'sum_of_items' ||
+    offer.product.comboItems.length === 0
+  ) {
+    return offer.priceCents;
+  }
+
+  let total = 0;
+  for (const item of offer.product.comboItems) {
+    const childPriceCents = item.childProduct.offers[0]?.priceCents;
+    if (childPriceCents === undefined) return offer.priceCents;
+    total += childPriceCents * item.quantity;
+  }
+  return total;
 }

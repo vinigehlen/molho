@@ -95,17 +95,19 @@ tem três eixos independentes, e cada um pode virar uma fatia própria
 
 ### Eixo A — preço "a partir de" (`sum_of_items`)
 
-- Hoje o preço do combo é `ProductOffer.priceCents` (fixo). Adicionar um modo
-  onde o preço = soma da oferta primária de cada filho × `quantity`.
-- Decisão de modelagem em aberto: `combo_pricing` (`fixed` | `sum`) pertence a
-  `Product` se o modo for global, ou a `ProductOffer` se cada apresentação
-  comercial puder escolher. `ComboItem` só deve guardar dados por filho, como
+- Hoje o preço do combo é `ProductOffer.priceCents` (fixo). A 4.2A adiciona
+  `combo_pricing_mode` em `ProductOffer`; no modo `sum_of_items`, o preço =
+  soma da oferta primária de cada filho × `quantity`.
+- Decisão de modelagem registrada: `combo_pricing_mode`
+  (`fixed` | `sum_of_items`) pertence a `ProductOffer`, pois cada apresentação
+  comercial pode escolher. `ComboItem` só deve guardar dados por filho, como
   contribuição, inclusão ou taxa, não a flag agregada do combo.
-- Checkout: no modo `sum`, o preço do combo **depende** do preço dos filhos —
+- Checkout: no modo `sum_of_items`, o preço do combo **depende** do preço dos filhos —
   a revalidação passa a comparar preço de filho, não só disponibilidade
   (regra 14: preço subiu = tela de revisão). O lock dos filhos já existe.
-- `order_item_components` provavelmente ganha `unit_price_cents` snapshot por
-  filho, e `lineTotalCents` do combo passa a somar os filhos.
+- A 4.2A adiciona `order_item_components.unit_price_cents` nullable como
+  snapshot por filho; em `sum_of_items`, `lineTotalCents` do combo passa a
+  refletir a soma dos filhos.
 
 ### Eixo B — personalização (add/remove item do combo, taxa extra)
 

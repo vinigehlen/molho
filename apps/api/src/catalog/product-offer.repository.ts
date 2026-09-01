@@ -1,4 +1,5 @@
 import { Prisma } from '@molho/db';
+import type { ComboPricingMode, ProductKind } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import type { CatalogActor } from './catalog-actor';
 import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
@@ -10,6 +11,7 @@ export interface ProductOfferRecord {
   categoryId: string;
   priceCents: number;
   available: boolean;
+  comboPricingMode: ComboPricingMode;
   pdvCode: string | null;
   sortOrder: number;
   isPrimary: boolean;
@@ -24,6 +26,7 @@ export interface ProductOfferFilter {
 export interface UpdateProductOfferInput {
   categoryId?: string;
   priceCents?: number;
+  comboPricingMode?: ComboPricingMode;
   pdvCode?: string | null;
   sortOrder?: number;
 }
@@ -33,6 +36,7 @@ export interface CreateProductOfferInput {
   categoryId: string;
   priceCents: number;
   available?: boolean;
+  comboPricingMode?: ComboPricingMode;
   pdvCode?: string | null;
   sortOrder?: number;
 }
@@ -40,6 +44,7 @@ export interface CreateProductOfferInput {
 export interface ProductOfferRepository {
   list(filter: ProductOfferFilter): Promise<ProductOfferRecord[]>;
   findById(id: string): Promise<ProductOfferRecord | null>;
+  findProductKind(productId: string): Promise<ProductKind | null>;
   productExists(productId: string): Promise<boolean>;
   categoryExists(categoryId: string): Promise<boolean>;
   offerExists(productId: string, categoryId: string, excludingId?: string): Promise<boolean>;
@@ -64,6 +69,7 @@ const SELECT = {
   categoryId: true,
   priceCents: true,
   available: true,
+  comboPricingMode: true,
   pdvCode: true,
   sortOrder: true,
   isPrimary: true,
@@ -90,6 +96,14 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
       where: { id, deletedAt: null },
       select: SELECT,
     });
+  }
+
+  async findProductKind(productId: string): Promise<ProductKind | null> {
+    const product = await this.requestContext.getClient().product.findFirst({
+      where: { id: productId, deletedAt: null },
+      select: { kind: true },
+    });
+    return product?.kind ?? null;
   }
 
   async productExists(productId: string): Promise<boolean> {
@@ -131,6 +145,7 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
           categoryId: input.categoryId,
           priceCents: input.priceCents,
           available: input.available ?? true,
+          comboPricingMode: input.comboPricingMode ?? 'fixed',
           pdvCode: input.pdvCode ?? null,
           sortOrder: input.sortOrder ?? 0,
           isPrimary: false,
@@ -150,6 +165,7 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
             categoryId: created.categoryId,
             priceCents: created.priceCents,
             available: created.available,
+            comboPricingMode: created.comboPricingMode,
           },
           ip: actor.ip,
         },
@@ -192,7 +208,10 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
     );
     const after = await this.findByIdOrThrow(id);
 
-    if (after.priceCents !== before.priceCents) {
+    if (
+      after.priceCents !== before.priceCents ||
+      after.comboPricingMode !== before.comboPricingMode
+    ) {
       await client.auditLog.create({
         data: {
           tenantId: this.requestContext.getTenantId(),
@@ -200,8 +219,18 @@ export class PrismaProductOfferRepository implements ProductOfferRepository {
           actorRole: actor.role,
           action: 'catalog.offer_price_update',
           entity: 'product_offer',
-          beforeJson: { offerId: id, productId: before.productId, priceCents: before.priceCents },
-          afterJson: { offerId: id, productId: after.productId, priceCents: after.priceCents },
+          beforeJson: {
+            offerId: id,
+            productId: before.productId,
+            priceCents: before.priceCents,
+            comboPricingMode: before.comboPricingMode,
+          },
+          afterJson: {
+            offerId: id,
+            productId: after.productId,
+            priceCents: after.priceCents,
+            comboPricingMode: after.comboPricingMode,
+          },
           ip: actor.ip,
         },
       });

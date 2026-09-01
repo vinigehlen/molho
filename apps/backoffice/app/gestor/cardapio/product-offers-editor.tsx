@@ -10,6 +10,7 @@ import {
   setProductOfferAvailability,
   updateProductOffer,
   type Category,
+  type ComboPricingMode,
   type Product,
   type ProductOffer,
 } from '../../../lib/catalog-api';
@@ -53,11 +54,13 @@ export function ProductOffersEditor({
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [primaryPricingBusy, setPrimaryPricingBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     categoryId: '',
     price: '',
+    comboPricingMode: 'fixed' as ComboPricingMode,
     pdvCode: '',
     sortOrder: '0',
   });
@@ -97,7 +100,9 @@ export function ProductOffersEditor({
     [offers, primaryDraft.categoryId, product.categoryId],
   );
   const availableCategories = categories.filter((category) => !usedCategoryIds.has(category.id));
+  const primaryOffer = offers.find((offer) => offer.isPrimary);
   const secondary = offers.filter((offer) => !offer.isPrimary);
+  const isComboProduct = product.kind === 'combo';
 
   function openCreation() {
     const first = availableCategories[0];
@@ -105,6 +110,7 @@ export function ProductOffersEditor({
     setDraft({
       categoryId: first.id,
       price: primaryDraft.price,
+      comboPricingMode: 'fixed',
       pdvCode: primaryDraft.pdvCode,
       sortOrder: '0',
     });
@@ -128,6 +134,7 @@ export function ProductOffersEditor({
         productId: product.id,
         categoryId: draft.categoryId,
         priceCents: brlToCents(draft.price),
+        ...(isComboProduct ? { comboPricingMode: draft.comboPricingMode } : {}),
         pdvCode: draft.pdvCode.trim() || null,
         sortOrder: Number(draft.sortOrder),
       });
@@ -143,6 +150,21 @@ export function ProductOffersEditor({
 
   function replaceOffer(updated: ProductOffer) {
     setOffers((current) => current.map((offer) => (offer.id === updated.id ? updated : offer)));
+  }
+
+  async function updatePrimaryPricingMode(comboPricingMode: ComboPricingMode) {
+    if (!primaryOffer) return;
+    setPrimaryPricingBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      replaceOffer(await updateProductOffer(primaryOffer, { comboPricingMode }));
+      setMessage('Modo de preço do combo atualizado.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível salvar o modo de preço.');
+    } finally {
+      setPrimaryPricingBusy(false);
+    }
   }
 
   return (
@@ -203,6 +225,17 @@ export function ProductOffersEditor({
                     ? ` · PDV ${primaryDraft.pdvCode.trim()}`
                     : ' · sem código PDV'}
                 </p>
+                {isComboProduct && primaryOffer ? (
+                  <div className="mt-3 max-w-xs">
+                    <PricingModeSelect
+                      id={`combo-pricing-${primaryOffer.id}`}
+                      label="Modo de preço"
+                      value={primaryOffer.comboPricingMode}
+                      disabled={primaryPricingBusy}
+                      onChange={(comboPricingMode) => void updatePrimaryPricingMode(comboPricingMode)}
+                    />
+                  </div>
+                ) : null}
               </div>
               <MoBadge variant={product.available ? 'positive' : 'neutral'}>
                 {product.available ? 'À venda' : 'Esgotado'}
@@ -218,6 +251,7 @@ export function ProductOffersEditor({
               key={offer.id}
               offer={offer}
               categories={categories}
+              isComboProduct={isComboProduct}
               usedCategoryIds={usedCategoryIds}
               onUpdated={replaceOffer}
               onDeleted={(id) => setOffers((current) => current.filter((item) => item.id !== id))}
@@ -279,6 +313,17 @@ export function ProductOffersEditor({
                     }
                   />
                 </label>
+                {isComboProduct ? (
+                  <PricingModeSelect
+                    id="new-offer-combo-pricing"
+                    label="Modo de preço do combo"
+                    value={draft.comboPricingMode}
+                    disabled={busy}
+                    onChange={(comboPricingMode) =>
+                      setDraft((current) => ({ ...current, comboPricingMode }))
+                    }
+                  />
+                ) : null}
                 <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">
                   Ordem na categoria
                   <input
@@ -333,12 +378,14 @@ export function ProductOffersEditor({
 function SecondaryOfferCard({
   offer,
   categories,
+  isComboProduct,
   usedCategoryIds,
   onUpdated,
   onDeleted,
 }: {
   offer: ProductOffer;
   categories: Category[];
+  isComboProduct: boolean;
   usedCategoryIds: Set<string>;
   onUpdated: (offer: ProductOffer) => void;
   onDeleted: (id: string) => void;
@@ -346,6 +393,7 @@ function SecondaryOfferCard({
   const [draft, setDraft] = useState({
     categoryId: offer.categoryId,
     price: centsToBRL(offer.priceCents),
+    comboPricingMode: offer.comboPricingMode,
     pdvCode: offer.pdvCode ?? '',
     sortOrder: String(offer.sortOrder),
   });
@@ -357,6 +405,7 @@ function SecondaryOfferCard({
     setDraft({
       categoryId: offer.categoryId,
       price: centsToBRL(offer.priceCents),
+      comboPricingMode: offer.comboPricingMode,
       pdvCode: offer.pdvCode ?? '',
       sortOrder: String(offer.sortOrder),
     });
@@ -382,6 +431,7 @@ function SecondaryOfferCard({
         await updateProductOffer(offer, {
           categoryId: draft.categoryId,
           priceCents: brlToCents(draft.price),
+          ...(isComboProduct ? { comboPricingMode: draft.comboPricingMode } : {}),
           pdvCode: draft.pdvCode.trim() || null,
           sortOrder: Number(draft.sortOrder),
         }),
@@ -481,6 +531,17 @@ function SecondaryOfferCard({
             }
           />
         </label>
+        {isComboProduct ? (
+          <PricingModeSelect
+            id={`combo-pricing-${offer.id}`}
+            label="Modo de preço do combo"
+            value={draft.comboPricingMode}
+            disabled={busy !== null}
+            onChange={(comboPricingMode) =>
+              setDraft((current) => ({ ...current, comboPricingMode }))
+            }
+          />
+        ) : null}
         <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">
           Ordem na categoria
           <input
@@ -558,5 +619,35 @@ function SecondaryOfferCard({
         </div>
       )}
     </article>
+  );
+}
+
+function PricingModeSelect({
+  id,
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: ComboPricingMode;
+  disabled: boolean;
+  onChange: (value: ComboPricingMode) => void;
+}) {
+  return (
+    <label htmlFor={id} className="grid gap-1.5 text-sm font-semibold sm:col-span-2">
+      {label}
+      <select
+        id={id}
+        className={FIELD_CLASS}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as ComboPricingMode)}
+      >
+        <option value="fixed">Preço fixo</option>
+        <option value="sum_of_items">Somar itens do combo</option>
+      </select>
+    </label>
   );
 }

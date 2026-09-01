@@ -1,5 +1,6 @@
 import type { CatalogActor } from './catalog-actor';
 import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
+import type { ComboPricingMode, ProductKind } from '@molho/contracts';
 import type {
   CreateProductOfferInput,
   ProductOfferFilter,
@@ -21,7 +22,9 @@ export class ProductOfferService {
 
   async create(input: CreateProductOfferInput, actor: CatalogActor): Promise<ProductOfferRecord> {
     this.assertValidPrice(input.priceCents);
-    if (!(await this.repo.productExists(input.productId))) throw new CatalogNotFoundError('Produto');
+    const productKind = await this.repo.findProductKind(input.productId);
+    if (!productKind) throw new CatalogNotFoundError('Produto');
+    this.assertComboPricingFitsProduct(input.comboPricingMode, productKind);
     await this.assertCategoryExists(input.categoryId);
     await this.assertCategoryAvailable(input.productId, input.categoryId);
     return this.repo.create(input, actor);
@@ -34,11 +37,21 @@ export class ProductOfferService {
     actor: CatalogActor,
   ): Promise<ProductOfferRecord> {
     if (input.priceCents !== undefined) this.assertValidPrice(input.priceCents);
+    let current: ProductOfferRecord | undefined;
+    if (input.categoryId !== undefined || input.comboPricingMode !== undefined) {
+      current = (await this.repo.findById(id)) ?? undefined;
+      if (current === undefined) throw new CatalogNotFoundError('Oferta');
+    }
     if (input.categoryId !== undefined) {
+      if (current === undefined) throw new CatalogNotFoundError('Oferta');
       await this.assertCategoryExists(input.categoryId);
-      const current = await this.repo.findById(id);
-      if (!current) throw new CatalogNotFoundError('Oferta');
       await this.assertCategoryAvailable(current.productId, input.categoryId, id);
+    }
+    if (input.comboPricingMode !== undefined) {
+      if (current === undefined) throw new CatalogNotFoundError('Oferta');
+      const productKind = await this.repo.findProductKind(current.productId);
+      if (!productKind) throw new CatalogNotFoundError('Produto');
+      this.assertComboPricingFitsProduct(input.comboPricingMode, productKind);
     }
     return this.repo.update(id, expectedVersion, input, actor);
   }
@@ -66,6 +79,17 @@ export class ProductOfferService {
     if (!Number.isInteger(cents) || cents < 0) {
       throw new CatalogValidationError(
         'Preço precisa ser um inteiro em centavos, maior ou igual a zero.',
+      );
+    }
+  }
+
+  private assertComboPricingFitsProduct(
+    mode: ComboPricingMode | undefined,
+    productKind: ProductKind,
+  ): void {
+    if (mode === 'sum_of_items' && productKind !== 'combo') {
+      throw new CatalogValidationError(
+        'Preço pela soma dos itens só pode ser usado em produto do tipo combo.',
       );
     }
   }

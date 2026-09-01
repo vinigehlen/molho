@@ -97,23 +97,37 @@ export class CheckoutRevalidationService {
         );
       }
 
-      // Combo (fase 4.1b): preço FIXO (o da oferta do combo) — os filhos só
-      // entram como composição. Combo fica indisponível (regra 14: tela de
-      // revisão, não toast) se perdeu qualquer filho ou algum filho esgotou
-      // — o cliente não recebe "meio combo".
+      // Combo: `fixed` preserva o preço da oferta; `sum_of_items` deriva a
+      // base pelas ofertas principais dos filhos. Em ambos, perder qualquer
+      // filho derruba o combo inteiro (regra 14: revisão obrigatória).
+      let unitBasePriceCents = validOffer.basePriceCents;
       let comboComponents: RevalidatedItem['comboComponents'];
       if (validOffer.productKind === 'combo') {
         if (
           validOffer.comboComponents.length === 0 ||
-          validOffer.comboComponents.some((component) => !component.available)
+          validOffer.comboComponents.some(
+            (component) =>
+              !component.available ||
+              (validOffer.comboPricingMode === 'sum_of_items' &&
+                component.unitBasePriceCents === null),
+          )
         ) {
           hasUnfavorableDivergence = true;
           return unavailableItem(input, validOffer.name, validOffer.basePriceCents);
+        }
+        if (validOffer.comboPricingMode === 'sum_of_items') {
+          unitBasePriceCents = validOffer.comboComponents.reduce(
+            (sum, component) => sum + (component.unitBasePriceCents ?? 0) * component.quantity,
+            0,
+          );
         }
         comboComponents = validOffer.comboComponents.map((component) => ({
           childProductId: component.childProductId,
           name: component.name,
           quantity: component.quantity,
+          ...(validOffer.comboPricingMode === 'sum_of_items'
+            ? { unitBasePriceCents: component.unitBasePriceCents ?? 0 }
+            : {}),
         }));
       }
 
@@ -126,12 +140,12 @@ export class CheckoutRevalidationService {
         // composição, item some igual a produto indisponível.
         if (!modifier) {
           hasUnfavorableDivergence = true;
-          return unavailableItem(input, validOffer.name, validOffer.basePriceCents);
+          return unavailableItem(input, validOffer.name, unitBasePriceCents);
         }
         resolvedModifiers.push({ modifierId: modifier.id, name: modifier.name, priceDeltaCents: modifier.priceDeltaCents });
       }
 
-      const unitCents = validOffer.basePriceCents + resolvedModifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
+      const unitCents = unitBasePriceCents + resolvedModifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
       const clientUnitCents = input.unitBasePriceCents + input.modifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
       const priceChanged = unitCents !== clientUnitCents;
       if (unitCents > clientUnitCents) hasUnfavorableDivergence = true;
@@ -141,7 +155,7 @@ export class CheckoutRevalidationService {
         offerId: validOffer.id,
         name: validOffer.name,
         available: true,
-        unitBasePriceCents: validOffer.basePriceCents,
+        unitBasePriceCents,
         modifiers: resolvedModifiers,
         quantity: input.quantity,
         notes: input.notes,

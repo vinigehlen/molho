@@ -22,7 +22,7 @@ export interface MoProductSheetProduct {
   imageUrl?: string | null;
   basePriceCents: number;
   modifierGroups: MoProductSheetModifierGroup[];
-  /** Combo (fase 4.1b): o que vem dentro. Exibição pura — o preço é `basePriceCents` (fixo). */
+  /** Combo: o que vem dentro. Exibição pura — o preço já vem consolidado em `basePriceCents`. */
   comboItems?: { name: string; quantity: number }[];
 }
 

@@ -3,8 +3,9 @@
 Atualizado em: 2026-09-01
 
 Status pós-sessão Codex: P1.1, P1.2, P1.3, P2.4 e P2.5 foram implementados
-nesta fatia. P2.6 continua como decisão de PM antes de qualquer migration de
-preço da 4.2.
+na fatia `codex/correcoes-pre-combos-4-2` (`c50c6c3`). P2.6 foi decidido na
+fatia 4.2A: o modo de preço pertence a `ProductOffer`, com enum
+`fixed | sum_of_items`.
 
 ## Objetivo
 
@@ -148,9 +149,9 @@ flag única `fixed | sum` do combo. As alternativas coerentes são:
 | `ProductOffer` | cada apresentação comercial pode ser fixa ou calculada; alinhado ao 4C |
 | `ComboItem` | somente dados por filho, como contribuição, inclusão ou taxa; não o modo agregado |
 
-**Decisão necessária do PM:** o mesmo combo pode ter preço fixo numa categoria
-e `sum_of_items` em outra? Se sim, o modo pertence a `ProductOffer`. Se não,
-`Product` é a opção mais simples. Registrar a decisão antes de criar migration.
+**Decisão registrada na 4.2A:** o mesmo combo pode ter preço fixo numa
+categoria e `sum_of_items` em outra. O modo pertence a `ProductOffer`, pois a
+semântica acompanha a apresentação comercial criada no 4C.
 
 ## Estado das migrations
 
@@ -177,8 +178,8 @@ evolução da 4.2 usa migration nova, idempotente e inspecionada conforme
    `docs/07-aprendizados.md`.
 2. Corrigir autoridade e handoffs (P1.1, P1.2, P2.4 e P2.5).
 3. Implementar e provar o lock da composição (P1.3) como fatia própria.
-4. Pedir/registrar a decisão de ownership de preço (P2.6).
-5. Só depois planejar a primeira fatia funcional da 4.2.
+4. Implementar a primeira fatia funcional da 4.2 (`combo_pricing_mode` em
+   `ProductOffer`).
 
 ## Gates da fatia de concorrência
 

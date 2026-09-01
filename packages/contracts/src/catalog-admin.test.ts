@@ -46,6 +46,7 @@ describe('contratos de ProductOffer', () => {
         categoryId: CATEGORY_ID,
         priceCents: 2590,
         available: true,
+        comboPricingMode: 'fixed',
         pdvCode: 'PDV-42',
         sortOrder: 3,
         isPrimary: true,
@@ -61,12 +62,14 @@ describe('contratos de ProductOffer', () => {
         categoryId: CATEGORY_ID,
         priceCents: 2390,
         available: true,
+        comboPricingMode: 'sum_of_items',
       }),
     ).toEqual({
       productId: PRODUCT_ID,
       categoryId: CATEGORY_ID,
       priceCents: 2390,
       available: true,
+      comboPricingMode: 'sum_of_items',
     });
     expect(
       createCatalogProductOfferSchema.safeParse({
@@ -81,6 +84,12 @@ describe('contratos de ProductOffer', () => {
   it.each([-1, 25.5])('rejeita preço fora da regra de centavos: %s', (priceCents) => {
     const result = updateCatalogProductOfferSchema.safeParse({ version: 0, priceCents });
     expect(result.success).toBe(false);
+  });
+
+  it('rejeita modo de preço de combo fora do enum', () => {
+    expect(
+      updateCatalogProductOfferSchema.safeParse({ version: 0, comboPricingMode: 'por_pessoa' }).success,
+    ).toBe(false);
   });
 
   it('não aceita available no PATCH genérico', () => {

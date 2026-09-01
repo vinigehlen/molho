@@ -24,6 +24,8 @@ export interface CheckoutComboComponentRecord {
   childProductId: string;
   name: string;
   quantity: number;
+  /** Preço da oferta principal viva do filho, usado quando o combo é `sum_of_items`. */
+  unitBasePriceCents: number | null;
   /** `childProduct.available` E oferta principal do filho disponível. */
   available: boolean;
 }
@@ -35,6 +37,7 @@ export interface CheckoutOfferRecord {
   name: string;
   basePriceCents: number;
   available: boolean;
+  comboPricingMode: 'fixed' | 'sum_of_items';
   /** Natureza do produto (fase 3). `combo` liga a cascata de disponibilidade. */
   productKind: 'prepared' | 'industrialized' | 'combo';
   /**
@@ -139,6 +142,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         isPrimary: true,
         priceCents: true,
         available: true,
+        comboPricingMode: true,
         product: {
           select: {
             name: true,
@@ -172,7 +176,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
                     available: true,
                     offers: {
                       where: { isPrimary: true, deletedAt: null },
-                      select: { available: true },
+                      select: { available: true, priceCents: true },
                     },
                   },
                 },
@@ -189,6 +193,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       name: row.product.name,
       basePriceCents: row.priceCents,
       available: row.available,
+      comboPricingMode: row.comboPricingMode,
       productKind: row.product.kind,
       modifiers: row.product.productModifierGroups.flatMap(
         (link) => link.modifierGroup.modifiers,
@@ -197,6 +202,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         childProductId: item.childProductId,
         name: item.childProduct.name,
         quantity: item.quantity,
+        unitBasePriceCents: item.childProduct.offers[0]?.priceCents ?? null,
         available: item.childProduct.available && item.childProduct.offers[0]?.available === true,
       })),
     }));

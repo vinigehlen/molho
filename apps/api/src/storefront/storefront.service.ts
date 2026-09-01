@@ -102,7 +102,12 @@ export class StorefrontService {
               // Composição do combo (fase 4.1b) — só no storefront opt-in,
               // mesma negociação do `offerId` (4C), e só quando há filhos.
               ...(catalogOffers && product.kind === 'combo' && product.comboItems.length > 0
-                ? { comboItems: product.comboItems }
+                ? {
+                    comboItems: product.comboItems.map((item) => ({
+                      name: item.name,
+                      quantity: item.quantity,
+                    })),
+                  }
                 : {}),
               modifierGroups: product.modifierGroups.map((group) => ({
                 id: group.id,

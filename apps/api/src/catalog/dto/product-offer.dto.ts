@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+
+const COMBO_PRICING_MODES = ['fixed', 'sum_of_items'] as const;
 
 export class CreateProductOfferDto {
   @IsUUID(7)
@@ -16,6 +18,10 @@ export class CreateProductOfferDto {
   @IsOptional()
   @IsBoolean()
   available?: boolean;
+
+  @IsOptional()
+  @IsIn(COMBO_PRICING_MODES)
+  comboPricingMode?: 'fixed' | 'sum_of_items';
 
   @IsOptional()
   @IsString()
@@ -42,6 +48,10 @@ export class UpdateProductOfferDto {
   @IsInt()
   @Min(0)
   priceCents?: number;
+
+  @IsOptional()
+  @IsIn(COMBO_PRICING_MODES)
+  comboPricingMode?: 'fixed' | 'sum_of_items';
 
   @IsOptional()
   @IsString()

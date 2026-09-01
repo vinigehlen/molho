@@ -390,8 +390,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
           })),
         });
       }
-      // Combo (fase 4.1b) — snapshot dos filhos. Só existe em item de combo;
-      // não afeta lineTotalCents (preço fixo).
+      // Combo — snapshot dos filhos. Em `sum_of_items`, também congela o
+      // preço unitário que formou a base do combo.
       if (item.comboComponents && item.comboComponents.length > 0) {
         await client.orderItemComponent.createMany({
           data: item.comboComponents.map((component) => ({
@@ -400,6 +400,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
             childProductId: component.childProductId,
             name: component.name,
             quantity: component.quantity,
+            unitPriceCents: component.unitBasePriceCents ?? null,
           })),
         });
       }

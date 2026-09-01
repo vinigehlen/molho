@@ -26,6 +26,7 @@ class FakeProductOfferRepository implements ProductOfferRepository {
         categoryId: 'category-1',
         priceCents: 2500,
         available: true,
+        comboPricingMode: 'fixed',
         pdvCode: null,
         sortOrder: 0,
         isPrimary: true,
@@ -34,6 +35,10 @@ class FakeProductOfferRepository implements ProductOfferRepository {
     ],
   ]);
   categoryIds = new Set(['category-1', 'category-2']);
+  productKinds = new Map([
+    ['product-1', 'prepared' as const],
+    ['combo-1', 'combo' as const],
+  ]);
   lastActor: CatalogActor | null = null;
 
   async list(filter: ProductOfferFilter): Promise<ProductOfferRecord[]> {
@@ -49,7 +54,11 @@ class FakeProductOfferRepository implements ProductOfferRepository {
   }
 
   async productExists(productId: string): Promise<boolean> {
-    return productId === 'product-1';
+    return this.productKinds.has(productId);
+  }
+
+  async findProductKind(productId: string) {
+    return this.productKinds.get(productId) ?? null;
   }
 
   async categoryExists(categoryId: string): Promise<boolean> {
@@ -67,6 +76,7 @@ class FakeProductOfferRepository implements ProductOfferRepository {
       id: `offer-${this.rows.size + 1}`,
       ...input,
       available: input.available ?? true,
+      comboPricingMode: input.comboPricingMode ?? 'fixed',
       pdvCode: input.pdvCode ?? null,
       sortOrder: input.sortOrder ?? 0,
       isPrimary: false,
@@ -160,6 +170,28 @@ describe('ProductOfferService', () => {
     const updated = await service.update('offer-1', 0, { priceCents: 2790 }, ACTOR);
     expect(updated).toMatchObject({ priceCents: 2790, version: 1 });
     expect(repo.lastActor).toEqual(ACTOR);
+  });
+
+  it('aceita preço pela soma dos itens apenas para produto combo', async () => {
+    const { repo, service } = setup();
+    repo.rows.set('offer-combo', {
+      ...repo.rows.get('offer-1')!,
+      id: 'offer-combo',
+      productId: 'combo-1',
+      categoryId: 'category-2',
+    });
+
+    const updated = await service.update(
+      'offer-combo',
+      0,
+      { comboPricingMode: 'sum_of_items' },
+      ACTOR,
+    );
+
+    expect(updated.comboPricingMode).toBe('sum_of_items');
+    await expect(
+      service.update('offer-1', 0, { comboPricingMode: 'sum_of_items' }, ACTOR),
+    ).rejects.toThrow('Preço pela soma dos itens só pode ser usado em produto do tipo combo.');
   });
 
   it.each([-1, 10.5])('rejeita preço inválido: %s', async (priceCents) => {

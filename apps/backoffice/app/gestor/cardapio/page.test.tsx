@@ -133,6 +133,7 @@ beforeEach(() => {
       categoryId: 'cat-1',
       priceCents: 9500,
       available: true,
+      comboPricingMode: 'fixed',
       pdvCode: '101',
       sortOrder: 0,
       isPrimary: true,
