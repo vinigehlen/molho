@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Molho — plataforma de cardápio digital, PDV e delivery. O ingrediente que transforma.",
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.13.1",
   "engines": {
     "node": ">=22"
   },
