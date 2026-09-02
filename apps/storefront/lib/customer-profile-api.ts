@@ -82,3 +82,27 @@ export async function deleteCustomerAddress(
 export async function listCustomerOrders(slug: string, token: string): Promise<CustomerOrderSummary[]> {
   return customerOrderSummaryListSchema.parse(await request(slug, token, '/orders'));
 }
+
+export class ReviewAlreadyExistsError extends Error {}
+
+/**
+ * Fora do helper `request()` — a rota não é `/me/*`, é `/orders/:orderId/review`
+ * (Épico 16, D1). `409` aqui é "esse pedido já foi avaliado", mensagem
+ * diferente do 409 genérico de `request()` ("dados mudaram em outra sessão").
+ */
+export async function createReview(
+  slug: string,
+  token: string,
+  orderId: string,
+  input: { rating: number; comment?: string },
+): Promise<void> {
+  const response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/review`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (response.status === 401) throw new CustomerProfileUnauthorizedError('Sua sessão expirou.');
+  if (response.status === 409) throw new ReviewAlreadyExistsError('Esse pedido já foi avaliado.');
+  if (response.status === 403) throw new Error('Esse pedido não pode ser avaliado.');
+  if (!response.ok) throw new Error('Não deu pra enviar sua avaliação agora.');
+}

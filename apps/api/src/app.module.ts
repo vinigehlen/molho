@@ -12,6 +12,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
 import { PlatformModule } from './platform/platform.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { SchedulingSlotAdminModule } from './scheduling-slots/scheduling-slot-admin.module';
 import { SignupModule } from './signup/signup.module';
 import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
@@ -34,6 +35,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     StoreSetupModule,
     SchedulingSlotAdminModule,
     PlatformModule,
+    ReviewsModule,
     SignupModule,
   ],
   controllers: [HealthController],

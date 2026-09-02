@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { LayoutGrid, List, MapPin, User } from 'lucide-react';
+import { LayoutGrid, List, MapPin, Star, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
@@ -65,6 +65,8 @@ export interface TenantMenuProps {
   minOrderCents: number;
   /** Já formatada por inteiro em page.tsx — `null` quando a loja está aberta agora. */
   closedMessage: string | null;
+  /** Épico 16, D4 — só nota média + contagem. `average: null` = loja sem avaliação nenhuma. */
+  reviewsSummary?: { average: number | null; count: number };
 }
 
 /** Nenhum grupo obrigatório: dá pra adicionar com o "+" sem abrir o detalhe. */
@@ -77,7 +79,7 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
 
 const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
 
-export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage }: TenantMenuProps) {
+export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage, reviewsSummary }: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
   // Sempre 'list' no SSR e no primeiro paint (senão a hidratação diverge); lê a
   // preferência salva logo após o mount — o "flash" de 1 frame é preferível.
@@ -202,6 +204,12 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
         <div className="flex flex-col gap-1">
           <h1 className="text-title-lg">{storeName}</h1>
           <p className="text-body opacity-90">{saudacao}</p>
+          {reviewsSummary && reviewsSummary.count > 0 ? (
+            <p className="flex items-center gap-1 text-caption opacity-90">
+              <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+              {reviewsSummary.average?.toFixed(1)} ({reviewsSummary.count} avaliaç{reviewsSummary.count === 1 ? 'ão' : 'ões'})
+            </p>
+          ) : null}
         </div>
         {/* Sem link nenhum pro cardápio, /minha-conta (já com histórico de
             pedidos pronto) ficava só alcançável digitando a URL na mão —

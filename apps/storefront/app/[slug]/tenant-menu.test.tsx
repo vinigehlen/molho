@@ -88,6 +88,16 @@ describe('TenantMenu — Épico 6', () => {
     expect(screen.queryByText(/cozinha tá descansando/)).not.toBeInTheDocument();
   });
 
+  it('reviewsSummary com avaliação: mostra nota média + contagem (Épico 16, D4)', () => {
+    renderTenantMenu({ reviewsSummary: { average: 4.7, count: 12 } });
+    expect(screen.getByText('4.7 (12 avaliações)')).toBeInTheDocument();
+  });
+
+  it('reviewsSummary sem avaliação nenhuma (count 0): não mostra badge', () => {
+    renderTenantMenu({ reviewsSummary: { average: null, count: 0 } });
+    expect(screen.queryByText(/avaliaç/)).not.toBeInTheDocument();
+  });
+
   it('sem endereço salvo: mostra o prompt "Adicionar endereço de entrega"', () => {
     renderTenantMenu();
     expect(screen.getByText('Adicionar endereço de entrega')).toBeInTheDocument();

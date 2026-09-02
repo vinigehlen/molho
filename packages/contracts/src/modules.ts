@@ -89,7 +89,9 @@ export const MODULES = {
   // `default: true` = nasce ligado em todo tenant com direito.
   combos: { plans: PLANS, default: true },
   loyalty: { plans: ['pro', 'premium'] },
-  reviews: { plans: ['pro', 'premium'] },
+  // Sem tiering por ora (mesma decisão de coupons/combos): código completo,
+  // nasce ligado em qualquer plano.
+  reviews: { plans: PLANS, default: true },
   campaigns: { plans: ['premium'], metered: true },
 
   // ─── Gestão ─────────────────────────────────────────────────────────────────

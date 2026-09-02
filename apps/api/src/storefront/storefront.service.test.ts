@@ -48,6 +48,10 @@ class FakeStorefrontRepository implements StorefrontRepository {
   async listStoreHours() {
     return this.hours;
   }
+  reviewsSummary: { average: number | null; count: number } = { average: null, count: 0 };
+  async getReviewsSummary() {
+    return this.reviewsSummary;
+  }
 }
 
 /** Por padrão devolve os 3 métodos (caminho feliz) — testes de disponibilidade sobrescrevem `methods`. */
