@@ -1,5 +1,5 @@
 import { API_URL } from './api-config';
-import { subFromToken } from './jwt-tenant';
+import { isPlatformSuperadmin, subFromToken } from './jwt-tenant';
 import {
   clearStaffSession,
   getPreferredTenantId,
@@ -22,6 +22,17 @@ interface LoginResult {
   user: { id: string; name: string };
   tenants: StaffTenant[];
 }
+
+/**
+ * Sentinela pro staff `platform.superadmin` — ele não tem tenant nenhum
+ * (escopo `platform`), mas `StaffSession` exige um `tenantId` porque é o
+ * mesmo modelo de sessão usado por `/gestor/*`. `X-Tenant-Id: platform`
+ * nunca bate com um tenant real (não é UUID) — se por engano uma chamada de
+ * rota tenant-scoped sair daqui, falha alto (404/400), nunca silenciosamente
+ * num tenant de verdade. Rotas de plataforma (`@RequirePlatformContext`)
+ * ignoram esse header, leem o papel direto do JWT.
+ */
+export const PLATFORM_TENANT: StaffTenant = { id: 'platform', name: 'Plataforma', slug: 'platform', stores: [] };
 
 async function fetchForLogin(url: string, init: RequestInit | undefined, networkMessage: string): Promise<Response> {
   try {
@@ -121,6 +132,10 @@ export function refreshStaffSession(): Promise<StaffSession | null> {
     const preferredId = getStaffSession()?.tenantId ?? getPreferredTenantId();
     const tenant = tenants.find((item) => item.id === preferredId) ?? tenants[0];
     if (!tenant) {
+      // Sem tenant nenhum: só é sessão válida se for platform.superadmin
+      // (nunca tem tenant, de propósito) — qualquer outro staff sem tenant
+      // continua caindo fora, mesmo comportamento de antes.
+      if (isPlatformSuperadmin(accessToken)) return activateStaffSession(accessToken, PLATFORM_TENANT);
       clearStaffSession();
       return null;
     }

@@ -3,6 +3,7 @@ import {
   activateStaffSession,
   fetchOtpChannel,
   logoutStaffSession,
+  PLATFORM_TENANT,
   requestStaffOtp,
   refreshStaffSession,
   verifyStaffOtp,
@@ -17,8 +18,8 @@ const TENANT: StaffTenant = {
   stores: [{ id: 'store-1', name: 'Cabanhas BBQ' }],
 };
 
-function jwt(sub: string): string {
-  return `h.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.s`;
+function jwt(sub: string, roles: string[] = []): string {
+  return `h.${Buffer.from(JSON.stringify({ sub, roles })).toString('base64url')}.s`;
 }
 
 function json(body: unknown, status = 200, headers?: HeadersInit): Response {
@@ -112,6 +113,36 @@ describe('staff-auth', () => {
     await refreshStaffSession();
 
     expect(lockRequest).toHaveBeenCalledWith('molho.staff-refresh', expect.any(Function));
+  });
+
+  it('platform.superadmin sem tenant nenhum vira sessão de plataforma no refresh', async () => {
+    const accessToken = jwt('superadmin-1', ['platform.superadmin']);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(json({ accessToken }))
+        .mockResolvedValueOnce(json({ tenants: [] })),
+    );
+
+    const session = await refreshStaffSession();
+
+    expect(session?.tenantId).toBe(PLATFORM_TENANT.id);
+    expect(getStaffSession()?.tenantId).toBe(PLATFORM_TENANT.id);
+  });
+
+  it('staff comum sem tenant nenhum continua sem sessão', async () => {
+    const accessToken = jwt('staff-sem-tenant');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(json({ accessToken }))
+        .mockResolvedValueOnce(json({ tenants: [] })),
+    );
+
+    const session = await refreshStaffSession();
+
+    expect(session).toBeNull();
+    expect(getStaffSession()).toBeNull();
   });
 
   it('só apaga a sessão local depois que o servidor confirma o logout', async () => {

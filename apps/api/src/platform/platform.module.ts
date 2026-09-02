@@ -9,6 +9,7 @@ import { ModulePanelController } from './module-panel.controller';
 import { ModulePanelRepository } from './module-panel.repository';
 import { ModulePanelService } from './module-panel.service';
 import { MODULE_PANEL_REPOSITORY, MODULE_PANEL_SERVICE } from './module-panel.tokens';
+import { PlatformTenantsController } from './platform-tenants.controller';
 import { StaffProvisioningController } from './staff-provisioning.controller';
 import { StaffProvisioningRepository } from './staff-provisioning.repository';
 import { StaffProvisioningService } from './staff-provisioning.service';
@@ -16,7 +17,7 @@ import { STAFF_PROVISIONING_REPOSITORY, STAFF_PROVISIONING_SERVICE } from './sta
 
 @Module({
   imports: [AuthModule, ContextModule, TokenModule, ModuleCheckModule],
-  controllers: [StaffProvisioningController, ModulePanelController],
+  controllers: [StaffProvisioningController, ModulePanelController, PlatformTenantsController],
   providers: [
     {
       provide: STAFF_PROVISIONING_REPOSITORY,
