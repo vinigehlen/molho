@@ -163,6 +163,7 @@ model Tenant {
   orderAdjustments      OrderAdjustment[]
   printJobs             PrintJob[]
   coupons               Coupon[]
+  reviews               Review[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -276,6 +277,7 @@ model Customer {
   addresses            Address[]
   orders               Order[]
   orderStatusHistories OrderStatusHistory[]
+  reviews              Review[]
 
   // Alvo de FK composta (addresses.customer_id) — índice único (id,
   // tenant_id) à mão na migration (Épico 6). Fica VAZIA neste épico —
@@ -1058,6 +1060,9 @@ model Order {
   statusHistory   OrderStatusHistory[]
   adjustments     OrderAdjustment[]
   printJobs       PrintJob[]
+  /// Sempre 0 ou 1 na prática (único vivo por pedido, índice parcial na
+  /// migration) — array só porque o Prisma exige 1:N sem `@unique` na FK.
+  reviews         Review[]
 
   @@unique([tenantId, idempotencyKey])
   // FKs compostas (store_id/customer_id/delivery_address_id, tenant_id) →
@@ -1113,6 +1118,39 @@ model Coupon {
 
   @@index([tenantId, code])
   @@map("coupons")
+}
+
+/// Avaliação do pedido (Épico 16) — imutável do lado do cliente (nasce com
+/// nota+comentário, nunca edita depois); `reply`/`repliedAt` são a ÚNICA
+/// mutação possível, e só o lojista faz. `version` existe pela regra geral
+/// de optimistic locking em tabela mutável (CLAUDE.md), mesmo a única
+/// escrita concorrente plausível ser duas respostas do lojista quase juntas.
+model Review {
+  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  /// Um review por pedido — único parcial (`deleted_at IS NULL`) na migration.
+  orderId    String    @map("order_id") @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  /// 1–5, CHECK na migration.
+  rating     Int
+  comment    String?
+  reply      String?
+  repliedAt  DateTime? @map("replied_at")
+  version    Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// FK real é composta (order_id, tenant_id) → orders(id, tenant_id), à mão
+  /// na migration — mesmo padrão de OrderItem.order acima: o Prisma DSL só
+  /// expressa a coluna simples, a defesa contra "pedido de outro tenant"
+  /// mora no banco.
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@map("reviews")
 }
 
 /// Append-only — mesmo tratamento de audit_log: sem version/deletedAt,

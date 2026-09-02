@@ -54,6 +54,7 @@ export default async function TenantHomePage({ params }: TenantHomePageProps) {
       categories={store.categories}
       minOrderCents={store.store.minOrderCents}
       closedMessage={closedMessage}
+      reviewsSummary={store.store.reviewsSummary}
     />
   );
 }

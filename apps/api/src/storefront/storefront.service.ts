@@ -27,11 +27,12 @@ export class StorefrontService {
   async getStorefront(
     { catalogOffers = false }: { catalogOffers?: boolean } = {},
   ): Promise<StorefrontPayload> {
-    const [tenant, store, categories, hours] = await Promise.all([
+    const [tenant, store, categories, hours, reviewsSummary] = await Promise.all([
       this.repository.findTenant(),
       this.repository.findStore(),
       this.repository.listMenu(),
       this.repository.listStoreHours(),
+      this.repository.getReviewsSummary(),
     ]);
     const availablePaymentMethods = await this.paymentMethods.list(store);
     const guestCheckout = await this.guestGate.isActive();
@@ -63,6 +64,7 @@ export class StorefrontService {
         isOpenNow,
         nextOpensAt,
         availablePaymentMethods,
+        reviewsSummary,
       },
       // Backend é fonte única do canal de OTP — o front NÃO tem env própria
       // pra isso (duas fontes divergiriam num deploy e o login pararia sem

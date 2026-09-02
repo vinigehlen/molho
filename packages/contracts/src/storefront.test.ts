@@ -17,6 +17,7 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
       isOpenNow: true,
       nextOpensAt: null,
       availablePaymentMethods: ['pix', 'cash_on_delivery', 'card_on_delivery'],
+      reviewsSummary: { average: null, count: 0 },
     },
     categories: [
       {

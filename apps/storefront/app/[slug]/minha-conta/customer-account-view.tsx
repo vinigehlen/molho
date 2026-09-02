@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import type {
   CustomerOrderSummary,
   CustomerProfile,
@@ -21,12 +21,14 @@ import {
 } from '@molho/ui';
 import {
   createCustomerAddress,
+  createReview,
   CustomerProfileConflictError,
   CustomerProfileUnauthorizedError,
   deleteCustomerAddress,
   getCustomerProfile,
   listCustomerAddresses,
   listCustomerOrders,
+  ReviewAlreadyExistsError,
   updateCustomerAddress,
   updateCustomerProfile,
 } from '../../../lib/customer-profile-api';
@@ -58,6 +60,8 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
   const [editingAddress, setEditingAddress] = React.useState<
     CustomerProfileAddress | null | undefined
   >(undefined);
+  const [reviewingOrderId, setReviewingOrderId] = React.useState<string | null>(null);
+  const [reviewedOrderIds, setReviewedOrderIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => setMounted(true), []);
   React.useEffect(() => {
@@ -133,6 +137,25 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
       await deleteCustomerAddress(slug, session.token, address.id, address.version);
       setAddresses((current) => current.filter((item) => item.id !== address.id));
     } catch (cause) {
+      handleMutationError(cause);
+    }
+  }
+
+  async function submitReview(orderId: string, rating: number, comment: string) {
+    if (!session.token) return;
+    setError(null);
+    try {
+      await createReview(slug, session.token, orderId, { rating, ...(comment.trim() ? { comment: comment.trim() } : {}) });
+      setReviewedOrderIds((current) => new Set(current).add(orderId));
+      setReviewingOrderId(null);
+    } catch (cause) {
+      // "já avaliado" não é erro de sessão/dados — só fecha o formulário,
+      // sem mandar pro handler genérico (que mostraria "recarregue a página").
+      if (cause instanceof ReviewAlreadyExistsError) {
+        setReviewedOrderIds((current) => new Set(current).add(orderId));
+        setReviewingOrderId(null);
+        return;
+      }
       handleMutationError(cause);
     }
   }
@@ -266,6 +289,23 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
                 <p className="mt-2 text-caption text-text-muted">
                   {order.items.map((item) => `${item.quantity}× ${item.name}`).join(' · ')}
                 </p>
+                {/* D1: só pedido completed pode ser avaliado, e só uma vez —
+                    `reviewedOrderIds` é otimista (sem readback do backend),
+                    mas o servidor sempre revalida (409 se já existir). */}
+                {order.status === 'completed' && !reviewedOrderIds.has(order.id) ? (
+                  reviewingOrderId === order.id ? (
+                    <OrderReviewForm
+                      onCancel={() => setReviewingOrderId(null)}
+                      onSubmit={(rating, comment) => void submitReview(order.id, rating, comment)}
+                    />
+                  ) : (
+                    <MoButton variant="ghost" size="sm" className="mt-2" onClick={() => setReviewingOrderId(order.id)}>
+                      Avaliar pedido
+                    </MoButton>
+                  )
+                ) : order.status === 'completed' ? (
+                  <p className="mt-2 text-caption text-text-muted">Obrigado pela avaliação!</p>
+                ) : null}
               </MoCardContent>
             </MoCard>
           ))
@@ -311,5 +351,53 @@ function AccountShell({
       </header>
       <div className="flex flex-col gap-8">{children}</div>
     </main>
+  );
+}
+
+/** Nota 1-5 + comentário opcional (D1: imutável, sem editar depois de enviar). */
+function OrderReviewForm({
+  onCancel,
+  onSubmit,
+}: {
+  onCancel: () => void;
+  onSubmit: (rating: number, comment: string) => void;
+}) {
+  const [rating, setRating] = React.useState(0);
+  const [comment, setComment] = React.useState('');
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-md border border-border p-3">
+      <div className="flex gap-1" role="radiogroup" aria-label="Nota do pedido">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={rating === value}
+            aria-label={`${value} estrela${value > 1 ? 's' : ''}`}
+            onClick={() => setRating(value)}
+            className="-m-1 p-1"
+          >
+            <Star
+              className={cn('h-6 w-6', value <= rating ? 'fill-brand text-brand' : 'text-border-strong')}
+              aria-hidden="true"
+            />
+          </button>
+        ))}
+      </div>
+      <MoInput
+        label="Comentário (opcional)"
+        value={comment}
+        onChange={(e) => setComment(e.currentTarget.value)}
+      />
+      <div className="flex gap-2">
+        <MoButton size="sm" disabled={rating === 0} onClick={() => onSubmit(rating, comment)}>
+          Enviar avaliação
+        </MoButton>
+        <MoButton variant="ghost" size="sm" onClick={onCancel}>
+          Cancelar
+        </MoButton>
+      </div>
+    </div>
   );
 }

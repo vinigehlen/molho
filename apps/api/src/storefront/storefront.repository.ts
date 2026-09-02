@@ -76,6 +76,7 @@ export interface StorefrontRepository {
   findStore(): Promise<StorefrontStoreRecord | null>;
   listMenu(): Promise<StorefrontCategoryRecord[]>;
   listStoreHours(): Promise<StorefrontHoursRecord[]>;
+  getReviewsSummary(): Promise<{ average: number | null; count: number }>;
 }
 
 /**
@@ -97,6 +98,16 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
       where: { deletedAt: null },
       select: { slug: true, name: true, themeKey: true, timezone: true },
     });
+  }
+
+  /** Agregado público (Épico 16, D4) — `average: null` sem review nenhum, nunca `0`. */
+  async getReviewsSummary(): Promise<{ average: number | null; count: number }> {
+    const result = await this.requestContext.getClient().review.aggregate({
+      where: { deletedAt: null },
+      _avg: { rating: true },
+      _count: true,
+    });
+    return { average: result._avg.rating, count: result._count };
   }
 
   /**

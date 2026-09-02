@@ -20,6 +20,7 @@
 
 import { z } from 'zod';
 import { paymentMethodSchema } from './checkout';
+import { reviewsSummarySchema } from './review';
 
 /** Dinheiro é SEMPRE inteiro em centavos (CLAUDE.md regra 4). Nunca float, nunca string. */
 const centsSchema = z.int().nonnegative();
@@ -141,6 +142,12 @@ export const storefrontStoreSchema = z.strictObject({
    * inteiro, com aviso, antes de montar carrinho nenhum.
    */
   availablePaymentMethods: z.array(paymentMethodSchema),
+  /**
+   * Agregado de avaliações (Épico 16, D4) — só nota média + contagem, sem
+   * lista individual por ora. `average: null` quando `count === 0` (loja sem
+   * avaliação nenhuma ainda — nunca `0`, que pareceria nota mínima real).
+   */
+  reviewsSummary: reviewsSummarySchema,
 });
 
 export const storefrontPayloadSchema = z.strictObject({
