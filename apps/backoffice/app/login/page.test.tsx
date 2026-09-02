@@ -9,19 +9,32 @@ const mocks = vi.hoisted(() => ({
   router: { replace: vi.fn() },
   fetchOtpChannel: vi.fn(),
   getStaffSession: vi.fn(),
+  verifyStaffOtp: vi.fn(),
+  activateStaffSession: vi.fn(),
+  isPlatformSuperadmin: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => mocks.router }));
 vi.mock('../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession }));
 vi.mock('../../lib/staff-auth', () => ({
   fetchOtpChannel: mocks.fetchOtpChannel,
-  activateStaffSession: vi.fn(),
+  activateStaffSession: mocks.activateStaffSession,
   requestStaffOtp: vi.fn(),
-  verifyStaffOtp: vi.fn(),
+  verifyStaffOtp: mocks.verifyStaffOtp,
+  PLATFORM_TENANT: { id: 'platform', name: 'Plataforma', slug: 'platform', stores: [] },
 }));
+vi.mock('../../lib/jwt-tenant', () => ({ isPlatformSuperadmin: mocks.isPlatformSuperadmin }));
 
 let container: HTMLDivElement;
 let root: Root;
+
+async function setInput(input: HTMLInputElement | null, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  await act(async () => {
+    setter?.call(input, value);
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
 
 async function renderPage(): Promise<void> {
   await act(async () => {
@@ -66,6 +79,31 @@ describe('LoginPage', () => {
     expect(container.textContent).not.toContain('Celular');
     const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Tentar novamente');
     expect(retry).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it('platform.superadmin sem tenant nenhum: entra na sessão de plataforma, não no erro genérico', async () => {
+    mocks.fetchOtpChannel.mockResolvedValue('email');
+    mocks.verifyStaffOtp.mockResolvedValue({ accessToken: 'token-superadmin', user: { id: 'u1', name: 'Admin' }, tenants: [] });
+    mocks.isPlatformSuperadmin.mockReturnValue(true);
+
+    await renderPage();
+    await vi.waitFor(() => expect(container.querySelector('#identifier')).not.toBeNull());
+
+    await setInput(container.querySelector('#identifier'), 'super@molho.live');
+    await act(async () => {
+      container.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await setInput(container.querySelector('#code'), '123456');
+    await act(async () => {
+      container.querySelector('#code')?.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mocks.activateStaffSession).toHaveBeenCalledWith('token-superadmin', expect.objectContaining({ id: 'platform' }));
+    expect(mocks.router.replace).toHaveBeenCalledWith('/plataforma');
+    expect(container.textContent).not.toContain('Seu acesso ainda não está ligado a um restaurante.');
   });
 
   it('renderiza o identificador de e-mail quando a API configura esse canal', async () => {

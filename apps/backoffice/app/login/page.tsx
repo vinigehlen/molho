@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   activateStaffSession,
   fetchOtpChannel,
+  PLATFORM_TENANT,
   requestStaffOtp,
   verifyStaffOtp,
   type StaffTenant,
 } from '../../lib/staff-auth';
+import { isPlatformSuperadmin } from '../../lib/jwt-tenant';
 import { getStaffSession } from '../../lib/staff-session';
 
 export default function LoginPage() {
@@ -33,8 +35,9 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (getStaffSession()) {
-      router.replace('/gestor');
+    const session = getStaffSession();
+    if (session) {
+      router.replace(session.tenantId === PLATFORM_TENANT.id ? '/plataforma' : '/gestor');
       return;
     }
     loadChannel();
@@ -60,7 +63,13 @@ export default function LoginPage() {
     setError(null);
     try {
       const result = await verifyStaffOtp(channel, identifier.trim(), code);
-      if (result.tenants.length === 0) throw new Error('Seu acesso ainda não está ligado a um restaurante.');
+      if (result.tenants.length === 0) {
+        if (isPlatformSuperadmin(result.accessToken)) {
+          enter(result.accessToken, PLATFORM_TENANT);
+          return;
+        }
+        throw new Error('Seu acesso ainda não está ligado a um restaurante.');
+      }
       if (result.tenants.length === 1 && result.tenants[0]) {
         enter(result.accessToken, result.tenants[0]);
         return;
@@ -77,7 +86,7 @@ export default function LoginPage() {
 
   function enter(token: string, tenant: StaffTenant) {
     activateStaffSession(token, tenant);
-    router.replace('/gestor');
+    router.replace(tenant.id === PLATFORM_TENANT.id ? '/plataforma' : '/gestor');
   }
 
   const isEmail = channel === 'email';
