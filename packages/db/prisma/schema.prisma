@@ -902,6 +902,11 @@ enum FulfillmentType {
 model Order {
   id         String @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId   String @map("tenant_id") @db.Uuid
+  /// Token opaco da página pública de acompanhamento (Épico 12). Nunca é
+  /// derivado do orderId: o link de pedido guest precisa ser não-adivinhável.
+  /// Único só entre pedidos vivos — índice parcial WHERE deleted_at IS NULL
+  /// criado à mão na migration (Prisma não expressa índice parcial).
+  trackingToken String @default(dbgenerated("gen_random_uuid()")) @map("tracking_token") @db.Uuid
   /// Não assume "1 loja por tenant" como outros épicos — Premium permite
   /// multi-loja (docs/02 §4), e backfill de pedido antigo seria migration dolorosa.
   storeId    String @map("store_id") @db.Uuid

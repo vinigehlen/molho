@@ -15,6 +15,7 @@ import { PrismaAvailablePaymentMethodsResolver } from './available-payment-metho
 import { DeliveryMatchService } from './delivery-match.service';
 import { PrismaDeliveryMatchRepository } from './delivery-match.repository';
 import { PublicStoreController } from './public-store.controller';
+import { StorefrontRateLimitMiddleware } from './storefront-rate-limit.middleware';
 import { PrismaStorefrontRepository } from './storefront.repository';
 import { StorefrontService } from './storefront.service';
 import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } from './storefront.tokens';
@@ -58,11 +59,12 @@ import { DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, STOREFRONT_SERVICE } f
       useFactory: (requestContext: RequestContextService): DeliveryMatchService =>
         new DeliveryMatchService(new PrismaDeliveryMatchRepository(requestContext)),
     },
+    StorefrontRateLimitMiddleware,
   ],
   // STOREFRONT_RATE_LIMITER exportado além dos dois serviços: o checkout
   // (Épico 7, OrdersModule) reaproveita StorefrontRateLimitGuard na rota
   // pública de revalidação — mesma razão de custo/scraping, chave por
   // (slug+IP) já cobre "preço do cardápio" e "preço revalidado" igual.
-  exports: [STOREFRONT_SERVICE, DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER],
+  exports: [STOREFRONT_SERVICE, DELIVERY_MATCH_SERVICE, STOREFRONT_RATE_LIMITER, StorefrontRateLimitMiddleware],
 })
 export class StorefrontModule {}

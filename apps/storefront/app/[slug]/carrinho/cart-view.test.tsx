@@ -324,6 +324,7 @@ describe('CartView — checkout (Épico 7)', () => {
     createOrder.mockResolvedValue({
       status: 'created',
       orderId: 'order-1',
+      trackingToken: 'tracking-1',
       totalCents: 3690,
       fulfillmentType: 'delivery',
       fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',
@@ -349,6 +350,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
     expect(await screen.findByText('Pedido feito!')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acompanhar pedido' })).toBeInTheDocument();
     expect(createOrder).toHaveBeenCalledWith(SLUG, expect.any(Object), { accessToken: 'token-x' });
 
     const salvo = JSON.parse(localStorage.getItem(cartStorageKey(SLUG)) ?? '{}');
@@ -359,6 +361,7 @@ describe('CartView — checkout (Épico 7)', () => {
     createOrder.mockResolvedValue({
       status: 'created',
       orderId: 'order-cash',
+      trackingToken: 'tracking-cash',
       totalCents: 3690,
       fulfillmentType: 'delivery',
       fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',
@@ -446,6 +449,7 @@ describe('CartView — checkout (Épico 7)', () => {
     createOrder.mockResolvedValue({
       status: 'created',
       orderId: 'order-exato',
+      trackingToken: 'tracking-exato',
       totalCents: 3690,
       fulfillmentType: 'delivery',
       fulfillmentDeadlineAt: '2026-08-14T20:30:00.000Z',

@@ -56,6 +56,17 @@ export const COPY = {
     pixCopiado: 'Código copiado. Agora é só colar no seu banco.',
 
     pedidoConfirmado: 'Pedido na cozinha! A gente te avisa a cada passo.',
+    acompanhamento: {
+      titulo: 'Acompanhe seu pedido',
+      subtitulo: 'Atualizamos esta página enquanto a casa toca a comanda.',
+      atualizar: 'Atualizar agora',
+      atualizadoAs: 'Atualizado às {hora}',
+      terminal: 'Esse pedido já chegou ao fim.',
+      cancelado: 'A casa cancelou este pedido.',
+      entregaAte: 'Entrega prevista até {hora}',
+      retiradaAte: 'Retirada prevista até {hora}',
+      itens: 'Itens do pedido',
+    },
 
     /** Vars: {horario} */
     lojaFechada: 'A cozinha tá descansando. Voltamos {horario}. Dá pra olhar o cardápio e já escolher!',

@@ -143,6 +143,7 @@ export interface CheckoutOrderPix {
 type CreatedOrderBase = {
   status: 'created';
   orderId: string;
+  trackingToken: string;
   totalCents: number;
   fulfillmentType: FulfillmentType;
   fulfillmentDeadlineAt: string;
@@ -214,17 +215,19 @@ function parseCreatedOrder(data: unknown): CreateOrderResult | null {
   const d = data as Record<string, unknown>;
   if (
     typeof d.orderId !== 'string' ||
+    typeof d.trackingToken !== 'string' ||
     typeof d.totalCents !== 'number' ||
     (d.fulfillmentType !== 'delivery' && d.fulfillmentType !== 'pickup') ||
     typeof d.fulfillmentDeadlineAt !== 'string'
   ) return null;
-  const { orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt } = d as {
+  const { orderId, trackingToken, totalCents, fulfillmentType, fulfillmentDeadlineAt } = d as {
     orderId: string;
+    trackingToken: string;
     totalCents: number;
     fulfillmentType: FulfillmentType;
     fulfillmentDeadlineAt: string;
   };
-  const base = { status: 'created' as const, orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt };
+  const base = { status: 'created' as const, orderId, trackingToken, totalCents, fulfillmentType, fulfillmentDeadlineAt };
 
   if (d.paymentMethod === 'pix' && isCheckoutOrderPix(d.pix)) {
     return { ...base, paymentMethod: 'pix', pix: d.pix };

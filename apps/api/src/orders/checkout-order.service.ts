@@ -234,7 +234,7 @@ export class CheckoutOrderService {
     if (etaMaxMinutes === null) throw new Error('Checkout de entrega sem prazo máximo revalidado.');
     const createdAt = this.now();
     const fulfillmentDeadlineAt = new Date(createdAt.getTime() + etaMaxMinutes * 60_000);
-    const orderId = await this.repo.createOrder({
+    const order = await this.repo.createOrder({
       storeId: store.id,
       customerId,
       fulfillmentType: request.fulfillmentType,
@@ -252,15 +252,16 @@ export class CheckoutOrderService {
       scheduledFor,
       legalAcceptance,
     });
-    await this.repo.createOrderItems(orderId, revalidation.items);
-    await this.orderStatusService.recordCreation({ orderId, tenantId, customerId });
+    await this.repo.createOrderItems(order.id, revalidation.items);
+    await this.orderStatusService.recordCreation({ orderId: order.id, tenantId, customerId });
 
     return {
       ok: true,
       response: this.buildResponse(
         request,
         store,
-        orderId,
+        order.id,
+        order.trackingToken,
         totalCents,
         changeForCents,
         fulfillmentDeadlineAt,
@@ -299,6 +300,7 @@ export class CheckoutOrderService {
     request: CheckoutRequest,
     store: StoreForOrder,
     orderId: string,
+    trackingToken: string,
     totalCents: number,
     changeForCents: number | null,
     fulfillmentDeadlineAt: Date,
@@ -308,6 +310,7 @@ export class CheckoutOrderService {
   ): CheckoutOrderResponse {
     const base = {
       orderId,
+      trackingToken,
       status: 'received' as const,
       paymentStatus: 'aguardando_confirmacao' as const,
       totalCents,

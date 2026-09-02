@@ -138,7 +138,7 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
   }
   async createOrder(params: CreateOrderParams) {
     this.createOrderCalls.push(params);
-    return 'order-1';
+    return { id: 'order-1', trackingToken: 'tracking-1' };
   }
   async createOrderItems(orderId: string, items: unknown) {
     this.createOrderItemsCalls.push({ orderId, items });
@@ -324,6 +324,7 @@ describe('CheckoutOrderService.createOrder', () => {
       ok: true,
       response: {
         orderId: 'order-1',
+        trackingToken: 'tracking-1',
         status: 'received',
         paymentStatus: 'aguardando_confirmacao',
         totalCents: 3690,

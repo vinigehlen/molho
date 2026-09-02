@@ -300,6 +300,12 @@ export const checkoutOrderPixSchema = z.strictObject({
 
 const checkoutOrderResponseBase = z.strictObject({
   orderId: z.uuid(),
+  /**
+   * Link público de acompanhamento (Épico 12). É token opaco, não derivado
+   * do orderId; pedido guest não tem sessão, então esse valor é a posse do
+   * link de leitura.
+   */
+  trackingToken: z.uuid(),
   status: z.literal('received'),
   paymentStatus: z.literal('aguardando_confirmacao'),
   totalCents: centsSchema,

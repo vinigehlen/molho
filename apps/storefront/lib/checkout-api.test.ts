@@ -257,6 +257,7 @@ describe('createOrder', () => {
       status: 201,
       json: async () => ({
         orderId: 'order-1',
+        trackingToken: 'tracking-1',
         status: 'received',
         paymentStatus: 'aguardando_confirmacao',
         totalCents: 7380,
@@ -272,7 +273,7 @@ describe('createOrder', () => {
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'pix', pix });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-1', trackingToken: 'tracking-1', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'pix', pix });
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toMatchObject({
       legalAcceptance: {
@@ -290,6 +291,7 @@ describe('createOrder', () => {
         status: 201,
         json: async () => ({
           orderId: 'order-2',
+          trackingToken: 'tracking-2',
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,
@@ -302,7 +304,7 @@ describe('createOrder', () => {
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-2', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-2', trackingToken: 'tracking-2', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'cash_on_delivery', changeForCents: 8000 });
   });
 
   it('201 card_on_delivery: devolve status created sem pix nem changeForCents', async () => {
@@ -313,6 +315,7 @@ describe('createOrder', () => {
         status: 201,
         json: async () => ({
           orderId: 'order-3',
+          trackingToken: 'tracking-3',
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,
@@ -324,7 +327,7 @@ describe('createOrder', () => {
     );
 
     const resultado = await createOrder('hamburgueria-da-vila', body, { accessToken: 'token-x' });
-    expect(resultado).toEqual({ status: 'created', orderId: 'order-3', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'card_on_delivery' });
+    expect(resultado).toEqual({ status: 'created', orderId: 'order-3', trackingToken: 'tracking-3', totalCents: 7380, fulfillmentType: 'delivery', fulfillmentDeadlineAt: deadline, paymentMethod: 'card_on_delivery' });
   });
 
   it('201 pix sem o campo pix no corpo: devolve status error (contrato exige QR pro cliente pagar)', async () => {
@@ -335,6 +338,7 @@ describe('createOrder', () => {
         status: 201,
         json: async () => ({
           orderId: 'order-1',
+          trackingToken: 'tracking-1',
           status: 'received',
           paymentStatus: 'aguardando_confirmacao',
           totalCents: 7380,

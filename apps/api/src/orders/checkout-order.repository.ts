@@ -148,7 +148,7 @@ export interface CheckoutOrderRepository {
   claimSchedulingSlot(storeId: string, timezone: string, scheduledFor: Date): Promise<boolean>;
   /** Grava o endereço do localStorage como linha real, vinculada ao customer autenticado (CLAUDE.md regra 13). */
   createAddress(customerId: string, address: DeliveryAddressSnapshot): Promise<string>;
-  createOrder(params: CreateOrderParams): Promise<string>;
+  createOrder(params: CreateOrderParams): Promise<{ id: string; trackingToken: string }>;
   createOrderItems(orderId: string, items: readonly RevalidatedItem[]): Promise<void>;
 }
 
@@ -302,7 +302,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     return id;
   }
 
-  async createOrder(params: CreateOrderParams): Promise<string> {
+  async createOrder(params: CreateOrderParams): Promise<{ id: string; trackingToken: string }> {
     const tenantId = this.requestContext.getTenantId();
     const {
       storeId,
@@ -327,7 +327,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     // combinação inválida no banco, não só na aplicação. `postalCodeVerified`
     // é irrelevante em pickup (nunca há CEP pra ficar mudo) — `true` fixo lá,
     // igual ao default da coluna.
-    const rows = await this.requestContext.getClient().$queryRaw<{ id: string }[]>`
+    const rows = await this.requestContext.getClient().$queryRaw<{ id: string; trackingToken: string }[]>`
       INSERT INTO "orders" (
         "tenant_id", "store_id", "customer_id", "status", "payment_method", "payment_status", "refund_status",
         "fulfillment_type",
@@ -355,11 +355,11 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${legalAcceptance.termsVersion}, ${legalAcceptance.privacyVersion}, ${createdAt},
         ${createdAt}
       )
-      RETURNING "id"
+      RETURNING "id", "tracking_token" AS "trackingToken"
     `;
-    const id = rows[0]?.id;
-    if (!id) throw new Error('INSERT em orders não devolveu id.');
-    return id;
+    const created = rows[0];
+    if (!created) throw new Error('INSERT em orders não devolveu id.');
+    return created;
   }
 
   async createOrderItems(orderId: string, items: readonly RevalidatedItem[]): Promise<void> {

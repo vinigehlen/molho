@@ -18,6 +18,7 @@ import { SignupModule } from './signup/signup.module';
 import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.module';
 import { StoreSetupModule } from './store-setup/store-setup.module';
 import { StorefrontModule } from './storefront/storefront.module';
+import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limit.middleware';
 
 @Module({
   imports: [
@@ -56,6 +57,10 @@ export class AppModule implements NestModule {
    * rodam depois de todo middleware.
    */
   configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(StorefrontRateLimitMiddleware)
+      .forRoutes({ path: 'v1/store/:slug/track/:token', method: RequestMethod.GET });
+
     // ANTES do bloco de geocode, e por isso num `apply()` próprio: o cap de
     // criação de pedido tem que barrar o bot antes de ele custar uma chamada
     // externa. `checkout.guest` (CLAUDE.md regra 13, EMENDA) torna esta rota
