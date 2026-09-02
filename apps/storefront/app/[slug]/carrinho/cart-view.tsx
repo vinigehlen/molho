@@ -139,6 +139,9 @@ export function CartView({
           </span>
         </p>
         <SuccessPaymentInfo step={checkout.step} />
+        {checkout.step.cashbackUsedCents > 0 ? (
+          <p className="text-body text-positive">Você usou {formatCents(checkout.step.cashbackUsedCents)} do seu saldo de cashback.</p>
+        ) : null}
         {/* Sem isso, o pico emocional ("consegui pedir") não tinha onde
             pousar: o cliente ficava só com "Voltar pro cardápio" depois de
             pagar, sem número do pedido nem caminho pro histórico que
@@ -354,6 +357,8 @@ export function CartView({
         onChangeForCentsChange={checkout.setChangeForCents}
         onApplyCoupon={checkout.applyCoupon}
         couponLoading={checkout.couponLoading}
+        useLoyaltyBalance={checkout.useLoyaltyBalance}
+        onUseLoyaltyBalanceChange={checkout.setUseLoyaltyBalance}
         legalAccepted={legalAccepted}
         onLegalAcceptedChange={setLegalAccepted}
         termsHref={LEGAL_TERMS_HREF}

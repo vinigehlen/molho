@@ -23,9 +23,9 @@ export type CheckoutStep =
   | { kind: 'otp' }
   /** Sem OTP (`checkout.guest` ligado no tenant): só nome + telefone, e o pedido nasce. */
   | { kind: 'guest' }
-  | { kind: 'success'; orderId: string; totalCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'pix'; pix: CheckoutOrderPix }
-  | { kind: 'success'; orderId: string; totalCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
-  | { kind: 'success'; orderId: string; totalCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'card_on_delivery' };
+  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'pix'; pix: CheckoutOrderPix }
+  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
+  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'card_on_delivery' };
 
 export interface UseCheckoutResult {
   step: CheckoutStep;
@@ -50,6 +50,9 @@ export interface UseCheckoutResult {
   /** Revalida o carrinho de novo com o código informado — mesma tela de revisão, review atualizado. */
   applyCoupon: (code: string) => Promise<void>;
   couponLoading: boolean;
+  /** Toggle "usar meu saldo" (Épico 16b, D3) — tudo ou nada, servidor decide quanto tem de saldo. */
+  useLoyaltyBalance: boolean;
+  setUseLoyaltyBalance: (value: boolean) => void;
 }
 
 const ERRO_REVALIDACAO = 'Não deu pra conferir seu pedido agora. Tenta de novo.';
@@ -80,6 +83,7 @@ export function useCheckout(
   const lastReviewRef = React.useRef<CheckoutReview | null>(null);
   const [paymentMethod, setPaymentMethod] = React.useState<CheckoutPaymentMethod>('pix');
   const [changeForCents, setChangeForCents] = React.useState<number | null>(null);
+  const [useLoyaltyBalance, setUseLoyaltyBalance] = React.useState(false);
   const [couponLoading, setCouponLoading] = React.useState(false);
 
   const submitOrder = React.useCallback(
@@ -87,7 +91,14 @@ export function useCheckout(
       if (!lastReviewRef.current) return;
       if (fulfillmentType === 'delivery' && !address) return;
 
-      const body = buildCheckoutRequestFromReview(lastReviewRef.current, fulfillmentType, address, paymentMethod, changeForCents);
+      const body = buildCheckoutRequestFromReview(
+        lastReviewRef.current,
+        fulfillmentType,
+        address,
+        paymentMethod,
+        changeForCents,
+        useLoyaltyBalance,
+      );
       const result = await createOrder(slug, body, identity);
 
       if (result.status === 'created') {
@@ -110,7 +121,7 @@ export function useCheckout(
       }
       setStep({ kind: 'review', review: lastReviewRef.current, errorMessage: ERRO_CRIACAO, submitting: false });
     },
-    [address, changeForCents, clearToken, fulfillmentType, paymentMethod, slug],
+    [address, changeForCents, clearToken, fulfillmentType, paymentMethod, slug, useLoyaltyBalance],
   );
 
   const startCheckout = React.useCallback(async () => {
@@ -222,5 +233,7 @@ export function useCheckout(
     setChangeForCents,
     applyCoupon,
     couponLoading,
+    useLoyaltyBalance,
+    setUseLoyaltyBalance,
   };
 }

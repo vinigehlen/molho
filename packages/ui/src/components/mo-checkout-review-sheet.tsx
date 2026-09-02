@@ -91,6 +91,14 @@ export interface MoCheckoutReviewSheetProps {
   /** Aplica/reaplica o cupom digitado — servidor sempre revalida, nunca confia no código sozinho. */
   onApplyCoupon?: (code: string) => void;
   couponLoading?: boolean;
+  /**
+   * Cashback (Épico 16b, D3) — "tudo ou nada", sem valor: o servidor decide
+   * quanto tem de saldo e debita até o limite do total na hora de criar o
+   * pedido. Esta tela nunca sabe o saldo (revalidação é pública/pré-OTP);
+   * o quanto foi usado só aparece depois, na tela de sucesso.
+   */
+  useLoyaltyBalance?: boolean;
+  onUseLoyaltyBalanceChange?: (checked: boolean) => void;
 }
 
 /**
@@ -123,6 +131,8 @@ export function MoCheckoutReviewSheet({
   privacyHref = '/privacidade',
   onApplyCoupon,
   couponLoading = false,
+  useLoyaltyBalance = false,
+  onUseLoyaltyBalanceChange,
 }: MoCheckoutReviewSheetProps) {
   const [couponInput, setCouponInput] = React.useState('');
   // Corrige o método selecionado sempre que a lista de disponíveis não bate
@@ -186,6 +196,18 @@ export function MoCheckoutReviewSheet({
                   <p className="text-caption font-semibold text-critical-strong">Esse cupom não é válido pra esse pedido.</p>
                 ) : null}
               </div>
+            ) : null}
+
+            {onUseLoyaltyBalanceChange ? (
+              <label className="flex items-center gap-2 border-t border-border pt-4 text-body text-text">
+                <input
+                  type="checkbox"
+                  checked={useLoyaltyBalance}
+                  onChange={(e) => onUseLoyaltyBalanceChange(e.currentTarget.checked)}
+                  className="h-5 w-5 rounded-sm border-border"
+                />
+                Usar meu saldo de cashback
+              </label>
             ) : null}
 
             <div className="flex flex-col gap-2 border-t border-border pt-4">

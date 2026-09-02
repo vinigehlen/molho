@@ -36,6 +36,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     StoreSetupModule,
     SchedulingSlotAdminModule,
     PlatformModule,
+    LoyaltyModule,
     ReviewsModule,
     SignupModule,
   ],

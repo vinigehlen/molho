@@ -43,6 +43,8 @@ export interface CheckoutRequestBody {
   changeForCents?: number | null;
   /** Cupom de desconto. Ausente = sem cupom — o servidor sempre revalida (existe/ativo/mínimo/uso). */
   couponCode?: string;
+  /** Cashback (Épico 16b, D3) — "tudo ou nada". Só o servidor sabe quanto tem de saldo. */
+  useLoyaltyBalance?: boolean;
 }
 
 export interface CheckoutReviewModifier {
@@ -144,6 +146,8 @@ type CreatedOrderBase = {
   status: 'created';
   orderId: string;
   totalCents: number;
+  /** Épico 16b — 0 quando o cliente não usou saldo ou não tinha nenhum. */
+  cashbackUsedCents: number;
   fulfillmentType: FulfillmentType;
   fulfillmentDeadlineAt: string;
 };
@@ -224,7 +228,8 @@ function parseCreatedOrder(data: unknown): CreateOrderResult | null {
     fulfillmentType: FulfillmentType;
     fulfillmentDeadlineAt: string;
   };
-  const base = { status: 'created' as const, orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt };
+  const cashbackUsedCents = typeof d.cashbackUsedCents === 'number' ? d.cashbackUsedCents : 0;
+  const base = { status: 'created' as const, orderId, totalCents, cashbackUsedCents, fulfillmentType, fulfillmentDeadlineAt };
 
   if (d.paymentMethod === 'pix' && isCheckoutOrderPix(d.pix)) {
     return { ...base, paymentMethod: 'pix', pix: d.pix };
@@ -313,6 +318,8 @@ export function buildCheckoutRequestFromReview(
   address: CustomerAddress | null,
   paymentMethod: CheckoutPaymentMethod,
   changeForCents: number | null,
+  /** Toggle "usar meu saldo" (Épico 16b, D3) — nunca vem da revalidação, é escolha do cliente na hora. */
+  useLoyaltyBalance = false,
 ): CheckoutRequestBody {
   return {
     items: review.items
@@ -336,5 +343,6 @@ export function buildCheckoutRequestFromReview(
     // de um input solto (mesmo racional do resto desta função: sempre parte
     // do que o servidor já validou, nunca do estado bruto do cliente).
     ...(review.couponCode ? { couponCode: review.couponCode } : {}),
+    ...(useLoyaltyBalance ? { useLoyaltyBalance: true } : {}),
   };
 }
