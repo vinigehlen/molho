@@ -79,11 +79,15 @@ export const MODULES = {
   'payments.on_delivery': { plans: PLANS, default: true },
 
   // ─── Crescimento ────────────────────────────────────────────────────────────
-  coupons: { plans: ['pro', 'premium'] },
+  // Decisão do PM (2026-09-02): sem tiering de plano por ora — toda feature
+  // com código completo (back+front) nasce ligada em QUALQUER plano.
+  // `plans` continua com os 3 pra quando a segmentação pro/premium voltar;
+  // só troca quando essa decisão for revertida, nunca junto de outra mudança.
+  coupons: { plans: PLANS, default: true },
   promotions: { plans: ['pro', 'premium'] },
   // Exceção MVP 2026-08-28 (CLAUDE.md): combo entra no MVP fora de ordem.
-  // `default: true` = nasce ligado em todo tenant com direito (pro/premium).
-  combos: { plans: ['pro', 'premium'], default: true },
+  // `default: true` = nasce ligado em todo tenant com direito.
+  combos: { plans: PLANS, default: true },
   loyalty: { plans: ['pro', 'premium'] },
   reviews: { plans: ['pro', 'premium'] },
   campaigns: { plans: ['premium'], metered: true },
