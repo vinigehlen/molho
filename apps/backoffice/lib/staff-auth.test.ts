@@ -55,6 +55,33 @@ describe('staff-auth', () => {
     );
   });
 
+  it('429 (cooldown) ao pedir OTP: mensagem clara com o tempo, não o erro genérico', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'rate_limited', kind: 'cooldown' }), {
+          status: 429,
+          headers: { 'content-type': 'application/json', 'retry-after': '60' },
+        }),
+      ),
+    );
+
+    await expect(requestStaffOtp('email', 'dono@restaurante.com.br')).rejects.toThrow(
+      'Muitos pedidos de código. Aguarde 60s e tenta de novo.',
+    );
+  });
+
+  it('429 sem Retry-After legível: mensagem genérica de "aguarde um pouco"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429 })),
+    );
+
+    await expect(requestStaffOtp('email', 'dono@restaurante.com.br')).rejects.toThrow(
+      'Muitos pedidos de código. Aguarde um pouco e tenta de novo.',
+    );
+  });
+
   it('verifica OTP com cookie e carrega somente os tenants permitidos', async () => {
     const accessToken = jwt('user-1');
     const fetchMock = vi.fn()

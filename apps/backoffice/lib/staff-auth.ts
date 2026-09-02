@@ -42,7 +42,19 @@ async function fetchForLogin(url: string, init: RequestInit | undefined, network
   }
 }
 
+/**
+ * 429 do OTP (`OtpService`, CLAUDE.md § Segurança — 5/hora + cooldown 60s por
+ * telefone/e-mail, 20/hora por IP) responde `{error, kind}` SEM `message` —
+ * sem isso o lojista via só o fallback genérico, indistinguível de falha de
+ * verdade. `Retry-After` é a mesma info que o servidor já manda pro cliente.
+ */
 async function errorMessage(res: Response, fallback: string): Promise<string> {
+  if (res.status === 429) {
+    const seconds = Number(res.headers.get('retry-after'));
+    return Number.isFinite(seconds) && seconds > 0
+      ? `Muitos pedidos de código. Aguarde ${seconds}s e tenta de novo.`
+      : 'Muitos pedidos de código. Aguarde um pouco e tenta de novo.';
+  }
   const body = (await res.json().catch(() => null)) as { message?: string } | null;
   return body?.message ?? fallback;
 }
