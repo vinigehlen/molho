@@ -276,7 +276,12 @@ export class CheckoutOrderService {
     const lockedChildren: string[] = [];
     let frontier = [...requestedProductIds];
 
-    for (let depth = 0; depth < 3; depth += 1) {
+    // Combo aninhado é limitado a 1 nível (ComboItemService.MAX_NESTED_COMBO_EDGES),
+    // então a árvore de trava tem no máximo: filho direto, neto — 2 níveis de
+    // `combo_items`. +1 de margem defensiva caso o limite de nesting suba sem
+    // este loop ser revisado junto.
+    const MAX_COMBO_LOCK_DEPTH = 3;
+    for (let depth = 0; depth < MAX_COMBO_LOCK_DEPTH; depth += 1) {
       const childProductIds = await this.repo.lockComboItemsForUpdate(frontier);
       const freshChildIds = childProductIds.filter((productId) => !seen.has(productId));
       if (freshChildIds.length === 0) break;
