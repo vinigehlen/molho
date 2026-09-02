@@ -107,8 +107,9 @@ export class CheckoutRevalidationService {
         hasUnfavorableDivergence = true;
       }
       if (validOffer.productKind === 'combo') {
+        const directComponents = validOffer.comboComponents.filter((component) => component.depth === 1);
         const componentByChildId = new Map(
-          validOffer.comboComponents.map((component) => [component.childProductId, component]),
+          directComponents.map((component) => [component.childProductId, component]),
         );
         for (const childProductId of requestedRemovedChildIds) {
           const component = componentByChildId.get(childProductId);
@@ -120,11 +121,12 @@ export class CheckoutRevalidationService {
           [...requestedRemovedChildIds].filter((childProductId) => componentByChildId.get(childProductId)?.removable === true),
         );
         if (
-          validOffer.comboComponents.length === 0 ||
+          directComponents.length === 0 ||
           validOffer.comboComponents.some(
             (component) =>
-              (!allowedRemovedChildIds.has(component.childProductId) && !component.available) ||
+              (!allowedRemovedChildIds.has(component.rootChildProductId) && !component.available) ||
               (validOffer.comboPricingMode === 'sum_of_items' &&
+                component.depth === 1 &&
                 !allowedRemovedChildIds.has(component.childProductId) &&
                 component.unitBasePriceCents === null),
           )
@@ -133,7 +135,7 @@ export class CheckoutRevalidationService {
           return unavailableItem(input, validOffer.name, validOffer.basePriceCents);
         }
         if (validOffer.comboPricingMode === 'sum_of_items') {
-          unitBasePriceCents = validOffer.comboComponents.reduce(
+          unitBasePriceCents = directComponents.reduce(
             (sum, component) =>
               allowedRemovedChildIds.has(component.childProductId)
                 ? sum
@@ -146,7 +148,7 @@ export class CheckoutRevalidationService {
           name: component.name,
           quantity: component.quantity,
           removable: component.removable,
-          removed: allowedRemovedChildIds.has(component.childProductId),
+          removed: allowedRemovedChildIds.has(component.rootChildProductId),
           ...(validOffer.comboPricingMode === 'sum_of_items' && component.unitBasePriceCents !== null
             ? { unitBasePriceCents: component.unitBasePriceCents }
             : {}),

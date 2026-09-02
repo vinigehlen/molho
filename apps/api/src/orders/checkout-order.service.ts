@@ -163,10 +163,7 @@ export class CheckoutOrderService {
     // `combo_items` esperar via FK; travar as linhas vivas da composição
     // serializa quantidade e soft-delete já existentes. Só depois disso os
     // filhos e suas ofertas entram no conjunto estável da revalidação.
-    const comboChildProductIds = await this.repo.lockComboItemsForUpdate(requestedProductIds);
-    if (comboChildProductIds.length > 0) {
-      await this.repo.lockProductsForUpdate(comboChildProductIds);
-    }
+    const comboChildProductIds = await this.lockComboTreeProducts(requestedProductIds);
     await this.repo.lockOffersForUpdate([
       ...request.items,
       ...comboChildProductIds.map((productId) => ({ productId })),
@@ -272,6 +269,24 @@ export class CheckoutOrderService {
         scheduledFor,
       ),
     };
+  }
+
+  private async lockComboTreeProducts(requestedProductIds: readonly string[]): Promise<string[]> {
+    const seen = new Set(requestedProductIds);
+    const lockedChildren: string[] = [];
+    let frontier = [...requestedProductIds];
+
+    for (let depth = 0; depth < 3; depth += 1) {
+      const childProductIds = await this.repo.lockComboItemsForUpdate(frontier);
+      const freshChildIds = childProductIds.filter((productId) => !seen.has(productId));
+      if (freshChildIds.length === 0) break;
+      freshChildIds.forEach((productId) => seen.add(productId));
+      lockedChildren.push(...freshChildIds);
+      await this.repo.lockProductsForUpdate(freshChildIds);
+      frontier = freshChildIds;
+    }
+
+    return lockedChildren;
   }
 
   /** Espelha a union de `checkoutOrderResponseSchema` — cada branch monta só os campos que existem nela (nunca `pix` fora de `pix`, nunca `changeForCents` fora de `cash_on_delivery`). */

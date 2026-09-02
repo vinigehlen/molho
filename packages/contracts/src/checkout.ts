@@ -214,11 +214,12 @@ export const revalidatedItemSchema = z.strictObject({
   /** Preço (produto ou modificador) mudou desde o que o cliente mandou. */
   priceChanged: z.boolean(),
   /**
-   * Composição do combo (exceção MVP 2026-08-28, fase 4.1b) — presente só
+   * Composição do combo (exceção MVP 2026-08-28, fase 4.2C) — presente só
    * quando o produto é `kind = 'combo'`. Snapshot de exibição/pedido; em
    * combos `sum_of_items`, `unitBasePriceCents` congela o preço unitário do
-   * filho que compôs a base do pedido. Um combo com qualquer filho
-   * indisponível volta como `available: false`, sem este campo.
+   * filho que compôs a base do pedido. Combo aninhado vem achatado no mesmo
+   * array; a API só aceita remoção de filho direto. Um combo com qualquer
+   * filho não removido indisponível volta como `available: false`, sem este campo.
    */
   comboComponents: z
     .array(

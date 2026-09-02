@@ -185,9 +185,25 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
                     childProduct: {
                       select: {
                         name: true,
+                        kind: true,
                         offers: {
                           where: { isPrimary: true, deletedAt: null },
-                          select: { priceCents: true },
+                          select: { priceCents: true, comboPricingMode: true },
+                        },
+                        comboItems: {
+                          where: { deletedAt: null, childProduct: { deletedAt: null } },
+                          orderBy: { sortOrder: 'asc' },
+                          select: {
+                            quantity: true,
+                            childProduct: {
+                              select: {
+                                offers: {
+                                  where: { isPrimary: true, deletedAt: null },
+                                  select: { priceCents: true },
+                                },
+                              },
+                            },
+                          },
                         },
                       },
                     },
@@ -247,7 +263,7 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
           name: item.childProduct.name,
           quantity: item.quantity,
           removable: item.removable,
-          unitBasePriceCents: item.childProduct.offers[0]?.priceCents ?? null,
+          unitBasePriceCents: storefrontComboChildPriceCents(item.childProduct) ?? null,
         })),
       })),
     }));
@@ -261,7 +277,7 @@ function storefrontOfferBasePriceCents(offer: {
     kind: 'prepared' | 'industrialized' | 'combo';
     comboItems: readonly {
       quantity: number;
-      childProduct: { offers: readonly { priceCents: number }[] };
+      childProduct: StorefrontComboChildForPrice;
     }[];
   };
 }): number {
@@ -275,8 +291,34 @@ function storefrontOfferBasePriceCents(offer: {
 
   let total = 0;
   for (const item of offer.product.comboItems) {
-    const childPriceCents = item.childProduct.offers[0]?.priceCents;
+    const childPriceCents = storefrontComboChildPriceCents(item.childProduct);
     if (childPriceCents === undefined) return offer.priceCents;
+    total += childPriceCents * item.quantity;
+  }
+  return total;
+}
+
+interface StorefrontComboChildForPrice {
+  kind: 'prepared' | 'industrialized' | 'combo';
+  offers: readonly { priceCents: number; comboPricingMode?: 'fixed' | 'sum_of_items' }[];
+  comboItems: readonly {
+    quantity: number;
+    childProduct: { offers: readonly { priceCents: number }[] };
+  }[];
+}
+
+function storefrontComboChildPriceCents(childProduct: StorefrontComboChildForPrice): number | undefined {
+  const primaryOffer = childProduct.offers[0];
+  if (!primaryOffer) return undefined;
+  if (childProduct.kind !== 'combo' || primaryOffer.comboPricingMode !== 'sum_of_items') {
+    return primaryOffer.priceCents;
+  }
+
+  if (childProduct.comboItems.length === 0) return primaryOffer.priceCents;
+  let total = 0;
+  for (const item of childProduct.comboItems) {
+    const childPriceCents = item.childProduct.offers[0]?.priceCents;
+    if (childPriceCents === undefined) return primaryOffer.priceCents;
     total += childPriceCents * item.quantity;
   }
   return total;
