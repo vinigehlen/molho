@@ -1,21 +1,22 @@
 import { CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
 import type {
+  ComboGraphEdge,
   ComboItemRecord,
   ComboItemRepository,
   CreateComboItemInput,
   UpdateComboItemInput,
 } from './combo-item.repository';
 
+const MAX_NESTED_COMBO_EDGES = 1;
+
 /**
- * Composição de combo (exceção MVP 2026-08-28, CLAUDE.md — fase 4/4, 4.1a).
+ * Composição de combo (exceção MVP 2026-08-28, CLAUDE.md — fase 4/4).
  *
- * Regras de 4.1a:
+ * Regras de composição:
  * - o "pai" tem que ser um `Product` com `kind = 'combo'` (fase 3);
- * - o filho tem que existir e NÃO pode ser outro combo (sem aninhamento);
+ * - o filho tem que existir;
  * - filho ≠ pai (o CHECK do banco também barra, isto é só pro 400 legível).
- *   Combo aninhado é validação somente da aplicação em 4.1; CHECK comum não
- *   consulta `Product.kind` de outra linha.
- * Preço "a partir de", modificador de filho e combo aninhado ficam pra 4.2.
+ * - combo dentro de combo é permitido em um nível, sem ciclo.
  */
 export class ComboItemService {
   constructor(private readonly repo: ComboItemRepository) {}
@@ -40,7 +41,7 @@ export class ComboItemService {
     const child = await this.repo.findProductKind(input.childProductId);
     if (!child) throw new CatalogNotFoundError('Produto');
     if (child.kind === 'combo') {
-      throw new CatalogValidationError('Um combo não pode conter outro combo.');
+      await this.assertNestedComboIsSafe(input.comboProductId, input.childProductId);
     }
     return this.repo.create(input);
   }
@@ -52,4 +53,64 @@ export class ComboItemService {
   delete(id: string, expectedVersion: number): Promise<void> {
     return this.repo.softDelete(id, expectedVersion);
   }
+
+  private async assertNestedComboIsSafe(comboProductId: string, childProductId: string): Promise<void> {
+    const edges = await this.repo.listNestedComboEdges();
+    const graph = buildNestedComboGraph([...edges, { comboProductId, childProductId }]);
+
+    if (hasCycle(graph)) {
+      throw new CatalogValidationError('Esse aninhamento criaria um ciclo entre combos.');
+    }
+    if (maxComboDepth(graph) > MAX_NESTED_COMBO_EDGES) {
+      throw new CatalogValidationError('Por enquanto, um combo só pode conter outro combo em um nível.');
+    }
+  }
+}
+
+function buildNestedComboGraph(edges: readonly ComboGraphEdge[]): Map<string, string[]> {
+  const graph = new Map<string, string[]>();
+  for (const edge of edges) {
+    const children = graph.get(edge.comboProductId) ?? [];
+    children.push(edge.childProductId);
+    graph.set(edge.comboProductId, children);
+    if (!graph.has(edge.childProductId)) graph.set(edge.childProductId, []);
+  }
+  return graph;
+}
+
+function hasCycle(graph: ReadonlyMap<string, readonly string[]>): boolean {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(productId: string): boolean {
+    if (visiting.has(productId)) return true;
+    if (visited.has(productId)) return false;
+    visiting.add(productId);
+    for (const childId of graph.get(productId) ?? []) {
+      if (visit(childId)) return true;
+    }
+    visiting.delete(productId);
+    visited.add(productId);
+    return false;
+  }
+
+  for (const productId of graph.keys()) {
+    if (visit(productId)) return true;
+  }
+  return false;
+}
+
+function maxComboDepth(graph: ReadonlyMap<string, readonly string[]>): number {
+  const memo = new Map<string, number>();
+
+  function depthFrom(productId: string): number {
+    const cached = memo.get(productId);
+    if (cached !== undefined) return cached;
+    const children = graph.get(productId) ?? [];
+    const depth = children.length === 0 ? 0 : 1 + Math.max(...children.map(depthFrom));
+    memo.set(productId, depth);
+    return depth;
+  }
+
+  return Math.max(0, ...[...graph.keys()].map(depthFrom));
 }

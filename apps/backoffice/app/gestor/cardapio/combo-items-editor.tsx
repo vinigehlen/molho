@@ -25,7 +25,7 @@ interface ComboItemsEditorProps {
 /**
  * Composição do combo (exceção MVP 2026-08-28, fase 4.1a). Só aparece quando
  * o item é do tipo Combo. Preço fixo (o da oferta do combo) — os filhos aqui
- * definem o que vem dentro, não o preço. Sem combo aninhado.
+ * definem o que vem dentro, não o preço.
  */
 export function ComboItemsEditor({ comboProductId, categories }: ComboItemsEditorProps) {
   const [items, setItems] = useState<ComboItem[]>([]);
@@ -62,12 +62,7 @@ export function ComboItemsEditor({ comboProductId, categories }: ComboItemsEdito
   }, [comboProductId, categories]);
 
   const usedChildIds = new Set(items.map((item) => item.childProductId));
-  const selectable = catalog.filter(
-    (product) =>
-      product.id !== comboProductId &&
-      product.kind !== 'combo' &&
-      !usedChildIds.has(product.id),
-  );
+  const selectable = catalog.filter((product) => product.id !== comboProductId && !usedChildIds.has(product.id));
 
   async function addItem() {
     const qty = Number(quantity);

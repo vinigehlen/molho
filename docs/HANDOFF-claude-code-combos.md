@@ -1,6 +1,6 @@
 # Handoff para Claude Code — Combos (exceção MVP 2026-08-28)
 
-Atualizado em 2026-09-01.
+Atualizado em 2026-09-02.
 
 Sequência aprovada pelo PM (ver CLAUDE.md § "EXCEÇÃO decidida em 2026-08-28"),
 em quatro fases, cada uma commit + gate + deploy separado:
@@ -23,10 +23,10 @@ em quatro fases, cada uma commit + gate + deploy separado:
 | correções pré-4.2 (P1.1–P1.3, P2.4–P2.5) | ✅ em `main` | `c50c6c3` | — |
 | 4.2A — `combo_pricing_mode` / `sum_of_items` | ✅ em `main` | `9a04b00` | `20260901110000_combo_pricing_product_offer_4_2a` |
 | bloqueio de troca de `kind` com filhos vivos | ✅ em `main` | `345a443` | — |
-| 4.2B — personalização (remover filho, D8–D13 travadas) | ⬜ não iniciada | — | recorte fechado, pronta pra codar |
-| 4.2C — combo aninhado | ⬜ recomendação: manter bloqueado | — | — |
+| 4.2B — personalização (remover filho, D8–D13 travadas) | ✅ em `main` | PR #32 → `118f33e` | — |
+| 4.2C — combo aninhado | ✅ pronta em branch | `codex/combo-4-2c-nested` | — |
 
-`main` em `674ec8f` (local; push pro `origin/main` ainda pendente).
+`main` em `342c57b` no começo da 4.2C.
 
 > **Processo:** `c50c6c3`, `9a04b00` e `345a443` foram empurrados direto pra
 > `main`, sem PR e sem rodar o CI. Revisão pós-fato (2026-09-01): gates da raiz
@@ -216,14 +216,27 @@ padrão de commit+gate+deploy separado das fases anteriores.
 
 ### 4.2C — combo aninhado
 
-Hoje barrado só em `ComboItemService.create()` (filho `kind='combo'` é
-rejeitado). **Recomendação: manter bloqueado** — YAGNI até pedido explícito do
-PM. Se liberar: profundidade máxima, detecção de ciclo, explosão do
-cálculo de preço/disponibilidade, snapshot recursivo.
+Desbloqueado pelo PM em 2026-09-02.
 
-> **Confirmado com o PM em 2026-09-01: continua bloqueado.** Sem
-> desbloqueio agora — Codex só avalia/decide isso se e quando vier um pedido
-> real, não implementar por conta própria.
+Recorte implementado:
+
+- Profundidade máxima: um combo pode conter outro combo em um nível
+  (`combo pai → combo filho → produtos`). Segundo nível de combo dentro de
+  combo continua bloqueado.
+- `ComboItemService.create()` aceita filho `kind='combo'`, mas rejeita ciclo e
+  profundidade acima do limite antes de gravar.
+- Checkout expande a composição de combo de forma achatada para snapshot:
+  filhos diretos e netos aparecem em `comboComponents`; `removedChildIds`
+  continua valendo só para filho direto, e remover um combo filho marca também
+  seus netos como removidos no snapshot.
+- `sum_of_items` calcula o preço pelo filho direto: se o filho direto for um
+  combo `sum_of_items`, usa o preço efetivo dele. Disponibilidade também sobe
+  recursivamente: qualquer filho não removido indisponível derruba o combo.
+- Criação de pedido trava produtos, `combo_items` e ofertas caminhando pela
+  árvore antes de revalidar, preservando a garantia de preço/disponibilidade.
+- Storefront mostra só os filhos diretos, mas o preço público do combo pai já
+  considera o preço efetivo de combo filho. Sem personalização de subfilhos
+  quando o combo filho é consumido dentro de outro combo.
 
 ## Comandos seguros para retomar
 

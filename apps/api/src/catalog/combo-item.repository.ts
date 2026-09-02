@@ -33,10 +33,16 @@ export interface ProductKindLookup {
   kind: 'prepared' | 'industrialized' | 'combo';
 }
 
+export interface ComboGraphEdge {
+  comboProductId: string;
+  childProductId: string;
+}
+
 export interface ComboItemRepository {
   listByCombo(comboProductId: string): Promise<ComboItemRecord[]>;
   findById(id: string): Promise<ComboItemRecord | null>;
   findProductKind(productId: string): Promise<ProductKindLookup | null>;
+  listNestedComboEdges(): Promise<ComboGraphEdge[]>;
   create(input: CreateComboItemInput): Promise<ComboItemRecord>;
   update(id: string, expectedVersion: number, input: UpdateComboItemInput): Promise<ComboItemRecord>;
   softDelete(id: string, expectedVersion: number): Promise<void>;
@@ -98,6 +104,17 @@ export class PrismaComboItemRepository implements ComboItemRepository {
     return this.requestContext
       .getClient()
       .product.findFirst({ where: { id: productId, deletedAt: null }, select: { kind: true } });
+  }
+
+  async listNestedComboEdges(): Promise<ComboGraphEdge[]> {
+    return this.requestContext.getClient().comboItem.findMany({
+      where: {
+        deletedAt: null,
+        comboProduct: { kind: 'combo', deletedAt: null },
+        childProduct: { kind: 'combo', deletedAt: null },
+      },
+      select: { comboProductId: true, childProductId: true },
+    });
   }
 
   async create(input: CreateComboItemInput): Promise<ComboItemRecord> {

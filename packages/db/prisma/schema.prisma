@@ -604,10 +604,8 @@ model ProductModifierGroup {
 /// oferta primária) vivem lá. Esta tabela só diz QUAIS produtos do catálogo
 /// vêm dentro e em que quantidade.
 ///
-/// Fase 4.1: preço FIXO (o da oferta do combo) — os filhos entram só como
-/// composição/exibição e, na fase 4.1b, cascata de disponibilidade no
-/// checkout. Sem combo aninhado (filho nunca é `kind = combo`), sem
-/// modificador de filho, sem preço "a partir de" — tudo isso é 4.2.
+/// Fase 4.2C: combo pode conter outro combo em um nível, validado na
+/// aplicação com detecção de ciclo. Sem modificador de filho dentro do combo.
 model ComboItem {
   id             String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid

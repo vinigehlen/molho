@@ -614,8 +614,26 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
       productKind: 'combo',
       modifiers: [],
       comboComponents: [
-        { childProductId: 'child-xis', name: 'Xis', quantity: 2, removable: false, unitBasePriceCents: 2490, available: true },
-        { childProductId: 'child-refri', name: 'Refri', quantity: 2, removable: true, unitBasePriceCents: 500, available: true },
+        {
+          childProductId: 'child-xis',
+          name: 'Xis',
+          quantity: 2,
+          rootChildProductId: 'child-xis',
+          depth: 1,
+          removable: false,
+          unitBasePriceCents: 2490,
+          available: true,
+        },
+        {
+          childProductId: 'child-refri',
+          name: 'Refri',
+          quantity: 2,
+          rootChildProductId: 'child-refri',
+          depth: 1,
+          removable: true,
+          unitBasePriceCents: 500,
+          available: true,
+        },
       ],
     };
     const comboRequest = () =>
@@ -821,6 +839,127 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
 
       expect(result.hasUnfavorableDivergence).toBe(true);
       expect(result.canSubmit).toBe(true);
+    });
+
+    it('combo aninhado: soma pelo filho direto e inclui netos no snapshot achatado', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.products = [
+        {
+          ...COMBO,
+          comboPricingMode: 'sum_of_items',
+          comboComponents: [
+            {
+              childProductId: 'child-combo',
+              name: 'Combo burger',
+              quantity: 1,
+              rootChildProductId: 'child-combo',
+              depth: 1,
+              removable: true,
+              unitBasePriceCents: 3490,
+              available: true,
+            },
+            {
+              childProductId: 'grandchild-burger',
+              name: 'Burger',
+              quantity: 1,
+              rootChildProductId: 'child-combo',
+              depth: 2,
+              removable: false,
+              unitBasePriceCents: 2990,
+              available: true,
+            },
+            {
+              childProductId: 'grandchild-batata',
+              name: 'Batata',
+              quantity: 2,
+              rootChildProductId: 'child-combo',
+              depth: 2,
+              removable: false,
+              unitBasePriceCents: 250,
+              available: true,
+            },
+          ],
+        },
+      ];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [{ productId: 'product-combo', unitBasePriceCents: 3490, modifiers: [], quantity: 1, notes: null }],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        unitBasePriceCents: 3490,
+        lineTotalCents: 3490,
+        comboComponents: [
+          { childProductId: 'child-combo', quantity: 1, removable: true, removed: false, unitBasePriceCents: 3490 },
+          { childProductId: 'grandchild-burger', quantity: 1, removable: false, removed: false, unitBasePriceCents: 2990 },
+          { childProductId: 'grandchild-batata', quantity: 2, removable: false, removed: false, unitBasePriceCents: 250 },
+        ],
+      });
+      expect(result.hasUnfavorableDivergence).toBe(false);
+    });
+
+    it('combo aninhado: remover o combo-filho remove também seus netos do snapshot e do preço', async () => {
+      const { checkoutRepo, service } = setup();
+      checkoutRepo.store = { ...checkoutRepo.store!, minOrderCents: 0 };
+      checkoutRepo.products = [
+        {
+          ...COMBO,
+          comboPricingMode: 'sum_of_items',
+          comboComponents: [
+            {
+              childProductId: 'child-combo',
+              name: 'Combo burger',
+              quantity: 1,
+              rootChildProductId: 'child-combo',
+              depth: 1,
+              removable: true,
+              unitBasePriceCents: 3490,
+              available: true,
+            },
+            {
+              childProductId: 'grandchild-burger',
+              name: 'Burger',
+              quantity: 1,
+              rootChildProductId: 'child-combo',
+              depth: 2,
+              removable: false,
+              unitBasePriceCents: 2990,
+              available: true,
+            },
+          ],
+        },
+      ];
+
+      const result = await service.revalidate(
+        baseRequest({
+          items: [
+            {
+              productId: 'product-combo',
+              removedChildIds: ['child-combo'],
+              unitBasePriceCents: 0,
+              modifiers: [],
+              quantity: 1,
+              notes: null,
+            },
+          ],
+        }),
+        RESOLVED,
+      );
+
+      expect(result.items[0]).toMatchObject({
+        available: true,
+        unitBasePriceCents: 0,
+        lineTotalCents: 0,
+        comboComponents: [
+          { childProductId: 'child-combo', removed: true },
+          { childProductId: 'grandchild-burger', removed: true },
+        ],
+      });
+      expect(result.hasUnfavorableDivergence).toBe(false);
     });
   });
 });

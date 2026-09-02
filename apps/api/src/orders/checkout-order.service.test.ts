@@ -278,11 +278,41 @@ describe('CheckoutOrderService.createOrder', () => {
     expect(repo.lockProductsForUpdateCalls[0]).toEqual(['product-1']);
     expect(repo.lockComboItemsForUpdateCalls[0]).toEqual(['product-1']);
     expect(repo.lockProductsForUpdateCalls[1]).toEqual(['child-a', 'child-b']);
+    expect(repo.lockComboItemsForUpdateCalls[1]).toEqual(['child-a', 'child-b']);
     // 1 item do request + as ofertas principais dos 2 filhos
     const lockedOffers = repo.lockOffersForUpdateCalls[0]!;
     expect(lockedOffers).toHaveLength(3);
     expect(lockedOffers).toContainEqual({ productId: 'child-a' });
     expect(lockedOffers).toContainEqual({ productId: 'child-b' });
+  });
+
+  it('4c) combo aninhado: trava também netos antes de revalidar', async () => {
+    const { repo, service } = setup();
+    repo.lockComboItemsForUpdate = async (comboProductIds: readonly string[]) => {
+      repo.lockComboItemsForUpdateCalls.push([...comboProductIds]);
+      if (comboProductIds.includes('product-1')) return ['child-combo'];
+      if (comboProductIds.includes('child-combo')) return ['grandchild-a', 'grandchild-b'];
+      return [];
+    };
+
+    await service.createOrder('tenant-1', 'customer-1', REQUEST, RESOLVED);
+
+    expect(repo.lockProductsForUpdateCalls).toEqual([
+      ['product-1'],
+      ['child-combo'],
+      ['grandchild-a', 'grandchild-b'],
+    ]);
+    expect(repo.lockComboItemsForUpdateCalls).toEqual([
+      ['product-1'],
+      ['child-combo'],
+      ['grandchild-a', 'grandchild-b'],
+    ]);
+    expect(repo.lockOffersForUpdateCalls[0]).toMatchObject([
+      { productId: 'product-1' },
+      { productId: 'child-combo' },
+      { productId: 'grandchild-a' },
+      { productId: 'grandchild-b' },
+    ]);
   });
 
   it('5) caminho feliz (pix): cria endereço, pedido, itens, grava order_status_history e devolve o QR', async () => {

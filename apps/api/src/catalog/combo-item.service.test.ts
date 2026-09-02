@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CatalogConflictError, CatalogNotFoundError, CatalogValidationError } from './catalog-errors';
 import type {
+  ComboGraphEdge,
   ComboItemRecord,
   ComboItemRepository,
   CreateComboItemInput,
@@ -22,6 +23,7 @@ class FakeComboItemRepository implements ComboItemRepository {
   names = new Map<string, string>([
     ['child-1', 'Xis'],
     ['child-2', 'Refri'],
+    ['combo-2', 'Combo pequeno'],
   ]);
   private nextId = 1;
 
@@ -36,6 +38,12 @@ class FakeComboItemRepository implements ComboItemRepository {
   async findProductKind(productId: string): Promise<ProductKindLookup | null> {
     const kind = this.kinds.get(productId);
     return kind ? { kind } : null;
+  }
+
+  async listNestedComboEdges(): Promise<ComboGraphEdge[]> {
+    return [...this.rows.values()]
+      .filter((row) => this.kinds.get(row.comboProductId) === 'combo' && this.kinds.get(row.childProductId) === 'combo')
+      .map((row) => ({ comboProductId: row.comboProductId, childProductId: row.childProductId }));
   }
 
   async create(input: CreateComboItemInput): Promise<ComboItemRecord> {
@@ -93,10 +101,29 @@ describe('ComboItemService (combo fase 4.1a)', () => {
     ).rejects.toThrow(CatalogValidationError);
   });
 
-  it('rejeita combo aninhado', async () => {
+  it('permite combo aninhado em um nível', async () => {
     const { service } = make();
+    const item = await service.create({ comboProductId: 'combo-1', childProductId: 'combo-2', quantity: 1 });
+    expect(item).toMatchObject({ childName: 'Combo pequeno', quantity: 1 });
+  });
+
+  it('rejeita combo aninhado que criaria ciclo', async () => {
+    const { repo, service } = make();
+    await service.create({ comboProductId: 'combo-1', childProductId: 'combo-2', quantity: 1 });
+
     await expect(
-      service.create({ comboProductId: 'combo-1', childProductId: 'combo-2', quantity: 1 }),
+      service.create({ comboProductId: 'combo-2', childProductId: 'combo-1', quantity: 1 }),
+    ).rejects.toThrow(CatalogValidationError);
+    expect([...repo.rows.values()]).toHaveLength(1);
+  });
+
+  it('rejeita segundo nível de combo dentro de combo', async () => {
+    const { repo, service } = make();
+    repo.kinds.set('combo-3', 'combo');
+    await service.create({ comboProductId: 'combo-1', childProductId: 'combo-2', quantity: 1 });
+
+    await expect(
+      service.create({ comboProductId: 'combo-2', childProductId: 'combo-3', quantity: 1 }),
     ).rejects.toThrow(CatalogValidationError);
   });
 
