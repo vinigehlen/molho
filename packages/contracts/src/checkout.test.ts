@@ -150,6 +150,7 @@ const RESPONSE_BASE = {
   totalCents: 3690,
   discountCents: 0,
   couponCode: null,
+  cashbackUsedCents: 0,
   scheduledFor: null,
   fulfillmentType: 'delivery' as const,
   fulfillmentDeadlineAt: '2026-08-14T19:50:00.000Z',

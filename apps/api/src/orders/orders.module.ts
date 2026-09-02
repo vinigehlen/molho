@@ -12,6 +12,9 @@ import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
 import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
+import { PrismaLoyaltyGate } from '../modules/loyalty.gate';
+import { LOYALTY_CREDITOR, LoyaltyModule } from '../loyalty/loyalty.module';
+import type { LoyaltyCreditor } from './loyalty-creditor.port';
 import { PrintingModule } from '../printing/printing.module';
 import { CustomerIdentityRepository } from '../auth/customer-identity.repository';
 import { StorefrontModule } from '../storefront/storefront.module';
@@ -68,7 +71,7 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  * precisam.
  */
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule, LoyaltyModule],
   controllers: [
     CheckoutController,
     OrderPaymentController,
@@ -102,9 +105,9 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     },
     {
       provide: ORDER_STATUS_SERVICE,
-      inject: [RequestContextService],
-      useFactory: (requestContext: RequestContextService): OrderStatusService =>
-        new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+      inject: [RequestContextService, LOYALTY_CREDITOR],
+      useFactory: (requestContext: RequestContextService, loyalty: LoyaltyCreditor): OrderStatusService =>
+        new OrderStatusService(new PrismaOrderStatusRepository(requestContext), loyalty),
     },
     {
       provide: ADMIN_ORDER_REPOSITORY,
@@ -150,18 +153,20 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     },
     {
       provide: CHECKOUT_ORDER_SERVICE,
-      inject: [RequestContextService, CHECKOUT_REVALIDATION_SERVICE, MODULE_CACHE],
+      inject: [RequestContextService, CHECKOUT_REVALIDATION_SERVICE, MODULE_CACHE, LOYALTY_CREDITOR],
       useFactory: (
         requestContext: RequestContextService,
         revalidationService: CheckoutRevalidationService,
         moduleCache: ModuleCache,
+        loyaltyCreditor: LoyaltyCreditor,
       ): CheckoutOrderService =>
         new CheckoutOrderService(
           new PrismaCheckoutOrderRepository(requestContext),
           revalidationService,
-          new OrderStatusService(new PrismaOrderStatusRepository(requestContext)),
+          new OrderStatusService(new PrismaOrderStatusRepository(requestContext), loyaltyCreditor),
           new PrismaPaymentMethodModuleGate(requestContext, moduleCache),
           new PrismaCheckoutGuestGate(requestContext, moduleCache),
+          new PrismaLoyaltyGate(requestContext, moduleCache),
           new CustomerIdentityRepository(requestContext),
         ),
     },

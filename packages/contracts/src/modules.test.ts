@@ -69,14 +69,14 @@ describe('planos × módulos (alinhado à tabela de preços da definições-v1 �
     expect(planGrants('standard', 'notify.whatsapp_ctc')).toBe(true);
   });
 
-  it('coupons/combos (código completo) são de todo plano; promos/fidelidade (sem código) continuam Pro+; PDV/KDS/mesas/iFood/campanhas são Premium', () => {
+  it('coupons/combos/reviews/loyalty (código completo) são de todo plano; promoções (sem código) continua Pro+; PDV/KDS/mesas/iFood/campanhas são Premium', () => {
     // Decisão do PM (2026-09-02): sem tiering por ora — feature com código
-    // completo nasce ligada em qualquer plano. `promotions`/`loyalty` seguem
-    // Pro+ porque não têm código nenhum ainda (nada a "ligar").
-    for (const key of ['coupons', 'combos'] as const) {
+    // completo nasce ligada em qualquer plano. `promotions` segue Pro+
+    // porque não tem código nenhum ainda (nada a "ligar").
+    for (const key of ['coupons', 'combos', 'reviews', 'loyalty'] as const) {
       expect(planGrants('standard', key), `${key} é do standard`).toBe(true);
     }
-    for (const key of ['promotions', 'loyalty'] as const) {
+    for (const key of ['promotions'] as const) {
       expect(planGrants('standard', key), `${key} não é do standard`).toBe(false);
       expect(planGrants('pro', key), `${key} é do pro`).toBe(true);
     }
@@ -118,6 +118,8 @@ describe('provisionamento', () => {
         'dashboard.basic',
         'coupons',
         'combos',
+        'reviews',
+        'loyalty',
       ]),
     );
     expect(ligados).not.toContain('promotions');

@@ -20,7 +20,14 @@ class FakeOrderStatusRepository implements OrderStatusRepository {
    *  máquina de estados não precisam se preocupar com pagamento. Testes de gate
    *  passam paymentMethod/paymentStatus explícitos. */
   seed(row: Pick<OrderStatusRecord, 'id' | 'status' | 'version'> & Partial<OrderStatusRecord>) {
-    this.rows.set(row.id, { tenantId: 'tenant-1', paymentMethod: 'pix', paymentStatus: 'confirmado', ...row });
+    this.rows.set(row.id, {
+      tenantId: 'tenant-1',
+      customerId: 'customer-1',
+      totalCents: 5000,
+      paymentMethod: 'pix',
+      paymentStatus: 'confirmado',
+      ...row,
+    });
   }
 
   async findForTransition(orderId: string) {
