@@ -4,7 +4,7 @@ Data: 2026-08-14
 Branch: `codex/epico-9b-login-staff`  
 PR draft: `#1` — `https://github.com/vinigehlen/molho/pull/1`  
 Base observada ao iniciar: `main@2481d1e`  
-Estado: implementado e em validação final; **sem merge e sem deploy do 9b**.
+Estado: **mesclado no `main` em 2026-09-02, gate verde.** Falta o deploy/promoção ao domínio do gestor (Épico 9c). Este handoff fica como registro histórico da revisão.
 
 ## O que foi entregue
 
