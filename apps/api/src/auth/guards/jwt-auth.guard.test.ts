@@ -1,12 +1,13 @@
 import type { ExecutionContext } from '@nestjs/common';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { ExpiredTokenError, InvalidTokenError, RevokedTokenError } from '../token/token-errors';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
-function contextWithHeader(authorization: string | undefined) {
-  const request: { headers: Record<string, string | undefined>; user?: unknown } = {
+function contextWithHeader(authorization: string | undefined, method = 'GET') {
+  const request: { headers: Record<string, string | undefined>; method: string; user?: unknown } = {
     headers: authorization === undefined ? {} : { authorization },
+    method,
   };
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
@@ -81,5 +82,51 @@ describe('JwtAuthGuard', () => {
       expect.objectContaining({ isPlatform: true }),
       expect.any(Function),
     );
+  });
+
+  describe('impersonation somente-leitura (Épico 14)', () => {
+    const readOnlyPayload = {
+      sub: 'admin-1',
+      roles: ['owner'],
+      scopes: [],
+      tokenVersion: 0,
+      deviceId: 'd1',
+      jti: 'j1',
+      impersonation: { tenantId: 'tenant-1', readOnly: true },
+    };
+
+    it.each(['POST', 'PUT', 'PATCH', 'DELETE'])('%s com token readOnly: 403, nunca chega no handler', async (method) => {
+      const tokenService = { verifyAccessToken: vi.fn().mockResolvedValue(readOnlyPayload) };
+      const guard = new JwtAuthGuard(tokenService as never, fakeRequestContext() as never);
+      const { context } = contextWithHeader('Bearer token-impersonation', method);
+
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it.each(['GET', 'HEAD', 'OPTIONS'])('%s com token readOnly: passa normal', async (method) => {
+      const tokenService = { verifyAccessToken: vi.fn().mockResolvedValue(readOnlyPayload) };
+      const guard = new JwtAuthGuard(tokenService as never, fakeRequestContext() as never);
+      const { context } = contextWithHeader('Bearer token-impersonation', method);
+
+      expect(await guard.canActivate(context)).toBe(true);
+    });
+
+    it('POST com token readOnly:false: passa normal (escrita liberada explicitamente)', async () => {
+      const payload = { ...readOnlyPayload, impersonation: { tenantId: 'tenant-1', readOnly: false } };
+      const tokenService = { verifyAccessToken: vi.fn().mockResolvedValue(payload) };
+      const guard = new JwtAuthGuard(tokenService as never, fakeRequestContext() as never);
+      const { context } = contextWithHeader('Bearer token-impersonation-rw', 'POST');
+
+      expect(await guard.canActivate(context)).toBe(true);
+    });
+
+    it('POST com token NORMAL (sem claim de impersonation): passa normal — a trava só existe pra token de impersonation', async () => {
+      const payload = { sub: 'user-1', roles: ['owner'], scopes: [], tokenVersion: 0, deviceId: 'd1', jti: 'j1' };
+      const tokenService = { verifyAccessToken: vi.fn().mockResolvedValue(payload) };
+      const guard = new JwtAuthGuard(tokenService as never, fakeRequestContext() as never);
+      const { context } = contextWithHeader('Bearer token-normal', 'POST');
+
+      expect(await guard.canActivate(context)).toBe(true);
+    });
   });
 });

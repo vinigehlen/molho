@@ -10,6 +10,21 @@ export interface TokenScope {
   scopeId: string | null;
 }
 
+/**
+ * Presente SÓ em token de impersonation (Épico 14) — `sub` continua sendo o
+ * ID do ATOR REAL (super-admin), nunca um ID sintético: toda escrita feita
+ * com este token grava `actorId` verdadeiro em audit_log/module_audit de
+ * graça, sem precisar de nenhum código extra nesses call sites (CLAUDE.md
+ * regra 9 já exige actorId real, e é exatamente o que `sub` fornece). `scopes`
+ * do token carrega um papel `owner` sintético pro tenant alvo (nunca gravado
+ * em `user_roles` — dura só o tempo de vida do JWT). `readOnly` é reforçado
+ * por `JwtAuthGuard` (bloqueia método não-GET/HEAD/OPTIONS).
+ */
+export interface ImpersonationClaim {
+  tenantId: string;
+  readOnly: boolean;
+}
+
 export interface TokenPayload {
   sub: string;
   roles: string[];
@@ -17,6 +32,7 @@ export interface TokenPayload {
   tokenVersion: number;
   deviceId: string;
   jti: string;
+  impersonation?: ImpersonationClaim;
   /**
    * Expiry (segundos epoch), preenchido pelo `jwt` via `expiresIn` na
    * assinatura e devolvido pelo `verifyAccessToken`. Ausente no objeto que se

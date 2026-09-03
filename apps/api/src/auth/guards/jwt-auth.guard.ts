@@ -1,4 +1,11 @@
-import { type CanActivate, type ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  type CanActivate,
+  type ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { RequestContextService } from '../../context/request-context.service';
 import { PLATFORM_CONTEXT_TENANT_ID } from '../../context/tenant-context.constants';
@@ -60,6 +67,16 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('Token de acesso inválido.');
       }
       throw error;
+    }
+
+    // Impersonation somente-leitura por padrão (docs/01 §5-C.1) — reforçado
+    // AQUI, num único ponto global, em vez de em cada controller: qualquer
+    // rota nova herda a trava de graça. GET/HEAD/OPTIONS passam; qualquer
+    // outro verbo com `readOnly: true` no token é 403, mesmo que o
+    // `@RequirePermission` da rota deixasse passar.
+    const impersonation = request.user.impersonation;
+    if (impersonation?.readOnly && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      throw new ForbiddenException('Sessão de impersonation é somente-leitura.');
     }
 
     return true;
