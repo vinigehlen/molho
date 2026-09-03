@@ -1,16 +1,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { MoButton, MoChip, MoInput } from '@molho/ui';
-import type { ModuleKey, ModuleStateResponse } from '@molho/contracts';
+import { PLANS, type ModuleKey, type ModuleStateResponse, type Plan } from '@molho/contracts';
 import {
   fetchPlatformTenants,
   fetchTenantModules,
   provisionStaff,
+  provisionTenant,
   setTenantEntitlement,
+  startImpersonation,
   type PlatformTenant,
 } from '../../lib/platform-api';
+import { subFromToken } from '../../lib/jwt-tenant';
+import { setStaffSession } from '../../lib/staff-session';
 
 const LOJISTA_ROLES = ['owner', 'manager', 'cashier', 'waiter', 'kitchen', 'courier', 'accountant', 'marketing'] as const;
 
@@ -28,6 +33,21 @@ export default function PlataformaPage() {
   const [provisioning, setProvisioning] = useState(false);
   const [provisionResult, setProvisionResult] = useState<string | null>(null);
   const [provisionError, setProvisionError] = useState<string | null>(null);
+
+  const [tenantName, setTenantName] = useState('');
+  const [tenantPlan, setTenantPlan] = useState<Plan>('standard');
+  const [tenantOwnerEmail, setTenantOwnerEmail] = useState('');
+  const [tenantOwnerName, setTenantOwnerName] = useState('');
+  const [tenantImmediate, setTenantImmediate] = useState(false);
+  const [provisioningTenant, setProvisioningTenant] = useState(false);
+  const [provisionTenantResult, setProvisionTenantResult] = useState<string | null>(null);
+  const [provisionTenantError, setProvisionTenantError] = useState<string | null>(null);
+
+  const [impersonateReason, setImpersonateReason] = useState('');
+  const [impersonateReadOnly, setImpersonateReadOnly] = useState(true);
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonateError, setImpersonateError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     fetchPlatformTenants()
@@ -84,6 +104,70 @@ export default function PlataformaPage() {
     }
   }
 
+  async function handleProvisionTenant() {
+    setProvisionTenantError(null);
+    setProvisionTenantResult(null);
+    if (!tenantName.trim()) return setProvisionTenantError('Informe o nome do restaurante.');
+    if (!tenantOwnerEmail.trim()) return setProvisionTenantError('Informe o e-mail do dono.');
+    if (!tenantOwnerName.trim()) return setProvisionTenantError('Informe o nome do dono.');
+    setProvisioningTenant(true);
+    try {
+      const result = await provisionTenant({
+        name: tenantName.trim(),
+        plan: tenantPlan,
+        ownerEmail: tenantOwnerEmail.trim(),
+        ownerName: tenantOwnerName.trim(),
+        immediate: tenantImmediate,
+      });
+      setProvisionTenantResult(`Loja "${result.tenant.name}" criada em /${result.tenant.slug}.`);
+      setTenantName('');
+      setTenantOwnerEmail('');
+      setTenantOwnerName('');
+      setTenants((prev) => [...prev, { id: result.tenant.id, slug: result.tenant.slug, name: result.tenant.name, planId: tenantPlan, status: tenantImmediate ? 'active' : 'trial' }]);
+    } catch {
+      setProvisionTenantError('Não deu pra provisionar a loja. Confere os dados.');
+    } finally {
+      setProvisioningTenant(false);
+    }
+  }
+
+  /**
+   * "Entrar como" (Épico 14, docs/01 §5-C.1) — abre a sessão de impersonation
+   * exatamente como um login normal abriria: `setStaffSession` é o MESMO
+   * mecanismo que `/login` usa, então todo o resto do backoffice (SSE,
+   * client autenticado, `X-Tenant-Id`) funciona sem nenhum código especial.
+   * Sem refresh token: quando o access expira (30min), o 401→refresh do
+   * client normal usa o cookie do PRÓPRIO super-admin e devolve a sessão
+   * real dele — nunca estende a impersonation silenciosamente.
+   */
+  async function handleImpersonate() {
+    setImpersonateError(null);
+    if (!selectedTenantId) return setImpersonateError('Selecione um tenant.');
+    if (!impersonateReason.trim()) return setImpersonateError('Informe o motivo do acesso.');
+    setImpersonating(true);
+    try {
+      const session = await startImpersonation(selectedTenantId, {
+        reason: impersonateReason.trim(),
+        readOnly: impersonateReadOnly,
+      });
+      setStaffSession({
+        accessToken: session.accessToken,
+        tenantId: session.tenantId,
+        // sub do token de impersonation é o ATOR REAL (nunca um ID
+        // sintético) — mesma decodificação-sem-verificar de subFromToken,
+        // usada só pra marcar autoria de intents offline na fila.
+        userId: subFromToken(session.accessToken) ?? '',
+        tenantName: session.tenantName,
+        tenantSlug: session.tenantSlug,
+      });
+      router.push('/gestor');
+    } catch {
+      setImpersonateError('Não deu pra iniciar a impersonation. Confere o motivo (mínimo 10 caracteres, 30 se for escrita).');
+    } finally {
+      setImpersonating(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       {error ? (
@@ -92,6 +176,35 @@ export default function PlataformaPage() {
           <span>{error}</span>
         </div>
       ) : null}
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-title text-text">Provisionar loja nova</h2>
+        <p className="text-body text-text-muted">Venda assistida — diferente do self-signup, cria o tenant direto daqui.</p>
+        <div className="flex max-w-md flex-col gap-4">
+          <MoInput label="Nome do restaurante" value={tenantName} onChange={(e) => { const v = e.currentTarget.value; setTenantName(v); }} />
+          <div className="flex flex-col gap-2">
+            <span className="text-body-strong text-text">Plano</span>
+            <div className="flex flex-wrap gap-2">
+              {PLANS.map((plan) => (
+                <MoChip key={plan} selected={tenantPlan === plan} onClick={() => setTenantPlan(plan)}>
+                  {plan}
+                </MoChip>
+              ))}
+            </div>
+          </div>
+          <MoInput label="E-mail do dono" value={tenantOwnerEmail} onChange={(e) => { const v = e.currentTarget.value; setTenantOwnerEmail(v); }} />
+          <MoInput label="Nome do dono" value={tenantOwnerName} onChange={(e) => { const v = e.currentTarget.value; setTenantOwnerName(v); }} />
+          <label className="flex items-center gap-2 text-body text-text">
+            <input type="checkbox" checked={tenantImmediate} onChange={(e) => setTenantImmediate(e.currentTarget.checked)} />
+            Sem trial (cliente já fechado, módulos nascem ativos direto)
+          </label>
+          {provisionTenantError ? <p className="text-caption font-semibold text-critical-strong">{provisionTenantError}</p> : null}
+          {provisionTenantResult ? <p className="text-caption font-semibold text-positive">{provisionTenantResult}</p> : null}
+          <MoButton onClick={() => void handleProvisionTenant()} loading={provisioningTenant}>
+            Provisionar loja
+          </MoButton>
+        </div>
+      </section>
 
       <section className="flex flex-col gap-4">
         <h2 className="text-title text-text">Módulos por tenant</h2>
@@ -124,6 +237,33 @@ export default function PlataformaPage() {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-title text-text">Entrar como</h2>
+        <p className="text-body text-text-muted">
+          Impersonation — motivo obrigatório, expira em 30min, somente leitura por padrão. O lojista é avisado por e-mail.
+        </p>
+        <div className="flex max-w-md flex-col gap-4">
+          <MoInput
+            label="Motivo do acesso"
+            value={impersonateReason}
+            onChange={(e) => { const v = e.currentTarget.value; setImpersonateReason(v); }}
+            hint={impersonateReadOnly ? 'Mínimo 10 caracteres.' : 'Escrita: mínimo 30 caracteres.'}
+          />
+          <label className="flex items-center gap-2 text-body text-text">
+            <input
+              type="checkbox"
+              checked={!impersonateReadOnly}
+              onChange={(e) => setImpersonateReadOnly(!e.currentTarget.checked)}
+            />
+            Permitir escrita (uso excepcional — justificativa mais longa)
+          </label>
+          {impersonateError ? <p className="text-caption font-semibold text-critical-strong">{impersonateError}</p> : null}
+          <MoButton onClick={() => void handleImpersonate()} loading={impersonating} disabled={!selectedTenantId}>
+            Entrar como {tenants.find((t) => t.id === selectedTenantId)?.name ?? 'esta loja'}
+          </MoButton>
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">

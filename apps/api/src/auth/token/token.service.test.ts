@@ -62,6 +62,63 @@ describe('TokenService.issueTokens', () => {
   });
 });
 
+describe('TokenService.issueImpersonationToken', () => {
+  it('sub é o ATOR REAL, não um ID sintético — mesmo passando o tenant alvo em `scopes`', async () => {
+    const { service, userRepository } = setup();
+    userRepository.versions.set('admin-1', 0);
+
+    const { accessToken, expiresAt } = await service.issueImpersonationToken('admin-1', 'tenant-alvo', {
+      readOnly: true,
+      ttlSeconds: 1800,
+    });
+
+    const payload = await service.verifyAccessToken(accessToken);
+    expect(payload.sub).toBe('admin-1');
+    expect(payload.scopes).toEqual([{ role: 'owner', scopeType: 'tenant', scopeId: 'tenant-alvo' }]);
+    expect(payload.impersonation).toEqual({ tenantId: 'tenant-alvo', readOnly: true });
+    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('readOnly=false propaga na claim', async () => {
+    const { service, userRepository } = setup();
+    userRepository.versions.set('admin-1', 0);
+
+    const { accessToken } = await service.issueImpersonationToken('admin-1', 'tenant-alvo', {
+      readOnly: false,
+      ttlSeconds: 1800,
+    });
+
+    const payload = await service.verifyAccessToken(accessToken);
+    expect(payload.impersonation?.readOnly).toBe(false);
+  });
+
+  it('token expira no ttlSeconds pedido, não no TTL default do access token', async () => {
+    const { service, userRepository } = setup();
+    userRepository.versions.set('admin-1', 0);
+
+    const { accessToken } = await service.issueImpersonationToken('admin-1', 'tenant-alvo', {
+      readOnly: true,
+      ttlSeconds: -1, // já nasce expirado
+    });
+
+    await expect(service.verifyAccessToken(accessToken)).rejects.toBeInstanceOf(ExpiredTokenError);
+  });
+
+  it('token_version++ derruba token de impersonation igual a qualquer outro (revogação de sessão do ator alcança impersonation em curso)', async () => {
+    const { service, userRepository, userVersionCache } = setup();
+    userRepository.versions.set('admin-1', 0);
+    const { accessToken } = await service.issueImpersonationToken('admin-1', 'tenant-alvo', {
+      readOnly: true,
+      ttlSeconds: 1800,
+    });
+
+    await service.revokeAllSessions('admin-1');
+    await userVersionCache.invalidate('admin-1');
+
+    await expect(service.verifyAccessToken(accessToken)).rejects.toBeInstanceOf(RevokedTokenError);
+  });
+});
+
 describe('TokenService.verifyAccessToken', () => {
   it('2) aceita token válido e devolve o payload', async () => {
     const { service } = setup();

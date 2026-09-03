@@ -131,6 +131,37 @@ export class TokenService {
     return { accessToken, refreshToken: newRefreshToken };
   }
 
+  /**
+   * Token de impersonation (Épico 14) — SEM refresh: expira em
+   * `ttlSeconds` (o caller cravA em `MAX_IMPERSONATION_MINUTES`, ver
+   * `platform-impersonation.ts`) e não renova. `sub` é o ID do ATOR REAL
+   * (não um ID sintético), pra toda escrita gravar autoria verdadeira em
+   * audit_log de graça — ver `ImpersonationClaim`. `scopes` carrega um único
+   * papel `owner` sintético pro tenant alvo, nunca persistido em
+   * `user_roles`: existe só dentro deste JWT, pelo tempo de vida dele.
+   */
+  async issueImpersonationToken(
+    actorId: string,
+    tenantId: string,
+    options: { readOnly: boolean; ttlSeconds: number },
+  ): Promise<{ accessToken: string; expiresAt: Date }> {
+    const tokenVersion = await this.userRepository.getTokenVersion(actorId);
+    const expiresAt = new Date(Date.now() + options.ttlSeconds * 1000);
+    const accessToken = this.signAccessToken(
+      {
+        sub: actorId,
+        roles: ['owner'],
+        scopes: [{ role: 'owner', scopeType: 'tenant', scopeId: tenantId }],
+        tokenVersion,
+        deviceId: randomUUID(),
+        jti: randomUUID(),
+        impersonation: { tenantId, readOnly: options.readOnly },
+      },
+      options.ttlSeconds,
+    );
+    return { accessToken, expiresAt };
+  }
+
   async revokeSession(userId: string, deviceId: string): Promise<void> {
     const session = await this.sessionStore.get(userId, deviceId);
     if (session) {
@@ -205,13 +236,13 @@ export class TokenService {
     return payload;
   }
 
-  private signAccessToken(payload: Omit<TokenPayload, 'exp'>): string {
+  private signAccessToken(payload: Omit<TokenPayload, 'exp'>, ttlSecondsOverride?: number): string {
     const version = currentJwtKeyVersion(this.jwtSecrets);
     const secret = this.jwtSecrets[version];
     if (!secret) throw new Error(`sem chave JWT pra versão "${version}"`);
     return jwt.sign(payload, secret, {
       algorithm: 'HS256',
-      expiresIn: this.accessTokenTtlSeconds,
+      expiresIn: ttlSecondsOverride ?? this.accessTokenTtlSeconds,
       keyid: version,
     });
   }

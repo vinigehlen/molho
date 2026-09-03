@@ -1,9 +1,13 @@
 import type {
+  ImpersonationSessionResponse,
   ModuleKey,
   ModuleStateResponse,
   ProvisionStaffInput,
   ProvisionStaffResponse,
+  ProvisionTenantInput,
+  ProvisionTenantResponse,
   PlatformTenant,
+  StartImpersonationInput,
 } from '@molho/contracts';
 import { apiFetch } from './api-client';
 
@@ -45,4 +49,28 @@ export async function provisionStaff(input: ProvisionStaffInput): Promise<Provis
   });
   if (!res.ok) throw new Error(`Falha ao provisionar staff (${res.status})`);
   return (await res.json()) as ProvisionStaffResponse;
+}
+
+export async function provisionTenant(input: ProvisionTenantInput): Promise<ProvisionTenantResponse> {
+  const res = await apiFetch('/v1/admin/platform/tenants', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Falha ao provisionar tenant (${res.status})`);
+  return (await res.json()) as ProvisionTenantResponse;
+}
+
+/** "O recurso mais perigoso da plataforma" (docs/01 §5-C.1) — motivo escrito obrigatório, expira em 30min, somente-leitura por padrão. */
+export async function startImpersonation(
+  tenantId: string,
+  input: StartImpersonationInput,
+): Promise<ImpersonationSessionResponse> {
+  const res = await apiFetch(`/v1/admin/platform/tenants/${encodeURIComponent(tenantId)}/impersonate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Falha ao iniciar impersonation (${res.status})`);
+  return (await res.json()) as ImpersonationSessionResponse;
 }

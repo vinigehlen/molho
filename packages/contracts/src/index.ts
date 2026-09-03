@@ -23,6 +23,8 @@ export * from './order-adjustment';
 export * from './permissions';
 export * from './phone-number';
 export * from './pix';
+export * from './platform-impersonation';
+export * from './platform-provision';
 export * from './postal-code';
 export * from './promotion';
 export * from './provision-staff';
