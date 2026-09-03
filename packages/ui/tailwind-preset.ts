@@ -137,12 +137,21 @@ const preset = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.55' },
         },
+        // "Publicar minha loja" (Épico 13, fim do wizard de onboarding) —
+        // único momento de confete do produto, de propósito: se aparecesse
+        // em toda ação de sucesso, deixaria de significar "primeira vez que
+        // a loja foi ao ar".
+        'confetti-fall': {
+          from: { transform: 'translateY(-12px) rotate(0deg)', opacity: '1' },
+          to: { transform: 'translateY(320px) rotate(540deg)', opacity: '0' },
+        },
       },
       animation: {
         'sheet-in': 'sheet-in var(--t-slow) var(--ease-out)',
         'pulse-dot': 'pulse-dot 1.2s var(--ease-in-out) infinite',
         shimmer: 'shimmer 1.2s linear infinite',
         breathe: 'breathe 1.6s var(--ease-in-out) infinite',
+        'confetti-fall': 'confetti-fall 1.4s var(--ease-in-out) forwards',
       },
     },
   },

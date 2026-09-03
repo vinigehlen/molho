@@ -1,12 +1,12 @@
-import { slugifyStoreName, type StoreSetup, type UpdateStoreSetupInput } from '@molho/contracts';
+import { slugifyStoreName, type StoreSetup, type ThemeKey, type UpdateStoreSetupInput } from '@molho/contracts';
 import type { RequestContextService } from '../context/request-context.service';
 import { nextAvailableSlug, normalizeSlugForCreation } from '../platform/tenant-slug.util';
-import { StoreSetupNotFoundError } from './store-setup.errors';
+import { StoreSetupNotFoundError, StoreSetupValidationError } from './store-setup.errors';
 
 const SELECT = {
   id: true,
   tenantId: true,
-  tenant: { select: { cnpj: true, slug: true } },
+  tenant: { select: { cnpj: true, slug: true, themeKey: true, onboardedAt: true } },
   name: true,
   addressText: true,
   phone: true,
@@ -21,6 +21,8 @@ const SELECT = {
 export interface StoreSetupRepository {
   get(storeId: string, actorId?: string): Promise<StoreSetup>;
   update(storeId: string, input: UpdateStoreSetupInput, actorId?: string): Promise<StoreSetup>;
+  updateTheme(storeId: string, themeKey: ThemeKey): Promise<StoreSetup>;
+  publish(storeId: string, actorId: string): Promise<StoreSetup>;
 }
 
 export class PrismaStoreSetupRepository implements StoreSetupRepository {
@@ -83,6 +85,58 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
     return this.get(storeId, actorId);
   }
 
+  async updateTheme(storeId: string, themeKey: ThemeKey): Promise<StoreSetup> {
+    const store = await this.lockStoreOrThrow(storeId);
+    await this.requestContext.getClient().tenant.updateMany({
+      where: { id: store.tenantId, deletedAt: null },
+      data: { themeKey },
+    });
+    return this.get(storeId);
+  }
+
+  /**
+   * "Publicar minha loja" (Épico 13, fim do wizard) — idempotente e
+   * revalidado no servidor, nunca confia só no checklist client-side:
+   * já publicado só devolve o estado atual; passos obrigatórios faltando
+   * vira 400, mesma natureza de `StoreSetupValidationError` do PIX acima.
+   * Os 5 booleans espelham EXATAMENTE o checklist do wizard
+   * (apps/backoffice/.../configuracao/page.tsx) — mudar um lado sem o
+   * outro reabre a divergência que este comentário existe pra evitar.
+   */
+  async publish(storeId: string, actorId: string): Promise<StoreSetup> {
+    const store = await this.lockStoreOrThrow(storeId);
+    const client = this.requestContext.getClient();
+
+    const tenant = await client.tenant.findFirst({
+      where: { id: store.tenantId, deletedAt: null },
+      select: { id: true, onboardedAt: true, cnpj: true },
+    });
+    if (!tenant) throw new StoreSetupNotFoundError();
+    if (tenant.onboardedAt) return this.get(storeId, actorId);
+
+    const [storeRow, hasShift, hasZone, hasAvailableProduct] = await Promise.all([
+      client.store.findFirst({ where: { id: storeId, deletedAt: null }, select: { name: true, addressText: true, phone: true, whatsappNumber: true, pixKey: true, pixKeyType: true, pixMerchantCity: true } }),
+      client.storeHours.findFirst({ where: { storeId, deletedAt: null }, select: { id: true } }),
+      client.deliveryZone.findFirst({ where: { storeId, deletedAt: null }, select: { id: true } }),
+      client.product.findFirst({ where: { tenantId: store.tenantId, deletedAt: null, available: true }, select: { id: true } }),
+    ]);
+    if (!storeRow) throw new StoreSetupNotFoundError();
+
+    const checklist = {
+      loja: Boolean(storeRow.name && storeRow.addressText && storeRow.phone && storeRow.whatsappNumber && tenant.cnpj),
+      horarios: hasShift !== null,
+      cardapio: hasAvailableProduct !== null,
+      entrega: hasZone !== null,
+      pagamento: Boolean(storeRow.pixKey && storeRow.pixKeyType && storeRow.pixMerchantCity),
+    };
+    if (!Object.values(checklist).every(Boolean)) {
+      throw new StoreSetupValidationError('Complete os passos obrigatórios antes de publicar.');
+    }
+
+    await client.tenant.updateMany({ where: { id: store.tenantId, deletedAt: null }, data: { onboardedAt: new Date() } });
+    return this.get(storeId, actorId);
+  }
+
   private async lockStoreOrThrow(storeId: string): Promise<{ id: string; tenantId: string }> {
     const rows = await this.requestContext.getClient().$queryRaw<Array<{ id: string; tenantId: string }>>`
       SELECT "id", "tenant_id" AS "tenantId"
@@ -105,11 +159,20 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
 }
 
 function toStoreSetup(
-  store: Omit<StoreSetup, 'cnpj' | 'ownerName' | 'tenantSlug'> & { tenant: { cnpj: string | null; slug: string } },
+  store: Omit<StoreSetup, 'cnpj' | 'ownerName' | 'tenantSlug' | 'themeKey' | 'onboardedAt'> & {
+    tenant: { cnpj: string | null; slug: string; themeKey: string; onboardedAt: Date | null };
+  },
   ownerName: string | null,
 ): StoreSetup {
   const { tenant, ...rest } = store;
-  return { ...rest, cnpj: tenant.cnpj, tenantSlug: tenant.slug, ownerName };
+  return {
+    ...rest,
+    cnpj: tenant.cnpj,
+    tenantSlug: tenant.slug,
+    ownerName,
+    themeKey: tenant.themeKey as StoreSetup['themeKey'],
+    onboardedAt: tenant.onboardedAt?.toISOString() ?? null,
+  };
 }
 
 function blankToNull(value: string | null): string | null {
