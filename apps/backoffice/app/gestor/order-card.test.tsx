@@ -96,7 +96,7 @@ describe('OrderCard — barra de ação (Fase 1 do plano do gestor)', () => {
   });
 
   it('mostra o último aviso por WhatsApp sem transformar isso em status do pedido', () => {
-    render({ order: order({ lastNotifiedAt: '2026-07-26T21:45:00.000Z', notificationCount: 2 }) });
+    render({ order: order({ lastNotifiedAt: '2026-07-26T18:45:00.000', notificationCount: 2 }) });
     expect(container.textContent).toContain('Avisado');
     expect(container.textContent).toContain('18:45');
     expect(container.textContent).not.toContain('notificationCount');
