@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const pixKeyTypeSchema = z.enum(['cpf', 'cnpj', 'email', 'phone', 'random']);
 
+/** Espelha `ThemeKey` de `@molho/ui/themes.ts` (docs/03-self-setup.md §5) —
+ * contracts não depende de ui, então os 3 valores vivem duplicados aqui,
+ * mesmo padrão de `pixKeyTypeSchema` acima. */
+export const themeKeySchema = z.enum(['brasa', 'folha', 'grafite']);
+export type ThemeKey = z.infer<typeof themeKeySchema>;
+
 export const storeSetupSchema = z.strictObject({
   id: z.uuid(),
   tenantId: z.uuid(),
@@ -21,7 +27,13 @@ export const storeSetupSchema = z.strictObject({
   pixKeyType: pixKeyTypeSchema.nullable(),
   pixMerchantCity: z.string().nullable(),
   timezone: z.string(),
+  themeKey: themeKeySchema,
+  /** `null` até o lojista apertar "Publicar minha loja" no wizard (Épico 13). */
+  onboardedAt: z.iso.datetime().nullable(),
 });
+
+export const updateThemeSchema = z.strictObject({ themeKey: themeKeySchema });
+export type UpdateThemeInput = z.infer<typeof updateThemeSchema>;
 
 export const updateStoreSetupSchema = z.strictObject({
   cnpj: z

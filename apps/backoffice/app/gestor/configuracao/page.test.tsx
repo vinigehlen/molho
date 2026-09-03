@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   fetchMyStores: vi.fn(),
   fetchStoreSetup: vi.fn(),
   saveStoreSetup: vi.fn(),
+  saveStoreTheme: vi.fn(),
+  publishStore: vi.fn(),
   fetchStoreHours: vi.fn(),
   saveStoreHours: vi.fn(),
   fetchDeliveryZones: vi.fn(),
@@ -25,6 +27,8 @@ vi.mock('../../../lib/my-stores-api', () => ({ fetchMyStores: mocks.fetchMyStore
 vi.mock('../../../lib/store-setup-api', () => ({
   fetchStoreSetup: mocks.fetchStoreSetup,
   saveStoreSetup: mocks.saveStoreSetup,
+  saveStoreTheme: mocks.saveStoreTheme,
+  publishStore: mocks.publishStore,
 }));
 vi.mock('../../../lib/store-hours-api', () => ({
   fetchStoreHours: mocks.fetchStoreHours,
@@ -71,6 +75,8 @@ function incompleteSetup() {
     pixKeyType: null,
     pixMerchantCity: null,
     timezone: 'America/Sao_Paulo',
+    themeKey: 'brasa' as const,
+    onboardedAt: null,
   };
 }
 
@@ -143,7 +149,7 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
     expect(container.textContent).toContain('Falta completar: Horários.');
   });
 
-  it('tudo completo: badge 5/5, "Loja pronta", CTA "Ir para pedidos"', async () => {
+  async function mountComplete() {
     mocks.fetchStoreSetup.mockResolvedValue(completeSetup());
     mocks.fetchStoreHours.mockResolvedValue({ shifts: [{ dayOfWeek: 'monday', opensAtMinutes: 60 * 18, closesAtMinutes: 60 * 23 }] });
     mocks.fetchDeliveryZones.mockResolvedValue([ZONE]);
@@ -152,11 +158,48 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
       { id: 'prod-1', categoryId: 'cat-1', name: 'Picanha', description: null, basePriceCents: 9500, sortOrder: 0, available: true },
     ]);
     await mount();
+  }
+
+  it('tudo completo mas ainda não publicada: badge 5/5, "Pronta pra publicar", CTA "Publicar minha loja"', async () => {
+    await mountComplete();
 
     expect(container.textContent).toContain('5/5');
-    expect(container.textContent).toContain('Loja pronta');
-    expect(container.textContent).toContain('Já pode receber clientes.');
+    expect(container.textContent).toContain('Pronta pra publicar');
+    expect(container.textContent).toContain('falta só publicar');
+    expect([...container.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Publicar minha loja')).toBe(true);
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'Ir para pedidos')).toBe(false);
+  });
+
+  it('clicar "Publicar minha loja" chama a API e abre a tela de compartilhamento', async () => {
+    await mountComplete();
+    mocks.publishStore.mockResolvedValue({ ...completeSetup(), onboardedAt: '2026-09-03T12:00:00.000Z' });
+
+    await act(async () => {
+      [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Publicar minha loja')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.publishStore).toHaveBeenCalledWith(STORE.id);
+    // MoSheet monta em portal (document.body), fora de `container`.
+    expect(document.body.textContent).toContain('Sua loja está no ar!');
+    expect(container.textContent).toContain('Loja publicada');
+  });
+
+  it('já publicada (onboardedAt setado): "Loja publicada", CTA "Ir para pedidos" e "Compartilhar"', async () => {
+    mocks.fetchStoreSetup.mockResolvedValue({ ...completeSetup(), onboardedAt: '2026-09-03T12:00:00.000Z' });
+    mocks.fetchStoreHours.mockResolvedValue({ shifts: [{ dayOfWeek: 'monday', opensAtMinutes: 60 * 18, closesAtMinutes: 60 * 23 }] });
+    mocks.fetchDeliveryZones.mockResolvedValue([ZONE]);
+    mocks.fetchCategories.mockResolvedValue([{ id: 'cat-1', name: 'Carnes', sortOrder: 0, visible: true }]);
+    mocks.fetchProducts.mockResolvedValue([
+      { id: 'prod-1', categoryId: 'cat-1', name: 'Picanha', description: null, basePriceCents: 9500, sortOrder: 0, available: true },
+    ]);
+    await mount();
+
+    expect(container.textContent).toContain('Loja publicada');
+    expect(container.textContent).toContain('No ar e recebendo clientes.');
     expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'Ir para pedidos')).toBe(true);
+    expect([...container.querySelectorAll('button')].some((b) => b.textContent?.trim().includes('Compartilhar'))).toBe(true);
   });
 
   it('cardápio incompleto: CTA "Completar Cardápio" leva pra /gestor/cardapio (aba própria)', async () => {

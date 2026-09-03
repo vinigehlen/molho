@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, PartyPopper, Plus, Printer, Share2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import type { DayOfWeek, Shift, StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
-import { MoButton, MoSheet } from '@molho/ui';
+import type { DayOfWeek, Shift, StoreSetup, ThemeKey, UpdateStoreSetupInput } from '@molho/contracts';
+import { MoButton, MoConfetti, MoQrCode, MoSheet, THEME_KEYS, THEMES } from '@molho/ui';
 import { getStaffSession, setStaffSession } from '../../../lib/staff-session';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
-import { fetchStoreSetup, saveStoreSetup } from '../../../lib/store-setup-api';
+import { fetchStoreSetup, publishStore, saveStoreSetup, saveStoreTheme } from '../../../lib/store-setup-api';
 import { fetchStoreHours, saveStoreHours } from '../../../lib/store-hours-api';
 import { createDeliveryZone, fetchDeliveryZones, type DeliveryZoneResponse } from '../../../lib/delivery-zones-api';
 import { fetchCategories, fetchProducts, type Category, type Product } from '../../../lib/catalog-api';
@@ -117,6 +117,8 @@ function stepLabel(step: string): string {
     cardapio: 'Cardápio',
     entrega: 'Entrega',
     pagamento: 'Pagamento',
+    marca: 'Sua marca',
+    impressora: 'Impressora',
     publicar: 'Publicar',
   };
   return labels[step] ?? step;
@@ -127,6 +129,7 @@ function stepLabel(step: string): string {
 function sectionHref(step: string): string {
   if (step === 'cardapio') return '/gestor/cardapio';
   if (step === 'pagamento') return '#loja';
+  if (step === 'impressora') return '/gestor/impressao';
   return `#${step}`;
 }
 
@@ -148,6 +151,11 @@ export default function ConfiguracaoPage() {
   const [horariosModalAberto, setHorariosModalAberto] = useState(false);
   const [diasRecolhidos, setDiasRecolhidos] = useState<Set<DayOfWeek>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [themeMessage, setThemeMessage] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [shareSheetAberto, setShareSheetAberto] = useState(false);
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   const checklist = {
     loja: Boolean(setup?.name && setup.addressText && setup.phone && setup.whatsappNumber && setup.cnpj),
@@ -277,6 +285,40 @@ export default function ConfiguracaoPage() {
     }
   }
 
+  async function chooseTheme(themeKey: ThemeKey) {
+    if (!storeId || themeKey === setup?.themeKey) return;
+    setBusy('theme');
+    setThemeMessage(null);
+    try {
+      const saved = await saveStoreTheme(storeId, themeKey);
+      setSetup(saved);
+      setThemeMessage(`Tema ${THEMES[themeKey].name} aplicado.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível trocar o tema.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** "Publicar minha loja" (Épico 13, fim do wizard) — o servidor revalida
+   * o checklist de novo (`publishable` aqui é só UX, não a fonte da
+   * verdade); 400 vira mensagem de erro normal, sem confete nenhum. */
+  async function publish() {
+    if (!storeId) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      const saved = await publishStore(storeId);
+      setSetup(saved);
+      setShowConfetti(true);
+      setShareSheetAberto(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível publicar a loja.');
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   async function addZone() {
     if (!storeId || !zoneDraft.name.trim() || !zoneDraft.city.trim() || zoneDraft.state.trim().length !== 2) return;
     setBusy('zone');
@@ -314,13 +356,19 @@ export default function ConfiguracaoPage() {
               )}
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-text">{publishable ? 'Loja pronta' : 'Loja em preparo'}</p>
+                  <p className="font-semibold text-text">
+                    {setup?.onboardedAt ? 'Loja publicada' : publishable ? 'Pronta pra publicar' : 'Loja em preparo'}
+                  </p>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${publishable ? 'bg-positive/10 text-positive' : 'bg-caution/10 text-caution'}`}>
                     {completedSteps}/{totalSteps}
                   </span>
                 </div>
                 <p className="text-sm text-text-muted">
-                  {publishable ? 'Já pode receber clientes.' : `Falta completar: ${stepLabel(nextStep)}.`}
+                  {setup?.onboardedAt
+                    ? 'No ar e recebendo clientes.'
+                    : publishable
+                      ? 'Os passos obrigatórios estão completos — falta só publicar.'
+                      : `Falta completar: ${stepLabel(nextStep)}.`}
                 </p>
                 {storefrontUrl && (
                   <a href={storefrontUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-brand-strong underline-offset-2 hover:underline">
@@ -330,10 +378,22 @@ export default function ConfiguracaoPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {publishable ? (
+              {setup?.onboardedAt ? (
                 <>
                   <a href="#loja" className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text">Editar loja</a>
+                  <MoButton variant="secondary" onClick={() => setShareSheetAberto(true)}>
+                    <Share2 className="h-4 w-4" aria-hidden="true" />
+                    Compartilhar
+                  </MoButton>
                   <Link href="/gestor" className="rounded-[14px] bg-brand px-4 py-2 text-sm font-semibold text-on-brand">Ir para pedidos</Link>
+                </>
+              ) : publishable ? (
+                <>
+                  <a href="#loja" className="rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text">Editar loja</a>
+                  <MoButton onClick={() => void publish()} loading={publishing}>
+                    <PartyPopper className="h-4 w-4" aria-hidden="true" />
+                    Publicar minha loja
+                  </MoButton>
                 </>
               ) : (
                 <>
@@ -592,7 +652,97 @@ export default function ConfiguracaoPage() {
             {zones.map((zone) => <span key={zone.id} className="rounded-full border border-border px-3 py-1 text-sm">{zone.name}: {centsToBRL(zone.feeCents)} · {zone.etaMinMinutes}-{zone.etaMaxMinutes}min</span>)}
           </div>
         </section>
+
+        {/* Passo 6 do wizard (docs/03-self-setup.md §3) — SÓ o template de
+            cor, de propósito: logo/capa/descrição/OG/PWA são escopo do
+            Épico 13b, não deste. Opcional pra publicar (nunca entra em
+            `checklist`), então não trava a loja em preparo. */}
+        <section id="marca" className="rounded-[20px] border border-border bg-bg-card p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">Sua marca</h2>
+              <p className="mt-1 text-sm text-text-muted">Escolha o template que combina com o seu cardápio. Dá pra trocar quando quiser.</p>
+            </div>
+            <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text-muted">Opcional</span>
+          </div>
+          {themeMessage && <p role="status" className="mt-3 text-sm font-semibold text-positive">{themeMessage}</p>}
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {THEME_KEYS.map((key) => {
+              const theme = THEMES[key];
+              const selecionado = setup?.themeKey === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={busy === 'theme'}
+                  aria-pressed={selecionado}
+                  onClick={() => void chooseTheme(key)}
+                  className={`flex flex-col gap-3 rounded-[16px] border-2 p-4 text-left transition-colors disabled:opacity-60 ${
+                    selecionado ? 'border-brand' : 'border-border hover:border-border-strong'
+                  }`}
+                  style={{ borderColor: selecionado ? theme.brand : undefined }}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="h-8 w-8 shrink-0 rounded-full" style={{ backgroundColor: theme.brand }} aria-hidden="true" />
+                    <span className="font-semibold text-text">{theme.name}</span>
+                    {selecionado && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0" style={{ color: theme.brand }} aria-hidden="true" />}
+                  </span>
+                  <span className="text-xs text-text-muted">{theme.personality}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Passo 7 do wizard — a impressora tem wizard próprio (Épico 10,
+            /gestor/impressao: detectar SO, baixar agente, cupom de teste).
+            Aqui é só o convite; opcional pra publicar, mesma razão do
+            "marca" acima. */}
+        <section id="impressora" className="rounded-[20px] border border-border bg-bg-card p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Printer className="h-6 w-6 shrink-0 text-text-muted" aria-hidden="true" />
+              <div>
+                <h2 className="text-2xl font-semibold">Impressora</h2>
+                <p className="mt-1 text-sm text-text-muted">Sem isso a cozinha opera por tela — dá pra configurar agora ou depois.</p>
+              </div>
+            </div>
+            <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text-muted">Opcional</span>
+          </div>
+          <Link href="/gestor/impressao" className="mt-4 inline-block rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text hover:border-border-strong">
+            Configurar impressora
+          </Link>
+        </section>
       </div>
+
+      {showConfetti && <MoConfetti onDone={() => setShowConfetti(false)} />}
+
+      <MoSheet
+        open={shareSheetAberto}
+        onOpenChange={setShareSheetAberto}
+        title="Sua loja está no ar!"
+        description="Compartilhe o link ou o QR code no Instagram, WhatsApp ou onde seu cliente estiver."
+      >
+        <div className="flex flex-col items-center gap-4 pb-4 text-center">
+          {storefrontUrl && <MoQrCode value={storefrontUrl} size={200} />}
+          {tenantSlug && (
+            <div className="flex w-full items-center gap-2 rounded-[14px] border border-border bg-bg px-4 py-3">
+              <span className="flex-1 truncate text-left text-sm font-medium text-text">molho.live/{tenantSlug}</span>
+              <button
+                type="button"
+                className="shrink-0 text-sm font-semibold text-brand-strong"
+                onClick={() => {
+                  if (storefrontUrl) void navigator.clipboard.writeText(storefrontUrl);
+                  setLinkCopiado(true);
+                  setTimeout(() => setLinkCopiado(false), 2000);
+                }}
+              >
+                {linkCopiado ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          )}
+        </div>
+      </MoSheet>
     </main>
   );
 }

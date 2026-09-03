@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Put, Req, UseGuards, UseInterceptors } from '@nestjs/common';
-import { type UpdateStoreSetupInput, updateStoreSetupSchema } from '@molho/contracts';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, Post, Put, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { type UpdateStoreSetupInput, type UpdateThemeInput, updateStoreSetupSchema, updateThemeSchema } from '@molho/contracts';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { RequestWithUser } from '../auth/guards/jwt-auth.guard';
 import { RequireModule } from '../auth/guards/require-module.decorator';
@@ -32,6 +32,22 @@ export class StoreSetupController {
     @Body(new ZodValidationPipe(updateStoreSetupSchema)) dto: UpdateStoreSetupInput,
   ) {
     return this.handle(() => this.setup.update(storeId, dto, req.user.sub));
+  }
+
+  @Put('theme')
+  @RequirePermission('catalog.product.update')
+  updateTheme(
+    @Param('storeId') storeId: string,
+    @Body(new ZodValidationPipe(updateThemeSchema)) dto: UpdateThemeInput,
+  ) {
+    return this.handle(() => this.setup.updateTheme(storeId, dto.themeKey));
+  }
+
+  @Post('publish')
+  @RequirePermission('catalog.product.update')
+  @HttpCode(HttpStatus.OK)
+  publish(@Param('storeId') storeId: string, @Req() req: RequestWithUser) {
+    return this.handle(() => this.setup.publish(storeId, req.user.sub));
   }
 
   private async handle<T>(fn: () => Promise<T>): Promise<T> {

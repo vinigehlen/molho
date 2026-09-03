@@ -1,4 +1,4 @@
-import type { UpdateStoreSetupInput } from '@molho/contracts';
+import type { ThemeKey, UpdateStoreSetupInput } from '@molho/contracts';
 import type { StoreSetupRepository } from './store-setup.repository';
 import { StoreSetupValidationError } from './store-setup.errors';
 
@@ -14,5 +14,13 @@ export class StoreSetupService {
       throw new StoreSetupValidationError('Para vender por PIX, informe tipo da chave e cidade do recebedor.');
     }
     return this.repo.update(storeId, input, actorId);
+  }
+
+  updateTheme(storeId: string, themeKey: ThemeKey) {
+    return this.repo.updateTheme(storeId, themeKey);
+  }
+
+  publish(storeId: string, actorId: string) {
+    return this.repo.publish(storeId, actorId);
   }
 }

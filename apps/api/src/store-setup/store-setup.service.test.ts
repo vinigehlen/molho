@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { StoreSetup, UpdateStoreSetupInput } from '@molho/contracts';
+import type { StoreSetup, ThemeKey, UpdateStoreSetupInput } from '@molho/contracts';
 import { StoreSetupValidationError } from './store-setup.errors';
 import type { StoreSetupRepository } from './store-setup.repository';
 import { StoreSetupService } from './store-setup.service';
@@ -19,6 +19,8 @@ const STORE: StoreSetup = {
   pixKeyType: null,
   pixMerchantCity: null,
   timezone: 'America/Sao_Paulo',
+  themeKey: 'brasa',
+  onboardedAt: null,
 };
 
 const INPUT: UpdateStoreSetupInput = {
@@ -45,6 +47,14 @@ class FakeRepo implements StoreSetupRepository {
     this.updates.push(input);
     return { ...STORE, ...input };
   }
+
+  async updateTheme(_storeId: string, themeKey: ThemeKey): Promise<StoreSetup> {
+    return { ...STORE, themeKey };
+  }
+
+  async publish(): Promise<StoreSetup> {
+    return { ...STORE, onboardedAt: new Date().toISOString() };
+  }
 }
 
 describe('StoreSetupService', () => {
@@ -63,5 +73,17 @@ describe('StoreSetupService', () => {
 
     await expect(service.update('store-1', { ...INPUT, pixKeyType: null })).rejects.toBeInstanceOf(StoreSetupValidationError);
     await expect(service.update('store-1', { ...INPUT, pixMerchantCity: null })).rejects.toBeInstanceOf(StoreSetupValidationError);
+  });
+
+  it('troca o tema da loja', async () => {
+    const service = new StoreSetupService(new FakeRepo());
+    const saved = await service.updateTheme('store-1', 'folha');
+    expect(saved.themeKey).toBe('folha');
+  });
+
+  it('publica a loja (repassa pro repositório, que revalida o checklist)', async () => {
+    const service = new StoreSetupService(new FakeRepo());
+    const saved = await service.publish('store-1', 'user-1');
+    expect(saved.onboardedAt).not.toBeNull();
   });
 });

@@ -130,8 +130,13 @@ model Tenant {
   cnpj      String?
   planId    String?      @map("plan_id")
   status    TenantStatus @default(active)
-  themeKey  String       @default("roxo") @map("theme_key")
+  themeKey  String       @default("brasa") @map("theme_key")
   timezone  String       @default("America/Sao_Paulo")
+  /// Marca o momento em que o lojista apertou "Publicar minha loja" no
+  /// wizard (Épico 13). Nunca bloqueia o storefront por si só (a loja já
+  /// está no ar desde a criação, docs/03 §1) — só faz o CTA de publicar
+  /// virar tela de compartilhamento em vez de reaparecer a cada acesso.
+  onboardedAt DateTime?  @map("onboarded_at")
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")
