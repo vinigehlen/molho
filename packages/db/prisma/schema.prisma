@@ -169,6 +169,7 @@ model Tenant {
   notificationLogs      NotificationLog[]
   printJobs             PrintJob[]
   coupons               Coupon[]
+  promotions            Promotion[]
   reviews               Review[]
   loyaltyConfig         LoyaltyConfig?
   loyaltyBalances       LoyaltyBalance[]
@@ -1006,6 +1007,13 @@ model Order {
   /// Sempre 0 sem o toggle ligado ou sem saldo disponível.
   cashbackUsedCents Int @default(0) @map("cashback_used_cents")
 
+  /// Promoções agendadas (Épico 15) — desconto AUTOMÁTICO aplicado por item
+  /// antes de cupom/cashback. Snapshot JSON preserva id/nome/valor aplicado
+  /// sem depender da promoção continuar ativa depois (mesmo racional do
+  /// snapshot de coupon_code_snapshot acima).
+  promotionDiscountCents Int   @default(0) @map("promotion_discount_cents")
+  promotionSnapshot      Json? @map("promotion_snapshot")
+
   /// Total ATUAL do pedido, depois de ajustes do balcão (Épico balcão —
   /// edição de pedido). `NULL` = pedido nunca sofreu ajuste, `subtotalCents`/
   /// `totalCents` acima (congelados na criação) continuam valendo como
@@ -1173,6 +1181,59 @@ model Coupon {
 
   @@index([tenantId, code])
   @@map("coupons")
+}
+
+enum PromotionDiscountType {
+  percent
+  fixed
+}
+
+/// Escopo de quem recebe o desconto — `store_wide` (todo o cardápio),
+/// `category` (uma categoria) ou `product` (um produto). `scopeId` é nulo
+/// só em `store_wide`; `category`/`product` exigem um alvo — validado no
+/// serviço (não dá pra expressar FK polimórfica condicional no Prisma).
+enum PromotionScope {
+  store_wide
+  category
+  product
+}
+
+/// Promoção agendada (Épico 15): desconto automático por dia da semana,
+/// janela de horário local da loja e escopo do catálogo. Nunca precisa de
+/// cupom digitado — se está dentro da janela, o desconto já vem aplicado na
+/// revalidação do checkout (checkout-revalidation.service.ts), empilhando
+/// com cupom/cashback do mesmo jeito que os dois empilham entre si.
+model Promotion {
+  id            String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId      String                @map("tenant_id") @db.Uuid
+  name          String
+  discountType  PromotionDiscountType @map("discount_type")
+  /// Percentual 1–100 quando `percent`; centavos quando `fixed`. CHECK na
+  /// migration garante > 0 (e <= 100 quando percent).
+  discountValue Int                   @map("discount_value")
+  /// 0–6, 0 = domingo (mesma convenção de DayOfWeek/store_hours). Array
+  /// vazio = nunca ativa — validado no serviço, não no banco.
+  weekdays      Int[]
+  /// "HH:MM" local da loja. `endTime < startTime` = janela cruza a
+  /// meia-noite (mesmo padrão de closesAtMinutes < opensAtMinutes em
+  /// StoreHours) — a comparação na revalidação já cobre isso.
+  startTime     String                @map("start_time")
+  endTime       String                @map("end_time")
+  scope         PromotionScope
+  /// Produto ou categoria alvo — nulo em `store_wide`. Sem FK: o alvo pode
+  /// ser Product OU Category (polimórfico), Postgres não expressa isso
+  /// como FK real; a existência no mesmo tenant é validada no serviço.
+  scopeId       String?               @map("scope_id") @db.Uuid
+  active        Boolean               @default(true)
+  version       Int                   @default(0)
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  deletedAt     DateTime?             @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, active])
+  @@map("promotions")
 }
 
 /// Avaliação do pedido (Épico 16) — imutável do lado do cliente (nasce com

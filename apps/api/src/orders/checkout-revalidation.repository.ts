@@ -39,6 +39,7 @@ export interface CheckoutComboComponentRecord {
 export interface CheckoutOfferRecord {
   id: string;
   productId: string;
+  categoryId: string;
   isPrimary: boolean;
   name: string;
   basePriceCents: number;
@@ -73,6 +74,19 @@ export interface CheckoutCouponRecord {
   active: boolean;
 }
 
+/** Recorte de Promotion que o checkout precisa para escolher o melhor desconto por item. */
+export interface CheckoutPromotionRecord {
+  id: string;
+  name: string;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  weekdays: number[];
+  startTime: string;
+  endTime: string;
+  scope: 'store_wide' | 'category' | 'product';
+  scopeId: string | null;
+}
+
 /** Recorte de StoreSchedulingSlot que o checkout precisa (Épico conversão, C3) — nunca a linha inteira. */
 export interface CheckoutSchedulingSlotRecord {
   dayOfWeek: Weekday;
@@ -89,6 +103,7 @@ export interface CheckoutRepository {
   ): Promise<CheckoutOfferRecord[]>;
   /** `mode: 'insensitive'` — mesma comparação do índice único parcial em upper(code) (packages/db). */
   findCoupon(code: string): Promise<CheckoutCouponRecord | null>;
+  listActivePromotions(): Promise<CheckoutPromotionRecord[]>;
   listSchedulingSlots(): Promise<CheckoutSchedulingSlotRecord[]>;
   /**
    * Contagem OTIMISTA (leitura, sem lock) de pedidos já agendados na
@@ -165,6 +180,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
       select: {
         id: true,
         productId: true,
+        categoryId: true,
         isPrimary: true,
         priceCents: true,
         available: true,
@@ -198,6 +214,7 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     return rows.map((row) => ({
       id: row.id,
       productId: row.productId,
+      categoryId: row.categoryId,
       isPrimary: row.isPrimary,
       name: row.product.name,
       basePriceCents: row.priceCents,
@@ -423,6 +440,23 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
         maxUses: true,
         usesCount: true,
         active: true,
+      },
+    });
+  }
+
+  async listActivePromotions(): Promise<CheckoutPromotionRecord[]> {
+    return this.requestContext.getClient().promotion.findMany({
+      where: { active: true, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        discountType: true,
+        discountValue: true,
+        weekdays: true,
+        startTime: true,
+        endTime: true,
+        scope: true,
+        scopeId: true,
       },
     });
   }

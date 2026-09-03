@@ -13,6 +13,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
 import { PlatformModule } from './platform/platform.module';
+import { PromotionsModule } from './promotions/promotions.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SchedulingSlotAdminModule } from './scheduling-slots/scheduling-slot-admin.module';
 import { SignupModule } from './signup/signup.module';
@@ -37,6 +38,7 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     StoreSetupModule,
     SchedulingSlotAdminModule,
     PlatformModule,
+    PromotionsModule,
     LoyaltyModule,
     ReviewsModule,
     SignupModule,

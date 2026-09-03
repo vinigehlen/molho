@@ -84,7 +84,9 @@ export const MODULES = {
   // `plans` continua com os 3 pra quando a segmentação pro/premium voltar;
   // só troca quando essa decisão for revertida, nunca junto de outra mudança.
   coupons: { plans: PLANS, default: true },
-  promotions: { plans: ['pro', 'premium'] },
+  // [15-D1] resolvido junto com o resto do épico (2026-09-03): alinha com
+  // coupons/combos/loyalty/reviews acima — código completo, nasce ligado.
+  promotions: { plans: PLANS, default: true },
   // Exceção MVP 2026-08-28 (CLAUDE.md): combo entra no MVP fora de ordem.
   // `default: true` = nasce ligado em todo tenant com direito.
   combos: { plans: PLANS, default: true },

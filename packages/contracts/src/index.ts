@@ -24,6 +24,7 @@ export * from './permissions';
 export * from './phone-number';
 export * from './pix';
 export * from './postal-code';
+export * from './promotion';
 export * from './provision-staff';
 export * from './scheduling-slot-admin';
 export * from './signup';

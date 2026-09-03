@@ -265,6 +265,8 @@ export class CheckoutOrderService {
       couponCodeSnapshot,
       discountCents,
       cashbackUsedCents,
+      promotionDiscountCents: revalidation.promotionDiscountCents,
+      promotionSnapshot: buildPromotionSnapshot(revalidation),
       scheduledFor,
       legalAcceptance,
     });
@@ -282,6 +284,7 @@ export class CheckoutOrderService {
         changeForCents,
         fulfillmentDeadlineAt,
         discountCents,
+        revalidation.promotionDiscountCents,
         cashbackUsedCents,
         couponCodeSnapshot,
         scheduledFor,
@@ -322,6 +325,7 @@ export class CheckoutOrderService {
     changeForCents: number | null,
     fulfillmentDeadlineAt: Date,
     discountCents: number,
+    promotionDiscountCents: number,
     cashbackUsedCents: number,
     couponCodeSnapshot: string | null,
     scheduledFor: Date | null,
@@ -333,6 +337,7 @@ export class CheckoutOrderService {
       paymentStatus: 'aguardando_confirmacao' as const,
       totalCents,
       discountCents,
+      promotionDiscountCents,
       cashbackUsedCents,
       couponCode: couponCodeSnapshot,
       scheduledFor: scheduledFor?.toISOString() ?? null,
@@ -347,4 +352,20 @@ export class CheckoutOrderService {
     }
     return { ...base, paymentMethod: 'card_on_delivery' };
   }
+}
+
+/** Agrega os itens revalidados por promoção (um pedido pode ter itens com promoções DIFERENTES) — vira `orders.promotion_snapshot`, preservado mesmo se a promoção for editada/desativada depois (mesmo racional de couponCodeSnapshot). `null` sem nenhum item promocionado (não grava `{ promotions: [] }` à toa). */
+function buildPromotionSnapshot(revalidation: RevalidatedCheckout): { promotions: { id: string; name: string; discountCents: number }[] } | null {
+  const byId = new Map<string, { id: string; name: string; discountCents: number }>();
+  for (const item of revalidation.items) {
+    if (!item.promotionId || item.promotionDiscountCents <= 0) continue;
+    const current = byId.get(item.promotionId);
+    byId.set(item.promotionId, {
+      id: item.promotionId,
+      name: item.promotionName ?? 'Promoção',
+      discountCents: (current?.discountCents ?? 0) + item.promotionDiscountCents,
+    });
+  }
+  const promotions = [...byId.values()];
+  return promotions.length > 0 ? { promotions } : null;
 }
