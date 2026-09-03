@@ -111,7 +111,7 @@ export class CustomerAuthController {
       if (error instanceof OtpRateLimitedError) {
         res.set('Retry-After', String(retryAfterSecondsFor(error.kind)));
       }
-      throw toAuthHttpException(error);
+      throw toAuthHttpException(error) ?? error;
     }
     return {};
   }
@@ -131,7 +131,7 @@ export class CustomerAuthController {
       // gravado (ver CustomerIdentityRepository.findOrCreate).
       email = dto.email ? parseEmail(dto.email) : undefined;
     } catch (error) {
-      throw toAuthHttpException(error);
+      throw toAuthHttpException(error) ?? error;
     }
 
     const ip = req.ip ?? '0.0.0.0';

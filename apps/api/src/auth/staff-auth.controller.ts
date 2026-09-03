@@ -137,7 +137,7 @@ export class StaffAuthController {
       if (error instanceof OtpRateLimitedError) {
         res.set('Retry-After', String(retryAfterSecondsFor(error.kind)));
       }
-      throw toAuthHttpException(error);
+      throw toAuthHttpException(error) ?? error;
       // 202 pra QUALQUER identificador (exista ou não): não há branch de
       // existência de conta em nenhum caminho de sucesso deste método —
       // é isso que sustenta a anti-enumeração, não um try/catch escondendo.
@@ -156,7 +156,7 @@ export class StaffAuthController {
     try {
       identifier = this.identifierFor(dto);
     } catch (error) {
-      throw toAuthHttpException(error);
+      throw toAuthHttpException(error) ?? error;
     }
 
     const ip = req.ip ?? '0.0.0.0';
