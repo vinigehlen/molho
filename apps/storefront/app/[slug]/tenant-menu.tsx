@@ -60,6 +60,9 @@ function interpolarCopy(template: string, vars: Record<string, string>): string 
 export interface TenantMenuProps {
   slug: string;
   storeName: string;
+  storeDescription: string | null;
+  logoImageUrl: string | null;
+  coverImageUrl: string | null;
   greeting: string;
   categories: StorefrontCategory[];
   minOrderCents: number;
@@ -79,7 +82,18 @@ function podeAdicionarRapido(produto: StorefrontProduct): boolean {
 
 const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
 
-export function TenantMenu({ slug, storeName, greeting, categories, minOrderCents, closedMessage, reviewsSummary }: TenantMenuProps) {
+export function TenantMenu({
+  slug,
+  storeName,
+  storeDescription,
+  logoImageUrl,
+  coverImageUrl,
+  greeting,
+  categories,
+  minOrderCents,
+  closedMessage,
+  reviewsSummary,
+}: TenantMenuProps) {
   const [categoriaAtiva, setCategoriaAtiva] = React.useState<string | null>(categories[0]?.id ?? null);
   // Sempre 'list' no SSR e no primeiro paint (senão a hidratação diverge); lê a
   // preferência salva logo após o mount — o "flash" de 1 frame é preferível.
@@ -200,29 +214,40 @@ export function TenantMenu({ slug, storeName, greeting, categories, minOrderCent
 
   return (
     <div className="mx-auto max-w-6xl pb-24">
-      <header className="flex items-start justify-between gap-2 bg-brand px-4 py-6 text-on-brand">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-title-lg">{storeName}</h1>
-          <p className="text-body opacity-90">{saudacao}</p>
-          {reviewsSummary && reviewsSummary.count > 0 ? (
-            <p className="flex items-center gap-1 text-caption opacity-90">
-              <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-              {reviewsSummary.average?.toFixed(1)} ({reviewsSummary.count} avaliaç{reviewsSummary.count === 1 ? 'ão' : 'ões'})
-            </p>
-          ) : null}
-        </div>
+      <header
+        className="relative overflow-hidden bg-brand px-4 py-6 text-on-brand"
+        style={coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.22)), url(${coverImageUrl})`, backgroundPosition: 'center', backgroundSize: 'cover' } : undefined}
+      >
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            {logoImageUrl ? (
+              <img src={logoImageUrl} alt={`Logo de ${storeName}`} className="h-14 w-14 shrink-0 rounded-[14px] border border-on-brand/20 object-cover shadow-lg" />
+            ) : null}
+            <div className="flex min-w-0 flex-col gap-1">
+              <h1 className="text-title-lg">{storeName}</h1>
+              <p className="text-body opacity-90">{storeDescription ?? saudacao}</p>
+              {storeDescription ? <p className="text-caption opacity-85">{saudacao}</p> : null}
+              {reviewsSummary && reviewsSummary.count > 0 ? (
+                <p className="flex items-center gap-1 text-caption opacity-90">
+                  <Star className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  {reviewsSummary.average?.toFixed(1)} ({reviewsSummary.count} avaliaç{reviewsSummary.count === 1 ? 'ão' : 'ões'})
+                </p>
+              ) : null}
+            </div>
+          </div>
         {/* Sem link nenhum pro cardápio, /minha-conta (já com histórico de
             pedidos pronto) ficava só alcançável digitando a URL na mão —
             achado do critique de consumidor. Aparece sempre, mesmo sem
             sessão: a própria página trata o caso "sem pedido ainda" com uma
             mensagem, nunca um formulário de login morto. */}
-        <Link
-          href={`/${slug}/minha-conta`}
-          aria-label="Minha conta"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
-        >
-          <User className="h-5 w-5" aria-hidden="true" />
-        </Link>
+          <Link
+            href={`/${slug}/minha-conta`}
+            aria-label="Minha conta"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
+          >
+            <User className="h-5 w-5" aria-hidden="true" />
+          </Link>
+        </div>
       </header>
 
       <button

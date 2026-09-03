@@ -56,6 +56,9 @@ function renderTenantMenu(overrides: Partial<React.ComponentProps<typeof TenantM
     <TenantMenu
       slug={SLUG}
       storeName="Hamburgueria da Vila"
+      storeDescription={null}
+      logoImageUrl={null}
+      coverImageUrl={null}
       greeting="Bateu a fome?"
       categories={CATEGORIAS}
       minOrderCents={3000}
@@ -96,6 +99,16 @@ describe('TenantMenu — Épico 6', () => {
   it('reviewsSummary sem avaliação nenhuma (count 0): não mostra badge', () => {
     renderTenantMenu({ reviewsSummary: { average: null, count: 0 } });
     expect(screen.queryByText(/avaliaç/)).not.toBeInTheDocument();
+  });
+
+  it('mostra descrição pública e logo quando a loja configurou a marca', () => {
+    renderTenantMenu({
+      storeDescription: 'Smash no capricho, feito na brasa.',
+      logoImageUrl: 'https://cdn.molho.test/stores/tenant/logo.webp',
+    });
+
+    expect(screen.getByText('Smash no capricho, feito na brasa.')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Logo de Hamburgueria da Vila' })).toHaveAttribute('src', 'https://cdn.molho.test/stores/tenant/logo.webp');
   });
 
   it('sem endereço salvo: mostra o prompt "Adicionar endereço de entrega"', () => {

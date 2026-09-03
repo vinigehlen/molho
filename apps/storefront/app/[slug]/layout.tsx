@@ -13,22 +13,35 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!store) return {};
 
   const title = store.store.name;
-  const descriptionParts = [
-    `Peça no cardápio digital do ${store.store.name}`,
-    store.store.addressText ? `em ${store.store.addressText}` : null,
-    'com entrega, retirada e pagamento pelo Molho.',
-  ].filter(Boolean);
-  const description = descriptionParts.join(' ');
+  // Descrição do lojista (Épico 13b, wizard) tem prioridade — é a que ele
+  // escreveu de propósito pra aparecer quando compartilha o link. Sem ela,
+  // cai no texto genérico de sempre.
+  const description =
+    store.store.publicDescription ??
+    [
+      `Peça no cardápio digital do ${store.store.name}`,
+      store.store.addressText ? `em ${store.store.addressText}` : null,
+      'com entrega, retirada e pagamento pelo Molho.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  const ogImage = store.store.coverImageUrl ?? '/og-image-1200x630.png';
 
   return {
     title,
     description,
     alternates: { canonical: `/${slug}` },
+    // Favicon por loja (Épico 13b) — `icons` do Metadata API é a forma
+    // suportada de trocar o ícone da aba por rota dinâmica sem precisar de
+    // um arquivo `icon.tsx` próprio; sem logo, cai no favicon padrão do
+    // Molho (herdado do layout raiz, `icons` aqui fica ausente de propósito).
+    ...(store.store.logoImageUrl ? { icons: { icon: store.store.logoImageUrl } } : {}),
+    manifest: `/${slug}/manifest.webmanifest`,
     openGraph: {
       title,
       description,
       url: `/${slug}`,
-      images: ['/og-image-1200x630.png'],
+      images: [ogImage],
       locale: 'pt_BR',
       type: 'website',
     },
@@ -36,7 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: 'summary_large_image',
       title,
       description,
-      images: ['/og-image-1200x630.png'],
+      images: [ogImage],
     },
   };
 }

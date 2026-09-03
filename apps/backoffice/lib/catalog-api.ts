@@ -112,6 +112,19 @@ export async function createCategory(input: { name: string; sortOrder?: number }
   return (await res.json()) as Category;
 }
 
+/** Reordenar categorias (Épico 13b, docs/03 §5) é um PATCH de `sortOrder`
+ * por linha — mesmo padrão de `reorderProductImage` (posição), não existe
+ * endpoint de lote no catálogo. */
+export async function updateCategory(category: Category, input: { name?: string; sortOrder?: number; visible?: boolean }): Promise<Category> {
+  const res = await apiFetch(`/v1/admin/categories/${encodeURIComponent(category.id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: category.version, ...input }),
+  });
+  if (!res.ok) throw new Error(`Falha ao reordenar categoria (${res.status})`);
+  return (await res.json()) as Category;
+}
+
 export async function fetchProducts(categoryId: string): Promise<Product[]> {
   const res = await apiFetch(`/v1/admin/products?categoryId=${encodeURIComponent(categoryId)}`);
   if (!res.ok) throw new Error(`Falha ao carregar produtos (${res.status})`);

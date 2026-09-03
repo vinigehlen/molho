@@ -9,6 +9,9 @@ export interface StorefrontTenantRecord {
 }
 
 export interface StorefrontStoreRecord {
+  publicDescription: string | null;
+  logoImageKey: string | null;
+  coverImageKey: string | null;
   addressText: string;
   phone: string | null;
   whatsappNumber: string | null;
@@ -121,6 +124,9 @@ export class PrismaStorefrontRepository implements StorefrontRepository {
       where: { deletedAt: null },
       orderBy: { createdAt: 'asc' },
       select: {
+        publicDescription: true,
+        logoImageKey: true,
+        coverImageKey: true,
         addressText: true,
         phone: true,
         whatsappNumber: true,

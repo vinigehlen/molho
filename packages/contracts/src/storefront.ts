@@ -112,6 +112,12 @@ export const storefrontStoreSchema = z.strictObject({
    */
   themeKey: z.string(),
   timezone: z.string(),
+  /** Texto curto definido pelo lojista no onboarding/configuração. */
+  publicDescription: z.string().nullable(),
+  /** Marca visual pública da loja. A API resolve a URL a partir da chave R2. */
+  logoImageUrl: z.url().nullable(),
+  /** Capa pública do cardápio. A API resolve a URL a partir da chave R2. */
+  coverImageUrl: z.url().nullable(),
   addressText: z.string().nullable(),
   phone: z.string().nullable(),
   whatsappNumber: z.string().nullable(),

@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   updateProductOffer: vi.fn(),
   setProductOfferAvailability: vi.fn(),
   deleteProductOffer: vi.fn(),
+  updateCategory: vi.fn(),
 }));
 
 vi.mock('../../../lib/staff-session', () => ({ getStaffSession: mocks.getStaffSession }));
@@ -43,6 +44,7 @@ vi.mock('../../../lib/catalog-api', () => ({
   linkModifierGroupToProduct: mocks.linkModifierGroupToProduct,
   unlinkModifierGroupFromProduct: vi.fn(),
   createCategory: vi.fn(),
+  updateCategory: mocks.updateCategory,
   createModifier: vi.fn(),
   createModifierGroup: vi.fn(),
   createProduct: mocks.createProduct,
@@ -634,5 +636,38 @@ describe('CardapioPage — importação', () => {
   it('não há mais input que importe planilha direto', async () => {
     await mount();
     expect(container.querySelector('input[type="file"][accept=".csv,.xlsx"]')).toBeNull();
+  });
+});
+
+describe('CardapioPage — ordem das categorias (Épico 13b)', () => {
+  const CARNES = { id: 'cat-1', name: 'Carnes', sortOrder: 0, visible: true, version: 0 };
+  const BEBIDAS = { id: 'cat-2', name: 'Bebidas', sortOrder: 1, visible: true, version: 0 };
+
+  it('mover a segunda categoria pra cima troca o sortOrder das duas', async () => {
+    mocks.fetchCategories.mockResolvedValue([CARNES, BEBIDAS]);
+    mocks.fetchProducts.mockResolvedValue([]);
+    mocks.updateCategory.mockImplementation(async (category: typeof CARNES, input: { sortOrder?: number }) => ({
+      ...category,
+      sortOrder: input.sortOrder ?? category.sortOrder,
+    }));
+    await mount();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Mover Bebidas pra cima"]')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.updateCategory).toHaveBeenCalledWith(BEBIDAS, { sortOrder: 0 });
+    expect(mocks.updateCategory).toHaveBeenCalledWith(CARNES, { sortOrder: 1 });
+  });
+
+  it('primeira categoria não tem "mover pra cima" habilitado', async () => {
+    mocks.fetchCategories.mockResolvedValue([CARNES, BEBIDAS]);
+    mocks.fetchProducts.mockResolvedValue([]);
+    await mount();
+
+    const botao = container.querySelector<HTMLButtonElement>('[aria-label="Mover Carnes pra cima"]');
+    expect(botao?.disabled).toBe(true);
   });
 });

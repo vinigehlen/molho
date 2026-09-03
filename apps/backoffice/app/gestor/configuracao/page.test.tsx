@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   saveStoreSetup: vi.fn(),
   saveStoreTheme: vi.fn(),
   publishStore: vi.fn(),
+  uploadStoreBrandImage: vi.fn(),
   fetchStoreHours: vi.fn(),
   saveStoreHours: vi.fn(),
   fetchDeliveryZones: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('../../../lib/store-setup-api', () => ({
   saveStoreSetup: mocks.saveStoreSetup,
   saveStoreTheme: mocks.saveStoreTheme,
   publishStore: mocks.publishStore,
+  uploadStoreBrandImage: mocks.uploadStoreBrandImage,
 }));
 vi.mock('../../../lib/store-hours-api', () => ({
   fetchStoreHours: mocks.fetchStoreHours,
@@ -67,9 +69,27 @@ function incompleteSetup() {
     cnpj: null,
     ownerName: null,
     name: '',
+    legalName: null,
+    stateRegistration: null,
+    publicDescription: null,
     addressText: '',
+    postalCode: null,
+    street: null,
+    number: null,
+    neighborhood: null,
+    city: null,
+    state: null,
+    complement: null,
+    referencePoint: null,
     phone: null,
     whatsappNumber: null,
+    logoImageKey: null,
+    logoImageUrl: null,
+    coverImageKey: null,
+    coverImageUrl: null,
+    responsibleCpf: null,
+    responsiblePhone: null,
+    financeEmail: null,
     minOrderCents: 0,
     pixKey: null,
     pixKeyType: null,
@@ -86,9 +106,23 @@ function completeSetup() {
     cnpj: '12.345.678/0001-90',
     ownerName: 'Maria',
     name: 'Cabanhas BBQ',
+    legalName: 'Cabanhas Churrasco Ltda',
+    stateRegistration: 'ISENTO',
+    publicDescription: 'Churrasco no capricho.',
     addressText: 'Rua das Carnes, 100',
+    postalCode: '93610000',
+    street: 'Rua das Carnes',
+    number: '100',
+    neighborhood: 'Centro',
+    city: 'Estância Velha',
+    state: 'RS',
+    complement: null,
+    referencePoint: 'Ao lado da praça',
     phone: '5199999999',
     whatsappNumber: '5199999999',
+    responsibleCpf: '00000000000',
+    responsiblePhone: '+5551999990000',
+    financeEmail: 'financeiro@cabanhas.test',
     pixKey: 'chave@pix.com',
     pixKeyType: 'email' as const,
     pixMerchantCity: 'ESTANCIA VELHA',
@@ -142,7 +176,7 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
   });
 
   it('só a loja completa: badge 1/5, próximo passo aponta pra Horários', async () => {
-    mocks.fetchStoreSetup.mockResolvedValue({ ...incompleteSetup(), name: 'Cabanhas', addressText: 'Rua X', phone: '51999999999', whatsappNumber: '51999999999', cnpj: '12.345.678/0001-90' });
+    mocks.fetchStoreSetup.mockResolvedValue({ ...completeSetup(), pixKey: null, pixKeyType: null, pixMerchantCity: null });
     await mount();
 
     expect(container.textContent).toContain('1/5');

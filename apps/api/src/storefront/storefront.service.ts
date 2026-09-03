@@ -54,6 +54,9 @@ export class StorefrontService {
         name: tenant.name,
         themeKey: tenant.themeKey,
         timezone: tenant.timezone,
+        publicDescription: store?.publicDescription ?? null,
+        logoImageUrl: store?.logoImageKey ? resolvePublicImageUrl(store.logoImageKey, this.publicImageBaseUrl) : null,
+        coverImageUrl: store?.coverImageKey ? resolvePublicImageUrl(store.coverImageKey, this.publicImageBaseUrl) : null,
         // Loja ainda não cadastrada (tenant recém-criado no wizard, Épico 13):
         // o cardápio já pode existir, então respondemos o que temos em vez de
         // 404 — o cabeçalho apenas omite endereço/telefone.

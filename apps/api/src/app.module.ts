@@ -75,6 +75,7 @@ export class AppModule implements NestModule {
       { path: 'v1/store/:slug/delivery-match', method: RequestMethod.POST },
       { path: 'v1/store/:slug/checkout/revalidate', method: RequestMethod.POST },
       { path: 'v1/store/:slug/checkout/orders', method: RequestMethod.POST },
+      { path: 'v1/admin/stores/:storeId/setup', method: RequestMethod.PUT },
     );
   }
 }
