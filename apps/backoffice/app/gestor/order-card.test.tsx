@@ -28,6 +28,8 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
     items: [{ name: 'Picanha Angus', quantity: 1, lineTotalCents: 9500, modifiers: [], notes: null }],
     flaggedAt: null,
     flaggedReason: null,
+    lastNotifiedAt: null,
+    notificationCount: 0,
     ...overrides,
   };
 }
@@ -91,6 +93,13 @@ describe('OrderCard — barra de ação (Fase 1 do plano do gestor)', () => {
     expect(print?.className).toContain('w-11');
     expect(notify?.className).toContain('h-11');
     expect(notify?.className).toContain('w-11');
+  });
+
+  it('mostra o último aviso por WhatsApp sem transformar isso em status do pedido', () => {
+    render({ order: order({ lastNotifiedAt: '2026-07-26T21:45:00.000Z', notificationCount: 2 }) });
+    expect(container.textContent).toContain('Avisado');
+    expect(container.textContent).toContain('18:45');
+    expect(container.textContent).not.toContain('notificationCount');
   });
 
   it('CTA bloqueado (advanceBlockReason) usa o par de tokens disabled do MoButton, nunca opacity sobre bg-brand', () => {

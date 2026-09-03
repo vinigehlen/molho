@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { AdminOrder } from '@molho/contracts';
+import React, { useEffect, useState } from 'react';
+import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { MoButton, MoSheet } from '@molho/ui';
-import { fetchCustomerPhone } from '../../lib/orders-api';
+import { fetchCustomerPhone, registerOrderNotification } from '../../lib/orders-api';
 import { waMeUrl, whatsappMessage } from '../../lib/whatsapp';
 
 /**
@@ -11,10 +11,18 @@ import { waMeUrl, whatsappMessage } from '../../lib/whatsapp';
  * EDITÁVEL — o lojista conhece o cliente, o Molho não. Tocar em "Abrir
  * WhatsApp" só abre o `wa.me`; quem aperta enviar é ele, no app dele.
  *
- * Nada é persistido: não existe "avisado" no pedido, nem `notification_log`
- * (Épico 12 decide se histórico vale a pena). Cola manual é cola manual.
+ * Ao abrir o WhatsApp, o Molho grava um `notification_log`: não prova envio,
+ * mas deixa rastro de que o lojista iniciou a conversa.
  */
-export function WhatsAppSheet({ order, onClose }: { order: AdminOrder; onClose: () => void }) {
+export function WhatsAppSheet({
+  order,
+  onClose,
+  onNotified,
+}: {
+  order: AdminOrder;
+  onClose: () => void;
+  onNotified: (notification: OrderNotificationResponse) => void;
+}) {
   const [texto, setTexto] = useState(() => whatsappMessage(order) ?? '');
   const [phone, setPhone] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -40,6 +48,11 @@ export function WhatsAppSheet({ order, onClose }: { order: AdminOrder; onClose: 
     if (!phone) return;
     // `window.open` dentro do handler de clique não é barrado por popup blocker.
     window.open(waMeUrl(phone, texto), '_blank', 'noopener,noreferrer');
+    void registerOrderNotification(order.id)
+      .then((notification) => {
+        if (notification) onNotified(notification);
+      })
+      .catch(() => null);
     onClose();
   }
 

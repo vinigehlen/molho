@@ -17,3 +17,5 @@ export const ORDER_ADJUSTMENT_SERVICE = Symbol('ORDER_ADJUSTMENT_SERVICE');
 export const ORDER_FLAG_SERVICE = Symbol('ORDER_FLAG_SERVICE');
 /** Leitura pública por token opaco (Épico 12, acompanhamento do pedido). */
 export const ORDER_TRACKING_SERVICE = Symbol('ORDER_TRACKING_SERVICE');
+/** Registro append-only do click-to-chat (Épico 11). */
+export const ORDER_NOTIFICATION_SERVICE = Symbol('ORDER_NOTIFICATION_SERVICE');

@@ -161,6 +161,7 @@ model Tenant {
   orderItemModifiers    OrderItemModifier[]
   orderStatusHistories  OrderStatusHistory[]
   orderAdjustments      OrderAdjustment[]
+  notificationLogs      NotificationLog[]
   printJobs             PrintJob[]
   coupons               Coupon[]
   reviews               Review[]
@@ -347,6 +348,7 @@ model User {
   auditLogs            AuditLog[]
   orderStatusHistories OrderStatusHistory[]
   orderAdjustments     OrderAdjustment[]
+  notificationLogs     NotificationLog[]
 
   @@map("users")
 }
@@ -1064,6 +1066,7 @@ model Order {
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
   adjustments     OrderAdjustment[]
+  notificationLogs NotificationLog[]
   printJobs       PrintJob[]
   /// Sempre 0 ou 1 na prática (único vivo por pedido, índice parcial na
   /// migration) — array só porque o Prisma exige 1:N sem `@unique` na FK.
@@ -1376,6 +1379,30 @@ model OrderAdjustment {
   // CLAUDE.md).
   @@index([tenantId, orderId])
   @@map("order_adjustments")
+}
+
+/// Click-to-chat (Épico 11). Append-only: cada abertura do WhatsApp registra
+/// quem iniciou o aviso, em qual status o pedido estava e quando. Não guarda
+/// telefone nem texto editado — o WhatsApp continua humano/no app do lojista,
+/// e PII fica fora do histórico operacional.
+model NotificationLog {
+  id                  String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId            String      @map("tenant_id") @db.Uuid
+  orderId             String      @map("order_id") @db.Uuid
+  channel             String
+  orderStatusSnapshot OrderStatus @map("order_status_snapshot")
+  actorId             String      @map("actor_id") @db.Uuid
+  actorRole           String      @map("actor_role")
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id])
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  // FK composta (order_id, tenant_id) → orders(id, tenant_id) na migration —
+  // impede log apontar pra pedido de outro tenant mesmo se o serviço errar.
+  @@index([tenantId, orderId, createdAt])
+  @@map("notification_log")
 }
 
 /// Épico 10 (impressão ESC/POS) — módulo consumidor em apps/api/src/printing/.

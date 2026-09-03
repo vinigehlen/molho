@@ -31,6 +31,8 @@ const ROW: AdminOrderRow = {
   items: [{ name: 'X-Salada', quantity: 2, lineTotalCents: 3200, notes: null, modifiers: [] }],
   flaggedAt: null,
   flaggedReason: null,
+  notificationLogs: [],
+  _count: { notificationLogs: 0 },
 };
 
 describe('toAdminOrder', () => {
@@ -129,5 +131,18 @@ describe('toAdminOrder', () => {
     expect(flagged.flaggedAt).toBe('2026-07-26T18:35:00.000Z');
     expect(flagged.flaggedReason).toBe('Cliente pediu troca de item por telefone');
     expect(adminOrderSchema.safeParse(flagged).success).toBe(true);
+  });
+
+  it('resume histórico de WhatsApp com última data e contagem, sem carregar telefone nem texto', () => {
+    const notified = toAdminOrder({
+      ...ROW,
+      notificationLogs: [{ createdAt: new Date('2026-07-26T18:45:00.000Z') }],
+      _count: { notificationLogs: 3 },
+    });
+
+    expect(notified.lastNotifiedAt).toBe('2026-07-26T18:45:00.000Z');
+    expect(notified.notificationCount).toBe(3);
+    expect(JSON.stringify(notified)).not.toMatch(/phone|telefone|whatsapp|message|texto/i);
+    expect(adminOrderSchema.safeParse(notified).success).toBe(true);
   });
 });

@@ -22,6 +22,7 @@ function order(status: AdminOrder['status'], over: Partial<AdminOrder> = {}): Ad
     delivery: { label: 'C', street: 'R', number: null, complement: null, neighborhood: 'B', city: 'C', state: 'RS', postalCode: null, referencePoint: null, postalCodeVerified: false },
     items: [], ...over, fulfillmentDeadlineAt: over.fulfillmentDeadlineAt ?? null,
     flaggedAt: over.flaggedAt ?? null, flaggedReason: over.flaggedReason ?? null,
+    lastNotifiedAt: over.lastNotifiedAt ?? null, notificationCount: over.notificationCount ?? 0,
   };
 }
 

@@ -34,6 +34,8 @@ import { OrderPaymentController } from './order-payment.controller';
 import { OrderTrackingController } from './order-tracking.controller';
 import { PrismaOrderTrackingRepository } from './order-tracking.repository';
 import { OrderTrackingService } from './order-tracking.service';
+import { PrismaOrderNotificationRepository } from './order-notification.repository';
+import { OrderNotificationService } from './order-notification.service';
 import { PrismaOrderStatusRepository } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
 import { InMemoryOrderEventBus, RedisOrderEventBus, type OrderEventBus } from './realtime/order-event-bus';
@@ -49,6 +51,7 @@ import {
   ORDER_ADJUSTMENT_SERVICE,
   ORDER_EVENT_BUS,
   ORDER_FLAG_SERVICE,
+  ORDER_NOTIFICATION_SERVICE,
   ORDER_TRACKING_SERVICE,
   ORDER_STATUS_SERVICE,
   PAYMENT_CONFIRMATION_SERVICE,
@@ -149,6 +152,12 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService): OrderTrackingService =>
         new OrderTrackingService(new PrismaOrderTrackingRepository(requestContext)),
+    },
+    {
+      provide: ORDER_NOTIFICATION_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService): OrderNotificationService =>
+        new OrderNotificationService(new PrismaOrderNotificationRepository(requestContext)),
     },
     {
       provide: CHECKOUT_REVALIDATION_SERVICE,

@@ -1,4 +1,4 @@
-import type { AdminOrder } from '@molho/contracts';
+import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { apiFetch } from './api-client';
 
 /**
@@ -90,6 +90,13 @@ export async function fetchCustomerPhone(id: string): Promise<string | null> {
   if (res.status === 404 || res.status === 403) return null;
   if (!res.ok) throw new Error(`Falha ao buscar o telefone (${res.status})`);
   return ((await res.json()) as { phone: string }).phone;
+}
+
+export async function registerOrderNotification(id: string): Promise<OrderNotificationResponse | null> {
+  const res = await apiFetch(`/v1/admin/orders/${encodeURIComponent(id)}/notifications`, { method: 'POST' });
+  if (res.status === 404 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`Falha ao registrar aviso (${res.status})`);
+  return (await res.json()) as OrderNotificationResponse;
 }
 
 /** Agrupa pedidos por coluna do board, preservando a ordem de chegada (FIFO). Puro, testável. */

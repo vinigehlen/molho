@@ -11,6 +11,8 @@ const ORDER: AdminOrder = {
   fulfillmentDeadlineAt: null,
   flaggedAt: null,
   flaggedReason: null,
+  lastNotifiedAt: null,
+  notificationCount: 0,
   customerName: 'Ana Souza',
   customerVerified: true,
   paymentMethod: 'pix',

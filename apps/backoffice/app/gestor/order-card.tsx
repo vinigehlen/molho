@@ -151,6 +151,11 @@ export const OrderCard = memo(function OrderCard({
         <span className="mt-1 inline-block rounded-full bg-brand-faint px-2 py-0.5 text-xs font-medium text-brand-strong">
           {destinationLabel(order)}
         </span>
+        {order.lastNotifiedAt && (
+          <span className="ml-1 mt-1 inline-block rounded-full bg-positive/10 px-2 py-0.5 text-xs font-medium text-positive">
+            Avisado {isoToTime(order.lastNotifiedAt)}
+          </span>
+        )}
         <div className="mt-1 flex items-center justify-between text-sm tabular-nums text-text">
           <span>{centsToBRL(order.totalCents)}</span>
           <span className="inline-flex items-center gap-1 text-xs text-brand-strong">

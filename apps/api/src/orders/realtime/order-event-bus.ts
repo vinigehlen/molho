@@ -15,7 +15,7 @@ export interface OrderEvent {
   // eixo mudou pra qualquer consumidor que ramifique por tipo (ex.: o
   // acompanhamento do cliente, Épico 12). O cutuque continua magro: o cliente
   // refaz o GET REST de qualquer forma.
-  event: 'new' | 'status_changed' | 'payment_confirmed';
+  event: 'new' | 'status_changed' | 'payment_confirmed' | 'notification_logged';
   version: number;
 }
 

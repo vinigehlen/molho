@@ -6,7 +6,7 @@ export type StreamStatus = 'connecting' | 'open' | 'reconnecting';
 
 interface Nudge {
   orderId: string;
-  event: 'new' | 'status_changed' | 'payment_confirmed';
+  event: 'new' | 'status_changed' | 'payment_confirmed' | 'notification_logged';
   version: number;
 }
 
@@ -81,6 +81,9 @@ export function useOrdersStream(tenantId: string | null, handlers: Handlers): St
       // Confirmação de pagamento (eixo ortogonal ao status) — refetch idêntico:
       // o AdminOrder devolvido já traz o paymentStatus fresco pro board/painel.
       source.addEventListener('order_payment', onNudge);
+      // Aviso por WhatsApp não muda status, mas muda o resumo do card
+      // (`lastNotifiedAt`/`notificationCount`), então refetch igual.
+      source.addEventListener('order_notification', onNudge);
       source.addEventListener('server_shutdown', () => {
         source.close();
         scheduleReconnect(true);

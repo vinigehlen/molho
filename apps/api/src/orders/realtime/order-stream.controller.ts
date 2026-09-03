@@ -32,6 +32,7 @@ const SSE_EVENT_TYPE: Record<OrderEvent['event'], string> = {
   new: 'order_new',
   status_changed: 'order_status',
   payment_confirmed: 'order_payment',
+  notification_logged: 'order_notification',
 };
 
 /** Reconstrói o Actor do JWT (mesmo critério do RequirePermissionGuard) — filtra papel desconhecido em vez de castar (fail-closed). */
