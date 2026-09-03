@@ -1,9 +1,11 @@
 import type { CheckoutRequest, RevalidatedCheckout, RevalidatedItem } from '@molho/contracts';
 import type { ResolvedAddress } from '../geo/resolve-address';
+import type { PromotionsGate } from '../modules/promotions.gate';
 import type { DeliveryMatchRepository } from '../storefront/delivery-match.repository';
 import { computeStoreOpenState, isWithinAnyShift, localWeekdayAndMinutes, localWeekMinutes, slotOccurrenceRange } from '../storefront/store-hours';
 import type {
   CheckoutCouponRecord,
+  CheckoutPromotionRecord,
   CheckoutRepository,
   CheckoutSchedulingSlotRecord,
   CheckoutStoreHoursRecord,
@@ -27,6 +29,7 @@ export class CheckoutRevalidationService {
     private readonly checkoutRepo: CheckoutRepository,
     private readonly deliveryMatchRepo: DeliveryMatchRepository,
     private readonly now: () => Date = () => new Date(),
+    private readonly promotionsGate: PromotionsGate = { isActive: async () => true },
   ) {}
 
   /**
@@ -42,7 +45,7 @@ export class CheckoutRevalidationService {
    */
   async revalidate(request: CheckoutRequest, resolved: ResolvedAddress | null): Promise<RevalidatedCheckout> {
     const isPickup = request.fulfillmentType === 'pickup';
-    const [store, hours, offers, zoneMatch, coupon, schedulingSlots] = await Promise.all([
+    const [store, hours, offers, zoneMatch, coupon, schedulingSlots, promotionsEnabled] = await Promise.all([
       this.checkoutRepo.findStore(),
       this.checkoutRepo.listStoreHours(),
       this.checkoutRepo.findOffersForItems(request.items),
@@ -62,6 +65,7 @@ export class CheckoutRevalidationService {
       request.couponCode ? this.checkoutRepo.findCoupon(request.couponCode) : Promise.resolve(null),
       // Épico conversão (C3). Mesmo racional do cupom — sem scheduledFor, sem consulta.
       request.scheduledFor ? this.checkoutRepo.listSchedulingSlots() : Promise.resolve<CheckoutSchedulingSlotRecord[]>([]),
+      this.promotionsGate.isActive(),
     ]);
 
     const offerById = new Map(offers.map((offer) => [offer.id, offer]));
@@ -70,6 +74,15 @@ export class CheckoutRevalidationService {
     );
     const { isOpenNow, nextOpensAt } = computeStoreOpenState(hours, store?.timezone ?? FALLBACK_TIMEZONE, this.now());
     const withinZone = isPickup || zoneMatch !== null;
+    const timezone = store?.timezone ?? FALLBACK_TIMEZONE;
+    // Módulo desligado no meio do checkout = lista vazia = nenhum item ganha
+    // desconto (nunca erro — CLAUDE.md regra 1, mesmo racional do cashback
+    // em checkout-order.service.ts).
+    const promotions = promotionsEnabled
+      ? (await this.checkoutRepo.listActivePromotions()).filter((promotion) =>
+          isPromotionCurrent(promotion, this.now(), timezone),
+        )
+      : [];
 
     let hasUnfavorableDivergence = !isOpenNow || !withinZone;
     if (
@@ -174,6 +187,18 @@ export class CheckoutRevalidationService {
       const priceChanged = unitCents !== clientUnitCents;
       if (unitCents > clientUnitCents) hasUnfavorableDivergence = true;
 
+      // Promoção (Épico 15): desconto AUTOMÁTICO por item, aplicado ANTES de
+      // cupom/cashback (mesma ordem de checkout-order.service.ts). Só o
+      // melhor desconto entre as promoções elegíveis pro item — nunca
+      // acumula mais de uma (bestPromotionForItem já resolve prioridade
+      // produto > categoria > loja inteira).
+      const promotion = bestPromotionForItem(promotions, {
+        productId: validOffer.productId,
+        categoryId: validOffer.categoryId,
+        unitCents,
+      });
+      const promotionDiscountCents = promotion ? promotion.discountCents * input.quantity : 0;
+
       return {
         productId: validOffer.productId,
         offerId: validOffer.id,
@@ -183,13 +208,17 @@ export class CheckoutRevalidationService {
         modifiers: resolvedModifiers,
         quantity: input.quantity,
         notes: input.notes,
-        lineTotalCents: unitCents * input.quantity,
+        lineTotalCents: unitCents * input.quantity - promotionDiscountCents,
         priceChanged,
+        promotionDiscountCents,
+        promotionName: promotion?.name ?? null,
+        promotionId: promotion?.id ?? null,
         ...(comboComponents ? { comboComponents } : {}),
       };
     });
 
     const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
+    const promotionDiscountCents = items.reduce((sum, item) => sum + item.promotionDiscountCents, 0);
     const minOrderCents = store?.minOrderCents ?? 0;
     const belowMinimum = subtotalCents < minOrderCents;
     if (belowMinimum) hasUnfavorableDivergence = true;
@@ -210,7 +239,6 @@ export class CheckoutRevalidationService {
     // /checkout/orders (slot lotou, loja fechou o turno) é
     // hasUnfavorableDivergence, nunca campo separado pra UI decidir sozinha.
     // Sem scheduledFor, não é divergência — "o quanto antes" continua valendo.
-    const timezone = store?.timezone ?? FALLBACK_TIMEZONE;
     const scheduledForValid = request.scheduledFor
       ? await this.isScheduledForUsable(new Date(request.scheduledFor), timezone, hours, schedulingSlots)
       : false;
@@ -238,6 +266,7 @@ export class CheckoutRevalidationService {
       couponCode: request.couponCode ?? null,
       couponValid,
       discountCents,
+      promotionDiscountCents,
       scheduledFor: request.scheduledFor ?? null,
       scheduledForValid,
       totalCents: withinZone ? subtotalCents + (deliveryFeeCents ?? 0) - discountCents : null,
@@ -321,5 +350,66 @@ function unavailableItem(
     notes: input.notes,
     lineTotalCents: 0,
     priceChanged: false,
+    promotionDiscountCents: 0,
+    promotionName: null,
+    promotionId: null,
   };
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return (hours ?? 0) * 60 + (minutes ?? 0);
+}
+
+/**
+ * Dia da semana + faixa de horário local da promoção (Épico 15) — mesmo
+ * racional de `computeStoreOpenState`, mas por promoção em vez de por loja.
+ * Janela que cruza a meia-noite (ex.: 22:00–02:00) é tratada como OR, não AND.
+ */
+function isPromotionCurrent(promotion: CheckoutPromotionRecord, now: Date, timezone: string): boolean {
+  const { dayOfWeek, minutes } = localWeekdayAndMinutes(timezone, now);
+  const weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(dayOfWeek);
+  if (!promotion.weekdays.includes(weekday)) return false;
+  const start = timeToMinutes(promotion.startTime);
+  const end = timeToMinutes(promotion.endTime);
+  if (start < end) return minutes >= start && minutes < end;
+  return minutes >= start || minutes < end;
+}
+
+/** Desconto por UNIDADE, nunca excede o próprio preço unitário (mesmo racional de computeDiscountCents pro cupom). */
+function computePromotionUnitDiscount(promotion: CheckoutPromotionRecord, unitCents: number): number {
+  const raw =
+    promotion.discountType === 'percent'
+      ? Math.round((unitCents * promotion.discountValue) / 100)
+      : promotion.discountValue;
+  return Math.min(raw, unitCents);
+}
+
+/**
+ * Um item pode ser alvo de várias promoções elegíveis ao mesmo tempo
+ * (loja inteira + categoria + produto específico) — escolhe a de MAIOR
+ * desconto em reais; empate resolve por especificidade (produto > categoria
+ * > loja inteira), nunca acumula.
+ */
+function bestPromotionForItem(
+  promotions: readonly CheckoutPromotionRecord[],
+  item: { productId: string; categoryId: string; unitCents: number },
+): { id: string; name: string; discountCents: number } | null {
+  let best: { id: string; name: string; discountCents: number; priority: number } | null = null;
+  for (const promotion of promotions) {
+    const priority =
+      promotion.scope === 'product' && promotion.scopeId === item.productId
+        ? 3
+        : promotion.scope === 'category' && promotion.scopeId === item.categoryId
+          ? 2
+          : promotion.scope === 'store_wide'
+            ? 1
+            : 0;
+    if (priority === 0) continue;
+    const discountCents = computePromotionUnitDiscount(promotion, item.unitCents);
+    if (!best || discountCents > best.discountCents || (discountCents === best.discountCents && priority > best.priority)) {
+      best = { id: promotion.id, name: promotion.name, discountCents, priority };
+    }
+  }
+  return best;
 }

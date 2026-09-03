@@ -224,6 +224,11 @@ export const revalidatedItemSchema = z.strictObject({
   lineTotalCents: centsSchema,
   /** Preço (produto ou modificador) mudou desde o que o cliente mandou. */
   priceChanged: z.boolean(),
+  /** Desconto automático de promoção agendada aplicado nesta linha (Épico 15). Sempre 0 sem promoção ativa na janela. */
+  promotionDiscountCents: centsSchema.default(0),
+  /** Nome/id da promoção aplicada nesta linha; null quando não há promoção. */
+  promotionName: z.string().nullable().default(null),
+  promotionId: z.uuid().nullable().default(null),
   /**
    * Composição do combo (exceção MVP 2026-08-28, fase 4.2C) — presente só
    * quando o produto é `kind = 'combo'`. Snapshot de exibição/pedido; em
@@ -272,6 +277,8 @@ export const revalidatedCheckoutSchema = z.strictObject({
   couponValid: z.boolean(),
   /** Sempre `0` sem cupom válido. Descontado só do subtotal, nunca da taxa de entrega. */
   discountCents: centsSchema,
+  /** Soma do desconto automático de promoções agendadas em todos os itens (Épico 15) — já embutido em cada `lineTotalCents`, aqui só pra exibição/recibo. */
+  promotionDiscountCents: centsSchema,
   /**
    * Agendamento (Épico conversão, C3). `scheduledFor` ecoa o que o cliente
    * mandou (`null` = "o quanto antes", nunca confundir com "agendamento
@@ -322,6 +329,8 @@ const checkoutOrderResponseBase = z.strictObject({
   totalCents: centsSchema,
   /** Cupom (Épico conversão, C2) — 0/null quando o pedido não usou cupom. */
   discountCents: centsSchema,
+  /** Promoções agendadas (Épico 15) — 0 quando nenhum item ganhou desconto automático. */
+  promotionDiscountCents: centsSchema,
   couponCode: z.string().nullable(),
   /** Cashback (Épico 16b) — 0 sem toggle ligado ou sem saldo disponível. */
   cashbackUsedCents: centsSchema,

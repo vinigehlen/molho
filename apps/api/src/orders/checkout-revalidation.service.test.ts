@@ -6,6 +6,7 @@ import type { Weekday } from '../storefront/store-hours';
 import type {
   CheckoutCouponRecord,
   CheckoutOfferRecord,
+  CheckoutPromotionRecord,
   CheckoutRepository,
   CheckoutSchedulingSlotRecord,
   CheckoutStoreHoursRecord,
@@ -24,6 +25,7 @@ const FIXED_NOW = new Date('2026-07-22T15:00:00Z'); // 12h em America/Sao_Paulo
 const PRODUCT: CheckoutOfferRecord = {
   id: 'offer-1',
   productId: 'product-1',
+  categoryId: 'category-1',
   isPrimary: true,
   name: 'X-Burger',
   basePriceCents: 2890,
@@ -74,6 +76,10 @@ class FakeCheckoutRepository implements CheckoutRepository {
   async countScheduledOrders(start: Date, end: Date) {
     this.scheduledCounts.push(start.getTime(), end.getTime());
     return this.scheduledCountResult;
+  }
+  promotions: CheckoutPromotionRecord[] = [];
+  async listActivePromotions() {
+    return this.promotions;
   }
 }
 
@@ -606,6 +612,7 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
     const COMBO: CheckoutOfferRecord = {
       id: 'offer-combo',
       productId: 'product-combo',
+      categoryId: 'category-1',
       isPrimary: true,
       name: 'Combo Casal',
       basePriceCents: 5990,
@@ -960,6 +967,131 @@ describe('CheckoutRevalidationService — agendamento de pedido', () => {
         ],
       });
       expect(result.hasUnfavorableDivergence).toBe(false);
+    });
+  });
+});
+
+describe('CheckoutRevalidationService — promoções (Épico 15)', () => {
+  // FIXED_NOW = 2026-07-22T15:00:00Z = quarta 12h em América/São_Paulo.
+  const STORE_WIDE: CheckoutPromotionRecord = {
+    id: 'promo-loja',
+    name: '10% na loja toda',
+    discountType: 'percent',
+    discountValue: 10,
+    weekdays: [3], // quarta
+    startTime: '00:00',
+    endTime: '23:59',
+    scope: 'store_wide',
+    scopeId: null,
+  };
+  const CATEGORY_PROMO: CheckoutPromotionRecord = {
+    id: 'promo-categoria',
+    name: 'R$5 off na categoria',
+    discountType: 'fixed',
+    discountValue: 500,
+    weekdays: [3],
+    startTime: '00:00',
+    endTime: '23:59',
+    scope: 'category',
+    scopeId: 'category-1',
+  };
+
+  it('desliga por módulo (promotionsGate.isActive=false): nenhum desconto, mesmo com promoção ativa cadastrada', async () => {
+    const checkoutRepo = new FakeCheckoutRepository();
+    const deliveryMatchRepo = new FakeDeliveryMatchRepository();
+    checkoutRepo.promotions = [STORE_WIDE];
+    const service = new CheckoutRevalidationService(checkoutRepo, deliveryMatchRepo, () => FIXED_NOW, {
+      isActive: async () => false,
+    });
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]?.promotionDiscountCents).toBe(0);
+    expect(result.items[0]?.promotionId).toBeNull();
+    expect(result.promotionDiscountCents).toBe(0);
+  });
+
+  it('promoção percentual da loja toda aplica desconto por item, refletido no subtotal', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [STORE_WIDE];
+
+    // unitCents = 2890 + 500 (bacon) = 3390 -> 10% = 339
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]).toMatchObject({
+      promotionDiscountCents: 339,
+      promotionName: '10% na loja toda',
+      promotionId: 'promo-loja',
+      lineTotalCents: 3390 - 339,
+    });
+    expect(result.promotionDiscountCents).toBe(339);
+    expect(result.subtotalCents).toBe(3390 - 339);
+  });
+
+  it('promoção fora do dia da semana cadastrado não aplica', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [{ ...STORE_WIDE, weekdays: [1] }]; // só segunda; hoje é quarta
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]?.promotionDiscountCents).toBe(0);
+  });
+
+  it('promoção fora da janela de horário não aplica', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [{ ...STORE_WIDE, startTime: '20:00', endTime: '23:00' }]; // agora é meio-dia
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]?.promotionDiscountCents).toBe(0);
+  });
+
+  it('entre promoções elegíveis, vence o MAIOR desconto em reais — nunca acumula', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [
+      STORE_WIDE, // 10% de 3390 = 339
+      { ...CATEGORY_PROMO, discountValue: 200 }, // fixo R$2 — menor, perde
+    ];
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]).toMatchObject({ promotionId: 'promo-loja', promotionDiscountCents: 339 });
+  });
+
+  it('empate no valor do desconto: vence a promoção de escopo mais específico (categoria > loja inteira)', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [
+      STORE_WIDE, // 10% de 3390 = 339
+      { ...CATEGORY_PROMO, discountType: 'fixed', discountValue: 339 }, // mesmo valor, escopo mais específico
+    ];
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]).toMatchObject({ promotionId: 'promo-categoria', promotionDiscountCents: 339 });
+  });
+
+  it('desconto fixo nunca deixa o item negativo — trava no valor unitário', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.promotions = [{ ...STORE_WIDE, discountType: 'fixed', discountValue: 999999 }];
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]?.promotionDiscountCents).toBe(3390); // unitCents inteiro, não mais
+    expect(result.items[0]?.lineTotalCents).toBe(0);
+  });
+
+  it('item indisponível não ganha promoção (unavailableItem tem campos zerados)', async () => {
+    const { checkoutRepo, service } = setup();
+    checkoutRepo.products = [];
+    checkoutRepo.promotions = [STORE_WIDE];
+
+    const result = await service.revalidate(baseRequest(), RESOLVED);
+
+    expect(result.items[0]).toMatchObject({
+      available: false,
+      promotionDiscountCents: 0,
+      promotionName: null,
+      promotionId: null,
     });
   });
 });

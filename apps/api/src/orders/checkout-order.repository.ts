@@ -75,6 +75,9 @@ export interface CreateOrderParams {
   scheduledFor: Date | null;
   /** Cashback (Épico 16b, D3/D6) — sempre 0 sem o toggle ligado ou sem saldo, empilha com desconto de cupom. */
   cashbackUsedCents: number;
+  /** Promoções agendadas (Épico 15) — desconto automático total e snapshot por promoção aplicada. */
+  promotionDiscountCents: number;
+  promotionSnapshot: Prisma.InputJsonValue | null;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -351,6 +354,8 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       couponCodeSnapshot,
       discountCents,
       cashbackUsedCents,
+      promotionDiscountCents,
+      promotionSnapshot,
       scheduledFor,
       legalAcceptance,
     } = params;
@@ -367,6 +372,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "discount_cents", "coupon_id", "coupon_code_snapshot",
         "cashback_used_cents",
+        "promotion_discount_cents", "promotion_snapshot",
         "scheduled_for",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
@@ -381,6 +387,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${(revalidated.totalCents ?? 0) - cashbackUsedCents},
         ${discountCents}, ${couponId}::uuid, ${couponCodeSnapshot},
         ${cashbackUsedCents},
+        ${promotionDiscountCents}, ${promotionSnapshot ? JSON.stringify(promotionSnapshot) : null}::jsonb,
         ${scheduledFor},
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},

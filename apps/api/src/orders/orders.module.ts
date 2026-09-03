@@ -13,6 +13,7 @@ import { RequestContextService } from '../context/request-context.service';
 import { MODULE_CACHE, ModuleCheckModule } from '../modules/module-check.module';
 import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
 import { PrismaLoyaltyGate } from '../modules/loyalty.gate';
+import { PrismaPromotionsGate } from '../modules/promotions.gate';
 import { LOYALTY_CREDITOR, LoyaltyModule } from '../loyalty/loyalty.module';
 import type { LoyaltyCreditor } from './loyalty-creditor.port';
 import { PrintingModule } from '../printing/printing.module';
@@ -164,11 +165,13 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     },
     {
       provide: CHECKOUT_REVALIDATION_SERVICE,
-      inject: [RequestContextService],
-      useFactory: (requestContext: RequestContextService): CheckoutRevalidationService =>
+      inject: [RequestContextService, MODULE_CACHE],
+      useFactory: (requestContext: RequestContextService, moduleCache: ModuleCache): CheckoutRevalidationService =>
         new CheckoutRevalidationService(
           new PrismaCheckoutRepository(requestContext),
           new PrismaDeliveryMatchRepository(requestContext),
+          () => new Date(),
+          new PrismaPromotionsGate(requestContext, moduleCache),
         ),
     },
     {

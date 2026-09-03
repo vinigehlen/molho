@@ -69,16 +69,12 @@ describe('planos × módulos (alinhado à tabela de preços da definições-v1 �
     expect(planGrants('standard', 'notify.whatsapp_ctc')).toBe(true);
   });
 
-  it('coupons/combos/reviews/loyalty (código completo) são de todo plano; promoções (sem código) continua Pro+; PDV/KDS/mesas/iFood/campanhas são Premium', () => {
+  it('coupons/combos/reviews/loyalty/promotions (código completo) são de todo plano; PDV/KDS/mesas/iFood/campanhas são Premium', () => {
     // Decisão do PM (2026-09-02): sem tiering por ora — feature com código
-    // completo nasce ligada em qualquer plano. `promotions` segue Pro+
-    // porque não tem código nenhum ainda (nada a "ligar").
-    for (const key of ['coupons', 'combos', 'reviews', 'loyalty'] as const) {
+    // completo nasce ligada em qualquer plano. `promotions` entrou nessa
+    // regra em 2026-09-03, quando ganhou código completo ([15-D1]).
+    for (const key of ['coupons', 'combos', 'reviews', 'loyalty', 'promotions'] as const) {
       expect(planGrants('standard', key), `${key} é do standard`).toBe(true);
-    }
-    for (const key of ['promotions'] as const) {
-      expect(planGrants('standard', key), `${key} não é do standard`).toBe(false);
-      expect(planGrants('pro', key), `${key} é do pro`).toBe(true);
     }
     for (const key of ['pdv', 'kds', 'tables', 'channel.ifood', 'campaigns'] as const) {
       expect(planGrants('pro', key), `${key} não é do pro`).toBe(false);
@@ -120,9 +116,9 @@ describe('provisionamento', () => {
         'combos',
         'reviews',
         'loyalty',
+        'promotions',
       ]),
     );
-    expect(ligados).not.toContain('promotions');
     expect(ligados).not.toContain('pdv');
     expect(ligados).not.toContain('fiscal.nfce');
   });
