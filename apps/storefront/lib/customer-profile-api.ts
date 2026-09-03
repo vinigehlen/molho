@@ -83,6 +83,12 @@ export async function listCustomerOrders(slug: string, token: string): Promise<C
   return customerOrderSummaryListSchema.parse(await request(slug, token, '/orders'));
 }
 
+/** Saldo de cashback (Épico 16b) — sob `/me/*`, mesmo helper `request()` do resto do perfil. */
+export async function getLoyaltyBalance(slug: string, token: string): Promise<number> {
+  const body = await request<{ balanceCents: number }>(slug, token, '/loyalty');
+  return body.balanceCents;
+}
+
 export class ReviewAlreadyExistsError extends Error {}
 
 /**

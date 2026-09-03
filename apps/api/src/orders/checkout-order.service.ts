@@ -15,6 +15,7 @@ import type {
 } from '@molho/contracts';
 import type { CustomerIdentityRepository } from '../auth/customer-identity.repository';
 import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
+import type { LoyaltyGate } from '../modules/loyalty.gate';
 import type { CheckoutRevalidationService } from './checkout-revalidation.service';
 import {
   CheckoutCustomerNotFoundError,
@@ -81,6 +82,7 @@ export class CheckoutOrderService {
     private readonly orderStatusService: OrderStatusService,
     private readonly moduleGate: PaymentMethodModuleGate,
     private readonly guestGate: CheckoutGuestGate,
+    private readonly loyaltyGate: LoyaltyGate,
     private readonly customerIdentity: CustomerIdentityRepository,
     private readonly now: () => Date = () => new Date(),
   ) {}
@@ -200,6 +202,19 @@ export class CheckoutOrderService {
     }
     const discountCents = couponId ? revalidation.discountCents : 0;
 
+    // Cashback (Épico 16b, D3/D6) — "tudo ou nada", empilha com o desconto
+    // de cupom acima (colunas independentes, sem XOR nenhum). Módulo
+    // desligado no meio do checkout vira no-op silencioso, mesmo racional
+    // do guestGate/moduleGate: nunca falha o pedido, só não aplica o
+    // benefício. `totalCents` aqui já é subtotal+fee-discountCents (vem da
+    // revalidação); o cashback só pode reduzir o que ainda falta pagar,
+    // nunca passar disso.
+    let cashbackUsedCents = 0;
+    if (request.useLoyaltyBalance && (await this.loyaltyGate.isActive())) {
+      cashbackUsedCents = await this.repo.claimLoyaltyBalance(customerId, totalCents);
+    }
+    const totalCentsAfterCashback = totalCents - cashbackUsedCents;
+
     // Épico conversão (C3). Mesmo racional do cupom acima: scheduledForValid
     // aqui já passou pelas checagens de leitura (horário, slot, teto
     // aparente) — só `claimSchedulingSlot` (advisory lock + contagem fresca)
@@ -220,7 +235,7 @@ export class CheckoutOrderService {
     // totalCents real (docs/02 §5.5: pedir troco pra menos que o total é
     // request inválido).
     const changeForCents = request.paymentMethod === 'cash_on_delivery' ? request.changeForCents : null;
-    if (changeForCents !== null && changeForCents < totalCents) {
+    if (changeForCents !== null && changeForCents < totalCentsAfterCashback) {
       throw new InvalidChangeAmountError();
     }
 
@@ -249,6 +264,7 @@ export class CheckoutOrderService {
       couponId,
       couponCodeSnapshot,
       discountCents,
+      cashbackUsedCents,
       scheduledFor,
       legalAcceptance,
     });
@@ -262,10 +278,11 @@ export class CheckoutOrderService {
         store,
         order.id,
         order.trackingToken,
-        totalCents,
+        totalCentsAfterCashback,
         changeForCents,
         fulfillmentDeadlineAt,
         discountCents,
+        cashbackUsedCents,
         couponCodeSnapshot,
         scheduledFor,
       ),
@@ -305,6 +322,7 @@ export class CheckoutOrderService {
     changeForCents: number | null,
     fulfillmentDeadlineAt: Date,
     discountCents: number,
+    cashbackUsedCents: number,
     couponCodeSnapshot: string | null,
     scheduledFor: Date | null,
   ): CheckoutOrderResponse {
@@ -315,6 +333,7 @@ export class CheckoutOrderService {
       paymentStatus: 'aguardando_confirmacao' as const,
       totalCents,
       discountCents,
+      cashbackUsedCents,
       couponCode: couponCodeSnapshot,
       scheduledFor: scheduledFor?.toISOString() ?? null,
       fulfillmentType: request.fulfillmentType,

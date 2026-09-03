@@ -1,6 +1,14 @@
 import { MissingCancelReasonError, OrderConflictError, OrderNotFoundError, IllegalOrderTransitionError, PaymentNotConfirmedError } from './order-errors';
 import { isLegalOrderTransition, orderTransitionRequiresReason, transitionRequiresConfirmedPayment, type OrderStatus } from './order-status-machine';
+import type { LoyaltyCreditor } from './loyalty-creditor.port';
 import type { OrderStatusRepository } from './order-status.repository';
+
+/** No-op — usado onde a transição não precisa saber de cashback (ex.: sem tenant com o módulo). */
+export const NOOP_LOYALTY_CREDITOR: LoyaltyCreditor = {
+  async creditForCompletedOrder() {
+    // nada
+  },
+};
 
 /**
  * Nunca `{type:'staff', actorId: string | null}` — a união força quem chama
@@ -30,7 +38,11 @@ export interface RecordOrderCreationInput {
 }
 
 export class OrderStatusService {
-  constructor(private readonly repo: OrderStatusRepository) {}
+  constructor(
+    private readonly repo: OrderStatusRepository,
+    /** Épico 16b — cashback só existe se o chamador injetar a implementação real; sem isto, no-op. */
+    private readonly loyalty: LoyaltyCreditor = NOOP_LOYALTY_CREDITOR,
+  ) {}
 
   /**
    * Ponto de entrada ÚNICO pra mudar o status de um pedido já existente
@@ -99,6 +111,19 @@ export class OrderStatusService {
         fromStatus,
         toStatus: input.toStatus,
         reason: input.reason,
+      });
+    }
+
+    // Épico 16b — cashback só se credita quando o pedido de fato CONCLUI
+    // (regra travada desde o doc original: "pontos só em completed"). Mesma
+    // transação do resto desta função — se o crédito falhar, a transição
+    // inteira reverte junto (nunca um "completou mas não creditou" silencioso).
+    if (input.toStatus === 'completed') {
+      await this.loyalty.creditForCompletedOrder({
+        tenantId: order.tenantId,
+        customerId: order.customerId,
+        orderId: order.id,
+        totalCents: order.totalCents,
       });
     }
   }

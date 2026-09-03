@@ -1,6 +1,6 @@
 # Épico 9b — autenticação do backoffice
 
-Status: implementado na branch `codex/epico-9b-login-staff`, aguardando revisão e deploy.
+Status: **mesclado no `main` (2026-09-02), gate verde.** Falta só o deploy/promoção ao domínio do gestor (Épico 9c — infra real).
 
 ## Fluxo
 

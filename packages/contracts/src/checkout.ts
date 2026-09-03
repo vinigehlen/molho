@@ -160,6 +160,17 @@ const checkoutRequestBase = z.strictObject({
    * escolhida na UI ainda é válida quando o pedido é criado.
    */
   scheduledFor: z.iso.datetime().optional(),
+  /**
+   * Cashback (Épico 16b, D3). "Tudo ou nada" — não é uma quantia, é um
+   * toggle: `true` = debita o saldo INTEIRO do cliente (até o limite do que
+   * sobrar depois de cupom), `false`/ausente = não mexe no saldo. Só faz
+   * sentido em `/checkout/orders` (identidade resolvida); `/checkout/revalidate`
+   * é público e pré-OTP, então nunca conhece o saldo — ver
+   * `revalidatedCheckoutSchema`, que não tem campo de cashback nenhum
+   * (regra 14 não se aplica: cashback só reduz o total, nunca é
+   * "divergência desfavorável" que precise de tela de revisão antes).
+   */
+  useLoyaltyBalance: z.boolean().optional(),
 });
 
 /**
@@ -312,6 +323,8 @@ const checkoutOrderResponseBase = z.strictObject({
   /** Cupom (Épico conversão, C2) — 0/null quando o pedido não usou cupom. */
   discountCents: centsSchema,
   couponCode: z.string().nullable(),
+  /** Cashback (Épico 16b) — 0 sem toggle ligado ou sem saldo disponível. */
+  cashbackUsedCents: centsSchema,
   /** Agendamento (Épico conversão, C3) — `null` = "o quanto antes". */
   scheduledFor: z.iso.datetime().nullable(),
   fulfillmentType: fulfillmentTypeSchema,

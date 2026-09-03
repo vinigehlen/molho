@@ -552,8 +552,8 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 5 | Storefront: menu, carrinho, bottom sheets — ✅ **entregue** | 1 | Navegação mobile completa |
 | 6 | Endereços + zonas de entrega (polígonos) + horários — ✅ **entregue** | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
 | 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) — ✅ **entregue** | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
-| 8 | Pagamento PIX com **MockPaymentProvider** | 1 | QR, webhook simulado, idempotência, reconciliação |
-| 9 | Gestor de pedidos realtime + **push/som** + fila offline | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
+| 8 | Pagamento PIX com **MockPaymentProvider** — ✅ **entregue** | 1 | QR, webhook simulado, idempotência, reconciliação |
+| 9 | Gestor de pedidos realtime + **push/som** + fila offline + **login real de staff (9b)** — ✅ **entregue** (resta 9c: infra real p/ deploy) | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
 | 11 | **WhatsApp de status via click-to-chat** + `notification_log` | 1 | Um toque envia o status pelo número do próprio lojista |
 | 12 | Página de acompanhamento do pedido (timeline) | 1 | Cliente vê status em tempo real |
 | 13 | **Onboarding self-service + wizard de 7 passos** | 1 | Signup OTP → loja publicada em <30min, sem humano do Molho |

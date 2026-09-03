@@ -73,6 +73,8 @@ export interface CreateOrderParams {
   discountCents: number;
   /** Agendamento (Épico conversão, C3) — `null` = "o quanto antes", comportamento atual. */
   scheduledFor: Date | null;
+  /** Cashback (Épico 16b, D3/D6) — sempre 0 sem o toggle ligado ou sem saldo, empilha com desconto de cupom. */
+  cashbackUsedCents: number;
 }
 
 /** Campos da loja que o checkout precisa pra montar o QR PIX (Épico 8) — nunca a Store inteira, só o recorte deste caso de uso. */
@@ -129,6 +131,13 @@ export interface CheckoutOrderRepository {
    * confirmado uso disponível de verdade.
    */
   claimCoupon(code: string): Promise<{ couponId: string; couponCodeSnapshot: string } | null>;
+  /**
+   * Debita ATÉ `maxToUse` do saldo de cashback do cliente (Épico 16b, D3) —
+   * `UPDATE` só, mesmo racional atômico de `claimCoupon` (nunca lê-então-
+   * escreve em dois passos). Devolve o quanto foi REALMENTE debitado — 0 se
+   * o cliente nunca ganhou cashback nenhum (sem linha de saldo).
+   */
+  claimLoyaltyBalance(customerId: string, maxToUse: number): Promise<number>;
   /**
    * Fecha a corrida do teto do SLOT (Épico conversão, C3, docs/handoff A3) —
    * diferente do cupom, não existe coluna contadora pra `UPDATE ... WHERE`
@@ -257,6 +266,28 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
     return row ? { couponId: row.id, couponCodeSnapshot: row.code } : null;
   }
 
+  async claimLoyaltyBalance(customerId: string, maxToUse: number): Promise<number> {
+    if (maxToUse <= 0) return 0;
+    const tenantId = this.requestContext.getTenantId();
+    // CTE com FOR UPDATE trava a linha ANTES do UPDATE usá-la — mesmo
+    // racional de LoyaltyBalanceRepository.debit (duas abas fechando o
+    // mesmo pedido quase junto não podem debitar o saldo cheio duas vezes).
+    const rows = await this.requestContext.getClient().$queryRaw<{ used: number }[]>`
+      WITH old AS (
+        SELECT balance_cents FROM loyalty_balances
+        WHERE tenant_id = ${tenantId}::uuid AND customer_id = ${customerId}::uuid AND deleted_at IS NULL
+        FOR UPDATE
+      )
+      UPDATE loyalty_balances lb
+      SET balance_cents = lb.balance_cents - LEAST(lb.balance_cents, ${maxToUse}::int),
+          version = lb.version + 1
+      FROM old
+      WHERE lb.tenant_id = ${tenantId}::uuid AND lb.customer_id = ${customerId}::uuid AND lb.deleted_at IS NULL
+      RETURNING LEAST(old.balance_cents, ${maxToUse}::int) AS used
+    `;
+    return Number(rows[0]?.used ?? 0);
+  }
+
   async claimSchedulingSlot(storeId: string, timezone: string, scheduledFor: Date): Promise<boolean> {
     const client = this.requestContext.getClient();
     const { dayOfWeek, minutes } = localWeekdayAndMinutes(timezone, scheduledFor);
@@ -319,6 +350,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
       couponId,
       couponCodeSnapshot,
       discountCents,
+      cashbackUsedCents,
       scheduledFor,
       legalAcceptance,
     } = params;
@@ -334,6 +366,7 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "discount_cents", "coupon_id", "coupon_code_snapshot",
+        "cashback_used_cents",
         "scheduled_for",
         "delivery_address_id", "delivery_label", "delivery_street", "delivery_number", "delivery_complement",
         "delivery_neighborhood", "delivery_city", "delivery_state", "delivery_postal_code", "delivery_reference_point",
@@ -345,8 +378,9 @@ export class PrismaCheckoutOrderRepository implements CheckoutOrderRepository {
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'aguardando_confirmacao', 'not_applicable',
         ${fulfillmentType}::"FulfillmentType",
         ${changeForCents},
-        ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${revalidated.totalCents},
+        ${revalidated.subtotalCents}, ${revalidated.deliveryFeeCents}, ${(revalidated.totalCents ?? 0) - cashbackUsedCents},
         ${discountCents}, ${couponId}::uuid, ${couponCodeSnapshot},
+        ${cashbackUsedCents},
         ${scheduledFor},
         ${deliveryAddressId}::uuid, ${address?.label ?? null}, ${address?.street ?? null}, ${address?.number ?? null}, ${address?.complement ?? null},
         ${address?.neighborhood ?? null}, ${address?.city ?? null}, ${address?.state ?? null}, ${address?.postalCode ?? null}, ${address?.referencePoint ?? null},

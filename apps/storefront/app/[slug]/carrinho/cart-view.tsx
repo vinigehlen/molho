@@ -140,6 +140,9 @@ export function CartView({
           </span>
         </p>
         <SuccessPaymentInfo step={successStep} />
+        {successStep.cashbackUsedCents > 0 ? (
+          <p className="text-body text-positive">Você usou {formatCents(successStep.cashbackUsedCents)} do seu saldo de cashback.</p>
+        ) : null}
         <p className="text-caption text-text-muted">
           Pedido <span className="font-mono">#{successStep.orderId.slice(0, 8)}</span>
         </p>
@@ -353,6 +356,8 @@ export function CartView({
         onChangeForCentsChange={checkout.setChangeForCents}
         onApplyCoupon={checkout.applyCoupon}
         couponLoading={checkout.couponLoading}
+        useLoyaltyBalance={checkout.useLoyaltyBalance}
+        onUseLoyaltyBalanceChange={checkout.setUseLoyaltyBalance}
         legalAccepted={legalAccepted}
         onLegalAcceptedChange={setLegalAccepted}
         termsHref={LEGAL_TERMS_HREF}

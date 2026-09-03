@@ -8,6 +8,7 @@ import { DeliveryZoneAdminModule } from './delivery-zones/delivery-zone.module';
 import { GeoModule } from './geo/geo.module';
 import { GeocodeIpRateLimitMiddleware, GeocodeMiddleware } from './geo/geocode.middleware';
 import { HealthController } from './health/health.controller';
+import { LoyaltyModule } from './loyalty/loyalty.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
 import { OrdersModule } from './orders/orders.module';
@@ -36,6 +37,7 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     StoreSetupModule,
     SchedulingSlotAdminModule,
     PlatformModule,
+    LoyaltyModule,
     ReviewsModule,
     SignupModule,
   ],

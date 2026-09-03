@@ -4,6 +4,7 @@ import React from 'react';
 import {
   BarChart3,
   ClipboardList,
+  Gift,
   ListPlus,
   LogOut,
   MapPin,
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/gestor/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/gestor/cupons', label: 'Cupons', icon: Ticket },
   { href: '/gestor/avaliacoes', label: 'Avaliações', icon: Star },
+  { href: '/gestor/fidelidade', label: 'Fidelidade', icon: Gift },
   { href: '/gestor/impressao', label: 'Impressão', icon: Printer },
   { href: '/gestor/configuracao', label: 'Configuração', icon: Settings },
 ];

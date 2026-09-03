@@ -165,6 +165,9 @@ model Tenant {
   printJobs             PrintJob[]
   coupons               Coupon[]
   reviews               Review[]
+  loyaltyConfig         LoyaltyConfig?
+  loyaltyBalances       LoyaltyBalance[]
+  loyaltyEvents         LoyaltyEvent[]
 
   // slug é único só entre tenants vivos — índice parcial WHERE deleted_at IS
   // NULL criado à mão na migration (Prisma não expressa índice parcial).
@@ -279,6 +282,8 @@ model Customer {
   orders               Order[]
   orderStatusHistories OrderStatusHistory[]
   reviews              Review[]
+  loyaltyBalance       LoyaltyBalance?
+  loyaltyEvents        LoyaltyEvent[]
 
   // Alvo de FK composta (addresses.customer_id) — índice único (id,
   // tenant_id) à mão na migration (Épico 6). Fica VAZIA neste épico —
@@ -959,6 +964,13 @@ model Order {
   couponId           String? @map("coupon_id") @db.Uuid
   couponCodeSnapshot String? @map("coupon_code_snapshot")
 
+  /// Cashback (Épico 16b) — saldo do CLIENTE debitado nesta compra, "tudo ou
+  /// nada" (D3: toggle "usar meu saldo", nunca valor parcial escolhido).
+  /// Empilha com cupom de propósito (D6: são colunas independentes) — sem
+  /// CHECK de mútua exclusão, diferente do XOR de discount/coupon acima.
+  /// Sempre 0 sem o toggle ligado ou sem saldo disponível.
+  cashbackUsedCents Int @default(0) @map("cashback_used_cents")
+
   /// Total ATUAL do pedido, depois de ajustes do balcão (Épico balcão —
   /// edição de pedido). `NULL` = pedido nunca sofreu ajuste, `subtotalCents`/
   /// `totalCents` acima (congelados na criação) continuam valendo como
@@ -1159,6 +1171,72 @@ model Review {
 
   @@index([tenantId, orderId])
   @@map("reviews")
+}
+
+/// Fidelidade por cashback (Épico 16b, D1/D5): % configurável POR TENANT — o
+/// lojista decide a própria margem, não é taxa fixa da plataforma. Singleton
+/// por tenant (`tenantId` é a PK, não um id próprio) — nunca existe mais de
+/// uma configuração por loja, então não faz sentido ter dois.
+model LoyaltyConfig {
+  tenantId        String    @id @map("tenant_id") @db.Uuid
+  /// 1–100, CHECK na migration. Sugestão de 5% ao ligar o módulo, editável.
+  cashbackPercent Int       @default(5) @map("cashback_percent")
+  version         Int       @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_config")
+}
+
+/// Saldo corrente do cliente (Épico 16b) — singleton por cliente (`customerId`
+/// é a PK), atualizado atomicamente por `UPDATE ... WHERE` (crédito) e por
+/// `UPDATE ... FROM (SELECT ... FOR UPDATE)` (débito no checkout, mesmo
+/// racional do `claimCoupon` — nunca lê-then-escreve em dois passos
+/// separados). `LoyaltyEvent` abaixo é o ledger auditável; esta tabela é só
+/// o total corrente, pra não somar o ledger inteiro a cada leitura.
+model LoyaltyBalance {
+  customerId   String    @id @map("customer_id") @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  balanceCents Int       @default(0) @map("balance_cents")
+  version      Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("loyalty_balances")
+}
+
+enum LoyaltyEventType {
+  earn
+  redeem
+}
+
+/// Ledger append-only (mesmo tratamento de audit_log/order_status_history) —
+/// "de onde veio cada centavo do saldo" sobrevive mesmo se `LoyaltyBalance`
+/// tiver um bug de soma um dia. `orderId` sem FK formal (pedido não-nulo
+/// sempre existe no momento do evento, mas o ledger não pode travar se o
+/// pedido for hard-deletado por alguma rotina futura — snapshot, não vínculo vivo).
+model LoyaltyEvent {
+  id          String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  customerId  String           @map("customer_id") @db.Uuid
+  orderId     String           @map("order_id") @db.Uuid
+  type        LoyaltyEventType
+  amountCents Int              @map("amount_cents")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, customerId, createdAt])
+  @@map("loyalty_events")
 }
 
 /// Append-only — mesmo tratamento de audit_log: sem version/deletedAt,

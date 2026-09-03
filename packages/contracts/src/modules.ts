@@ -88,7 +88,7 @@ export const MODULES = {
   // Exceção MVP 2026-08-28 (CLAUDE.md): combo entra no MVP fora de ordem.
   // `default: true` = nasce ligado em todo tenant com direito.
   combos: { plans: PLANS, default: true },
-  loyalty: { plans: ['pro', 'premium'] },
+  loyalty: { plans: PLANS, default: true },
   // Sem tiering por ora (mesma decisão de coupons/combos): código completo,
   // nasce ligado em qualquer plano.
   reviews: { plans: PLANS, default: true },
