@@ -194,13 +194,43 @@ model Store {
   id              String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId        String                                 @map("tenant_id") @db.Uuid
   name            String
+  /// Razão social separada do nome fantasia. Nullable por legado: `name`
+  /// continua sendo o nome público da loja.
+  legalName       String?                                @map("legal_name")
+  /// Inscrição estadual opcional — texto porque "isento" e formatos estaduais
+  /// variam; validação fiscal forte fica pro módulo fiscal futuro.
+  stateRegistration String?                              @map("state_registration")
+  /// Descrição pública curta da loja (marca/OG/cardápio), sem afetar checkout.
+  publicDescription String?                              @map("public_description")
   addressText     String                                 @map("address_text")
+  /// Endereço estruturado do ponto físico. `addressText` fica como fallback
+  /// legado e texto de exibição enquanto estes campos são preenchidos.
+  postalCode      String?                                @map("postal_code")
+  street          String?
+  number          String?
+  neighborhood    String?
+  city            String?
+  state           String?
+  complement      String?
+  referencePoint  String?                                @map("reference_point")
   /// geography(Point,4326) — PostGIS habilitado agora; sem uso ainda (zonas
   /// de entrega chegam no Épico 6, mas o tipo geo já nasce certo).
   geo             Unsupported("geography(Point, 4326)")?
+  /// Chaves R2 dos assets da marca. A URL pública é derivada no API por env
+  /// (`S3_PUBLIC_URL`), igual foto de produto; não persistir domínio de bucket.
+  logoImageKey    String?                                @map("logo_image_key")
+  coverImageKey   String?                                @map("cover_image_key")
   timezone        String
   phone           String?
   whatsappNumber  String?                                @map("whatsapp_number")
+  /// Dados do responsável/financeiro em repouso. Sem hash porque não são
+  /// usados como seletor de busca; cifra basta e evita índice de PII.
+  responsibleCpfCiphertext Bytes?                        @map("responsible_cpf_ciphertext")
+  responsibleCpfKeyVersion Int                           @default(1) @map("responsible_cpf_key_version")
+  responsiblePhoneCiphertext Bytes?                      @map("responsible_phone_ciphertext")
+  responsiblePhoneKeyVersion Int                         @default(1) @map("responsible_phone_key_version")
+  financeEmailCiphertext Bytes?                          @map("finance_email_ciphertext")
+  financeEmailKeyVersion Int                             @default(1) @map("finance_email_key_version")
   minOrderCents   Int                                    @default(0) @map("min_order_cents")
   /// Chave PIX do LOJISTA (Épico 8) — o dinheiro cai direto na conta dele,
   /// nunca passa pelo Molho (docs/01 §5-D.1, modelo A). Nula até o lojista

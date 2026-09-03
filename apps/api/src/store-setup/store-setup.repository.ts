@@ -1,6 +1,9 @@
-import { slugifyStoreName, type StoreSetup, type ThemeKey, type UpdateStoreSetupInput } from '@molho/contracts';
+import { parseEmail, parsePhoneNumber, phoneNumberToE164, slugifyStoreName, type StoreSetup, type ThemeKey, type UpdateStoreSetupInput } from '@molho/contracts';
+import { decryptEmail, decryptPhone, encryptEmail, encryptPhone, Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
+import type { ResolvedAddress } from '../geo/resolve-address';
 import { nextAvailableSlug, normalizeSlugForCreation } from '../platform/tenant-slug.util';
+import { resolvePublicImageUrl } from '../storage/public-url';
 import { StoreSetupNotFoundError, StoreSetupValidationError } from './store-setup.errors';
 
 const SELECT = {
@@ -8,9 +11,28 @@ const SELECT = {
   tenantId: true,
   tenant: { select: { cnpj: true, slug: true, themeKey: true, onboardedAt: true } },
   name: true,
+  legalName: true,
+  stateRegistration: true,
+  publicDescription: true,
   addressText: true,
+  postalCode: true,
+  street: true,
+  number: true,
+  neighborhood: true,
+  city: true,
+  state: true,
+  complement: true,
+  referencePoint: true,
   phone: true,
   whatsappNumber: true,
+  logoImageKey: true,
+  coverImageKey: true,
+  responsibleCpfCiphertext: true,
+  responsibleCpfKeyVersion: true,
+  responsiblePhoneCiphertext: true,
+  responsiblePhoneKeyVersion: true,
+  financeEmailCiphertext: true,
+  financeEmailKeyVersion: true,
   minOrderCents: true,
   pixKey: true,
   pixKeyType: true,
@@ -20,7 +42,12 @@ const SELECT = {
 
 export interface StoreSetupRepository {
   get(storeId: string, actorId?: string): Promise<StoreSetup>;
-  update(storeId: string, input: UpdateStoreSetupInput, actorId?: string): Promise<StoreSetup>;
+  update(
+    storeId: string,
+    input: UpdateStoreSetupInput,
+    actor?: { userId: string; role: string },
+    resolvedAddress?: ResolvedAddress | null,
+  ): Promise<StoreSetup>;
   updateTheme(storeId: string, themeKey: ThemeKey): Promise<StoreSetup>;
   publish(storeId: string, actorId: string): Promise<StoreSetup>;
 }
@@ -38,11 +65,16 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
     return toStoreSetup(store, ownerName);
   }
 
-  async update(storeId: string, input: UpdateStoreSetupInput, actorId?: string): Promise<StoreSetup> {
+  async update(
+    storeId: string,
+    input: UpdateStoreSetupInput,
+    actor?: { userId: string; role: string },
+    resolvedAddress?: ResolvedAddress | null,
+  ): Promise<StoreSetup> {
     const store = await this.lockStoreOrThrow(storeId);
-    if (actorId && input.ownerName !== undefined) {
+    if (actor?.userId && input.ownerName !== undefined) {
       await this.requestContext.getClient().user.updateMany({
-        where: { id: actorId, deletedAt: null },
+        where: { id: actor.userId, deletedAt: null },
         data: { name: blankToNull(input.ownerName) ?? storeNameFallback(input.name) },
       });
     }
@@ -69,20 +101,61 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
         data: { name: newName, slug: newSlug },
       });
     }
+    const responsibleCpf = encryptOptionalCpf(input.responsibleCpf);
+    const responsiblePhone = encryptOptionalPhone(input.responsiblePhone);
+    const financeEmail = encryptOptionalEmail(input.financeEmail);
     await this.requestContext.getClient().store.updateMany({
       where: { id: storeId, deletedAt: null },
       data: {
         name: input.name,
+        legalName: blankToNull(input.legalName),
+        stateRegistration: blankToNull(input.stateRegistration),
+        publicDescription: blankToNull(input.publicDescription),
         addressText: input.addressText,
+        postalCode: normalizePostalCodeOrNull(input.postalCode),
+        street: blankToNull(resolvedAddress?.street ?? input.street),
+        number: blankToNull(input.number),
+        neighborhood: blankToNull(resolvedAddress?.neighborhood ?? input.neighborhood),
+        city: blankToNull(resolvedAddress?.city ?? input.city),
+        state: blankToNull(resolvedAddress?.state ?? input.state)?.toUpperCase() ?? null,
+        complement: blankToNull(input.complement),
+        referencePoint: blankToNull(input.referencePoint),
         phone: blankToNull(input.phone),
         whatsappNumber: blankToNull(input.whatsappNumber),
+        logoImageKey: blankToNull(input.logoImageKey),
+        coverImageKey: blankToNull(input.coverImageKey),
+        responsibleCpfCiphertext: toPrismaBytes(responsibleCpf?.ciphertext ?? null),
+        responsibleCpfKeyVersion: responsibleCpf?.keyVersion ?? 1,
+        responsiblePhoneCiphertext: toPrismaBytes(responsiblePhone?.ciphertext ?? null),
+        responsiblePhoneKeyVersion: responsiblePhone?.keyVersion ?? 1,
+        financeEmailCiphertext: toPrismaBytes(financeEmail?.ciphertext ?? null),
+        financeEmailKeyVersion: financeEmail?.keyVersion ?? 1,
         minOrderCents: input.minOrderCents,
         pixKey: blankToNull(input.pixKey),
         pixKeyType: input.pixKey ? input.pixKeyType : null,
         pixMerchantCity: input.pixKey ? blankToNull(input.pixMerchantCity) : null,
       },
     });
-    return this.get(storeId, actorId);
+    await this.updateGeo(storeId, resolvedAddress);
+    if (actor) {
+      await this.requestContext.getClient().auditLog.create({
+        data: {
+          tenantId: store.tenantId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'store.setup.update',
+          entity: 'store',
+          afterJson: {
+            storeId,
+            fields: Object.keys(input),
+            hasResponsibleCpf: Boolean(blankToNull(input.responsibleCpf)),
+            hasResponsiblePhone: Boolean(blankToNull(input.responsiblePhone)),
+            hasFinanceEmail: Boolean(blankToNull(input.financeEmail)),
+          },
+        },
+      });
+    }
+    return this.get(storeId, actor?.userId);
   }
 
   async updateTheme(storeId: string, themeKey: ThemeKey): Promise<StoreSetup> {
@@ -156,22 +229,67 @@ export class PrismaStoreSetupRepository implements StoreSetupRepository {
     });
     return user?.name ?? null;
   }
+
+  private async updateGeo(storeId: string, resolvedAddress: ResolvedAddress | null | undefined): Promise<void> {
+    if (!resolvedAddress) return;
+    const geo =
+      resolvedAddress.lat !== null && resolvedAddress.lng !== null
+        ? Prisma.sql`ST_SetSRID(ST_MakePoint(${resolvedAddress.lng}, ${resolvedAddress.lat}), 4326)::geography`
+        : Prisma.sql`NULL`;
+    await this.requestContext.getClient().$executeRaw`
+      UPDATE "stores"
+      SET "geo" = ${geo}
+      WHERE "id" = ${storeId}::uuid AND "deleted_at" IS NULL
+    `;
+  }
 }
 
 function toStoreSetup(
-  store: Omit<StoreSetup, 'cnpj' | 'ownerName' | 'tenantSlug' | 'themeKey' | 'onboardedAt'> & {
+  store: Omit<
+    StoreSetup,
+    | 'cnpj'
+    | 'ownerName'
+    | 'tenantSlug'
+    | 'logoImageUrl'
+    | 'coverImageUrl'
+    | 'responsibleCpf'
+    | 'responsiblePhone'
+    | 'financeEmail'
+    | 'themeKey'
+    | 'onboardedAt'
+  > & {
     tenant: { cnpj: string | null; slug: string; themeKey: string; onboardedAt: Date | null };
+    responsibleCpfCiphertext: Uint8Array | Buffer | null;
+    responsibleCpfKeyVersion: number;
+    responsiblePhoneCiphertext: Uint8Array | Buffer | null;
+    responsiblePhoneKeyVersion: number;
+    financeEmailCiphertext: Uint8Array | Buffer | null;
+    financeEmailKeyVersion: number;
   },
   ownerName: string | null,
 ): StoreSetup {
-  const { tenant, ...rest } = store;
+  const {
+    tenant,
+    responsibleCpfCiphertext,
+    responsibleCpfKeyVersion,
+    responsiblePhoneCiphertext,
+    responsiblePhoneKeyVersion,
+    financeEmailCiphertext,
+    financeEmailKeyVersion,
+    ...publicStore
+  } = store;
   return {
-    ...rest,
+    ...publicStore,
     cnpj: tenant.cnpj,
     tenantSlug: tenant.slug,
     ownerName,
     themeKey: tenant.themeKey as StoreSetup['themeKey'],
     onboardedAt: tenant.onboardedAt?.toISOString() ?? null,
+    logoImageUrl: publicStore.logoImageKey ? resolvePublicImageUrl(publicStore.logoImageKey, process.env.S3_PUBLIC_URL) : null,
+    coverImageUrl: publicStore.coverImageKey ? resolvePublicImageUrl(publicStore.coverImageKey, process.env.S3_PUBLIC_URL) : null,
+    responsibleCpf: decryptOptional(responsibleCpfCiphertext, responsibleCpfKeyVersion),
+    responsiblePhone: decryptOptional(responsiblePhoneCiphertext, responsiblePhoneKeyVersion),
+    financeEmail: decryptOptionalEmail(financeEmailCiphertext, financeEmailKeyVersion),
   };
 }
 
@@ -185,6 +303,40 @@ function normalizeCnpj(value: string | null): string | null {
   return trimmed.length > 0 ? trimmed.replace(/\D/g, '') : null;
 }
 
+function normalizePostalCodeOrNull(value: string | null): string | null {
+  const digits = value?.replace(/\D/g, '') ?? '';
+  return digits.length > 0 ? digits : null;
+}
+
 function storeNameFallback(value: string): string {
   return value.trim() || 'Dono da loja';
+}
+
+function encryptOptionalCpf(value: string | null): { ciphertext: Buffer; keyVersion: number } | null {
+  const digits = value?.replace(/\D/g, '') ?? '';
+  return digits.length > 0 ? encryptPhone(digits) : null;
+}
+
+function encryptOptionalPhone(value: string | null): { ciphertext: Buffer; keyVersion: number } | null {
+  const trimmed = blankToNull(value);
+  if (!trimmed) return null;
+  return encryptPhone(phoneNumberToE164(parsePhoneNumber(trimmed)));
+}
+
+function encryptOptionalEmail(value: string | null): { ciphertext: Buffer; keyVersion: number } | null {
+  const trimmed = blankToNull(value);
+  if (!trimmed) return null;
+  return encryptEmail(parseEmail(trimmed));
+}
+
+function toPrismaBytes(value: Buffer | null): Uint8Array<ArrayBuffer> | null {
+  return value ? Uint8Array.from(value) : null;
+}
+
+function decryptOptional(ciphertext: Uint8Array | Buffer | null, keyVersion: number): string | null {
+  return ciphertext ? decryptPhone(Buffer.from(ciphertext), keyVersion) : null;
+}
+
+function decryptOptionalEmail(ciphertext: Uint8Array | Buffer | null, keyVersion: number): string | null {
+  return ciphertext ? decryptEmail(Buffer.from(ciphertext), keyVersion) : null;
 }

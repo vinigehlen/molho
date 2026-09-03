@@ -43,6 +43,7 @@ import {
   setModifierGroupActive,
   setProductAvailability,
   unlinkModifierGroupFromProduct,
+  updateCategory,
   updateProduct,
   uploadProductImage,
   type Category,
@@ -295,6 +296,34 @@ export default function CardapioPage() {
       setError(cause instanceof Error ? cause.message : 'Não foi possível carregar complementos.'),
     );
   }, [selectedProductId]);
+
+  /** Ordem das categorias (Épico 13b, docs/03 §5) — troca (swap) de
+   * `sortOrder` com a vizinha, mesmo padrão de `moveImage` acima pra fotos
+   * de produto: nunca "pula pra 0", nunca duplica sortOrder. */
+  async function moveCategory(category: Category, direction: 'up' | 'down') {
+    const sorted = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
+    const index = sorted.findIndex((item) => item.id === category.id);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const other = sorted[targetIndex];
+    if (!other) return;
+    setBusy('category-reorder');
+    setError(null);
+    try {
+      const [updated, updatedOther] = await Promise.all([
+        updateCategory(category, { sortOrder: other.sortOrder }),
+        updateCategory(other, { sortOrder: category.sortOrder }),
+      ]);
+      setCategories((prev) =>
+        prev
+          .map((item) => (item.id === updated.id ? updated : item.id === updatedOther.id ? updatedOther : item))
+          .sort((a, b) => a.sortOrder - b.sortOrder),
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível reordenar categorias.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function addCategory() {
     if (!categoryName.trim()) return;
@@ -807,24 +836,49 @@ export default function CardapioPage() {
                   Todas
                   <span className="tabular-nums text-xs font-normal">{products.length}</span>
                 </button>
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    aria-pressed={activeCategoryId === category.id}
-                    className={cn(
-                      'flex h-11 shrink-0 items-center justify-between gap-5 rounded-[14px] px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus lg:w-full',
-                      activeCategoryId === category.id
-                        ? 'bg-brand-faint text-brand-strong'
-                        : 'hover:bg-bg',
-                    )}
-                    onClick={() => setActiveCategoryId(category.id)}
-                  >
-                    <span className="max-w-36 truncate">{category.name}</span>
-                    <span className="tabular-nums text-xs font-normal">
-                      {productCounts.byCategory.get(category.id) ?? 0}
-                    </span>
-                  </button>
+                {categories.map((category, index) => (
+                  <div key={category.id} className="flex shrink-0 items-center gap-1 lg:w-full">
+                    <button
+                      type="button"
+                      aria-pressed={activeCategoryId === category.id}
+                      className={cn(
+                        'flex h-11 min-w-0 flex-1 items-center justify-between gap-5 rounded-[14px] px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:shadow-focus',
+                        activeCategoryId === category.id
+                          ? 'bg-brand-faint text-brand-strong'
+                          : 'hover:bg-bg',
+                      )}
+                      onClick={() => setActiveCategoryId(category.id)}
+                    >
+                      <span className="max-w-36 truncate">{category.name}</span>
+                      <span className="tabular-nums text-xs font-normal">
+                        {productCounts.byCategory.get(category.id) ?? 0}
+                      </span>
+                    </button>
+                    {/* Ordem das categorias (Épico 13b) — só no rail
+                        desktop; no scroll horizontal mobile a ordem já é
+                        visual e reordenar por toque exigiria drag, fora de
+                        escopo aqui (YAGNI até alguém pedir). */}
+                    <div className="hidden shrink-0 flex-col lg:flex">
+                      <button
+                        type="button"
+                        aria-label={`Mover ${category.name} pra cima`}
+                        disabled={index === 0 || busy === 'category-reorder'}
+                        className="flex h-5 w-6 items-center justify-center text-text-muted hover:text-text disabled:opacity-30"
+                        onClick={() => void moveCategory(category, 'up')}
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Mover ${category.name} pra baixo`}
+                        disabled={index === categories.length - 1 || busy === 'category-reorder'}
+                        className="flex h-5 w-6 items-center justify-center text-text-muted hover:text-text disabled:opacity-30"
+                        onClick={() => void moveCategory(category, 'down')}
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
               <div className="mt-4 border-t border-border pt-4">

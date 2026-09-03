@@ -8,7 +8,7 @@ import { MoButton, MoConfetti, MoQrCode, MoSheet, THEME_KEYS, THEMES } from '@mo
 import { getStaffSession, setStaffSession } from '../../../lib/staff-session';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
-import { fetchStoreSetup, publishStore, saveStoreSetup, saveStoreTheme } from '../../../lib/store-setup-api';
+import { fetchStoreSetup, publishStore, saveStoreSetup, saveStoreTheme, uploadStoreBrandImage } from '../../../lib/store-setup-api';
 import { fetchStoreHours, saveStoreHours } from '../../../lib/store-hours-api';
 import { createDeliveryZone, fetchDeliveryZones, type DeliveryZoneResponse } from '../../../lib/delivery-zones-api';
 import { fetchCategories, fetchProducts, type Category, type Product } from '../../../lib/catalog-api';
@@ -100,9 +100,25 @@ function emptyStoreForm(): UpdateStoreSetupInput {
     cnpj: null,
     ownerName: null,
     name: '',
+    legalName: null,
+    stateRegistration: null,
+    publicDescription: null,
     addressText: '',
+    postalCode: null,
+    street: null,
+    number: null,
+    neighborhood: null,
+    city: null,
+    state: null,
+    complement: null,
+    referencePoint: null,
     phone: null,
     whatsappNumber: null,
+    logoImageKey: null,
+    coverImageKey: null,
+    responsibleCpf: null,
+    responsiblePhone: null,
+    financeEmail: null,
     minOrderCents: 0,
     pixKey: null,
     pixKeyType: null,
@@ -117,7 +133,7 @@ function stepLabel(step: string): string {
     cardapio: 'Cardápio',
     entrega: 'Entrega',
     pagamento: 'Pagamento',
-    marca: 'Sua marca',
+    marca: 'Tema',
     impressora: 'Impressora',
     publicar: 'Publicar',
   };
@@ -158,7 +174,7 @@ export default function ConfiguracaoPage() {
   const [linkCopiado, setLinkCopiado] = useState(false);
 
   const checklist = {
-    loja: Boolean(setup?.name && setup.addressText && setup.phone && setup.whatsappNumber && setup.cnpj),
+    loja: Boolean(setup?.name && setup.addressText && setup.postalCode && setup.street && setup.city && setup.state && setup.phone && setup.whatsappNumber && setup.cnpj),
     horarios: draftToShifts(hours).length > 0,
     cardapio: categories.length > 0 && products.some((product) => product.available),
     entrega: zones.length > 0,
@@ -212,9 +228,25 @@ export default function ConfiguracaoPage() {
           cnpj: loadedSetup.cnpj,
           ownerName: loadedSetup.ownerName,
           name: loadedSetup.name,
+          legalName: loadedSetup.legalName,
+          stateRegistration: loadedSetup.stateRegistration,
+          publicDescription: loadedSetup.publicDescription,
           addressText: loadedSetup.addressText,
+          postalCode: loadedSetup.postalCode,
+          street: loadedSetup.street,
+          number: loadedSetup.number,
+          neighborhood: loadedSetup.neighborhood,
+          city: loadedSetup.city,
+          state: loadedSetup.state,
+          complement: loadedSetup.complement,
+          referencePoint: loadedSetup.referencePoint,
           phone: loadedSetup.phone,
           whatsappNumber: loadedSetup.whatsappNumber,
+          logoImageKey: loadedSetup.logoImageKey,
+          coverImageKey: loadedSetup.coverImageKey,
+          responsibleCpf: loadedSetup.responsibleCpf,
+          responsiblePhone: loadedSetup.responsiblePhone,
+          financeEmail: loadedSetup.financeEmail,
           minOrderCents: loadedSetup.minOrderCents,
           pixKey: loadedSetup.pixKey,
           pixKeyType: loadedSetup.pixKeyType,
@@ -262,6 +294,52 @@ export default function ConfiguracaoPage() {
       setMessage('Loja salva.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a loja.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function uploadBrand(kind: 'logo' | 'cover', file: File | undefined) {
+    if (!storeId || !file) return;
+    setBusy(kind);
+    setError(null);
+    try {
+      const key = await uploadStoreBrandImage(storeId, kind, file);
+      const next = { ...storeForm, [kind === 'logo' ? 'logoImageKey' : 'coverImageKey']: key };
+      setStoreForm(next);
+      const saved = await saveStoreSetup(storeId, next);
+      setSetup(saved);
+      setStoreForm({
+        cnpj: saved.cnpj,
+        ownerName: saved.ownerName,
+        name: saved.name,
+        legalName: saved.legalName,
+        stateRegistration: saved.stateRegistration,
+        publicDescription: saved.publicDescription,
+        addressText: saved.addressText,
+        postalCode: saved.postalCode,
+        street: saved.street,
+        number: saved.number,
+        neighborhood: saved.neighborhood,
+        city: saved.city,
+        state: saved.state,
+        complement: saved.complement,
+        referencePoint: saved.referencePoint,
+        phone: saved.phone,
+        whatsappNumber: saved.whatsappNumber,
+        logoImageKey: saved.logoImageKey,
+        coverImageKey: saved.coverImageKey,
+        responsibleCpf: saved.responsibleCpf,
+        responsiblePhone: saved.responsiblePhone,
+        financeEmail: saved.financeEmail,
+        minOrderCents: saved.minOrderCents,
+        pixKey: saved.pixKey,
+        pixKeyType: saved.pixKeyType,
+        pixMerchantCity: saved.pixMerchantCity,
+      });
+      setMessage(kind === 'logo' ? 'Logo salva.' : 'Capa salva.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível enviar a imagem.');
     } finally {
       setBusy(null);
     }
@@ -456,15 +534,49 @@ export default function ConfiguracaoPage() {
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <Field label="Nome fantasia" value={storeForm.name} onChange={(value) => setStoreForm((prev) => ({ ...prev, name: value }))} />
+            <Field label="Razão social" value={storeForm.legalName ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, legalName: value || null }))} />
             <Field label="CNPJ" value={storeForm.cnpj ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, cnpj: value || null }))} placeholder="12.345.678/0001-90" />
+            <Field label="Inscrição estadual" value={storeForm.stateRegistration ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, stateRegistration: value || null }))} />
             <Field label="Responsável" value={storeForm.ownerName ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, ownerName: value || null }))} />
+            <Field label="CPF do responsável" value={storeForm.responsibleCpf ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, responsibleCpf: value || null }))} placeholder="000.000.000-00" />
+            <Field label="Telefone do responsável" value={storeForm.responsiblePhone ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, responsiblePhone: value || null }))} placeholder="(51) 99999-0000" />
+            <Field label="E-mail financeiro" value={storeForm.financeEmail ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, financeEmail: value || null }))} placeholder="financeiro@loja.com.br" />
             <Field label="Telefone comercial" value={storeForm.phone ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, phone: value || null }))} />
             <Field label="WhatsApp de pedidos" value={storeForm.whatsappNumber ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, whatsappNumber: value || null }))} />
             <MoneyField label="Pedido mínimo" value={centsToBRL(storeForm.minOrderCents)} onChange={(value) => setStoreForm((prev) => ({ ...prev, minOrderCents: brlToCents(value) }))} />
+            <Field label="CEP" value={storeForm.postalCode ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, postalCode: value || null }))} placeholder="00000-000" />
+            <Field label="Rua" value={storeForm.street ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, street: value || null }))} />
+            <Field label="Número" value={storeForm.number ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, number: value || null }))} />
+            <Field label="Bairro" value={storeForm.neighborhood ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, neighborhood: value || null }))} />
+            <Field label="Cidade" value={storeForm.city ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, city: value || null }))} />
+            <Field label="UF" value={storeForm.state ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, state: value.toUpperCase().slice(0, 2) || null }))} />
+            <Field label="Complemento" value={storeForm.complement ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, complement: value || null }))} />
+            <Field label="Referência" value={storeForm.referencePoint ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, referencePoint: value || null }))} />
             <label className="block md:col-span-2">
               <span className="text-sm font-medium">Endereço completo e referência</span>
               <textarea className="mt-2 min-h-24 w-full rounded-[14px] border border-border bg-bg px-4 py-3 outline-none focus:border-brand" value={storeForm.addressText} onChange={(event) => setStoreForm((prev) => ({ ...prev, addressText: event.target.value }))} />
             </label>
+          </div>
+          <div className="mt-6 border-t border-border pt-5">
+            <h3 className="text-base font-semibold">Sua marca</h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium">Descrição pública</span>
+                <textarea className="mt-2 min-h-20 w-full rounded-[14px] border border-border bg-bg-card px-4 py-3 outline-none focus:border-brand" value={storeForm.publicDescription ?? ''} onChange={(event) => setStoreForm((prev) => ({ ...prev, publicDescription: event.target.value || null }))} maxLength={280} />
+              </label>
+              <ImageUploadField
+                label="Logo"
+                imageUrl={setup?.logoImageUrl ?? null}
+                busy={busy === 'logo'}
+                onChange={(file) => void uploadBrand('logo', file)}
+              />
+              <ImageUploadField
+                label="Capa"
+                imageUrl={setup?.coverImageUrl ?? null}
+                busy={busy === 'cover'}
+                onChange={(file) => void uploadBrand('cover', file)}
+              />
+            </div>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             <Field label="Chave PIX" value={storeForm.pixKey ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, pixKey: value || null }))} />
@@ -653,14 +765,15 @@ export default function ConfiguracaoPage() {
           </div>
         </section>
 
-        {/* Passo 6 do wizard (docs/03-self-setup.md §3) — SÓ o template de
-            cor, de propósito: logo/capa/descrição/OG/PWA são escopo do
-            Épico 13b, não deste. Opcional pra publicar (nunca entra em
-            `checklist`), então não trava a loja em preparo. */}
+        {/* Passo 6 do wizard (docs/03-self-setup.md §3) — o template de cor.
+            Logo/capa/descrição vivem na seção #loja (mesmo grupo dos outros
+            dados públicos da loja) — "Tema" evita duas seções chamadas
+            "Sua marca" na mesma página. Opcional pra publicar (nunca entra
+            em `checklist`), então não trava a loja em preparo. */}
         <section id="marca" className="rounded-[20px] border border-border bg-bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold">Sua marca</h2>
+              <h2 className="text-2xl font-semibold">Tema</h2>
               <p className="mt-1 text-sm text-text-muted">Escolha o template que combina com o seu cardápio. Dá pra trocar quando quiser.</p>
             </div>
             <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text-muted">Opcional</span>
@@ -761,6 +874,43 @@ function MoneyField({ label, value, onChange, placeholder }: { label: string; va
     <label className="block">
       <span className="text-sm font-medium">{label}</span>
       <MoneyInput value={value} onChange={onChange} placeholder={placeholder} className="mt-2" />
+    </label>
+  );
+}
+
+function ImageUploadField({
+  label,
+  imageUrl,
+  busy,
+  onChange,
+}: {
+  label: string;
+  imageUrl: string | null;
+  busy: boolean;
+  onChange: (file: File | undefined) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium">{label}</span>
+      <span className="mt-2 flex min-h-28 items-center gap-3 rounded-[14px] border border-border bg-bg px-3 py-3">
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="h-20 w-20 rounded-[10px] object-cover" />
+        ) : (
+          <span className="flex h-20 w-20 items-center justify-center rounded-[10px] bg-bg-card text-xs text-text-muted">
+            Sem imagem
+          </span>
+        )}
+        <span className="flex min-w-0 flex-col gap-2">
+          <input
+            className="block w-full text-sm text-text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-brand file:px-3 file:py-2 file:text-sm file:font-semibold file:text-on-brand"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={busy}
+            onChange={(event) => onChange(event.target.files?.[0])}
+          />
+          <span className="text-xs text-text-muted">{busy ? 'Enviando…' : 'PNG, JPG ou WebP'}</span>
+        </span>
+      </span>
     </label>
   );
 }

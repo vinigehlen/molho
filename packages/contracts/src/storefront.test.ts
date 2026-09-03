@@ -10,6 +10,9 @@ function payload(overrides: Partial<StorefrontPayload> = {}): StorefrontPayload 
       name: 'Hamburgueria da Vila',
       themeKey: 'brasa',
       timezone: 'America/Sao_Paulo',
+      publicDescription: 'Smash no capricho, feito na brasa.',
+      logoImageUrl: 'https://cdn.molho.test/stores/tenant/logo.webp',
+      coverImageUrl: 'https://cdn.molho.test/stores/tenant/cover.webp',
       addressText: 'Rua das Palmeiras, 120',
       phone: '+5511999990000',
       whatsappNumber: '+5511999990000',
@@ -70,6 +73,9 @@ describe('storefrontPayloadSchema', () => {
   it('aceita os campos opcionais da loja como null', () => {
     const p = payload();
     p.store.addressText = null;
+    p.store.publicDescription = null;
+    p.store.logoImageUrl = null;
+    p.store.coverImageUrl = null;
     p.store.phone = null;
     p.store.whatsappNumber = null;
     expect(storefrontPayloadSchema.safeParse(p).success).toBe(true);

@@ -37,6 +37,7 @@ export class R2StorageProvider implements StorageProvider {
 
   async createPresignedUpload(params: {
     tenantId: string;
+    folder?: 'products' | 'stores';
     contentType: keyof typeof ALLOWED_IMAGE_CONTENT_TYPES;
     contentLength: number;
   }): Promise<PresignedUpload> {
@@ -44,7 +45,7 @@ export class R2StorageProvider implements StorageProvider {
     // Chave sempre gerada no servidor — nunca a partir de nome de arquivo do
     // cliente (evita path traversal/colisão). Prefixo por tenant, mesmo
     // padrão do MisterCheff analisado (§3.2 do plano-produto).
-    const key = `products/${params.tenantId}/${randomUUID()}.${extension}`;
+    const key = `${params.folder ?? 'products'}/${params.tenantId}/${randomUUID()}.${extension}`;
 
     // ContentType e ContentLength precisam bater EXATAMENTE com o que o
     // cliente manda no PUT real, senão o R2 rejeita com 403 (content-length

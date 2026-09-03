@@ -50,6 +50,9 @@ export default async function TenantHomePage({ params }: TenantHomePageProps) {
     <TenantMenu
       slug={slug}
       storeName={store.store.name}
+      storeDescription={store.store.publicDescription}
+      logoImageUrl={store.store.logoImageUrl}
+      coverImageUrl={store.store.coverImageUrl}
       greeting={COPY.storefront.saudacaoAnonima}
       categories={store.categories}
       minOrderCents={store.store.minOrderCents}

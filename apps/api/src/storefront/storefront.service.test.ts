@@ -23,6 +23,9 @@ class FakeStorefrontRepository implements StorefrontRepository {
     timezone: 'America/Sao_Paulo',
   };
   store: StorefrontStoreRecord | null = {
+    publicDescription: 'Smash no capricho.',
+    logoImageKey: 'stores/tenant/logo.webp',
+    coverImageKey: 'stores/tenant/cover.webp',
     addressText: 'Rua das Palmeiras, 120',
     phone: '+5511999990000',
     whatsappNumber: '+5511999990000',

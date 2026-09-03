@@ -11,9 +11,27 @@ const STORE: StoreSetup = {
   cnpj: null,
   ownerName: null,
   name: 'Casa Molho',
+  legalName: null,
+  stateRegistration: null,
+  publicDescription: null,
   addressText: 'Rua das Panelas, 10',
+  postalCode: null,
+  street: null,
+  number: null,
+  neighborhood: null,
+  city: null,
+  state: null,
+  complement: null,
+  referencePoint: null,
   phone: null,
   whatsappNumber: null,
+  logoImageKey: null,
+  logoImageUrl: null,
+  coverImageKey: null,
+  coverImageUrl: null,
+  responsibleCpf: null,
+  responsiblePhone: null,
+  financeEmail: null,
   minOrderCents: 0,
   pixKey: null,
   pixKeyType: null,
@@ -27,9 +45,25 @@ const INPUT: UpdateStoreSetupInput = {
   cnpj: '12.345.678/0001-90',
   ownerName: 'Dona Molho',
   name: 'Casa Molho',
+  legalName: 'Casa Molho Ltda',
+  stateRegistration: 'ISENTO',
+  publicDescription: 'Comida brasileira no capricho.',
   addressText: 'Rua das Panelas, 10',
+  postalCode: '93610000',
+  street: 'Rua das Panelas',
+  number: '10',
+  neighborhood: 'Centro',
+  city: 'Estância Velha',
+  state: 'RS',
+  complement: null,
+  referencePoint: null,
   phone: null,
   whatsappNumber: '51999990000',
+  logoImageKey: null,
+  coverImageKey: null,
+  responsibleCpf: '00000000000',
+  responsiblePhone: '+5551999990000',
+  financeEmail: 'financeiro@casa.test',
   minOrderCents: 2500,
   pixKey: 'pix@molho.test',
   pixKeyType: 'email',
@@ -45,7 +79,7 @@ class FakeRepo implements StoreSetupRepository {
 
   async update(_storeId: string, input: UpdateStoreSetupInput): Promise<StoreSetup> {
     this.updates.push(input);
-    return { ...STORE, ...input };
+    return { ...STORE, ...input, logoImageUrl: null, coverImageUrl: null };
   }
 
   async updateTheme(_storeId: string, themeKey: ThemeKey): Promise<StoreSetup> {
@@ -64,7 +98,7 @@ describe('StoreSetupService', () => {
 
     const saved = await service.update('store-1', INPUT);
 
-    expect(saved).toMatchObject({ cnpj: '12.345.678/0001-90', ownerName: 'Dona Molho', pixKey: 'pix@molho.test', pixKeyType: 'email', pixMerchantCity: 'Sao Paulo' });
+    expect(saved).toMatchObject({ cnpj: '12.345.678/0001-90', ownerName: 'Dona Molho', legalName: 'Casa Molho Ltda', responsiblePhone: '+5551999990000', pixKey: 'pix@molho.test', pixKeyType: 'email', pixMerchantCity: 'Sao Paulo' });
     expect(repo.updates).toHaveLength(1);
   });
 

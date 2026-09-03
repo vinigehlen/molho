@@ -26,6 +26,7 @@ export interface PresignedUpload {
 export interface StorageProvider {
   createPresignedUpload(params: {
     tenantId: string;
+    folder?: 'products' | 'stores';
     contentType: AllowedImageContentType;
     /** Assinado como Content-Length exato no PUT — o cliente não consegue mandar corpo maior (R2 rejeita o mismatch). */
     contentLength: number;

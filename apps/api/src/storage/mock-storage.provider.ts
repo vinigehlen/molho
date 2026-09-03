@@ -10,11 +10,12 @@ export class MockStorageProvider implements StorageProvider {
 
   async createPresignedUpload(params: {
     tenantId: string;
+    folder?: 'products' | 'stores';
     contentType: keyof typeof ALLOWED_IMAGE_CONTENT_TYPES;
     contentLength: number;
   }): Promise<PresignedUpload> {
     const extension = ALLOWED_IMAGE_CONTENT_TYPES[params.contentType];
-    const key = `products/${params.tenantId}/${randomUUID()}.${extension}`;
+    const key = `${params.folder ?? 'products'}/${params.tenantId}/${randomUUID()}.${extension}`;
     this.logger.log(
       `[mock] URL de upload gerada pra ${key} (${params.contentLength} bytes, nenhum arquivo sobe de verdade)`,
     );

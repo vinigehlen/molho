@@ -4,13 +4,14 @@ import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { ModuleCheckModule } from '../modules/module-check.module';
+import { StorageModule } from '../storage/storage.module';
 import { PrismaStoreSetupRepository } from './store-setup.repository';
 import { StoreSetupController } from './store-setup.controller';
 import { StoreSetupService } from './store-setup.service';
 import { STORE_SETUP_REPOSITORY, STORE_SETUP_SERVICE } from './store-setup.tokens';
 
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorageModule],
   controllers: [StoreSetupController],
   providers: [
     {
