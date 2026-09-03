@@ -3,17 +3,30 @@
 import { ArrowLeft, Clock3, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
-import {
-  COPY,
-  ORDER_TRACKING_TERMINAL_STATUSES,
-  t,
-  type OrderStatus,
-  type OrderTrackingResponse,
-} from '@molho/contracts';
+import type { OrderStatus, OrderTrackingResponse } from '@molho/contracts';
 import { formatCents, MoButton, MoCard, MoCardContent, MoTimeline, type MoTimelineStep } from '@molho/ui';
 import { getOrderTracking } from '../../../../lib/order-tracking-api';
 
 const POLL_MS = 18_000;
+const ORDER_TRACKING_TERMINAL_STATUSES: OrderStatus[] = [
+  'completed',
+  'canceled',
+  'delivery_failed',
+  'expired',
+  'auto_canceled',
+];
+
+const COPY_ACOMPANHAMENTO = {
+  titulo: 'Acompanhe seu pedido',
+  subtitulo: 'A cozinha atualiza esse link conforme a comanda anda.',
+  entregaAte: 'Entrega prevista até {hora}',
+  retiradaAte: 'Retirada prevista até {hora}',
+  atualizar: 'Atualizar',
+  atualizadoAs: 'Atualizado às {hora}',
+  terminal: 'pedido finalizado',
+  cancelado: 'Pedido cancelado',
+  itens: 'Itens do pedido',
+};
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending_payment: 'Aguardando pagamento',
@@ -34,6 +47,10 @@ const TERMINAL = new Set<OrderStatus>(ORDER_TRACKING_TERMINAL_STATUSES);
 function formatTime(iso: string | null): string | null {
   if (!iso) return null;
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function interpolarCopy(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (bruto, chave: string) => vars[chave] ?? bruto);
 }
 
 function timelineSteps(tracking: OrderTrackingResponse): { steps: MoTimelineStep[]; currentIndex: number } {
@@ -98,8 +115,8 @@ export function OrderTrackingView({
         </Link>
         <div className="flex flex-col gap-1">
           <p className="text-caption text-text-muted">{storeName}</p>
-          <h1 className="text-title-lg text-text">{COPY.storefront.acompanhamento.titulo}</h1>
-          <p className="text-body text-text-muted">{COPY.storefront.acompanhamento.subtitulo}</p>
+          <h1 className="text-title-lg text-text">{COPY_ACOMPANHAMENTO.titulo}</h1>
+          <p className="text-body text-text-muted">{COPY_ACOMPANHAMENTO.subtitulo}</p>
         </div>
       </header>
 
@@ -111,10 +128,10 @@ export function OrderTrackingView({
             {deadline ? (
               <p className="inline-flex items-center gap-2 text-body text-text-muted">
                 <Clock3 className="h-4 w-4 text-brand-strong" aria-hidden="true" />
-                {t(
+                {interpolarCopy(
                   tracking.fulfillmentType === 'pickup'
-                    ? COPY.storefront.acompanhamento.retiradaAte
-                    : COPY.storefront.acompanhamento.entregaAte,
+                    ? COPY_ACOMPANHAMENTO.retiradaAte
+                    : COPY_ACOMPANHAMENTO.entregaAte,
                   { hora: deadline },
                 )}
               </p>
@@ -122,20 +139,20 @@ export function OrderTrackingView({
           </div>
           <MoButton variant="secondary" onClick={() => void refresh()} loading={refreshing}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            {COPY.storefront.acompanhamento.atualizar}
+            {COPY_ACOMPANHAMENTO.atualizar}
           </MoButton>
         </div>
         <p className="mt-3 text-caption text-text-muted">
-          {t(COPY.storefront.acompanhamento.atualizadoAs, {
+          {interpolarCopy(COPY_ACOMPANHAMENTO.atualizadoAs, {
             hora: lastUpdatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           })}
-          {terminal ? ` · ${COPY.storefront.acompanhamento.terminal}` : null}
+          {terminal ? ` · ${COPY_ACOMPANHAMENTO.terminal}` : null}
         </p>
       </section>
 
       {tracking.status === 'canceled' || tracking.status === 'auto_canceled' || tracking.status === 'delivery_failed' ? (
         <section className="rounded-lg border border-critical-strong bg-critical/10 p-4">
-          <p className="text-body-strong text-critical-strong">{COPY.storefront.acompanhamento.cancelado}</p>
+          <p className="text-body-strong text-critical-strong">{COPY_ACOMPANHAMENTO.cancelado}</p>
           {tracking.canceledReason ? (
             <p className="mt-1 text-body text-text-muted">{tracking.canceledReason}</p>
           ) : null}
@@ -148,7 +165,7 @@ export function OrderTrackingView({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-title text-text">{COPY.storefront.acompanhamento.itens}</h2>
+          <h2 className="text-title text-text">{COPY_ACOMPANHAMENTO.itens}</h2>
           <span className="text-body-strong tnum text-text">{formatCents(tracking.totalCents)}</span>
         </div>
         <MoCard>

@@ -1,4 +1,4 @@
-import { orderTrackingResponseSchema, type OrderTrackingResponse } from '@molho/contracts';
+import type { OrderTrackingResponse } from '@molho/contracts';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
 
@@ -15,5 +15,5 @@ export async function getOrderTracking(slug: string, token: string): Promise<Ord
 
   if (!response.ok) return null;
   const data: unknown = await response.json().catch(() => null);
-  return orderTrackingResponseSchema.safeParse(data).data ?? null;
+  return data as OrderTrackingResponse | null;
 }
