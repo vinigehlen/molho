@@ -10,6 +10,7 @@ const { useCustomerToken, getCustomerProfile, listCustomerAddresses, listCustome
 vi.mock('../../../lib/use-customer-token', () => ({ useCustomerToken }));
 vi.mock('../../../lib/customer-profile-api', () => ({
   getCustomerProfile, listCustomerAddresses, listCustomerOrders, createReview,
+  getLoyaltyBalance: vi.fn().mockResolvedValue(0),
   createCustomerAddress: vi.fn(), updateCustomerAddress: vi.fn(), deleteCustomerAddress: vi.fn(), updateCustomerProfile: vi.fn(),
   CustomerProfileUnauthorizedError: class extends Error {}, CustomerProfileConflictError: class extends Error {},
   ReviewAlreadyExistsError: class extends Error {},

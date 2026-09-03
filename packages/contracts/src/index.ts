@@ -13,6 +13,7 @@ export * from './delivery-match';
 export * from './delivery-zone-admin';
 export * from './email-address';
 export * from './module-panel';
+export * from './loyalty';
 export * from './platform-tenants';
 export * from './review';
 export * from './modules';

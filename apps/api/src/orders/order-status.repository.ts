@@ -5,6 +5,8 @@ import type { OrderStatus } from './order-status-machine';
 export interface OrderStatusRecord {
   id: string;
   tenantId: string;
+  customerId: string;
+  totalCents: number;
   status: OrderStatus;
   version: number;
   /** §5.5: o gate de pagamento em transition() lê os dois — findForTransition seleciona junto.
@@ -65,7 +67,16 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
   async findForTransition(orderId: string): Promise<OrderStatusRecord | null> {
     return this.requestContext.getClient().order.findFirst({
       where: { id: orderId, deletedAt: null },
-      select: { id: true, tenantId: true, status: true, version: true, paymentMethod: true, paymentStatus: true },
+      select: {
+        id: true,
+        tenantId: true,
+        customerId: true,
+        totalCents: true,
+        status: true,
+        version: true,
+        paymentMethod: true,
+        paymentStatus: true,
+      },
     });
   }
 

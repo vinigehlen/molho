@@ -14,6 +14,7 @@ import type { CheckoutOrderRepository, CreateOrderParams, DeliveryAddressSnapsho
 import { CheckoutOrderService } from './checkout-order.service';
 import type { PaymentMethodModuleGate } from './payment-method-module-gate';
 import type { CheckoutGuestGate } from '../modules/checkout-guest.gate';
+import type { LoyaltyGate } from '../modules/loyalty.gate';
 
 const ITEMS = [{ productId: 'product-1', unitBasePriceCents: 2890, modifiers: [], quantity: 1, notes: null }];
 const ADDRESS = {
@@ -131,6 +132,12 @@ class FakeCheckoutOrderRepository implements CheckoutOrderRepository {
     this.claimSchedulingSlotCalls.push({ storeId, timezone, scheduledFor });
     return this.claimSchedulingSlotResult;
   }
+  claimLoyaltyBalanceResult = 0;
+  claimLoyaltyBalanceCalls: { customerId: string; maxToUse: number }[] = [];
+  async claimLoyaltyBalance(customerId: string, maxToUse: number) {
+    this.claimLoyaltyBalanceCalls.push({ customerId, maxToUse });
+    return this.claimLoyaltyBalanceResult;
+  }
   createAddressCalls: DeliveryAddressSnapshot[] = [];
   async createAddress(_customerId: string, address: DeliveryAddressSnapshot) {
     this.createAddressCalls.push(address);
@@ -163,6 +170,14 @@ class FakeCheckoutGuestGate implements CheckoutGuestGate {
   }
 }
 
+/** `loyalty` — ligado por padrão (D7: sempre ligado), como o resto dos módulos "sempre ligados". */
+class FakeLoyaltyGate implements LoyaltyGate {
+  active = true;
+  async isActive() {
+    return this.active;
+  }
+}
+
 /** Espelha o contrato de `CustomerIdentityRepository.findOrCreate` só no que o service usa. */
 class FakeCustomerIdentityRepository {
   calls: { tenantId: string; phone: string; options: { name?: string; verified: boolean } }[] = [];
@@ -179,6 +194,7 @@ function setup() {
   const orderStatusService = { recordCreation: vi.fn().mockResolvedValue(undefined) };
   const moduleGate = new FakeModuleGate();
   const guestGate = new FakeCheckoutGuestGate();
+  const loyaltyGate = new FakeLoyaltyGate();
   const customerIdentity = new FakeCustomerIdentityRepository();
   const now = new Date('2026-08-14T18:00:00.000Z');
   const service = new CheckoutOrderService(
@@ -187,10 +203,11 @@ function setup() {
     orderStatusService as never,
     moduleGate,
     guestGate,
+    loyaltyGate,
     customerIdentity as never,
     () => now,
   );
-  return { repo, revalidationService, orderStatusService, moduleGate, guestGate, customerIdentity, service };
+  return { repo, revalidationService, orderStatusService, moduleGate, guestGate, loyaltyGate, customerIdentity, service };
 }
 
 describe('CheckoutOrderService.createOrder', () => {

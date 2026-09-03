@@ -26,6 +26,7 @@ import {
   CustomerProfileUnauthorizedError,
   deleteCustomerAddress,
   getCustomerProfile,
+  getLoyaltyBalance,
   listCustomerAddresses,
   listCustomerOrders,
   ReviewAlreadyExistsError,
@@ -62,6 +63,7 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
   >(undefined);
   const [reviewingOrderId, setReviewingOrderId] = React.useState<string | null>(null);
   const [reviewedOrderIds, setReviewedOrderIds] = React.useState<Set<string>>(new Set());
+  const [loyaltyBalanceCents, setLoyaltyBalanceCents] = React.useState(0);
 
   React.useEffect(() => setMounted(true), []);
   React.useEffect(() => {
@@ -90,6 +92,14 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
         setError(cause instanceof Error ? cause.message : 'Não deu pra carregar sua conta agora.');
         setLoading(false);
       });
+    // Separado do Promise.all acima de propósito: saldo é um bônus, não pode
+    // derrubar perfil/endereços/pedidos se o módulo estiver desligado nesse
+    // tenant (403) — falha calada, mostra 0.
+    getLoyaltyBalance(slug, session.token)
+      .then((cents) => {
+        if (active) setLoyaltyBalanceCents(cents);
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -219,6 +229,18 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
           </MoCardContent>
         </MoCard>
       </section>
+
+      {loyaltyBalanceCents > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-title text-text">Seu cashback</h2>
+          <MoCard>
+            <MoCardContent className="p-5">
+              <p className="text-title-lg tnum text-brand-strong">{formatCents(loyaltyBalanceCents)}</p>
+              <p className="text-caption text-text-muted">Aplica no próximo pedido, na tela de revisão.</p>
+            </MoCardContent>
+          </MoCard>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
