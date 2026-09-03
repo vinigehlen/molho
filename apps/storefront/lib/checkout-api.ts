@@ -145,6 +145,7 @@ export interface CheckoutOrderPix {
 type CreatedOrderBase = {
   status: 'created';
   orderId: string;
+  trackingToken: string;
   totalCents: number;
   /** Épico 16b — 0 quando o cliente não usou saldo ou não tinha nenhum. */
   cashbackUsedCents: number;
@@ -218,18 +219,20 @@ function parseCreatedOrder(data: unknown): CreateOrderResult | null {
   const d = data as Record<string, unknown>;
   if (
     typeof d.orderId !== 'string' ||
+    typeof d.trackingToken !== 'string' ||
     typeof d.totalCents !== 'number' ||
     (d.fulfillmentType !== 'delivery' && d.fulfillmentType !== 'pickup') ||
     typeof d.fulfillmentDeadlineAt !== 'string'
   ) return null;
-  const { orderId, totalCents, fulfillmentType, fulfillmentDeadlineAt } = d as {
+  const { orderId, trackingToken, totalCents, fulfillmentType, fulfillmentDeadlineAt } = d as {
     orderId: string;
+    trackingToken: string;
     totalCents: number;
     fulfillmentType: FulfillmentType;
     fulfillmentDeadlineAt: string;
   };
   const cashbackUsedCents = typeof d.cashbackUsedCents === 'number' ? d.cashbackUsedCents : 0;
-  const base = { status: 'created' as const, orderId, totalCents, cashbackUsedCents, fulfillmentType, fulfillmentDeadlineAt };
+  const base = { status: 'created' as const, orderId, trackingToken, totalCents, cashbackUsedCents, fulfillmentType, fulfillmentDeadlineAt };
 
   if (d.paymentMethod === 'pix' && isCheckoutOrderPix(d.pix)) {
     return { ...base, paymentMethod: 'pix', pix: d.pix };

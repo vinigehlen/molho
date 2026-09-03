@@ -23,9 +23,9 @@ export type CheckoutStep =
   | { kind: 'otp' }
   /** Sem OTP (`checkout.guest` ligado no tenant): só nome + telefone, e o pedido nasce. */
   | { kind: 'guest' }
-  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'pix'; pix: CheckoutOrderPix }
-  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
-  | { kind: 'success'; orderId: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'card_on_delivery' };
+  | { kind: 'success'; orderId: string; trackingToken: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'pix'; pix: CheckoutOrderPix }
+  | { kind: 'success'; orderId: string; trackingToken: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'cash_on_delivery'; changeForCents: number | null }
+  | { kind: 'success'; orderId: string; trackingToken: string; totalCents: number; cashbackUsedCents: number; fulfillmentType: FulfillmentType; fulfillmentDeadlineAt: string; paymentMethod: 'card_on_delivery' };
 
 export interface UseCheckoutResult {
   step: CheckoutStep;

@@ -129,28 +129,27 @@ export function CartView({
   }, [checkout.step]);
 
   if (checkout.step.kind === 'success') {
+    const successStep = checkout.step;
     return (
       <main className="flex min-h-screen flex-col items-center gap-6 p-6 text-center">
         <h1 className="text-title-lg text-text">Pedido feito!</h1>
         <p className="text-body font-medium text-text">
-          {checkout.step.fulfillmentType === 'pickup' ? 'Retirar até' : 'Entregar até'}:{' '}
+          {successStep.fulfillmentType === 'pickup' ? 'Retirar até' : 'Entregar até'}:{' '}
           <span className="tabular-nums">
-            {new Date(checkout.step.fulfillmentDeadlineAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(successStep.fulfillmentDeadlineAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </p>
-        <SuccessPaymentInfo step={checkout.step} />
-        {checkout.step.cashbackUsedCents > 0 ? (
-          <p className="text-body text-positive">Você usou {formatCents(checkout.step.cashbackUsedCents)} do seu saldo de cashback.</p>
+        <SuccessPaymentInfo step={successStep} />
+        {successStep.cashbackUsedCents > 0 ? (
+          <p className="text-body text-positive">Você usou {formatCents(successStep.cashbackUsedCents)} do seu saldo de cashback.</p>
         ) : null}
-        {/* Sem isso, o pico emocional ("consegui pedir") não tinha onde
-            pousar: o cliente ficava só com "Voltar pro cardápio" depois de
-            pagar, sem número do pedido nem caminho pro histórico que
-            /minha-conta já lista. Épico 12 (acompanhamento) ainda não
-            existe — este é o reasseguramento possível até lá. */}
         <p className="text-caption text-text-muted">
-          Pedido <span className="font-mono">#{checkout.step.orderId.slice(0, 8)}</span>
+          Pedido <span className="font-mono">#{successStep.orderId.slice(0, 8)}</span>
         </p>
         <div className="flex flex-col gap-2">
+          <MoButton onClick={() => router.push(`/${slug}/acompanhar/${successStep.trackingToken}`)}>
+            Acompanhar pedido
+          </MoButton>
           <Link href={`/${slug}/minha-conta`} className="text-body-strong text-brand-strong underline-offset-2 hover:underline">
             Ver meus pedidos
           </Link>

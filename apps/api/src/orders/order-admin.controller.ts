@@ -10,12 +10,13 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
   Req,
   UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { AdminOrder } from '@molho/contracts';
+import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { JwtAuthGuard, type RequestWithUser } from '../auth/guards/jwt-auth.guard';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
@@ -28,8 +29,9 @@ import { FlagOrderDto } from './dto/flag-order.dto';
 import { TransitionOrderDto } from './dto/transition-order.dto';
 import { OrderExceptionFilter } from './order-exception.filter';
 import type { OrderFlagService } from './order-flag.service';
+import type { OrderNotificationService } from './order-notification.service';
 import type { OrderStatusService } from './order-status.service';
-import { ADMIN_ORDER_REPOSITORY, ORDER_FLAG_SERVICE, ORDER_STATUS_SERVICE } from './orders.tokens';
+import { ADMIN_ORDER_REPOSITORY, ORDER_FLAG_SERVICE, ORDER_NOTIFICATION_SERVICE, ORDER_STATUS_SERVICE } from './orders.tokens';
 import { OrderPublishInterceptor, queueOrderPublish } from './realtime/order-publish.interceptor';
 
 /**
@@ -51,6 +53,7 @@ export class OrderAdminController {
     @Inject(ORDER_STATUS_SERVICE) private readonly orderStatus: OrderStatusService,
     @Inject(ADMIN_ORDER_REPOSITORY) private readonly orders: AdminOrderRepository,
     @Inject(ORDER_FLAG_SERVICE) private readonly orderFlag: OrderFlagService,
+    @Inject(ORDER_NOTIFICATION_SERVICE) private readonly orderNotification: OrderNotificationService,
   ) {}
 
   /** Board do gestor: pedidos ativos do tenant (load inicial + refetch na reconexão). */
@@ -85,6 +88,27 @@ export class OrderAdminController {
     const phone = await this.orders.findCustomerPhoneForChat(id);
     if (!phone) throw new NotFoundException('Pedido não encontrado.');
     return { phone };
+  }
+
+  /**
+   * Registra que o lojista iniciou um aviso por WhatsApp. Não prova envio
+   * (quem envia é humano, fora do Molho), mas dá rastro operacional suficiente
+   * pro board mostrar "cliente já foi chamado".
+   */
+  @Post(':id/notifications')
+  @RequireModule('notify.whatsapp_ctc')
+  @RequirePermission('order.update_status')
+  @HttpCode(HttpStatus.CREATED)
+  async notify(@Param('id') id: string, @Req() req: RequestWithUser): Promise<OrderNotificationResponse> {
+    const tenantId = requireTenantIdHeader(req);
+    const role = resolveActorRole(req, tenantId);
+    const notification = await this.orderNotification.create({
+      orderId: id,
+      actorId: req.user.sub,
+      actorRole: role,
+    });
+    queueOrderPublish(req, tenantId, { orderId: id, event: 'notification_logged', version: Date.parse(notification.createdAt) });
+    return notification;
   }
 
   @Patch(':id/status')

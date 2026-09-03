@@ -125,6 +125,9 @@ export const adminOrderSchema = z.strictObject({
    */
   flaggedAt: z.iso.datetime().nullable(),
   flaggedReason: z.string().nullable(),
+  /** Última vez em que alguém abriu o click-to-chat para este pedido. Não prova envio, só ação humana iniciada. */
+  lastNotifiedAt: z.iso.datetime().nullable(),
+  notificationCount: z.int().nonnegative(),
 });
 export type AdminOrder = z.infer<typeof adminOrderSchema>;
 export type AdminOrderItem = z.infer<typeof adminOrderItemSchema>;

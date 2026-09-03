@@ -11,6 +11,8 @@ function order(id: string, status: AdminOrder['status'], version = 0): AdminOrde
     fulfillmentDeadlineAt: null,
     flaggedAt: null,
     flaggedReason: null,
+    lastNotifiedAt: null,
+    notificationCount: 0,
     customerName: 'X',
     customerVerified: true,
     paymentMethod: 'pix',

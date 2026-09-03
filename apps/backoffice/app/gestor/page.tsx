@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flag } from 'lucide-react';
-import type { AdminOrder } from '@molho/contracts';
+import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { refreshStaffSession } from '../../lib/staff-auth';
 import {
@@ -187,6 +187,22 @@ export default function GestorPage() {
     } finally {
       setConfirmingId(null);
     }
+  }
+
+  function applyNotification(notification: OrderNotificationResponse) {
+    setOrders((prev) =>
+      prev
+        ? prev.map((order) =>
+            order.id === notification.orderId
+              ? {
+                  ...order,
+                  lastNotifiedAt: notification.createdAt,
+                  notificationCount: order.notificationCount + 1,
+                }
+              : order,
+          )
+        : prev,
+    );
   }
 
   if (error) {
@@ -379,7 +395,7 @@ export default function GestorPage() {
         </section>
       )}
 
-      {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} />}
+      {avisando && <WhatsAppSheet order={avisando} onClose={() => setAvisando(null)} onNotified={applyNotification} />}
       {reversal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
           <section
