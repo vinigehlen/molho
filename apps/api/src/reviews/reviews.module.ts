@@ -9,12 +9,13 @@ import { PrismaReviewRepository } from './review.repository';
 import { ReviewService } from './review.service';
 import { REVIEW_SERVICE } from './review.tokens';
 import { ReviewsController } from './reviews.controller';
+import { TrackReviewController } from './track-review.controller';
 
 export { REVIEW_SERVICE };
 
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
-  controllers: [ReviewsController, ReviewAdminController],
+  controllers: [ReviewsController, ReviewAdminController, TrackReviewController],
   providers: [
     {
       provide: REVIEW_SERVICE,

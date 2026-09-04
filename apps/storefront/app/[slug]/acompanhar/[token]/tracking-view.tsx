@@ -5,7 +5,8 @@ import Link from 'next/link';
 import * as React from 'react';
 import type { OrderStatus, OrderTrackingResponse } from '@molho/contracts';
 import { formatCents, MoButton, MoCard, MoCardContent, MoTimeline, type MoTimelineStep } from '@molho/ui';
-import { getOrderTracking } from '../../../../lib/order-tracking-api';
+import { OrderReviewForm } from '../../../../components/order-review-form';
+import { createTrackReview, getOrderTracking, ReviewAlreadyExistsError } from '../../../../lib/order-tracking-api';
 
 const POLL_MS = 18_000;
 const ORDER_TRACKING_TERMINAL_STATUSES: OrderStatus[] = [
@@ -82,6 +83,9 @@ export function OrderTrackingView({
   const [tracking, setTracking] = React.useState(initialTracking);
   const [lastUpdatedAt, setLastUpdatedAt] = React.useState(() => new Date());
   const [refreshing, setRefreshing] = React.useState(false);
+  const [reviewing, setReviewing] = React.useState(false);
+  const [reviewed, setReviewed] = React.useState(false);
+  const [reviewError, setReviewError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -101,6 +105,26 @@ export function OrderTrackingView({
     const id = window.setInterval(() => void refresh(), POLL_MS);
     return () => window.clearInterval(id);
   }, [refresh, tracking.status]);
+
+  async function submitReview(rating: number, comment: string) {
+    setReviewError(null);
+    try {
+      await createTrackReview(slug, token, { rating, ...(comment.trim() ? { comment: comment.trim() } : {}) });
+    } catch (error) {
+      // "já avaliado" não é erro de verdade pro cliente — só fecha o
+      // formulário com o mesmo agradecimento (mesmo racional de
+      // customer-account-view.tsx: idempotente na percepção de quem usa).
+      if (error instanceof ReviewAlreadyExistsError) {
+        setReviewing(false);
+        setReviewed(true);
+        return;
+      }
+      setReviewError(error instanceof Error ? error.message : 'Não deu pra enviar sua avaliação agora.');
+      return;
+    }
+    setReviewing(false);
+    setReviewed(true);
+  }
 
   const deadline = formatTime(tracking.fulfillmentDeadlineAt);
   const { steps, currentIndex } = timelineSteps(tracking);
@@ -179,6 +203,24 @@ export function OrderTrackingView({
           </MoCardContent>
         </MoCard>
       </section>
+
+      {tracking.status === 'completed' ? (
+        <section className="rounded-lg border border-border bg-bg-card p-4">
+          <h2 className="text-title text-text">O que achou do pedido?</h2>
+          {reviewed ? (
+            <p className="mt-2 text-caption text-text-muted">Obrigado pela avaliação!</p>
+          ) : reviewing ? (
+            <>
+              <OrderReviewForm onCancel={() => setReviewing(false)} onSubmit={(rating, comment) => void submitReview(rating, comment)} />
+              {reviewError ? <p className="mt-2 text-caption text-critical-strong">{reviewError}</p> : null}
+            </>
+          ) : (
+            <MoButton variant="ghost" size="sm" className="mt-2" onClick={() => setReviewing(true)}>
+              Avaliar pedido
+            </MoButton>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }
