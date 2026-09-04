@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IllegalOrderTransitionError, MissingCancelReasonError, OrderConflictError, OrderNotFoundError, PaymentNotConfirmedError } from './order-errors';
+import type { LoyaltyCreditor } from './loyalty-creditor.port';
 import type { OrderStatus } from './order-status-machine';
 import type {
   OrderStatusRecord,
@@ -8,6 +9,19 @@ import type {
   RecordHistoryParams,
 } from './order-status.repository';
 import { OrderStatusService } from './order-status.service';
+
+class FakeLoyaltyCreditor implements LoyaltyCreditor {
+  creditCalls: { tenantId: string; customerId: string; orderId: string; totalCents: number }[] = [];
+  refundCalls: { tenantId: string; customerId: string; orderId: string; cashbackUsedCents: number }[] = [];
+
+  async creditForCompletedOrder(params: { tenantId: string; customerId: string; orderId: string; totalCents: number }) {
+    this.creditCalls.push(params);
+  }
+
+  async refundUsedBalance(params: { tenantId: string; customerId: string; orderId: string; cashbackUsedCents: number }) {
+    this.refundCalls.push(params);
+  }
+}
 
 class FakeOrderStatusRepository implements OrderStatusRepository {
   rows = new Map<string, OrderStatusRecord>();
@@ -26,6 +40,7 @@ class FakeOrderStatusRepository implements OrderStatusRepository {
       totalCents: 5000,
       paymentMethod: 'pix',
       paymentStatus: 'confirmado',
+      cashbackUsedCents: 0,
       ...row,
     });
   }
@@ -61,9 +76,9 @@ class FakeOrderStatusRepository implements OrderStatusRepository {
   }
 }
 
-function setup() {
+function setup(loyalty?: FakeLoyaltyCreditor) {
   const repo = new FakeOrderStatusRepository();
-  return { repo, service: new OrderStatusService(repo) };
+  return { repo, loyalty, service: new OrderStatusService(repo, loyalty) };
 }
 
 const STAFF = { type: 'staff' as const, userId: 'user-1', role: 'manager' };
@@ -279,6 +294,60 @@ describe('OrderStatusService.transition — idempotência da fila offline (§9)'
     repo.seed({ id: 'order-1', status: 'received', version: 0 });
     await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'preparing', actor: STAFF, reason: null, idempotencyKey: 'abc' });
     expect(repo.history[0]!.idempotencyKey).toBe('abc');
+  });
+});
+
+describe('OrderStatusService.transition — cashback (Épico 16b/16.2)', () => {
+  it('completed credita cashback via LoyaltyCreditor injetado', async () => {
+    const loyalty = new FakeLoyaltyCreditor();
+    const { repo, service } = setup(loyalty);
+    repo.seed({ id: 'order-1', status: 'ready', version: 0, totalCents: 5000 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'completed', actor: STAFF, reason: null });
+
+    expect(loyalty.creditCalls).toEqual([{ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', totalCents: 5000 }]);
+    expect(loyalty.refundCalls).toEqual([]);
+  });
+
+  it('canceled com cashbackUsedCents > 0 devolve o saldo usado', async () => {
+    const loyalty = new FakeLoyaltyCreditor();
+    const { repo, service } = setup(loyalty);
+    repo.seed({ id: 'order-1', status: 'received', version: 0, cashbackUsedCents: 500 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'canceled', actor: STAFF, reason: 'Cliente desistiu' });
+
+    expect(loyalty.refundCalls).toEqual([{ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', cashbackUsedCents: 500 }]);
+    expect(loyalty.creditCalls).toEqual([]);
+  });
+
+  it('auto_canceled com cashbackUsedCents > 0 também devolve (mesma família de cancelamento)', async () => {
+    const loyalty = new FakeLoyaltyCreditor();
+    const { repo, service } = setup(loyalty);
+    repo.seed({ id: 'order-1', status: 'received', version: 0, cashbackUsedCents: 300 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'auto_canceled', actor: STAFF, reason: null });
+
+    expect(loyalty.refundCalls).toEqual([{ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', cashbackUsedCents: 300 }]);
+  });
+
+  it('canceled SEM uso de cashback (cashbackUsedCents = 0) não chama a devolução — nada a devolver', async () => {
+    const loyalty = new FakeLoyaltyCreditor();
+    const { repo, service } = setup(loyalty);
+    repo.seed({ id: 'order-1', status: 'received', version: 0, cashbackUsedCents: 0 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'canceled', actor: STAFF, reason: 'Sem cashback' });
+
+    expect(loyalty.refundCalls).toEqual([]);
+  });
+
+  it('delivery_failed NÃO devolve — pedido foi preparado/saiu pra entrega, não é "nunca aconteceu"', async () => {
+    const loyalty = new FakeLoyaltyCreditor();
+    const { repo, service } = setup(loyalty);
+    repo.seed({ id: 'order-1', status: 'in_transit', version: 0, cashbackUsedCents: 500 });
+
+    await service.transition({ orderId: 'order-1', expectedVersion: 0, toStatus: 'delivery_failed', actor: STAFF, reason: 'Cliente não atendeu' });
+
+    expect(loyalty.refundCalls).toEqual([]);
   });
 });
 

@@ -1,4 +1,5 @@
 import { Controller, Get, Inject, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { LoyaltyEventsResponse } from '@molho/contracts';
 import { CustomerJwtAuthGuard, type RequestWithCustomer } from '../auth/guards/customer-jwt-auth.guard';
 import { RequireModule } from '../auth/guards/require-module.decorator';
 import { RequireModuleGuard } from '../auth/guards/require-module.guard';
@@ -17,5 +18,12 @@ export class LoyaltyBalanceController {
   @Get()
   async get(@Req() request: RequestWithCustomer) {
     return { balanceCents: await this.balances.getBalance(request.user.sub) };
+  }
+
+  /** Extrato (Épico 16.1) — "ganhou R$X no pedido #…" / "usou R$Y no pedido #…". */
+  @Get('events')
+  async listEvents(@Req() request: RequestWithCustomer): Promise<LoyaltyEventsResponse> {
+    const events = await this.balances.listEvents(request.user.sub);
+    return { events: events.map((event) => ({ ...event, createdAt: event.createdAt.toISOString() })) };
   }
 }

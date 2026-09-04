@@ -14,6 +14,8 @@ export interface OrderStatusRecord {
    *  pedido, incluindo os de balcão (Épico balcão), que carregam cash_at_counter/card_at_counter. */
   paymentMethod: AdminPaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Épico 16.2 — >0 sse o cliente usou saldo de cashback neste pedido; devolvido se o pedido cancelar ANTES de concluir. */
+  cashbackUsedCents: number;
 }
 
 export interface RecordHistoryParams {
@@ -76,6 +78,7 @@ export class PrismaOrderStatusRepository implements OrderStatusRepository {
         version: true,
         paymentMethod: true,
         paymentStatus: true,
+        cashbackUsedCents: true,
       },
     });
   }
