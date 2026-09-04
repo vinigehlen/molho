@@ -6,6 +6,10 @@ import { LoyaltyConfigService } from './loyalty-config.service';
 class FakeLoyaltyConfigRepository implements LoyaltyConfigRepository {
   row: LoyaltyConfigRecord | null = null;
 
+  async find(): Promise<LoyaltyConfigRecord | null> {
+    return this.row;
+  }
+
   async get(): Promise<LoyaltyConfigRecord> {
     return this.row ?? { cashbackPercent: 5, version: 0 };
   }
