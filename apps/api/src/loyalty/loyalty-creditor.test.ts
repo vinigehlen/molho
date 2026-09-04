@@ -28,11 +28,16 @@ class FakeConfigRepository implements LoyaltyConfigRepository {
 
 class FakeBalanceRepository implements LoyaltyBalanceRepository {
   creditCalls: { customerId: string; orderId: string; amountCents: number }[] = [];
+  balanceCents = 0;
   async getBalance() {
-    return 0;
+    return this.balanceCents;
   }
   async credit(customerId: string, orderId: string, amountCents: number) {
     this.creditCalls.push({ customerId, orderId, amountCents });
+    this.balanceCents += amountCents;
+  }
+  async listEvents() {
+    return [];
   }
 }
 
@@ -85,5 +90,31 @@ describe('RealLoyaltyCreditor.creditForCompletedOrder', () => {
     await creditor.creditForCompletedOrder({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', totalCents: 10000 });
 
     expect(balance.creditCalls).toEqual([{ customerId: 'customer-1', orderId: 'order-1', amountCents: 800 }]);
+  });
+});
+
+describe('RealLoyaltyCreditor.refundUsedBalance', () => {
+  it('16.2: devolve o saldo debitado no checkout — mesma operação de crédito, mesmo orderId do pedido cancelado', async () => {
+    const gate = new FakeGate();
+    const config = new FakeConfigRepository();
+    const balance = new FakeBalanceRepository();
+    const creditor = new RealLoyaltyCreditor(gate, config, balance);
+
+    await creditor.refundUsedBalance({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', cashbackUsedCents: 500 });
+
+    expect(balance.creditCalls).toEqual([{ customerId: 'customer-1', orderId: 'order-1', amountCents: 500 }]);
+    expect(balance.balanceCents).toBe(500);
+  });
+
+  it('devolve mesmo com o módulo loyalty desligado agora — dinheiro do cliente não fica preso por causa de um toggle depois do checkout', async () => {
+    const gate = new FakeGate();
+    gate.active = false;
+    const config = new FakeConfigRepository();
+    const balance = new FakeBalanceRepository();
+    const creditor = new RealLoyaltyCreditor(gate, config, balance);
+
+    await creditor.refundUsedBalance({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', cashbackUsedCents: 500 });
+
+    expect(balance.creditCalls).toEqual([{ customerId: 'customer-1', orderId: 'order-1', amountCents: 500 }]);
   });
 });

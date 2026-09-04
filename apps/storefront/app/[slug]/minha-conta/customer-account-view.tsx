@@ -7,11 +7,13 @@ import type {
   CustomerOrderSummary,
   CustomerProfile,
   CustomerProfileAddress,
+  LoyaltyEvent,
 } from '@molho/contracts';
 import {
   buttonVariants,
   cn,
   formatCents,
+  formatCentsDelta,
   MoAddressSheet,
   MoButton,
   MoCard,
@@ -27,6 +29,7 @@ import {
   deleteCustomerAddress,
   getCustomerProfile,
   getLoyaltyBalance,
+  getLoyaltyEvents,
   listCustomerAddresses,
   listCustomerOrders,
   ReviewAlreadyExistsError,
@@ -64,6 +67,7 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
   const [reviewingOrderId, setReviewingOrderId] = React.useState<string | null>(null);
   const [reviewedOrderIds, setReviewedOrderIds] = React.useState<Set<string>>(new Set());
   const [loyaltyBalanceCents, setLoyaltyBalanceCents] = React.useState(0);
+  const [loyaltyEvents, setLoyaltyEvents] = React.useState<LoyaltyEvent[]>([]);
 
   React.useEffect(() => setMounted(true), []);
   React.useEffect(() => {
@@ -98,6 +102,11 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
     getLoyaltyBalance(slug, session.token)
       .then((cents) => {
         if (active) setLoyaltyBalanceCents(cents);
+      })
+      .catch(() => {});
+    getLoyaltyEvents(slug, session.token)
+      .then((events) => {
+        if (active) setLoyaltyEvents(events);
       })
       .catch(() => {});
     return () => {
@@ -230,13 +239,30 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
         </MoCard>
       </section>
 
-      {loyaltyBalanceCents > 0 ? (
+      {loyaltyBalanceCents > 0 || loyaltyEvents.length > 0 ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-title text-text">Seu cashback</h2>
           <MoCard>
-            <MoCardContent className="p-5">
-              <p className="text-title-lg tnum text-brand-strong">{formatCents(loyaltyBalanceCents)}</p>
-              <p className="text-caption text-text-muted">Aplica no próximo pedido, na tela de revisão.</p>
+            <MoCardContent className="flex flex-col gap-4 p-5">
+              <div>
+                <p className="text-title-lg tnum text-brand-strong">{formatCents(loyaltyBalanceCents)}</p>
+                <p className="text-caption text-text-muted">Aplica no próximo pedido, na tela de revisão.</p>
+              </div>
+              {loyaltyEvents.length > 0 ? (
+                <ul className="flex flex-col gap-2 border-t border-border pt-4">
+                  {loyaltyEvents.map((event, index) => (
+                    <li key={`${event.orderId}-${event.type}-${index}`} className="flex items-center justify-between gap-2 text-caption">
+                      <span className="text-text-muted">
+                        {event.type === 'earn' ? 'Ganhou' : 'Usou'} no pedido de{' '}
+                        {new Date(event.createdAt).toLocaleDateString('pt-BR')}
+                      </span>
+                      <span className={cn('tnum font-semibold', event.type === 'earn' ? 'text-positive' : 'text-text')}>
+                        {formatCentsDelta(event.type === 'earn' ? event.amountCents : -event.amountCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </MoCardContent>
           </MoCard>
         </section>
