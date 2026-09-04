@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CustomerAccountView } from './customer-account-view';
 
 const clearToken = vi.fn();
-const { useCustomerToken, getCustomerProfile, listCustomerAddresses, listCustomerOrders, createReview } = vi.hoisted(() => ({
+const { useCustomerToken, getCustomerProfile, listCustomerAddresses, listCustomerOrders, createReview, getLoyaltyBalance, getLoyaltyEvents } = vi.hoisted(() => ({
   useCustomerToken: vi.fn(), getCustomerProfile: vi.fn(), listCustomerAddresses: vi.fn(), listCustomerOrders: vi.fn(), createReview: vi.fn(),
+  getLoyaltyBalance: vi.fn().mockResolvedValue(0), getLoyaltyEvents: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../../lib/use-customer-token', () => ({ useCustomerToken }));
 vi.mock('../../../lib/customer-profile-api', () => ({
-  getCustomerProfile, listCustomerAddresses, listCustomerOrders, createReview,
-  getLoyaltyBalance: vi.fn().mockResolvedValue(0),
+  getCustomerProfile, listCustomerAddresses, listCustomerOrders, createReview, getLoyaltyBalance, getLoyaltyEvents,
   createCustomerAddress: vi.fn(), updateCustomerAddress: vi.fn(), deleteCustomerAddress: vi.fn(), updateCustomerProfile: vi.fn(),
   CustomerProfileUnauthorizedError: class extends Error {}, CustomerProfileConflictError: class extends Error {},
   ReviewAlreadyExistsError: class extends Error {},
@@ -20,6 +20,8 @@ describe('CustomerAccountView', () => {
   beforeEach(() => {
     clearToken.mockReset();
     useCustomerToken.mockReturnValue({ token: null, customerId: null, setToken: vi.fn(), clearToken });
+    getLoyaltyBalance.mockReset().mockResolvedValue(0);
+    getLoyaltyEvents.mockReset().mockResolvedValue([]);
   });
 
   it('não pede OTP quando não existe sessão', async () => {
@@ -60,5 +62,25 @@ describe('CustomerAccountView', () => {
 
     await waitFor(() => expect(createReview).toHaveBeenCalledWith('tempero', 'token-x', 'order-1', { rating: 5, comment: 'Muito bom!' }));
     expect(await screen.findByText('Obrigado pela avaliação!')).toBeInTheDocument();
+  });
+
+  it('16.1: mostra o extrato de cashback (ganhou/usou) quando há eventos', async () => {
+    useCustomerToken.mockReturnValue({ token: 'token-x', customerId: 'customer-1', setToken: vi.fn(), clearToken });
+    getCustomerProfile.mockResolvedValue({ id: '0193f1a0-0000-7000-8000-000000000001', name: 'Bia', phoneMasked: '(51) *****-1234', emailMasked: null, phoneVerified: true, version: 0 });
+    listCustomerAddresses.mockResolvedValue([]);
+    listCustomerOrders.mockResolvedValue([]);
+    getLoyaltyBalance.mockResolvedValue(150);
+    getLoyaltyEvents.mockResolvedValue([
+      { type: 'earn', amountCents: 250, orderId: 'order-1', createdAt: '2026-09-01T00:00:00.000Z' },
+      { type: 'redeem', amountCents: 100, orderId: 'order-2', createdAt: '2026-08-20T00:00:00.000Z' },
+    ]);
+
+    render(<CustomerAccountView slug="tempero" storeName="Casa Tempero" />);
+
+    expect(await screen.findByText('Seu cashback')).toBeInTheDocument();
+    expect(screen.getByText(/^Ganhou no pedido de/)).toBeInTheDocument();
+    expect(screen.getByText(/^Usou no pedido de/)).toBeInTheDocument();
+    expect(screen.getByText('+ R$ 2,50')).toBeInTheDocument();
+    expect(screen.getByText('− R$ 1,00')).toBeInTheDocument();
   });
 });

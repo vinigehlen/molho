@@ -28,4 +28,22 @@ export class RealLoyaltyCreditor implements LoyaltyCreditor {
     const amountCents = Math.round((params.totalCents * config.cashbackPercent) / 100);
     await this.balance.credit(params.customerId, params.orderId, amountCents);
   }
+
+  /**
+   * Devolução de saldo usado (Épico 16.2) — mesma operação de crédito
+   * (`balance.credit`): incrementa `loyalty_balances` e grava um
+   * `loyalty_events` tipo `earn` com o MESMO `orderId` do pedido cancelado.
+   * O extrato (16.1) então mostra "usou" (derivado de
+   * `orders.cashback_used_cents`, que fica como está — o pedido REALMENTE
+   * usou saldo, cancelar depois não apaga o fato) seguido de "ganhou" (a
+   * devolução) — histórico verdadeiro, não escondido.
+   *
+   * Sem gate de módulo aqui de propósito: se o saldo foi debitado (o módulo
+   * estava ativo no momento do checkout), devolver não pode depender do
+   * módulo continuar ativo agora — dinheiro do cliente não fica preso porque
+   * o lojista desligou fidelidade depois.
+   */
+  async refundUsedBalance(params: { tenantId: string; customerId: string; orderId: string; cashbackUsedCents: number }): Promise<void> {
+    await this.balance.credit(params.customerId, params.orderId, params.cashbackUsedCents);
+  }
 }

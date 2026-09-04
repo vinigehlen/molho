@@ -2,10 +2,12 @@ import {
   customerOrderSummaryListSchema,
   customerProfileAddressSchema,
   customerProfileSchema,
+  loyaltyEventsResponseSchema,
   type CreateCustomerProfileAddressInput,
   type CustomerOrderSummary,
   type CustomerProfile,
   type CustomerProfileAddress,
+  type LoyaltyEvent,
   type UpdateCustomerProfileAddressInput,
   type UpdateCustomerProfileInput,
 } from '@molho/contracts';
@@ -87,6 +89,12 @@ export async function listCustomerOrders(slug: string, token: string): Promise<C
 export async function getLoyaltyBalance(slug: string, token: string): Promise<number> {
   const body = await request<{ balanceCents: number }>(slug, token, '/loyalty');
   return body.balanceCents;
+}
+
+/** Extrato de cashback (Épico 16.1) — "ganhou R$X" / "usou R$Y", por pedido. */
+export async function getLoyaltyEvents(slug: string, token: string): Promise<LoyaltyEvent[]> {
+  const body = loyaltyEventsResponseSchema.parse(await request(slug, token, '/loyalty/events'));
+  return body.events;
 }
 
 export class ReviewAlreadyExistsError extends Error {}

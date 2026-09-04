@@ -8,7 +8,13 @@ export const NOOP_LOYALTY_CREDITOR: LoyaltyCreditor = {
   async creditForCompletedOrder() {
     // nada
   },
+  async refundUsedBalance() {
+    // nada
+  },
 };
+
+/** `toStatus` que encerram o pedido SEM completá-lo — devolve saldo usado (16.2). `delivery_failed` fica de fora: o pedido foi preparado/saiu pra entrega, não é "nunca aconteceu". */
+const CANCEL_FAMILY_STATUSES: ReadonlySet<OrderStatus> = new Set(['canceled', 'auto_canceled', 'expired']);
 
 /**
  * Nunca `{type:'staff', actorId: string | null}` — a união força quem chama
@@ -124,6 +130,19 @@ export class OrderStatusService {
         customerId: order.customerId,
         orderId: order.id,
         totalCents: order.totalCents,
+      });
+    }
+
+    // Épico 16.2 — pedido que usou saldo de cashback e cancela ANTES de
+    // concluir devolve o que foi debitado. Mesma transação do resto: se a
+    // devolução falhar, o cancelamento inteiro reverte junto (nunca um
+    // "cancelou mas não devolveu" silencioso, mesmo racional do crédito acima).
+    if (CANCEL_FAMILY_STATUSES.has(input.toStatus) && order.cashbackUsedCents > 0) {
+      await this.loyalty.refundUsedBalance({
+        tenantId: order.tenantId,
+        customerId: order.customerId,
+        orderId: order.id,
+        cashbackUsedCents: order.cashbackUsedCents,
       });
     }
   }
