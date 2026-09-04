@@ -13,6 +13,16 @@ const SUGGESTED_CASHBACK_PERCENT = 5;
 const SELECT = { cashbackPercent: true, version: true } as const;
 
 export interface LoyaltyConfigRepository {
+  /**
+   * Registro CRU do banco — `null` quando o lojista nunca salvou nada.
+   * Único método que `RealLoyaltyCreditor` pode usar (Épico 16.4): a
+   * distinção "nunca configurado" vs "configurado com o mesmo valor da
+   * sugestão" só existe aqui. `get()` colapsa os dois em `version: 0`, o
+   * que é correto pro FORM de admin (pré-preenche com a sugestão) mas
+   * teria sido fail-OPEN se o creditor usasse — creditaria 5% de cashback
+   * de verdade sem o lojista jamais ter confirmado percentual nenhum.
+   */
+  find(): Promise<LoyaltyConfigRecord | null>;
   get(): Promise<LoyaltyConfigRecord>;
   update(cashbackPercent: number, expectedVersion: number): Promise<LoyaltyConfigRecord>;
 }
@@ -20,10 +30,13 @@ export interface LoyaltyConfigRepository {
 export class PrismaLoyaltyConfigRepository implements LoyaltyConfigRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
-  async get(): Promise<LoyaltyConfigRecord> {
+  async find(): Promise<LoyaltyConfigRecord | null> {
     const tenantId = this.requestContext.getTenantId();
-    const row = await this.requestContext.getClient().loyaltyConfig.findUnique({ where: { tenantId }, select: SELECT });
-    return row ?? { cashbackPercent: SUGGESTED_CASHBACK_PERCENT, version: 0 };
+    return this.requestContext.getClient().loyaltyConfig.findUnique({ where: { tenantId }, select: SELECT });
+  }
+
+  async get(): Promise<LoyaltyConfigRecord> {
+    return (await this.find()) ?? { cashbackPercent: SUGGESTED_CASHBACK_PERCENT, version: 0 };
   }
 
   async update(cashbackPercent: number, expectedVersion: number): Promise<LoyaltyConfigRecord> {

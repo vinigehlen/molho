@@ -12,12 +12,17 @@ class FakeGate implements LoyaltyGate {
 }
 
 class FakeConfigRepository implements LoyaltyConfigRepository {
-  row: LoyaltyConfigRecord = { cashbackPercent: 5, version: 0 };
-  async get() {
+  // null por padrão: representa "lojista nunca salvou nada" — o creditor
+  // (16.4) tem que tratar isso como desligado, nunca como "usa a sugestão".
+  row: LoyaltyConfigRecord | null = null;
+  async find() {
     return this.row;
   }
+  async get() {
+    return this.row ?? { cashbackPercent: 5, version: 0 };
+  }
   async update() {
-    return this.row;
+    return this.row ?? { cashbackPercent: 5, version: 0 };
   }
 }
 
@@ -32,9 +37,10 @@ class FakeBalanceRepository implements LoyaltyBalanceRepository {
 }
 
 describe('RealLoyaltyCreditor.creditForCompletedOrder', () => {
-  it('credita cashbackPercent% do total (D5), arredondado', async () => {
+  it('credita cashbackPercent% do total (D5), arredondado — com config REALMENTE salva pelo lojista', async () => {
     const gate = new FakeGate();
     const config = new FakeConfigRepository();
+    config.row = { cashbackPercent: 5, version: 1 }; // já passou por um PUT — configurado de verdade
     const balance = new FakeBalanceRepository();
     const creditor = new RealLoyaltyCreditor(gate, config, balance);
 
@@ -48,11 +54,36 @@ describe('RealLoyaltyCreditor.creditForCompletedOrder', () => {
     const gate = new FakeGate();
     gate.active = false;
     const config = new FakeConfigRepository();
+    config.row = { cashbackPercent: 5, version: 1 };
     const balance = new FakeBalanceRepository();
     const creditor = new RealLoyaltyCreditor(gate, config, balance);
 
     await creditor.creditForCompletedOrder({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', totalCents: 10000 });
 
     expect(balance.creditCalls).toEqual([]);
+  });
+
+  it('16.4: SEM config salva (lojista nunca abriu a tela de fidelidade) — fail-closed, não credita a sugestão de 5%', async () => {
+    const gate = new FakeGate();
+    const config = new FakeConfigRepository();
+    config.row = null; // nunca salvou nada
+    const balance = new FakeBalanceRepository();
+    const creditor = new RealLoyaltyCreditor(gate, config, balance);
+
+    await creditor.creditForCompletedOrder({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', totalCents: 10000 });
+
+    expect(balance.creditCalls).toEqual([]);
+  });
+
+  it('config salva com version:0 (primeiro save de verdade) AINDA credita — 0 é versão válida, não "não configurado"', async () => {
+    const gate = new FakeGate();
+    const config = new FakeConfigRepository();
+    config.row = { cashbackPercent: 8, version: 0 }; // Prisma cria com version default 0
+    const balance = new FakeBalanceRepository();
+    const creditor = new RealLoyaltyCreditor(gate, config, balance);
+
+    await creditor.creditForCompletedOrder({ tenantId: 'tenant-1', customerId: 'customer-1', orderId: 'order-1', totalCents: 10000 });
+
+    expect(balance.creditCalls).toEqual([{ customerId: 'customer-1', orderId: 'order-1', amountCents: 800 }]);
   });
 });
