@@ -32,6 +32,8 @@ const SELECT = {
 
 export interface ReviewRepository {
   findOrderForReview(customerId: string, orderId: string): Promise<OrderForReview | null>;
+  /** Épico 16.3 — pedido guest não tem JWT (CLAUDE.md regra 13); o token opaco do acompanhamento É a autorização, mesmo padrão de OrderTrackingRepository.findByToken. */
+  findOrderForReviewByToken(token: string): Promise<OrderForReview | null>;
   create(input: { orderId: string; customerId: string; rating: number; comment?: string }): Promise<ReviewRecord>;
   findById(id: string): Promise<ReviewRecord | null>;
   reply(id: string, version: number, reply: string): Promise<ReviewRecord>;
@@ -46,6 +48,14 @@ export class PrismaReviewRepository implements ReviewRepository {
     const client = this.requestContext.getClient();
     return client.order.findFirst({
       where: { id: orderId, customerId, deletedAt: null },
+      select: { id: true, customerId: true, status: true },
+    });
+  }
+
+  async findOrderForReviewByToken(token: string): Promise<OrderForReview | null> {
+    const client = this.requestContext.getClient();
+    return client.order.findFirst({
+      where: { trackingToken: token, deletedAt: null },
       select: { id: true, customerId: true, status: true },
     });
   }
