@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { OrderReviewForm } from '../../../components/order-review-form';
 import type {
   CustomerOrderSummary,
   CustomerProfile,
@@ -399,53 +400,5 @@ function AccountShell({
       </header>
       <div className="flex flex-col gap-8">{children}</div>
     </main>
-  );
-}
-
-/** Nota 1-5 + comentário opcional (D1: imutável, sem editar depois de enviar). */
-function OrderReviewForm({
-  onCancel,
-  onSubmit,
-}: {
-  onCancel: () => void;
-  onSubmit: (rating: number, comment: string) => void;
-}) {
-  const [rating, setRating] = React.useState(0);
-  const [comment, setComment] = React.useState('');
-
-  return (
-    <div className="mt-3 flex flex-col gap-2 rounded-md border border-border p-3">
-      <div className="flex gap-1" role="radiogroup" aria-label="Nota do pedido">
-        {[1, 2, 3, 4, 5].map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={rating === value}
-            aria-label={`${value} estrela${value > 1 ? 's' : ''}`}
-            onClick={() => setRating(value)}
-            className="-m-1 p-1"
-          >
-            <Star
-              className={cn('h-6 w-6', value <= rating ? 'fill-brand text-brand' : 'text-border-strong')}
-              aria-hidden="true"
-            />
-          </button>
-        ))}
-      </div>
-      <MoInput
-        label="Comentário (opcional)"
-        value={comment}
-        onChange={(e) => setComment(e.currentTarget.value)}
-      />
-      <div className="flex gap-2">
-        <MoButton size="sm" disabled={rating === 0} onClick={() => onSubmit(rating, comment)}>
-          Enviar avaliação
-        </MoButton>
-        <MoButton variant="ghost" size="sm" onClick={onCancel}>
-          Cancelar
-        </MoButton>
-      </div>
-    </div>
   );
 }

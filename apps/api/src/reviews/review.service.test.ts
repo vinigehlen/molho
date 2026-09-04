@@ -19,6 +19,8 @@ function record(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
 
 class FakeReviewRepository implements ReviewRepository {
   orders = new Map<string, OrderForReview>();
+  /** token → orderId, simulando trackingToken como uma chave separada do orderId (mesmo desenho real: token opaco, não o UUID do pedido). */
+  tokens = new Map<string, string>();
   rows = new Map<string, ReviewRecord>();
   createdFor = new Set<string>();
 
@@ -26,6 +28,12 @@ class FakeReviewRepository implements ReviewRepository {
     const order = this.orders.get(orderId);
     if (!order || order.customerId !== customerId) return null;
     return order;
+  }
+
+  async findOrderForReviewByToken(token: string): Promise<OrderForReview | null> {
+    const orderId = this.tokens.get(token);
+    if (!orderId) return null;
+    return this.orders.get(orderId) ?? null;
   }
 
   async create(input: { orderId: string; customerId: string; rating: number; comment?: string }): Promise<ReviewRecord> {
@@ -95,6 +103,45 @@ describe('ReviewService.createForOrder', () => {
     await service.createForOrder('cust-1', 'order-1', { rating: 5 });
 
     await expect(service.createForOrder('cust-1', 'order-1', { rating: 1 })).rejects.toThrow(ReviewAlreadyExistsError);
+  });
+});
+
+describe('ReviewService.createForOrderByToken (Épico 16.3 — pedido guest, sem JWT)', () => {
+  it('cria quando o token resolve um pedido completed', async () => {
+    const repo = new FakeReviewRepository();
+    repo.orders.set('order-1', { id: 'order-1', customerId: 'cust-1', status: 'completed' });
+    repo.tokens.set('token-abc', 'order-1');
+    const service = new ReviewService(repo);
+
+    const review = await service.createForOrderByToken('token-abc', { rating: 4 });
+
+    expect(review.orderId).toBe('order-1');
+  });
+
+  it('token que não resolve pedido nenhum: mesmo erro genérico (sem enumeração)', async () => {
+    const repo = new FakeReviewRepository();
+    const service = new ReviewService(repo);
+
+    await expect(service.createForOrderByToken('token-invalido', { rating: 5 })).rejects.toThrow(OrderNotEligibleForReviewError);
+  });
+
+  it('pedido ainda não completed: rejeita', async () => {
+    const repo = new FakeReviewRepository();
+    repo.orders.set('order-1', { id: 'order-1', customerId: 'cust-1', status: 'preparing' });
+    repo.tokens.set('token-abc', 'order-1');
+    const service = new ReviewService(repo);
+
+    await expect(service.createForOrderByToken('token-abc', { rating: 5 })).rejects.toThrow(OrderNotEligibleForReviewError);
+  });
+
+  it('mesmo pedido avaliado antes pelo caminho de JWT: token não dá segunda avaliação (índice único cobre as duas portas)', async () => {
+    const repo = new FakeReviewRepository();
+    repo.orders.set('order-1', { id: 'order-1', customerId: 'cust-1', status: 'completed' });
+    repo.tokens.set('token-abc', 'order-1');
+    const service = new ReviewService(repo);
+    await service.createForOrder('cust-1', 'order-1', { rating: 5 });
+
+    await expect(service.createForOrderByToken('token-abc', { rating: 1 })).rejects.toThrow(ReviewAlreadyExistsError);
   });
 });
 
