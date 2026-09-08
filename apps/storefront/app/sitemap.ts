@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
-
-const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? 'https://molho.vercel.app';
+import { STOREFRONT_URL } from '../lib/site-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
