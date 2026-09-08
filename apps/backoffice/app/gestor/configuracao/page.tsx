@@ -565,13 +565,13 @@ export default function ConfiguracaoPage() {
                 <textarea className="mt-2 min-h-20 w-full rounded-[14px] border border-border bg-bg-card px-4 py-3 outline-none focus:border-brand" value={storeForm.publicDescription ?? ''} onChange={(event) => setStoreForm((prev) => ({ ...prev, publicDescription: event.target.value || null }))} maxLength={280} />
               </label>
               <ImageUploadField
-                label="Logo"
+                kind="logo"
                 imageUrl={setup?.logoImageUrl ?? null}
                 busy={busy === 'logo'}
                 onChange={(file) => void uploadBrand('logo', file)}
               />
               <ImageUploadField
-                label="Capa"
+                kind="cover"
                 imageUrl={setup?.coverImageUrl ?? null}
                 busy={busy === 'cover'}
                 onChange={(file) => void uploadBrand('cover', file)}
@@ -878,25 +878,71 @@ function MoneyField({ label, value, onChange, placeholder }: { label: string; va
   );
 }
 
+const BRAND_IMAGE_SPEC = {
+  logo: {
+    label: 'Logo',
+    // Vira a foto de perfil circular no card de compartilhamento e no ícone PWA.
+    hint: 'Quadrada, 512 × 512 px · até 500 KB',
+    maxBytes: 500 * 1024,
+    maxLabel: '500 KB',
+    previewClass: 'h-20 w-20 rounded-full',
+  },
+  cover: {
+    label: 'Capa',
+    // É o fundo do card "fachada" (1.91:1, tamanho exato do preview de link).
+    hint: '1200 × 630 px (1.91:1) · até 1 MB',
+    maxBytes: 1024 * 1024,
+    maxLabel: '1 MB',
+    previewClass: 'h-20 w-36 rounded-[10px]',
+  },
+} as const;
+
 function ImageUploadField({
-  label,
+  kind,
   imageUrl,
   busy,
   onChange,
 }: {
-  label: string;
+  kind: 'logo' | 'cover';
   imageUrl: string | null;
   busy: boolean;
   onChange: (file: File | undefined) => void;
 }) {
+  const spec = BRAND_IMAGE_SPEC[kind];
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [tooBig, setTooBig] = useState(false);
+
+  // Preview imediato do arquivo escolhido (antes de o upload terminar). O
+  // objectURL é revogado quando troca ou o componente desmonta.
+  useEffect(() => {
+    if (!localPreview) return;
+    return () => URL.revokeObjectURL(localPreview);
+  }, [localPreview]);
+
+  function handleFile(file: File | undefined) {
+    setTooBig(false);
+    if (!file) return;
+    if (file.size > spec.maxBytes) {
+      setTooBig(true);
+      setLocalPreview(null);
+      return;
+    }
+    setLocalPreview(URL.createObjectURL(file));
+    onChange(file);
+  }
+
+  const shownImage = localPreview ?? imageUrl;
+
   return (
     <label className="block">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium">{spec.label}</span>
       <span className="mt-2 flex min-h-28 items-center gap-3 rounded-[14px] border border-border bg-bg px-3 py-3">
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="h-20 w-20 rounded-[10px] object-cover" />
+        {shownImage ? (
+          <img src={shownImage} alt="" className={`${spec.previewClass} shrink-0 border border-border object-cover`} />
         ) : (
-          <span className="flex h-20 w-20 items-center justify-center rounded-[10px] bg-bg-card text-xs text-text-muted">
+          <span
+            className={`${spec.previewClass} flex shrink-0 items-center justify-center bg-bg-card text-center text-xs text-text-muted`}
+          >
             Sem imagem
           </span>
         )}
@@ -906,9 +952,16 @@ function ImageUploadField({
             type="file"
             accept="image/png,image/jpeg,image/webp"
             disabled={busy}
-            onChange={(event) => onChange(event.target.files?.[0])}
+            onChange={(event) => handleFile(event.target.files?.[0])}
           />
-          <span className="text-xs text-text-muted">{busy ? 'Enviando…' : 'PNG, JPG ou WebP'}</span>
+          <span className="text-xs text-text-muted">
+            {busy ? 'Enviando…' : `PNG, JPG ou WebP · ${spec.hint}`}
+          </span>
+          {tooBig && (
+            <span role="alert" className="text-xs font-medium text-critical">
+              Imagem acima de {spec.maxLabel}. Reduza e tente de novo.
+            </span>
+          )}
         </span>
       </span>
     </label>
