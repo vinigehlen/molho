@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
-
-const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? 'https://molho.vercel.app';
+import { STOREFRONT_URL } from '../lib/site-url';
 
 // Rota estática do Next (metadata route) — nunca chama a API, nunca toca
 // Redis. Bot batendo em /robots.txt não consome o balde do

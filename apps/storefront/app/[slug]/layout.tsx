@@ -25,8 +25,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     ]
       .filter(Boolean)
       .join(' ');
-  const ogImage = store.store.coverImageUrl ?? '/og-image-1200x630.png';
-
   return {
     title,
     description,
@@ -37,11 +35,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     // Molho (herdado do layout raiz, `icons` aqui fica ausente de propósito).
     ...(store.store.logoImageUrl ? { icons: { icon: store.store.logoImageUrl } } : {}),
     manifest: `/${slug}/manifest.webmanifest`,
+    // Sem `images` aqui de propósito — a imagem vem de
+    // `app/[slug]/opengraph-image.tsx` (card "fachada" gerado). Declarar
+    // `images` explícito suprimiria a convenção de arquivo.
     openGraph: {
       title,
       description,
       url: `/${slug}`,
-      images: [ogImage],
       locale: 'pt_BR',
       type: 'website',
     },
@@ -49,7 +49,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: 'summary_large_image',
       title,
       description,
-      images: [ogImage],
     },
   };
 }
