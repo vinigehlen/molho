@@ -117,10 +117,17 @@ model ModuleAudit {
 
 // ─── Tenant / loja ───────────────────────────────────────────────────────────
 
+/// Épico 13d — cobrança MANUAL no piloto (CLAUDE.md, 2026-09-04): trial →
+/// active → past_due → suspended é uma linha só (autocura por leitura, ver
+/// packages/contracts/subscription-status.ts); canceled é alcançável de
+/// qualquer estado não-terminal. suspended só sai por ação manual do
+/// super-admin (marcar pago) — nunca se autocura sozinho.
 enum TenantStatus {
   trial
   active
+  past_due
   suspended
+  canceled
 }
 
 model Tenant {
@@ -137,6 +144,18 @@ model Tenant {
   /// está no ar desde a criação, docs/03 §1) — só faz o CTA de publicar
   /// virar tela de compartilhamento em vez de reaparecer a cada acesso.
   onboardedAt DateTime?  @map("onboarded_at")
+  /// Épico 13d — quando o TRIAL DA CONTA (não de um módulo) expira sem
+  /// nunca ter sido confirmado como pago. Null depois que a assinatura vira
+  /// `active` pela primeira vez (não volta a valer nunca mais).
+  trialEndsAt DateTime? @map("trial_ends_at")
+  /// Fim do período pago corrente — passou disso sem renovar (super-admin
+  /// marcar pago de novo) vira `past_due`. Renovado a cada "marcar pago".
+  currentPeriodEndsAt DateTime? @map("current_period_end_at")
+  /// Quando a assinatura ENTROU em `past_due` — âncora fixa da folga de
+  /// `SUBSCRIPTION_GRACE_PERIOD_DAYS`, não recalculada a cada leitura (senão
+  /// mudar a política de folga moveria o prazo de contas já atrasadas).
+  pastDueAt DateTime? @map("past_due_at")
+  canceledAt DateTime? @map("canceled_at")
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
   deletedAt DateTime?    @map("deleted_at")

@@ -76,6 +76,10 @@ export class SignupProvisioningService {
         planId: SIGNUP_PLAN,
         status: 'trial',
         timezone: 'America/Sao_Paulo',
+        // Épico 13d: mesmo trialEndsAt já computado pra entitlement dos
+        // módulos, mas no nível da CONTA — é o que SubscriptionService lê
+        // pra suspender sozinho quando o trial acaba sem nunca virar pago.
+        trialEndsAt,
       },
       select: { id: true, slug: true, name: true },
     });

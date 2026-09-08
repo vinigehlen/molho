@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { MoButton, MoChip, MoInput } from '@molho/ui';
-import { PLANS, type ModuleKey, type ModuleStateResponse, type Plan } from '@molho/contracts';
+import { PLANS, type ModuleKey, type ModuleStateResponse, type Plan, type SubscriptionResponse } from '@molho/contracts';
 import {
   fetchPlatformTenants,
   fetchTenantModules,
+  fetchTenantSubscription,
+  markTenantSubscriptionPaid,
   provisionStaff,
   provisionTenant,
   setTenantEntitlement,
@@ -49,6 +51,11 @@ export default function PlataformaPage() {
   const [impersonateError, setImpersonateError] = useState<string | null>(null);
   const router = useRouter();
 
+  const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchPlatformTenants()
       .then(setTenants)
@@ -62,6 +69,16 @@ export default function PlataformaPage() {
       .then(setModules)
       .catch(() => setError('Não deu pra carregar os módulos desse tenant.'))
       .finally(() => setLoadingModules(false));
+  }, [selectedTenantId]);
+
+  useEffect(() => {
+    if (!selectedTenantId) return;
+    setLoadingSubscription(true);
+    setSubscriptionError(null);
+    fetchTenantSubscription(selectedTenantId)
+      .then(setSubscription)
+      .catch(() => setSubscriptionError('Não deu pra carregar a assinatura desse tenant.'))
+      .finally(() => setLoadingSubscription(false));
   }, [selectedTenantId]);
 
   async function toggleModule(module: ModuleStateResponse) {
@@ -168,6 +185,20 @@ export default function PlataformaPage() {
     }
   }
 
+  /** Épico 13d — cobrança MANUAL: o super-admin clica aqui depois de conferir o PIX/boleto na mão (sem PSP recorrente ainda, CLAUDE.md). Reabre `active` a partir de qualquer estado, inclusive `suspended`. */
+  async function handleMarkPaid() {
+    if (!selectedTenantId) return;
+    setSubscriptionError(null);
+    setMarkingPaid(true);
+    try {
+      setSubscription(await markTenantSubscriptionPaid(selectedTenantId));
+    } catch {
+      setSubscriptionError('Não deu pra marcar como pago. Tenta de novo.');
+    } finally {
+      setMarkingPaid(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       {error ? (
@@ -238,6 +269,30 @@ export default function PlataformaPage() {
           </div>
         ) : null}
       </section>
+
+      {selectedTenantId ? (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-title text-text">Assinatura</h2>
+          <p className="text-body text-text-muted">Cobrança manual no piloto — marque como pago depois de conferir o PIX/boleto na mão.</p>
+          {subscriptionError ? <p className="text-caption font-semibold text-critical-strong">{subscriptionError}</p> : null}
+          {loadingSubscription ? (
+            <p className="text-body text-text-muted">Carregando…</p>
+          ) : subscription ? (
+            <div className="flex max-w-md flex-col gap-3 rounded-lg border border-border bg-bg-card p-4">
+              <p className="text-body-strong text-text">{subscription.status}</p>
+              {subscription.trialEndsAt ? <p className="text-caption text-text-muted">Trial até {new Date(subscription.trialEndsAt).toLocaleDateString('pt-BR')}.</p> : null}
+              {subscription.currentPeriodEndsAt ? <p className="text-caption text-text-muted">Período até {new Date(subscription.currentPeriodEndsAt).toLocaleDateString('pt-BR')}.</p> : null}
+              {subscription.pastDueAt ? <p className="text-caption text-text-muted">Atrasada desde {new Date(subscription.pastDueAt).toLocaleDateString('pt-BR')}.</p> : null}
+              {subscription.canceledAt ? <p className="text-caption text-text-muted">Cancelada em {new Date(subscription.canceledAt).toLocaleDateString('pt-BR')}.</p> : null}
+              {subscription.status !== 'canceled' ? (
+                <MoButton onClick={() => void handleMarkPaid()} loading={markingPaid}>
+                  Marcar como pago (30 dias)
+                </MoButton>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <h2 className="text-title text-text">Entrar como</h2>

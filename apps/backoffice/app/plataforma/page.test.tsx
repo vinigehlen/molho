@@ -10,6 +10,8 @@ import PlataformaPage from './page';
 const mocks = vi.hoisted(() => ({
   fetchPlatformTenants: vi.fn(),
   fetchTenantModules: vi.fn(),
+  fetchTenantSubscription: vi.fn(),
+  markTenantSubscriptionPaid: vi.fn(),
   setTenantEntitlement: vi.fn(),
   provisionStaff: vi.fn(),
   provisionTenant: vi.fn(),
@@ -21,6 +23,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../lib/platform-api', () => ({
   fetchPlatformTenants: mocks.fetchPlatformTenants,
   fetchTenantModules: mocks.fetchTenantModules,
+  fetchTenantSubscription: mocks.fetchTenantSubscription,
+  markTenantSubscriptionPaid: mocks.markTenantSubscriptionPaid,
   setTenantEntitlement: mocks.setTenantEntitlement,
   provisionStaff: mocks.provisionStaff,
   provisionTenant: mocks.provisionTenant,
@@ -94,6 +98,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.fetchPlatformTenants.mockResolvedValue([TENANT]);
   mocks.fetchTenantModules.mockResolvedValue([MODULE]);
+  mocks.fetchTenantSubscription.mockResolvedValue({
+    status: 'trial',
+    planId: 'standard',
+    trialEndsAt: '2026-09-15T00:00:00.000Z',
+    currentPeriodEndsAt: null,
+    pastDueAt: null,
+    canceledAt: null,
+  });
 });
 
 afterEach(() => {
@@ -117,6 +129,61 @@ describe('PlataformaPage — módulos', () => {
 
     expect(mocks.fetchTenantModules).toHaveBeenCalledWith(TENANT.id);
     expect(container.textContent).toContain('coupons');
+  });
+});
+
+describe('PlataformaPage — assinatura (Épico 13d)', () => {
+  async function selectTenant() {
+    const select = container.querySelector('select') as HTMLSelectElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter?.call(select, TENANT.id);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('mostra o status e a data de fim do trial ao selecionar um tenant', async () => {
+    await mount();
+    await selectTenant();
+
+    expect(mocks.fetchTenantSubscription).toHaveBeenCalledWith(TENANT.id);
+    expect(container.textContent).toContain('trial');
+  });
+
+  it('"Marcar como pago" chama a API e atualiza a tela pro novo status', async () => {
+    mocks.markTenantSubscriptionPaid.mockResolvedValue({
+      status: 'active',
+      planId: 'standard',
+      trialEndsAt: null,
+      currentPeriodEndsAt: '2026-10-08T00:00:00.000Z',
+      pastDueAt: null,
+      canceledAt: null,
+    });
+    await mount();
+    await selectTenant();
+
+    await click(getButton('Marcar como pago (30 dias)'));
+
+    expect(mocks.markTenantSubscriptionPaid).toHaveBeenCalledWith(TENANT.id);
+    expect(container.textContent).toContain('active');
+  });
+
+  it('assinatura cancelada: sem botão de marcar como pago', async () => {
+    mocks.fetchTenantSubscription.mockResolvedValue({
+      status: 'canceled',
+      planId: 'standard',
+      trialEndsAt: null,
+      currentPeriodEndsAt: null,
+      pastDueAt: null,
+      canceledAt: '2026-09-01T00:00:00.000Z',
+    });
+    await mount();
+    await selectTenant();
+
+    expect(container.querySelectorAll('button').length).toBeGreaterThan(0);
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'Marcar como pago (30 dias)')).toBe(false);
   });
 });
 

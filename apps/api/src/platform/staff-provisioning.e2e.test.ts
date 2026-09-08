@@ -5,10 +5,15 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, encryptEmail, hashEmailForLookup } from '@molho/db';
 import Redis from 'ioredis';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app.module';
 import { EMAIL_PROVIDER } from '../messaging/messaging.module';
 import type { MockEmailProvider } from '../messaging/mock-email.provider';
+
+// Fluxo faz OTP request+verify (2x — admin e owner) seguido de
+// provisionamento — múltiplos round-trips pro Neon, o default de 5s do
+// vitest é curto demais (mesmo achado de impersonation.e2e.test.ts).
+vi.setConfig({ testTimeout: 20_000 });
 
 /**
  * e2e de verdade: Redis + Postgres reais, MockEmailProvider (RESEND_API_KEY
