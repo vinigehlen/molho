@@ -33,10 +33,9 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
   # subscriber de pub/sub (CLAUDE.md → Infra de produção).
   auto_stop_machines = false
   auto_start_machines = false
-  # Staging/pre-go-live: 1 máquina sempre ligada basta enquanto não há loja real
-  # operando. Voltar para 2 antes do piloto/go-live para rolling deploy sem
-  # derrubar todos os streams SSE do gestor de uma vez.
-  min_machines_running = 1
+  # DUAS máquinas: rolling deploy derruba uma por vez, a outra segura os streams
+  # SSE do gestor. Uma só mataria 100% dos streams a cada deploy.
+  min_machines_running = 2
 
   # /health existe (HealthController, sem prefixo global e sem guard) — resposta
   # estática, não toca banco nem Redis: check de liveness, não de dependência.
@@ -56,6 +55,9 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
 
 [[vm]]
   size = "shared-cpu-1x"
+  # 512MB: 256MB não cabe — NestJS + engine do Prisma + pool pg passam de 200MB
+  # no baseline, e o Node em cima disso OOMa (health check flapando, 2026-09-08).
+  # A carga do piloto (~100 conexões SSE) sobra dentro de 512.
   memory = "512mb"
 
 [deploy]
