@@ -5,14 +5,16 @@ Infra que destrava a validação de fronteira do Épico 9. **Não é código de 
 Redis cross-instância, CSP). Ver `CLAUDE.md` → "Infra de produção (decidida no Épico 9)"
 pras decisões travadas, e `docs/07` § "Débito técnico ABERTO" pro checklist de fronteira.
 
-## ESTADO ATUAL DO STAGING (2026-08-04) — ler antes dos passos
+## ESTADO ATUAL DO STAGING (2026-09-08) — ler antes dos passos
 
 Fonte única do que já está de pé. Os passos da "Ordem de execução" abaixo continuam válidos
 como desenho; este bloco diz onde a execução parou.
 
-> **`molho-api-staging` está NO AR** — 1 máquina em `gru`, `https://api.staging.molho.live/health`
-> responde **HTTP 200**. Não há bloqueio de boot. Próximo movimento: escalar pra 2 e provar o
-> ★ pub/sub cross-instância (§7.7).
+> **`molho-api-staging` está NO AR** — 2 máquinas em `gru`,
+> `https://api.staging.molho.live/health` responde **HTTP 200**, e o ★ pub/sub Redis
+> cross-instância (§7.7) foi **PROVADO em staging real** em 2026-09-08. Próximo movimento:
+> fechar o checklist de fronteira de navegador/cookie/CORS/logout nos domínios reais de staging
+> (`staging-app.molho.live` + `api.staging.molho.live`).
 
 **Feito:**
 - **Invólucro de build: RESOLVIDO — o deploy da raiz builda e sobe.** Comando final:
@@ -51,17 +53,15 @@ como desenho; este bloco diz onde a execução parou.
   - **Headers de segurança ativos** na resposta: `X-Content-Type-Options: nosniff`,
     `X-Frame-Options: DENY`, e ACAO com credentials (passo 6 parcialmente entregue — falta só a
     verificação de allowlist/origem do §7.2–7.3).
-- **Estado de configuração do app no ar:** OTP em **e-mail**; `MessagingProvider` e
-  `StorageProvider` em **Mock** (`ZENVIA_API_KEY` e `S3_ACCESS_KEY_ID` ausentes — **esperado**,
-  a guarda é por canal em uso). Se for testar upload, o R2/S3 vira secret. **Uma máquina só**
-  (`--ha=false` no deploy).
-- **12 secrets staged** em `molho-api-staging`: `DATABASE_URL`, `DIRECT_URL`,
+- **Estado de configuração do app no ar:** OTP em **e-mail**; `MessagingProvider` via
+  **Resend real**; S3/R2 configurado por secrets. `MOLHO_DEBUG_PUBSUB` está ligado em staging
+  para carimbar `hello.machine` e `_via` no SSE durante a validação. **Duas máquinas** em `gru`
+  na versão 36.
+- **Secrets ativos** em `molho-api-staging`: `DATABASE_URL`, `DIRECT_URL`,
   `MOLHO_ENCRYPTION_KEYS`, `MOLHO_OTP_HMAC_KEY`, `REDIS_URL`, `OTP_CHANNEL_STAFF=email`,
   `OTP_CHANNEL_CUSTOMER=email`, `MOLHO_EMAIL_FROM`, `MOLHO_EMAIL_PEPPER`, `RESEND_API_KEY`,
-  `MOLHO_JWT_SECRETS`, `MOLHO_CORS_ORIGINS=https://staging.molho.live`.
-  Staged materializa no próximo `fly deploy` — não precisa de `fly secrets deploy` separado.
-  **No deploy de 2026-08-03 a máquina reportou 11 secrets** (conferir a diferença ao re-setar o
-  `MOLHO_JWT_SECRETS`; `fly secrets list` mostra os nomes).
+  `MOLHO_JWT_SECRETS`, `MOLHO_CORS_ORIGINS`, `MOLHO_DEBUG_PUBSUB`, e secrets S3/R2. Conferido
+  via `flyctl secrets list -a molho-api-staging` em 2026-09-08.
 - **DNS do staging pronto e CINZA (DNS-only) na Cloudflare** — `staging.molho.live` (CNAME
   Vercel, backoffice) e `api.staging.molho.live` (A/AAAA Fly, cert Let's Encrypt **Issued**).
   `molho.live` fica **reservado pro piloto**. ⚠ Nomenclatura final é
@@ -69,15 +69,25 @@ como desenho; este bloco diz onde a execução parou.
   doc e no comentário do `fly.toml` — os dois pares são same-site sob `molho.live` do mesmo jeito,
   mas ao ler o §7 traduza os nomes.
 
-**PRÓXIMO BLOCO — não feito, PRECISA DE PLANO ANTES:** `fly scale count 2 --region gru`, que é o
-**1º teste do ★ pub/sub Redis cross-instância** (`/v1/admin/orders/stream`, §7.7 — o único
-mecanismo do Épico 9 que ninguém nunca viu rodar). **Não é "subir 2 e torcer".** O experimento
-tem que ser desenhado: abrir **duas conexões SSE em máquinas DISTINTAS** (a Fly balanceia sozinha
-— não presumir, **confirmar em qual máquina cada conexão caiu**), publicar um evento numa e
-**provar de propósito** que a aba da OUTRA recebe o cutuque. Sem isolar a máquina de cada conexão,
-um verde não distingue fan-out cross-instância de duas conexões na mesma máquina — seria o pior
-resultado possível: falso positivo no item de maior risco do épico. Depende da cadeia
-OTP→JWT→`arm` funcionando, logo do gate do Resend abaixo.
+**FEITO em 2026-09-08 — §7.7 pub/sub Redis cross-instância:** `flyctl status -a molho-api-staging`
+mostrou as duas máquinas `started`, ambas versão 36 e com health check passando:
+`28654d62a02e98` e `28747d00f40d48`. Com JWT real de staff do tenant `cabanhas-bbq`,
+foram abertos 12 streams SSE contra `https://api.staging.molho.live/v1/admin/orders/stream`.
+Os eventos `hello` confirmaram distribuição entre as duas máquinas. A transição real do pedido
+seed `018f0000-0000-7000-8000-0000000000a1` de `preparing` para `ready` (`version 2 → 3`)
+foi publicada por `28747d00f40d48`; streams atendidos por `28654d62a02e98` receberam
+`order_status` com `_via=28747d00f40d48`. Resultado: **todos os streams receberam o cutuque**
+e **fan-out cross-instância provado**. Arquivos temporários com OTP/JWT foram apagados ao fim.
+
+Comando de referência para repetir a prova:
+```
+TOKEN='<access token de staff ou valor do cookie __Host-molho_stream>' CONNS=12 node scripts/pubsub-crossinstance.mjs
+```
+
+Observação de tooling: se o `node_modules` local não expuser `undici` no topo, reinstalar deps
+ou rodar a partir de um ambiente com `undici` resolvível. Na sessão de 2026-09-08 foi usado o
+mesmo corpo do script apontando para a cópia `.pnpm/undici@8.10.0` só como workaround local,
+sem mudar o comportamento validado.
 
 **Pendências registradas (não bloqueiam o §7.7):**
 - **Cap por IP in-app no request de OTP — ANTES do piloto.** O IP público da Fly **já está
@@ -90,14 +100,13 @@ OTP→JWT→`arm` funcionando, logo do gate do Resend abaixo.
 - ~~Corrigir o comentário mentiroso do `[build]` no `fly.toml`~~ — **FEITO** (dizia "relativo à
   raiz", é relativo ao TOML).
 
-**GATE PENDENTE — bloqueia a validação de OTP (não o boot):** `send.molho.live` **ainda não verificado no Resend**
-(DNS propagando). Com `OTP_CHANNEL_*=email`, esse é o único caminho de OTP. **O app JÁ SUBIU sem
-isso** — a guarda só exige `RESEND_API_KEY` + `MOLHO_EMAIL_FROM` **presentes** (ver passo 4), não
-verificados. O que falha é a **ENTREGA**, silenciosamente, e aí
-ninguém loga e o §7 inteiro trava sem erro visível. Esperar o Verified.
+**OTP real em staging: OK em 2026-09-08.** `GET /v1/auth/otp/config` retorna
+`{"channel":"email"}`; `POST /v1/auth/otp/request` retornou 202; `POST /v1/auth/otp/verify`
+emitiu access token real de staff. A entrega por e-mail também foi usada pelo PM no navegador.
 
-**Por que UMA máquina primeiro** (`--ha=false`): isola bug de imagem/secret de bug de fan-out.
-Não é contradição com "duas sempre ligadas" — isso é regra de operação, não de primeiro boot.
+**Histórico — por que UMA máquina primeiro** (`--ha=false`): isolou bug de imagem/secret de bug
+de fan-out durante o primeiro boot. Não é contradição com "duas sempre ligadas" — isso era regra
+de primeiro boot; o staging já roda com duas máquinas desde a validação de 2026-09-08.
 
 ## Decisões de escopo (não deixar implícito)
 
@@ -528,7 +537,7 @@ Só verificável contra os domínios reais na Fly. Ordem:
 4. Cookie no DevTools de prod: `__Host-` + `HttpOnly; Secure; SameSite=Strict; Path=/` **sem `Domain`**.
 5. `token_expired` com stream aberto → servidor fecha limpo → cliente reabre; refresh negado → login. *(fluxo completo depende do 9b; o fecha-limpo do servidor é testável já.)*
 6. Preview Vercel (`*.vercel.app`) → SSE não autentica (cross-site) e o front **degrada pra polling**.
-7. **★ pub/sub Redis cross-instância** — o ÚNICO mecanismo do Épico 9 que **ninguém nunca viu rodar**: publicar numa máquina, confirmar que a aba conectada na OUTRA máquina recebe o cutuque. Só existe com duas máquinas + Upstash real. **Priorizar.** (Em dev validou-se só single-instance in-memory: 2 abas, 1 API.)
+7. **FEITO em staging 2026-09-08 — ★ pub/sub Redis cross-instância**: publicar numa máquina, confirmar que stream conectado na OUTRA máquina recebe o cutuque. Prova registrada acima no estado atual.
 8. `disarm` no logout apaga o cookie em `api.molho.live` (wiring depende do 9b; o endpoint já existe).
 
 ### 7b. Passe de fumaça de PRODUÇÃO (condição de go-live)
