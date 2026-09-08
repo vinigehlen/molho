@@ -25,6 +25,7 @@ import { CheckoutOrderRateLimitMiddleware } from './checkout-order-rate-limit.mi
 import { PrismaCheckoutOrderRepository } from './checkout-order.repository';
 import { CheckoutOrderService } from './checkout-order.service';
 import { CounterOrderController } from './counter-order.controller';
+import { CustomerDirectoryController } from './customer-directory.controller';
 import { PrismaCounterOrderRepository } from './counter-order.repository';
 import { CounterOrderService } from './counter-order.service';
 import { PrismaCheckoutRepository } from './checkout-revalidation.repository';
@@ -87,6 +88,7 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     OrderAdminController,
     OrderTrackingController,
     CounterOrderController,
+    CustomerDirectoryController,
     OrderAdjustmentController,
   ],
   providers: [

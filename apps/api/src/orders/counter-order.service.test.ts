@@ -1,6 +1,7 @@
 import type { CounterOrderInput } from '@molho/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CounterOrderInvalidCustomerError,
   CounterOrderProductNotFoundError,
   CounterOrderStoreNotFoundError,
   MissingIdempotencyKeyError,
@@ -23,6 +24,8 @@ function makeRepo(overrides: Partial<CounterOrderRepository> = {}): CounterOrder
     findModifiers: vi.fn().mockResolvedValue(new Map()),
     findOrderByIdempotencyKey: vi.fn().mockResolvedValue(null),
     createAnonymousCustomer: vi.fn().mockResolvedValue('customer-1'),
+    findOrCreateNamedCustomer: vi.fn().mockResolvedValue('customer-named-1'),
+    searchCustomersByName: vi.fn().mockResolvedValue([]),
     createOrder: vi.fn().mockResolvedValue({ id: 'order-1', created: true }),
     createOrderItems: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -204,5 +207,57 @@ describe('CounterOrderService.createOrder', () => {
       ACTOR,
     );
     expect(repo2.createAnonymousCustomer).toHaveBeenCalledWith('Zé');
+  });
+
+  it('cadastro completo: findOrCreateNamedCustomer com nome montado, e-mail normalizado e telefone E.164', async () => {
+    const repo = makeRepo();
+    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    await service.createOrder(
+      TENANT_ID,
+      STORE_ID,
+      {
+        items: [unitInput()],
+        paymentMethod: 'pix',
+        customer: { firstName: 'Vinícius', lastName: 'Gehlen', email: '  Vini@Loja.COM ', phone: '(51) 99876-5432' },
+      },
+      'idem-c',
+      ACTOR,
+    );
+    expect(repo.createAnonymousCustomer).not.toHaveBeenCalled();
+    expect(repo.findOrCreateNamedCustomer).toHaveBeenCalledWith({
+      name: 'Vinícius Gehlen',
+      email: 'vini@loja.com',
+      phone: '+5551998765432',
+    });
+  });
+
+  it('telefone inválido no cadastro: CounterOrderInvalidCustomerError, nada é criado', async () => {
+    const repo = makeRepo();
+    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    await expect(
+      service.createOrder(
+        TENANT_ID,
+        STORE_ID,
+        {
+          items: [unitInput()],
+          paymentMethod: 'pix',
+          customer: { firstName: 'A', lastName: 'B', phone: '123' },
+        },
+        'idem-x',
+        ACTOR,
+      ),
+    ).rejects.toThrow(CounterOrderInvalidCustomerError);
+    expect(repo.findOrCreateNamedCustomer).not.toHaveBeenCalled();
+    expect(repo.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('searchCustomers: query < 2 chars devolve [] sem tocar no repo', async () => {
+    const repo = makeRepo();
+    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    expect(await service.searchCustomers(' a ')).toEqual([]);
+    expect(repo.searchCustomersByName).not.toHaveBeenCalled();
+
+    await service.searchCustomers('  Vin ');
+    expect(repo.searchCustomersByName).toHaveBeenCalledWith('Vin', 8);
   });
 });

@@ -6,6 +6,8 @@ import CuponsPage from './page';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+vi.mock('next/navigation', () => ({ usePathname: () => '/gestor/cupons' }));
+
 const mocks = vi.hoisted(() => ({
   fetchCoupons: vi.fn(),
   createCoupon: vi.fn(),

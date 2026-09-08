@@ -22,6 +22,14 @@ export class WeighedPriceOutOfRangeError extends Error {
   }
 }
 
+/** Cadastro de cliente do balcão com telefone/e-mail que não passam na validação (`parsePhoneNumber`/`parseEmail`). */
+export class CounterOrderInvalidCustomerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CounterOrderInvalidCustomerError';
+  }
+}
+
 /** Escrita idempotente exige a chave — sem ela, um retry de rede duplicaria o pedido no caixa. */
 export class MissingIdempotencyKeyError extends Error {
   constructor() {

@@ -17,6 +17,7 @@ import {
   PaymentNotConfirmedError,
 } from './order-errors';
 import {
+  CounterOrderInvalidCustomerError,
   CounterOrderProductNotFoundError,
   CounterOrderStoreNotFoundError,
   MissingIdempotencyKeyError,
@@ -42,6 +43,7 @@ type OrderDomainError =
   | FulfillmentAddressMismatchError
   | CounterOrderStoreNotFoundError
   | CounterOrderProductNotFoundError
+  | CounterOrderInvalidCustomerError
   | WeighedPriceOutOfRangeError
   | MissingIdempotencyKeyError
   | OrderNotEditableError
@@ -65,6 +67,7 @@ type OrderDomainError =
   FulfillmentAddressMismatchError,
   CounterOrderStoreNotFoundError,
   CounterOrderProductNotFoundError,
+  CounterOrderInvalidCustomerError,
   WeighedPriceOutOfRangeError,
   MissingIdempotencyKeyError,
   OrderNotEditableError,

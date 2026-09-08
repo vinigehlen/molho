@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { MoButton, MoInput } from '@molho/ui';
 import { fetchLoyaltyConfig, updateLoyaltyConfig, type LoyaltyConfig } from '../../../lib/loyalty-config-api';
+import { PromoTabs } from '../promo-tabs';
 
 export default function FidelidadePage() {
   const [config, setConfig] = useState<LoyaltyConfig | null>(null);
@@ -54,6 +55,7 @@ export default function FidelidadePage() {
 
   return (
     <main className="flex flex-col gap-6 p-6">
+      <PromoTabs />
       <header>
         <h1 className="text-title-lg text-text">Fidelidade</h1>
         <p className="text-body text-text-muted">

@@ -51,6 +51,26 @@ describe('Sidebar', () => {
     expect(container.querySelectorAll('a[aria-current="page"]')).toHaveLength(1);
   });
 
+  it('item único de Promoções acende também em /gestor/cupons e /gestor/fidelidade', async () => {
+    mocks.pathname = '/gestor/cupons';
+    await render(baseProps());
+
+    const active = container.querySelector('a[aria-current="page"]');
+    expect(active?.getAttribute('href')).toBe('/gestor/promocoes');
+    expect(active?.textContent).toContain('Promoções');
+    expect(container.querySelectorAll('a[aria-current="page"]')).toHaveLength(1);
+    // Cupons e Fidelidade não têm mais entrada própria na sidebar.
+    const hrefs = [...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).not.toContain('/gestor/cupons');
+    expect(hrefs).not.toContain('/gestor/fidelidade');
+  });
+
+  it('Balcão é o segundo item da navegação', async () => {
+    await render(baseProps());
+    const hrefs = [...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'));
+    expect(hrefs.slice(0, 2)).toEqual(['/gestor', '/gestor/balcao']);
+  });
+
   it('colapsado: labels somem visualmente (sr-only) mas continuam no DOM pro leitor de tela', async () => {
     await render({ ...baseProps(), collapsed: true });
 

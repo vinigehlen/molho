@@ -11,6 +11,7 @@ import {
   type Coupon,
   type CouponDiscountType,
 } from '../../../lib/coupons-api';
+import { PromoTabs } from '../promo-tabs';
 
 interface Draft {
   code: string;
@@ -132,6 +133,7 @@ export default function CuponsPage() {
 
   return (
     <main className="flex flex-col gap-6 p-6">
+      <PromoTabs />
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-title-lg text-text">Cupons</h1>
