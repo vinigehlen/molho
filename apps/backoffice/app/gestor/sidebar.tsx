@@ -4,6 +4,7 @@ import React from 'react';
 import {
   BarChart3,
   ClipboardList,
+  CreditCard,
   Gift,
   ListPlus,
   LogOut,
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/gestor/avaliacoes', label: 'Avaliações', icon: Star },
   { href: '/gestor/fidelidade', label: 'Fidelidade', icon: Gift },
   { href: '/gestor/impressao', label: 'Impressão', icon: Printer },
+  { href: '/gestor/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/gestor/configuracao', label: 'Configuração', icon: Settings },
 ];
 

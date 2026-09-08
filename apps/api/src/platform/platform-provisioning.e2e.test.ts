@@ -5,10 +5,15 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, encryptEmail, hashEmailForLookup } from '@molho/db';
 import Redis from 'ioredis';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app.module';
 import { EMAIL_PROVIDER } from '../messaging/messaging.module';
 import type { MockEmailProvider } from '../messaging/mock-email.provider';
+
+// Fluxo faz OTP request+verify seguido de provisionamento completo do
+// tenant — múltiplos round-trips pro Neon, o default de 5s do vitest é
+// curto demais (mesmo achado de impersonation.e2e.test.ts).
+vi.setConfig({ testTimeout: 20_000 });
 
 /**
  * e2e de verdade (Neon/Redis) — Épico 14.6. Mesmo desenho de
@@ -126,6 +131,11 @@ describe('POST /v1/admin/platform/tenants', () => {
     expect(entitlements.length).toBeGreaterThan(0);
     expect(entitlements.every((e) => e.source === 'trial' && e.status === 'trialing')).toBe(true);
 
+    // Épico 13d: trialEndsAt no nível da CONTA (não só entitlement de módulo).
+    const tenantRow = await migratorPrisma.tenant.findUnique({ where: { id: res.body.tenant.id as string } });
+    expect(tenantRow?.status).toBe('trial');
+    expect(tenantRow?.trialEndsAt).not.toBeNull();
+
     // Fecha o ciclo: owner recém-criado loga pelo OTP normal e chega com o tenant.
     const ownerToken = await loginStaff(ownerEmail);
     const tenants = await request(app.getHttpServer())
@@ -154,6 +164,14 @@ describe('POST /v1/admin/platform/tenants', () => {
     });
     expect(entitlements.length).toBeGreaterThan(0);
     expect(entitlements.every((e) => e.source === 'manual' && e.status === 'active')).toBe(true);
+
+    // Épico 13d: venda assistida SEM relógio de cobrança rodando ainda —
+    // trialEndsAt e currentPeriodEndsAt ficam null até o super-admin
+    // confirmar o 1º pagamento de verdade (markPaid).
+    const tenantRow = await migratorPrisma.tenant.findUnique({ where: { id: res.body.tenant.id as string } });
+    expect(tenantRow?.status).toBe('active');
+    expect(tenantRow?.trialEndsAt).toBeNull();
+    expect(tenantRow?.currentPeriodEndsAt).toBeNull();
   });
 
   it('JWT sem platform.superadmin: 403', async () => {

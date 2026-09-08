@@ -1,5 +1,6 @@
 import type {
   ImpersonationSessionResponse,
+  MarkSubscriptionPaidInput,
   ModuleKey,
   ModuleStateResponse,
   ProvisionStaffInput,
@@ -8,6 +9,7 @@ import type {
   ProvisionTenantResponse,
   PlatformTenant,
   StartImpersonationInput,
+  SubscriptionResponse,
 } from '@molho/contracts';
 import { apiFetch } from './api-client';
 
@@ -73,4 +75,31 @@ export async function startImpersonation(
   });
   if (!res.ok) throw new Error(`Falha ao iniciar impersonation (${res.status})`);
   return (await res.json()) as ImpersonationSessionResponse;
+}
+
+/** Épico 13d — assinatura de QUALQUER tenant, vista pelo super-admin. */
+export async function fetchTenantSubscription(tenantId: string): Promise<SubscriptionResponse> {
+  const res = await apiFetch(`/v1/admin/platform/tenants/${encodeURIComponent(tenantId)}/subscription`);
+  if (!res.ok) throw new Error(`Falha ao carregar assinatura (${res.status})`);
+  return (await res.json()) as SubscriptionResponse;
+}
+
+/**
+ * Super-admin confirma "recebi o PIX/boleto" na mão — cobrança MANUAL no
+ * piloto (CLAUDE.md, sem PSP recorrente ainda). `periodDays` tem default 30
+ * no schema (`markSubscriptionPaidSchema`), mas `z.infer` reflete o tipo de
+ * SAÍDA (pós-default, obrigatório) — o default aqui replica o mesmo valor
+ * pro chamador não precisar saber disso.
+ */
+export async function markTenantSubscriptionPaid(
+  tenantId: string,
+  input: MarkSubscriptionPaidInput = { periodDays: 30 },
+): Promise<SubscriptionResponse> {
+  const res = await apiFetch(`/v1/admin/platform/tenants/${encodeURIComponent(tenantId)}/subscription/mark-paid`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Falha ao marcar assinatura como paga (${res.status})`);
+  return (await res.json()) as SubscriptionResponse;
 }

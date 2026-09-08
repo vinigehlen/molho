@@ -1,6 +1,7 @@
 export * from './address';
 export * from './admin-order';
 export * from './analytics';
+export * from './billing';
 export * from './cart';
 export * from './catalog-admin';
 export * from './checkout';

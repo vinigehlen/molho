@@ -5,10 +5,16 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@molho/db';
 import Redis from 'ioredis';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../app.module';
 import { EMAIL_PROVIDER } from '../messaging/messaging.module';
 import type { MockEmailProvider } from '../messaging/mock-email.provider';
+
+// Fluxo faz OTP request+verify seguido de todo o provisionamento (tenant +
+// store + owner + entitlements + cardápio-exemplo), múltiplos round-trips
+// pro Neon — o default de 5s do vitest é curto demais (mesmo achado de
+// impersonation.e2e.test.ts).
+vi.setConfig({ testTimeout: 20_000 });
 
 function randomEmail(): string {
   return `signup-${Date.now()}-${randomBytes(3).toString('hex')}@example.test`;
@@ -90,6 +96,12 @@ describe('POST /v1/signup', () => {
 
     const tenant = await prisma.tenant.findUnique({ where: { id: res.body.tenant.id } });
     expect(tenant?.planId).toBe('standard');
+    // Épico 13d: mesmo trialEndsAt já usado pra entitlement dos módulos, agora no nível da CONTA (~7 dias, tolerância de 1min pro round-trip do teste).
+    expect(tenant?.status).toBe('trial');
+    expect(tenant?.trialEndsAt).not.toBeNull();
+    const trialDays = ((tenant?.trialEndsAt?.getTime() ?? 0) - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(trialDays).toBeGreaterThan(6.99);
+    expect(trialDays).toBeLessThan(7.01);
     const [stores, roles, entitlements, products] = await Promise.all([
       prisma.store.count({ where: { tenantId: res.body.tenant.id } }),
       prisma.userRole.count({ where: { role: 'owner', scopeType: 'tenant', scopeId: res.body.tenant.id } }),

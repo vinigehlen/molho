@@ -1,5 +1,6 @@
 import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ContextModule } from './context/context.module';
 import { CouponsModule } from './coupons/coupons.module';
@@ -27,6 +28,7 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     ContextModule,
     MessagingModule,
     AuthModule,
+    BillingModule,
     CustomerProfileModule,
     CatalogModule,
     CouponsModule,

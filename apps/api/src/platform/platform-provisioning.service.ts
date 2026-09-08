@@ -65,6 +65,13 @@ export class PlatformProvisioningService {
         planId: input.plan,
         status: input.immediate ? 'active' : 'trial',
         timezone: 'America/Sao_Paulo',
+        // Épico 13d: immediate=true (venda assistida, sem trial) nasce SEM
+        // relógio de cobrança rodando — currentPeriodEndsAt fica null até o
+        // super-admin confirmar o primeiro pagamento de verdade
+        // (SubscriptionService trata período null como "nunca expira").
+        // immediate=false herda o mesmo trialEndsAt já usado pra
+        // entitlement dos módulos, agora também no nível da conta.
+        ...(input.immediate ? {} : { trialEndsAt }),
       },
       select: { id: true, slug: true, name: true },
     });
