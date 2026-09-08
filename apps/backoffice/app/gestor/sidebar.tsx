@@ -5,7 +5,6 @@ import {
   BarChart3,
   ClipboardList,
   CreditCard,
-  Gift,
   ListPlus,
   LogOut,
   MapPin,
@@ -16,7 +15,6 @@ import {
   Settings,
   Star,
   Store,
-  Ticket,
   UtensilsCrossed,
   X,
 } from 'lucide-react';
@@ -27,19 +25,21 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof ClipboardList;
+  /** Rotas extras que também acendem este item (ex.: as abas de Promoções). */
+  alsoActiveFor?: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/gestor', label: 'Pedidos', icon: ClipboardList },
+  { href: '/gestor/balcao', label: 'Balcão', icon: Store },
   { href: '/gestor/cardapio', label: 'Cardápio', icon: UtensilsCrossed },
   { href: '/gestor/complementos', label: 'Complementos', icon: ListPlus },
-  { href: '/gestor/balcao', label: 'Balcão', icon: Store },
   { href: '/gestor/entrega', label: 'Entrega', icon: MapPin },
   { href: '/gestor/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/gestor/cupons', label: 'Cupons', icon: Ticket },
-  { href: '/gestor/promocoes', label: 'Promoções', icon: Percent },
+  // Promoções, Cupons e Fidelidade viram um item só — as três telas vivem
+  // sob abas em /gestor/promocoes (ver promo-tabs.tsx).
+  { href: '/gestor/promocoes', label: 'Promoções', icon: Percent, alsoActiveFor: ['/gestor/cupons', '/gestor/fidelidade'] },
   { href: '/gestor/avaliacoes', label: 'Avaliações', icon: Star },
-  { href: '/gestor/fidelidade', label: 'Fidelidade', icon: Gift },
   { href: '/gestor/impressao', label: 'Impressão', icon: Printer },
   { href: '/gestor/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/gestor/configuracao', label: 'Configuração', icon: Settings },
@@ -59,8 +59,8 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
   const pathname = usePathname();
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2" aria-label="Navegação do gestor">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href;
+      {NAV_ITEMS.map(({ href, label, icon: Icon, alsoActiveFor }) => {
+        const active = pathname === href || (alsoActiveFor?.includes(pathname) ?? false);
         return (
           <Link
             key={href}

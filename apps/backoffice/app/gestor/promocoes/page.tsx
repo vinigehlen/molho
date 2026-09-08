@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Percent } from 'lucide-react';
 import { MoButton, MoChip, MoChipGroup, MoEmptyState, MoInput } from '@molho/ui';
 import { fetchCategories, fetchProducts, type Category, type Product } from '../../../lib/catalog-api';
+import { PromoTabs } from '../promo-tabs';
 import {
   createPromotion,
   deletePromotion,
@@ -173,6 +174,7 @@ export default function PromocoesPage() {
 
   return (
     <main className="flex flex-col gap-6 p-6">
+      <PromoTabs />
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-title-lg text-text">Promoções</h1>

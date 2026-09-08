@@ -6,6 +6,8 @@ import PromocoesPage from './page';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+vi.mock('next/navigation', () => ({ usePathname: () => '/gestor/promocoes' }));
+
 const mocks = vi.hoisted(() => ({
   fetchPromotions: vi.fn(),
   createPromotion: vi.fn(),
