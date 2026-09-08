@@ -42,14 +42,49 @@ export type CounterOrderItemInput = z.infer<typeof counterOrderItemSchema>;
 export const counterOrderPaymentMethodSchema = z.enum(['pix', 'cash_at_counter', 'card_at_counter']);
 export type CounterOrderPaymentMethod = z.infer<typeof counterOrderPaymentMethodSchema>;
 
-export const counterOrderSchema = z.strictObject({
-  items: z.array(counterOrderItemSchema).min(1),
-  paymentMethod: counterOrderPaymentMethodSchema,
-  /** Nome pra chamar no balcão — sem ele, o pedido chama só "Balcão" (customer anônimo, sem telefone/e-mail). */
-  customerName: z.string().trim().min(1).max(120).optional(),
-  notes: z.string().trim().max(500).optional(),
+/**
+ * Cadastro de cliente no balcão. Quando presente, o pedido é vinculado a um
+ * `customer` DE VERDADE (nome + telefone + e-mail), não ao customer anônimo
+ * "Balcão". A identidade continua sendo o TELEFONE (mesma regra de todo o
+ * resto — `customer-identity.repository.ts`): telefone igual, no mesmo tenant,
+ * reaproveita o registro e o pedido entra no histórico do cliente que volta.
+ * `phone` chega como o operador digitou; a API normaliza pra E.164.
+ * `email` é opcional de propósito — exigir e-mail no caixa trava venda; a UI
+ * pede, o contrato não bloqueia.
+ */
+export const counterOrderCustomerSchema = z.strictObject({
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  email: z.string().trim().max(160).optional(),
+  phone: z.string().trim().min(1).max(40),
 });
+export type CounterOrderCustomerInput = z.infer<typeof counterOrderCustomerSchema>;
+
+export const counterOrderSchema = z
+  .strictObject({
+    items: z.array(counterOrderItemSchema).min(1),
+    paymentMethod: counterOrderPaymentMethodSchema,
+    /** Nome pra chamar no balcão — sem ele, o pedido chama só "Balcão" (customer anônimo, sem telefone/e-mail). */
+    customerName: z.string().trim().min(1).max(120).optional(),
+    /** Cadastro completo do cliente (Nome, Sobrenome, E-mail, Telefone). Tem precedência sobre `customerName`. */
+    customer: counterOrderCustomerSchema.optional(),
+    notes: z.string().trim().max(500).optional(),
+  })
+  .refine((value) => !(value.customer && value.customerName), {
+    message: 'Envie customer OU customerName, nunca os dois.',
+    path: ['customerName'],
+  });
 export type CounterOrderInput = z.infer<typeof counterOrderSchema>;
+
+/** Busca por prefixo de nome pro autopreenchimento do balcão (staff autorizado — telefone/e-mail vêm em claro). */
+export const customerSearchResultSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+});
+export type CustomerSearchResult = z.infer<typeof customerSearchResultSchema>;
+export const customerSearchResponseSchema = z.array(customerSearchResultSchema);
 
 export const counterOrderResponseSchema = z.strictObject({
   orderId: z.uuid(),

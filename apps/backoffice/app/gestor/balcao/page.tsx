@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CounterOrderPaymentMethod, CounterOrderResponse } from '@molho/contracts';
 import { Minus, Plus, ReceiptText, RefreshCw, Trash2 } from 'lucide-react';
-import { createCounterOrder, fetchCounterCatalog, type CounterCategory, type CounterProduct } from '../../../lib/counter-pos-api';
+import type { CustomerSearchResult } from '@molho/contracts';
+import {
+  createCounterOrder,
+  fetchCounterCatalog,
+  searchCustomers,
+  type CounterCategory,
+  type CounterProduct,
+} from '../../../lib/counter-pos-api';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
 
@@ -26,7 +33,12 @@ export default function BalcaoPage() {
   const [categoryId, setCategoryId] = useState('all');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<CounterOrderPaymentMethod>('pix');
-  const [customerName, setCustomerName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [suggestions, setSuggestions] = useState<CustomerSearchResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -42,6 +54,49 @@ export default function BalcaoPage() {
   useEffect(() => {
     void loadInitialData();
   }, []);
+
+  // Autopreenchimento: staff digita "Vin" no nome e o sistema oferece clientes
+  // já cadastrados começando com essas letras. Selecionar um preenche o resto.
+  useEffect(() => {
+    const query = firstName.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      searchCustomers(query)
+        .then((results) => {
+          if (active) setSuggestions(results);
+        })
+        .catch(() => {
+          if (active) setSuggestions([]);
+        });
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [firstName]);
+
+  function applySuggestion(customer: CustomerSearchResult) {
+    const [first, ...rest] = customer.name.trim().split(/\s+/);
+    setFirstName(first ?? customer.name);
+    setLastName(rest.join(' '));
+    setCustomerEmail(customer.email ?? '');
+    setCustomerPhone(customer.phone ?? '');
+    setShowSuggestions(false);
+    setSuggestions([]);
+  }
+
+  function resetCustomer() {
+    setFirstName('');
+    setLastName('');
+    setCustomerEmail('');
+    setCustomerPhone('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }
 
   async function loadInitialData() {
     setLoading(true);
@@ -81,17 +136,32 @@ export default function BalcaoPage() {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedPhone = customerPhone.trim();
+    // Cadastro completo só quando nome + sobrenome + telefone estão preenchidos;
+    // senão manda o nome solto (comportamento antigo, "nome pra chamar").
+    const fullCustomer =
+      trimmedFirst && trimmedLast && trimmedPhone
+        ? {
+            firstName: trimmedFirst,
+            lastName: trimmedLast,
+            phone: trimmedPhone,
+            email: customerEmail.trim() || undefined,
+          }
+        : undefined;
     try {
       const result = await createCounterOrder({
         storeId,
         items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         paymentMethod,
-        customerName,
+        customer: fullCustomer,
+        customerName: fullCustomer ? undefined : trimmedFirst || undefined,
         notes,
       });
       setSuccess(result);
       setCart([]);
-      setCustomerName('');
+      resetCustomer();
       setNotes('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao criar pedido.');
@@ -232,15 +302,80 @@ export default function BalcaoPage() {
             )}
           </div>
 
-          <label className="mt-4 block text-sm font-medium text-text-muted">
-            Cliente
-            <input
-              className="mt-1 w-full rounded-[12px] border border-border bg-bg px-3 py-2 text-text"
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-              placeholder="Nome para chamar"
-            />
-          </label>
+          <fieldset className="mt-4 rounded-[12px] border border-border p-3">
+            <legend className="px-1 text-sm font-medium text-text-muted">Cliente</legend>
+            <div className="relative">
+              <label className="block text-xs font-medium text-text-muted">
+                Nome
+                <input
+                  className="mt-1 w-full rounded-[12px] border border-border bg-bg px-3 py-2 text-text"
+                  value={firstName}
+                  onChange={(event) => {
+                    setFirstName(event.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  autoComplete="off"
+                  placeholder="Vinícius"
+                />
+              </label>
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-[12px] border border-border bg-bg-card shadow-3">
+                  {suggestions.map((customer) => (
+                    <li key={customer.id}>
+                      <button
+                        type="button"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-brand-faint"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => applySuggestion(customer)}
+                      >
+                        <span className="text-sm font-semibold text-text">{customer.name}</span>
+                        <span className="text-xs text-text-muted">
+                          {[customer.phone, customer.email].filter(Boolean).join(' · ') || 'sem contato'}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <label className="mt-3 block text-xs font-medium text-text-muted">
+              Sobrenome
+              <input
+                className="mt-1 w-full rounded-[12px] border border-border bg-bg px-3 py-2 text-text"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                autoComplete="off"
+                placeholder="Gehlen"
+              />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-text-muted">
+              E-mail
+              <input
+                type="email"
+                className="mt-1 w-full rounded-[12px] border border-border bg-bg px-3 py-2 text-text"
+                value={customerEmail}
+                onChange={(event) => setCustomerEmail(event.target.value)}
+                autoComplete="off"
+                placeholder="cliente@email.com"
+              />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-text-muted">
+              Telefone
+              <input
+                type="tel"
+                className="mt-1 w-full rounded-[12px] border border-border bg-bg px-3 py-2 text-text"
+                value={customerPhone}
+                onChange={(event) => setCustomerPhone(event.target.value)}
+                autoComplete="off"
+                placeholder="(51) 99999-0000"
+              />
+            </label>
+            <p className="mt-2 text-xs text-text-muted">
+              Nome, sobrenome e telefone preenchidos cadastram o cliente. Só o nome serve pra chamar no balcão.
+            </p>
+          </fieldset>
 
           <label className="mt-4 block text-sm font-medium text-text-muted">
             Observações

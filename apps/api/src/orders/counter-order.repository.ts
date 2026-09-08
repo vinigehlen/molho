@@ -1,3 +1,5 @@
+import { type EmailAddress, type PhoneNumber, phoneNumberToE164 } from '@molho/contracts';
+import { decryptEmail, decryptPhone, encryptEmail, encryptPhone, hashPhoneForLookup } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 
 export interface CatalogProduct {
@@ -21,6 +23,13 @@ export interface PricedCounterItem {
   notes: string | null;
   lineTotalCents: number;
   modifiers: { modifierId: string; name: string; priceDeltaCents: number }[];
+}
+
+export interface CustomerSearchRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
 }
 
 export interface ExistingCounterOrder {
@@ -48,6 +57,17 @@ export interface CounterOrderRepository {
   findModifiers(modifierIds: readonly string[]): Promise<Map<string, CatalogModifier>>;
   findOrderByIdempotencyKey(idempotencyKey: string): Promise<ExistingCounterOrder | null>;
   createAnonymousCustomer(name: string): Promise<string>;
+  /**
+   * Cadastro nomeado de balcão — identidade é o telefone (mesma regra de
+   * `CustomerIdentityRepository`). Telefone já visto no tenant reaproveita o
+   * `customer`; diferente do fluxo de OTP, aqui o dado é digitado pelo staff
+   * com o cliente na frente, então nome/e-mail são atualizados no encontro
+   * (não há TOFU a proteger). `phoneVerifiedAt` nunca é tocado — balcão não
+   * prova telefone.
+   */
+  findOrCreateNamedCustomer(input: { name: string; email: EmailAddress | null; phone: PhoneNumber }): Promise<string>;
+  /** Prefixo de nome (case-insensitive), escopo do tenant. Telefone/e-mail decifrados pro autopreenchimento. */
+  searchCustomersByName(query: string, limit: number): Promise<CustomerSearchRow[]>;
   /** `created: false` ⟺ perdeu a corrida do `ON CONFLICT` — outra request com a MESMA chave já criou o pedido. */
   createOrder(params: CreateCounterOrderParams): Promise<{ id: string; created: boolean }>;
   createOrderItems(orderId: string, items: readonly PricedCounterItem[]): Promise<void>;
@@ -102,6 +122,71 @@ export class PrismaCounterOrderRepository implements CounterOrderRepository {
       select: { id: true },
     });
     return customer.id;
+  }
+
+  async findOrCreateNamedCustomer(input: { name: string; email: EmailAddress | null; phone: PhoneNumber }): Promise<string> {
+    const tenantId = this.requestContext.getTenantId();
+    const client = this.requestContext.getClient();
+    const phoneE164 = phoneNumberToE164(input.phone);
+    const phoneHash = hashPhoneForLookup(phoneE164);
+    const encryptedEmail = input.email ? encryptEmail(input.email) : null;
+
+    const existing = await client.customer.findFirst({
+      where: { tenantId, phoneLookupHash: phoneHash, deletedAt: null },
+      select: { id: true },
+    });
+    if (existing) {
+      await client.customer.update({
+        where: { id: existing.id },
+        data: {
+          name: input.name,
+          ...(encryptedEmail
+            ? { emailCiphertext: new Uint8Array(encryptedEmail.ciphertext), emailKeyVersion: encryptedEmail.keyVersion }
+            : {}),
+        },
+        select: { id: true },
+      });
+      return existing.id;
+    }
+
+    const { ciphertext, keyVersion } = encryptPhone(phoneE164);
+    const created = await client.customer.create({
+      data: {
+        tenantId,
+        name: input.name,
+        phoneCiphertext: new Uint8Array(ciphertext),
+        phoneLookupHash: phoneHash,
+        phoneKeyVersion: keyVersion,
+        ...(encryptedEmail
+          ? { emailCiphertext: new Uint8Array(encryptedEmail.ciphertext), emailKeyVersion: encryptedEmail.keyVersion }
+          : {}),
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
+
+  async searchCustomersByName(query: string, limit: number): Promise<CustomerSearchRow[]> {
+    const tenantId = this.requestContext.getTenantId();
+    const rows = await this.requestContext.getClient().customer.findMany({
+      where: { tenantId, deletedAt: null, name: { startsWith: query, mode: 'insensitive' } },
+      select: {
+        id: true,
+        name: true,
+        phoneCiphertext: true,
+        phoneKeyVersion: true,
+        emailCiphertext: true,
+        emailKeyVersion: true,
+      },
+      orderBy: { name: 'asc' },
+      take: limit,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phoneCiphertext ? decryptPhone(Buffer.from(row.phoneCiphertext), row.phoneKeyVersion) : null,
+      email: row.emailCiphertext ? decryptEmail(Buffer.from(row.emailCiphertext), row.emailKeyVersion) : null,
+    }));
   }
 
   async createOrder(params: CreateCounterOrderParams): Promise<{ id: string; created: boolean }> {

@@ -22,6 +22,7 @@ import {
   PaymentNotConfirmedError,
 } from './order-errors';
 import {
+  CounterOrderInvalidCustomerError,
   CounterOrderProductNotFoundError,
   CounterOrderStoreNotFoundError,
   MissingIdempotencyKeyError,
@@ -50,6 +51,7 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof FulfillmentAddressMismatchError) return new BadRequestException(error.message);
   if (error instanceof CounterOrderStoreNotFoundError) return new NotFoundException(error.message);
   if (error instanceof CounterOrderProductNotFoundError) return new NotFoundException(error.message);
+  if (error instanceof CounterOrderInvalidCustomerError) return new BadRequestException(error.message);
   if (error instanceof WeighedPriceOutOfRangeError) return new BadRequestException(error.message);
   if (error instanceof MissingIdempotencyKeyError) return new BadRequestException(error.message);
   if (error instanceof OrderNotEditableError) return new ConflictException(error.message);

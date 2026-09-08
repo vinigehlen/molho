@@ -1,6 +1,14 @@
-import type { CounterOrderInput, CounterOrderItemInput, CounterOrderResponse } from '@molho/contracts';
+import type {
+  CounterOrderCustomerInput,
+  CounterOrderInput,
+  CounterOrderItemInput,
+  CounterOrderResponse,
+  CustomerSearchResult,
+} from '@molho/contracts';
 import type { OrderStatus } from '@molho/contracts';
+import { EmailAddressError, PhoneNumberError, parseEmail, parsePhoneNumber } from '@molho/contracts';
 import {
+  CounterOrderInvalidCustomerError,
   CounterOrderProductNotFoundError,
   CounterOrderStoreNotFoundError,
   MissingIdempotencyKeyError,
@@ -59,7 +67,9 @@ export class CounterOrderService {
 
     const { items, subtotalCents } = await this.priceItems(input.items);
 
-    const customerId = await this.repo.createAnonymousCustomer(input.customerName?.trim() || 'Balcão');
+    const customerId = input.customer
+      ? await this.repo.findOrCreateNamedCustomer(parseCustomer(input.customer))
+      : await this.repo.createAnonymousCustomer(input.customerName?.trim() || 'Balcão');
     const createdAt = this.now();
     const { id: orderId, created } = await this.repo.createOrder({
       storeId,
@@ -109,6 +119,13 @@ export class CounterOrderService {
       subtotalCents,
       totalCents: subtotalCents,
     };
+  }
+
+  /** Autopreenchimento do balcão: prefixo de nome (>= 2 chars), escopo do tenant, teto de 8 resultados. */
+  async searchCustomers(rawQuery: string): Promise<CustomerSearchResult[]> {
+    const query = rawQuery.trim();
+    if (query.length < 2) return [];
+    return this.repo.searchCustomersByName(query, 8);
   }
 
   /**
@@ -178,4 +195,35 @@ export class CounterOrderService {
 
     return { items: priced, subtotalCents };
   }
+}
+
+/**
+ * Valida telefone/e-mail digitados no caixa com os MESMOS parsers do resto do
+ * sistema (`parsePhoneNumber` normaliza pra E.164 com DDD real + nono dígito;
+ * `parseEmail` normaliza pra minúsculo). Erro vira 400 com mensagem pt-BR.
+ */
+function parseCustomer(input: CounterOrderCustomerInput): {
+  name: string;
+  email: ReturnType<typeof parseEmail> | null;
+  phone: ReturnType<typeof parsePhoneNumber>;
+} {
+  const name = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+  let phone: ReturnType<typeof parsePhoneNumber>;
+  try {
+    phone = parsePhoneNumber(input.phone);
+  } catch (cause) {
+    if (cause instanceof PhoneNumberError) throw new CounterOrderInvalidCustomerError(`Telefone inválido: ${cause.message}`);
+    throw cause;
+  }
+  let email: ReturnType<typeof parseEmail> | null = null;
+  const rawEmail = input.email?.trim();
+  if (rawEmail) {
+    try {
+      email = parseEmail(rawEmail);
+    } catch (cause) {
+      if (cause instanceof EmailAddressError) throw new CounterOrderInvalidCustomerError(`E-mail inválido: ${cause.message}`);
+      throw cause;
+    }
+  }
+  return { name, email, phone };
 }
