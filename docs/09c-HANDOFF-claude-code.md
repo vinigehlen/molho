@@ -52,6 +52,41 @@ Nota de tooling: nesta máquina o `node_modules` estava inconsistente e `node sc
   - Item 7: `apps/backoffice/lib/staff-logout.ts` — ordem `fila (sync/confirm) → disarmStream() (retenta 1x) → logoutStaffSession()`; `disarm` roda antes de descartar o JWT. `disarm` chama `res.clearCookie(STREAM_COOKIE_NAME, ...)` (`order-stream.controller.ts:113`).
 - **BLOQUEIO para itens 1, 2, 5, 6, 7 (prova de runtime no browser):** a extensão Claude-in-Chrome não está conectada nesta máquina (`Browser extension is not connected`) e o login de staff exige OTP por e-mail real (sem acesso à caixa). Precisa de: extensão conectada, OU uma sessão de browser já logada em `staging-app.molho.live`, OU o valor do cookie `__Host-molho_stream`/access token de staff colado aqui.
 
+## Progresso 2026-09-08 (terceira passada — Claude Code, browser conectado)
+
+Sessão de staff já logada em `staging-app.molho.live/gestor`, tenant Cabanhas BBQ (`019fa903-04e5-7755-8102-b176b2e0775f`), máquina servindo streams: `28747d00f40d48` / `gru`.
+
+- **Item 1 (SSE real do navegador): FECHADO.**
+  - `POST /v1/admin/orders/stream/arm` presente no bootstrap do `/gestor` (resource timing). Cookie resultante funcional (ver abaixo).
+  - `GET /v1/admin/orders/stream?tenant=...` → `200`, `content-type: text/event-stream`, conexão aberta. Primeiro frame `event: hello` com `{"machine":"28747d00f40d48","region":"gru"}` (MOLHO_DEBUG_PUBSUB ativo).
+  - Cookie `__Host-molho_stream` enviado: o `fetch`/`EventSource` de teste foi feito **sem `Authorization`**, só `credentials:'include'` — o `StreamCookieAuthGuard` autenticou apenas pelo cookie. Prova que está presente e viaja same-site (`app.` → `api.`).
+  - Keepalive `event: ping` a cada 25s confirmado ao vivo.
+- **Item 2 (atributos do cookie): PARCIAL.**
+  - `document.cookie` = `""` em `staging-app.molho.live` → `__Host-molho_stream` e `__Host-molho_refresh` são `HttpOnly` (invisíveis ao JS).
+  - `Secure` implícito (só HTTPS) + prefixo `__Host-` (o browser recusa gravar `__Host-` sem `Secure`+`Path=/`+sem `Domain`, então a gravação bem-sucedida já força esses três).
+  - `SameSite=Strict`, `Path=/`, ausência de `Domain`: confirmados no código (`order-stream.controller.ts:100`, `staff-auth.controller.ts:56`). Inspeção visual DevTools/Application ainda não feita (JS não lê atributos de cookie `HttpOnly`).
+- **Item 4 (CORS negativo, fronteira do browser): FECHADO.**
+  - De `https://example.com` (fora da allowlist): `fetch` credenciado a `/stream/arm` e `/stream` → `TypeError: Failed to fetch` (bloqueio CORS do browser). `EventSource` withCredentials → `onerror`, `readyState=2` (CLOSED), nunca recebeu `hello`. Nada vazou.
+  - Confirma o desenho de `apps/api/src/bootstrap/cors.ts`: allowlist exata via `MOLHO_CORS_ORIGINS`, sem eco cego nem regex.
+- **Item 6 (preview degrada para polling): ACHADO — divergência.**
+  - A parte "SSE não fica legível fora da allowlist" está provada (item 4).
+  - **Mas o board do gestor NÃO tem polling de fallback.** `app/gestor/page.tsx` faz UM `fetchActiveOrders()` no mount; `useOrdersStream` só expõe `connecting|open|reconnecting` e faz backoff infinito no `onerror`; não há `setInterval`/refetch periódico de pedidos em lugar nenhum do fluxo `/gestor`. Num preview fora da allowlist o board carrega uma vez, mostra o badge amarelo "Sem tempo real, reconectando…" (não "Sem conexão" — `useReachability` vê o REST OK) e **congela no snapshot inicial** até refresh manual.
+  - Decisão de PM: ou o item 6 do checklist está com expectativa errada (preview não é ambiente de operação, "carrega uma vez + badge" pode ser aceitável), ou falta implementar polling degradado. Não corrigido sem aval.
+- **Item 5 (token_expired): lado servidor FECHADO ao vivo; rearme do cliente por código.** TTL do access token = 15min (`token.service.ts:11`). Stream de teste na origem allowlisted, aberto às 21:01:23Z. Aos ~15min do `arm` do token: **`event: token_expired` recebido às 21:07:33.855Z, seguido do fechamento limpo do stream pelo servidor** (`subscriber.complete()`, `order-stream.controller.ts:152`). O `EventSource` cru tentou reconectar e caiu em `CLOSED` (401 — cookie já desarmado pelo logout anterior).
+  - O rearme do cliente (`onExpired` → `refreshStaffSession()` → re-arma cookie → reconecta com jitter, `use-orders-stream.ts:91-101`) não foi observado ao vivo porque a sessão do PM já tinha sido encerrada no teste do item 7. Coberto por revisão de código + e2e do 9b ("O SSE renova a sessão quando o token expira e rearma o stream").
+- **Item 7 (logout apaga cookie de stream): FECHADO.** Logout clicado na sidebar em 2026-09-08 21:01:55Z (interceptor de `fetch` na aba logada):
+  - `POST /v1/admin/orders/stream/disarm` → `204` (21:01:55.686Z)
+  - `POST /v1/auth/logout` → `204` (21:01:55.831Z, 145ms depois)
+  - **Ordem efetiva: `disarm` ANTES de `logout`** (cookie de stream apagado antes de descartar o JWT). Fila offline estava vazia, então sem etapa de sync (esperado).
+  - Ambas as abas redirecionaram para `/login` (broadcast de logout multi-aba do 9b).
+  - **Pós-logout: `GET /v1/admin/orders/stream` → `401` e `POST .../arm` → `401`** (nova requisição, sem credencial → o `__Host-molho_stream` sumiu). Um `EventSource` já estabelecido ANTES do logout continua vivo (readyState 1, ainda recebe `ping`) — esperado: `disarm` corta credencial para requisições futuras, não derruba conexão SSE já aberta (essa morre no `token_expired`/SIGTERM; "revogação com dente até o TTL").
+
+- **Item 6: decisão do PM = IMPLEMENTAR polling degradado. FEITO (código).**
+  - `apps/backoffice/lib/use-orders-poll.ts` (+ `.test.ts`): hook `useOrdersPoll` + predicado puro `isBoardDegraded(tenantId, streamStatus, online)`. Enquanto degradado (tenant presente, `streamStatus != 'open'`, REST alcançável), refaz `fetchActiveOrders()` a cada `DEGRADED_POLL_INTERVAL_MS` (15s). Volta a `open` ou REST cai → intervalo limpo.
+  - `apps/backoffice/app/gestor/page.tsx`: load inicial extraído para `reloadOrders()` (refetch que falha não apaga board já carregado); `useOrdersPoll({ tenantId, streamStatus, online, reload: reloadOrders })` fiado após `useReachability`.
+  - Gate: `pnpm --filter backoffice test` 241/241 verde; `pnpm --filter backoffice build` verde (lint+typecheck do Next inclusos). Gate raiz completo (`pnpm lint && pnpm test && pnpm build`) NÃO rodado — mudança isolada ao backoffice. Rodar antes do merge.
+  - Não commitado (branch `codex/epico-9c-staging-pubsub-handoff`, working tree).
+
 ## Itens pendentes para fechar
 
 1. **SSE real do navegador com cookie `__Host-molho_stream`**
@@ -93,6 +128,20 @@ curl -sS -D - -o /dev/null -X OPTIONS 'https://api.staging.molho.live/v1/admin/o
    - Confirmar ordem efetiva: fila offline/sync → `stream/disarm` → `auth/logout` → limpeza local.
    - Confirmar `POST /v1/admin/orders/stream/disarm` retorna 204 antes do token sumir.
    - Confirmar que `__Host-molho_stream` desaparece dos cookies de `api.staging.molho.live`.
+
+## Placar da fronteira (2026-09-08, fim da terceira passada)
+
+| Item | Estado | Falta |
+|---|---|---|
+| 1 SSE real do navegador | ✅ FECHADO | — |
+| 2 Atributos do cookie | 🟡 PARCIAL | inspeção visual DevTools/Application de `__Host-molho_stream` e `__Host-molho_refresh` em `api.staging.molho.live` (HttpOnly provado por JS; Secure/Path=/`/sem Domain forçados pelo prefixo `__Host-`; SameSite=Strict só por código). JS não lê atributo de cookie HttpOnly — precisa de olho humano no painel. |
+| 3 CORS positivo | ✅ FECHADO (curl) | — |
+| 4 CORS negativo | ✅ FECHADO (browser) | — |
+| 5 token_expired | ✅ servidor ao vivo; 🟡 rearme do cliente por código+e2e | observar rearme do cliente ao vivo numa sessão logada (opcional — coberto por e2e do 9b) |
+| 6 degrada para polling | ✅ código implementado | rodar gate raiz; validar num preview real; revisão/merge |
+| 7 logout apaga cookie | ✅ FECHADO | — |
+
+Único bloqueio residual real: **item 2**, e só a parte visual (o comportamento está provado). Abrir DevTools → Application → Cookies → `https://api.staging.molho.live` numa sessão logada e conferir os atributos das duas linhas `__Host-*`.
 
 ## Cuidados
 

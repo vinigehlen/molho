@@ -18,6 +18,7 @@ import {
 } from '../../lib/orders-api';
 import { applyOrderUpdate } from '../../lib/order-updates';
 import { useOrdersStream } from '../../lib/use-orders-stream';
+import { useOrdersPoll } from '../../lib/use-orders-poll';
 import { useReachability } from '../../lib/reachability';
 import { useWakeLock } from '../../lib/use-wake-lock';
 import { useOrderQueue } from '../../lib/use-order-queue';
@@ -51,6 +52,7 @@ export default function GestorPage() {
   const [mobileColumn, setMobileColumn] = useState<BoardColumn>(BOARD_COLUMNS[0]);
   const beeperRef = useRef<Beeper | null>(null);
   const seenIdsRef = useRef<Set<string> | null>(null); // null = load inicial ainda não semeado
+  const loadedOnceRef = useRef(false); // 1º load do board concluído com sucesso
 
   // Som por diff de ids: id nunca visto → beep. O 1º load só SEMEIA o conjunto
   // (não toca — senão o board inteiro apitaria ao abrir). Depois, todo id novo
@@ -75,6 +77,21 @@ export default function GestorPage() {
     setSoundOn(beeperRef.current.unlock());
   }
 
+  // Load completo do board. Usado no mount e pelo polling degradado
+  // (useOrdersPoll) quando o SSE não conecta. Um refetch que falha por rede não
+  // apaga o board — `useReachability` já sinaliza "sem conexão"; erro só é
+  // mostrado se ainda não há nada carregado.
+  async function reloadOrders() {
+    try {
+      setOrders(await fetchActiveOrders());
+      loadedOnceRef.current = true;
+    } catch (e) {
+      // Refetch periódico que falha não apaga o board já carregado —
+      // useReachability já mostra "sem conexão". Erro só aparece no load inicial.
+      if (!loadedOnceRef.current) setError(e instanceof Error ? e.message : 'Erro ao carregar.');
+    }
+  }
+
   useEffect(() => {
     const session = getStaffSession();
     if (!session) {
@@ -84,9 +101,7 @@ export default function GestorPage() {
     setTenantId(session.tenantId);
     setUserId(session.userId);
     setTenantName(session.tenantName);
-    fetchActiveOrders()
-      .then(setOrders)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Erro ao carregar.'));
+    void reloadOrders();
   }, [router]);
 
   const streamStatus = useOrdersStream(tenantId, {
@@ -108,6 +123,11 @@ export default function GestorPage() {
   // Alcançabilidade da API — DIFERENTE do stream. "sem conexão" só quando o
   // REST em si falha; stream caído com API alcançável é só "sem tempo real".
   const online = useReachability();
+
+  // Fallback: SSE fora de `open` + REST alcançável (preview fora da allowlist
+  // CORS, proxy que corta stream) → refaz o load completo periodicamente em vez
+  // de congelar no snapshot inicial.
+  useOrdersPoll({ tenantId, streamStatus, online, reload: reloadOrders });
 
   // Fila offline: submit (online aplica / offline enfileira), sync na volta, conflitos.
   const { pending, conflicts, autoApplied, submit, resolveConflict } = useOrderQueue(tenantId, userId, online);
