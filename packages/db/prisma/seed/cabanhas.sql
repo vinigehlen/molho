@@ -45,6 +45,504 @@ BEGIN
   END IF;
 END $$;
 
+-- ─── Catálogo: reset + combos iniciais ──────────────────────────────────────
+--
+-- "Limpar tudo" aqui significa substituir o catálogo ATIVO do tenant sem
+-- apagar histórico: soft-delete em categorias, produtos, ofertas,
+-- componentes, imagens e complementos. Reaplicar este bloco deixa o catálogo
+-- ativo no mesmo estado, embora preserve linhas antigas como deletadas.
+UPDATE "combo_items"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "modifiers"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "product_modifier_groups"
+SET "deleted_at" = now(),
+    "updated_at" = now()
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "modifier_groups"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "product_images"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "product_offers"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "products"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+UPDATE "categories"
+SET "deleted_at" = now(),
+    "updated_at" = now(),
+    "version"    = "version" + 1
+WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+  AND "deleted_at" IS NULL;
+
+CREATE TEMP TABLE _cabanhas_catalog_ids (
+  "key" text PRIMARY KEY,
+  "id" uuid NOT NULL
+) ON COMMIT DROP;
+
+WITH inserted AS (
+  INSERT INTO "categories" (
+    "tenant_id", "name", "sort_order", "visible", "updated_at"
+  )
+  VALUES
+    ('019fa903-04e5-7755-8102-b176b2e0775f', 'Combos', 0, true, now()),
+    ('019fa903-04e5-7755-8102-b176b2e0775f', 'Porções', 1, true, now()),
+    ('019fa903-04e5-7755-8102-b176b2e0775f', 'Hambúrgueres', 2, true, now()),
+    ('019fa903-04e5-7755-8102-b176b2e0775f', 'Itens dos combos', 3, false, now())
+  RETURNING "id", "name"
+)
+INSERT INTO _cabanhas_catalog_ids ("key", "id")
+SELECT 'category:' || "name", "id" FROM inserted;
+
+WITH components("name", "sort_order") AS (
+  VALUES
+    ('pedaço de coxa', 0),
+    ('pedaço de sobrecoxa', 1),
+    ('350g de massa', 2),
+    ('350g de polenta frita', 3),
+    ('350g de maionese de batata', 4),
+    ('500g de vazio', 5),
+    ('400g de arroz', 6),
+    ('350g de batata frita', 7),
+    ('porção de Salada de Alface e Tomate', 8),
+    ('500g de maminha', 9),
+    ('500g de picanha', 10),
+    ('500g de entrecot', 11),
+    ('500g de alcatra', 12),
+    ('500g de assado de tiras', 13)
+),
+inserted AS (
+  INSERT INTO "products" (
+    "tenant_id", "category_id", "name", "description", "base_price_cents",
+    "available", "kind", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    ids."id",
+    c."name",
+    NULL,
+    0,
+    true,
+    'prepared'::"ProductKind",
+    c."sort_order",
+    now()
+  FROM components c
+  CROSS JOIN _cabanhas_catalog_ids ids
+  WHERE ids."key" = 'category:Itens dos combos'
+  RETURNING "id", "name"
+)
+INSERT INTO _cabanhas_catalog_ids ("key", "id")
+SELECT 'component:' || "name", "id" FROM inserted;
+
+WITH combos("name", "description", "price_cents", "sort_order") AS (
+  VALUES
+    (
+      'KIT GALETO',
+      '3 pedaços de coxa, 3 pedaços de sobrecoxa, 350g de massa, 350g de polenta frita, 350g de maionese de batata e 1 molho à escolha.',
+      9190,
+      0
+    ),
+    (
+      'KIT VAZIO',
+      '500g de vazio, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      16990,
+      1
+    ),
+    (
+      'KIT MAMINHA',
+      '500g de maminha, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      16490,
+      2
+    ),
+    (
+      'KIT PICANHA',
+      '500g de picanha, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      21990,
+      3
+    ),
+    (
+      'KIT ENTRECOT',
+      '500g de entrecot, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      21290,
+      4
+    ),
+    (
+      'KIT ALCATRA',
+      '500g de alcatra, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      16990,
+      5
+    ),
+    (
+      'KIT ASSADO DE TIRAS',
+      '500g de assado de tiras, 400g de arroz, 350g de batata frita, 350g de maionese de batata e 1 porção de Salada de Alface e Tomate.',
+      19990,
+      6
+    )
+),
+inserted AS (
+  INSERT INTO "products" (
+    "tenant_id", "category_id", "name", "description", "base_price_cents",
+    "available", "kind", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    ids."id",
+    c."name",
+    c."description",
+    c."price_cents",
+    true,
+    'combo'::"ProductKind",
+    c."sort_order",
+    now()
+  FROM combos c
+  CROSS JOIN _cabanhas_catalog_ids ids
+  WHERE ids."key" = 'category:Combos'
+  RETURNING "id", "name"
+)
+INSERT INTO _cabanhas_catalog_ids ("key", "id")
+SELECT 'combo:' || "name", "id" FROM inserted;
+
+WITH composition("combo", "component", "quantity", "sort_order") AS (
+  VALUES
+    ('KIT GALETO', 'pedaço de coxa', 3, 0),
+    ('KIT GALETO', 'pedaço de sobrecoxa', 3, 1),
+    ('KIT GALETO', '350g de massa', 1, 2),
+    ('KIT GALETO', '350g de polenta frita', 1, 3),
+    ('KIT GALETO', '350g de maionese de batata', 1, 4),
+    ('KIT VAZIO', '500g de vazio', 1, 0),
+    ('KIT VAZIO', '400g de arroz', 1, 1),
+    ('KIT VAZIO', '350g de batata frita', 1, 2),
+    ('KIT VAZIO', '350g de maionese de batata', 1, 3),
+    ('KIT VAZIO', 'porção de Salada de Alface e Tomate', 1, 4),
+    ('KIT MAMINHA', '500g de maminha', 1, 0),
+    ('KIT MAMINHA', '400g de arroz', 1, 1),
+    ('KIT MAMINHA', '350g de batata frita', 1, 2),
+    ('KIT MAMINHA', '350g de maionese de batata', 1, 3),
+    ('KIT MAMINHA', 'porção de Salada de Alface e Tomate', 1, 4),
+    ('KIT PICANHA', '500g de picanha', 1, 0),
+    ('KIT PICANHA', '400g de arroz', 1, 1),
+    ('KIT PICANHA', '350g de batata frita', 1, 2),
+    ('KIT PICANHA', '350g de maionese de batata', 1, 3),
+    ('KIT PICANHA', 'porção de Salada de Alface e Tomate', 1, 4),
+    ('KIT ENTRECOT', '500g de entrecot', 1, 0),
+    ('KIT ENTRECOT', '400g de arroz', 1, 1),
+    ('KIT ENTRECOT', '350g de batata frita', 1, 2),
+    ('KIT ENTRECOT', '350g de maionese de batata', 1, 3),
+    ('KIT ENTRECOT', 'porção de Salada de Alface e Tomate', 1, 4),
+    ('KIT ALCATRA', '500g de alcatra', 1, 0),
+    ('KIT ALCATRA', '400g de arroz', 1, 1),
+    ('KIT ALCATRA', '350g de batata frita', 1, 2),
+    ('KIT ALCATRA', '350g de maionese de batata', 1, 3),
+    ('KIT ALCATRA', 'porção de Salada de Alface e Tomate', 1, 4),
+    ('KIT ASSADO DE TIRAS', '500g de assado de tiras', 1, 0),
+    ('KIT ASSADO DE TIRAS', '400g de arroz', 1, 1),
+    ('KIT ASSADO DE TIRAS', '350g de batata frita', 1, 2),
+    ('KIT ASSADO DE TIRAS', '350g de maionese de batata', 1, 3),
+    ('KIT ASSADO DE TIRAS', 'porção de Salada de Alface e Tomate', 1, 4)
+)
+INSERT INTO "combo_items" (
+  "tenant_id", "combo_product_id", "child_product_id",
+  "quantity", "removable", "sort_order", "updated_at"
+)
+SELECT
+  '019fa903-04e5-7755-8102-b176b2e0775f',
+  combo_ids."id",
+  component_ids."id",
+  c."quantity",
+  false,
+  c."sort_order",
+  now()
+FROM composition c
+JOIN _cabanhas_catalog_ids combo_ids
+  ON combo_ids."key" = 'combo:' || c."combo"
+JOIN _cabanhas_catalog_ids component_ids
+  ON component_ids."key" = 'component:' || c."component";
+
+WITH galeto AS (
+  SELECT "id" AS product_id
+  FROM _cabanhas_catalog_ids
+  WHERE "key" = 'combo:KIT GALETO'
+),
+inserted_group AS (
+  INSERT INTO "modifier_groups" (
+    "tenant_id", "product_id", "name", "min", "max", "active", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    product_id,
+    'Escolha o molho',
+    1,
+    1,
+    true,
+    now()
+  FROM galeto
+  RETURNING "id", "product_id"
+),
+inserted_link AS (
+  INSERT INTO "product_modifier_groups" (
+    "tenant_id", "product_id", "modifier_group_id", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    "product_id",
+    "id",
+    0,
+    now()
+  FROM inserted_group
+)
+INSERT INTO "modifiers" (
+  "tenant_id", "group_id", "name", "price_delta_cents", "active",
+  "sort_order", "updated_at"
+)
+SELECT
+  '019fa903-04e5-7755-8102-b176b2e0775f',
+  g."id",
+  m."name",
+  0,
+  true,
+  m."sort_order",
+  now()
+FROM inserted_group g
+CROSS JOIN (VALUES
+  ('Ao sugo', 0),
+  ('Alho e óleo', 1),
+  ('Aos quatro queijos', 2),
+  ('Pesto', 3)
+) AS m("name", "sort_order");
+
+WITH portions("name", "description", "price_cents", "sort_order") AS (
+  VALUES
+    ('BATATA FRITA', '350g', 2000, 0),
+    ('ANÉIS DE CEBOLA', '350g', 2300, 1),
+    ('BATATA RÚSTICA', '350g', 2300, 2),
+    ('ARROZ BRANCO', '400g', 1600, 3),
+    ('AIPIM COM FAROFA', '400g', 1800, 4),
+    ('MAIONESE DA CASA', '400g', 1800, 5),
+    ('POLENTA DA CASA', '350g', 2300, 6),
+    ('PÃO DE ALHO', 'Unidade', 350, 7),
+    ('SALSICHÃO', 'Unidade', 500, 8),
+    ('Salada de Alface e Tomate', NULL, 1500, 9)
+),
+inserted AS (
+  INSERT INTO "products" (
+    "tenant_id", "category_id", "name", "description", "base_price_cents",
+    "available", "kind", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    ids."id",
+    p."name",
+    p."description",
+    p."price_cents",
+    true,
+    'prepared'::"ProductKind",
+    p."sort_order",
+    now()
+  FROM portions p
+  CROSS JOIN _cabanhas_catalog_ids ids
+  WHERE ids."key" = 'category:Porções'
+  RETURNING "id", "name"
+)
+INSERT INTO _cabanhas_catalog_ids ("key", "id")
+SELECT 'portion:' || "name", "id" FROM inserted;
+
+WITH burgers("name", "description", "price_cents", "sort_order") AS (
+  VALUES
+    (
+      'CABANHAS BIG STEAK',
+      'Pão com gergelim, maionese Cabanhas, alface americana, hambúrguer de 200g de carne, queijo mussarela, queijo cheddar, bacon, cebola caramelizada e molho barbecue.',
+      3990,
+      0
+    ),
+    (
+      'CABANHAS CLÁSSICO',
+      'Pão com gergelim, maionese Cabanhas, alface americana, hambúrguer de 200g de carne, queijo mussarela, queijo cheddar, tomate, cebola roxa, picles e molho especial Cabanhas.',
+      3590,
+      1
+    ),
+    (
+      'CABANHAS FRANGO GRELHADO',
+      'Pão com gergelim, maionese Cabanhas, alface americana, 200g de peito de frango grelhado, queijo mussarela, queijo cheddar, tomate, cebola caramelizada e molho barbecue.',
+      3490,
+      2
+    ),
+    (
+      'CABANHAS PORCO BBQ',
+      'Pão com gergelim, maionese Cabanhas, porco desfiado ao molho barbecue, queijo cheddar, coleslaw (salada de repolho cremoso) e picles.',
+      3990,
+      3
+    ),
+    (
+      'CABANHAS GORGON BURGER',
+      'Pão com gergelim, maionese Cabanhas, alface americana, hambúrguer de 200g de carne, queijo mussarela, queijo cheddar, bacon, pasta de queijo gorgonzola e cebola caramelizada.',
+      4390,
+      4
+    )
+),
+inserted AS (
+  INSERT INTO "products" (
+    "tenant_id", "category_id", "name", "description", "base_price_cents",
+    "available", "kind", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    ids."id",
+    b."name",
+    b."description",
+    b."price_cents",
+    true,
+    'prepared'::"ProductKind",
+    b."sort_order",
+    now()
+  FROM burgers b
+  CROSS JOIN _cabanhas_catalog_ids ids
+  WHERE ids."key" = 'category:Hambúrgueres'
+  RETURNING "id", "name"
+)
+INSERT INTO _cabanhas_catalog_ids ("key", "id")
+SELECT 'burger:' || "name", "id" FROM inserted;
+
+WITH first_burger AS (
+  SELECT ids."id" AS product_id
+  FROM _cabanhas_catalog_ids ids
+  WHERE ids."key" = 'burger:CABANHAS BIG STEAK'
+),
+inserted_group AS (
+  INSERT INTO "modifier_groups" (
+    "tenant_id", "product_id", "name", "min", "max", "active", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    product_id,
+    'Porções para acompanhar seu Burger',
+    1,
+    1,
+    true,
+    now()
+  FROM first_burger
+  RETURNING "id"
+),
+burger_links AS (
+  SELECT "id" AS product_id
+  FROM _cabanhas_catalog_ids
+  WHERE "key" LIKE 'burger:%'
+),
+inserted_links AS (
+  INSERT INTO "product_modifier_groups" (
+    "tenant_id", "product_id", "modifier_group_id", "sort_order", "updated_at"
+  )
+  SELECT
+    '019fa903-04e5-7755-8102-b176b2e0775f',
+    burger_links.product_id,
+    inserted_group."id",
+    0,
+    now()
+  FROM burger_links
+  CROSS JOIN inserted_group
+)
+INSERT INTO "modifiers" (
+  "tenant_id", "group_id", "name", "price_delta_cents", "active",
+  "sort_order", "updated_at"
+)
+SELECT
+  '019fa903-04e5-7755-8102-b176b2e0775f',
+  g."id",
+  a."name",
+  a."price_delta_cents",
+  true,
+  a."sort_order",
+  now()
+FROM inserted_group g
+CROSS JOIN (VALUES
+  ('Fritas', 1000, 0),
+  ('Rústica', 1300, 1),
+  ('Onion rings', 1300, 2),
+  ('Maionese Cabanhas', 400, 3),
+  ('Não quero acompanhamento', 0, 4)
+) AS a("name", "price_delta_cents", "sort_order");
+
+-- Confere que o catálogo ativo ficou exatamente no recorte pedido.
+DO $$
+DECLARE
+  active_categories int;
+  active_combos int;
+  active_components int;
+  active_combo_items int;
+  active_modifier_groups int;
+  active_modifiers int;
+BEGIN
+  SELECT count(*) INTO active_categories
+  FROM "categories"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL;
+
+  SELECT count(*) INTO active_combos
+  FROM "products"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL
+    AND "kind" = 'combo';
+
+  SELECT count(*) INTO active_components
+  FROM "products"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL
+    AND "kind" <> 'combo';
+
+  SELECT count(*) INTO active_combo_items
+  FROM "combo_items"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL;
+
+  SELECT count(*) INTO active_modifier_groups
+  FROM "modifier_groups"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL;
+
+  SELECT count(*) INTO active_modifiers
+  FROM "modifiers"
+  WHERE "tenant_id" = '019fa903-04e5-7755-8102-b176b2e0775f'
+    AND "deleted_at" IS NULL;
+
+  IF active_categories <> 4 OR active_combos <> 7 OR active_components <> 29
+     OR active_combo_items <> 35 OR active_modifier_groups <> 2 OR active_modifiers <> 9 THEN
+    RAISE EXCEPTION
+      'Catálogo Cabanhas inesperado: categorias %, combos %, componentes %, combo_items %, grupos %, modificadores %',
+      active_categories, active_combos, active_components, active_combo_items,
+      active_modifier_groups, active_modifiers;
+  END IF;
+END $$;
+
 -- ─── Zonas: reset do que não é das 4 cidades ─────────────────────────────────
 --
 -- O tenant da Cabanhas herdou a `Zona padrão (10km)` do `pnpm db:seed`
