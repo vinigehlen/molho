@@ -12,7 +12,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Percent,
-  Printer,
   Settings,
   Star,
   Store,
@@ -42,10 +41,12 @@ const NAV_ITEMS: NavItem[] = [
   // sob abas em /gestor/promocoes (ver promo-tabs.tsx).
   { href: '/gestor/promocoes', label: 'Promoções', icon: Percent, alsoActiveFor: ['/gestor/cupons', '/gestor/fidelidade'] },
   { href: '/gestor/avaliacoes', label: 'Avaliações', icon: Star },
-  { href: '/gestor/impressao', label: 'Impressão', icon: Printer },
   { href: '/gestor/assinatura', label: 'Assinatura', icon: CreditCard },
-  { href: '/gestor/configuracao', label: 'Configuração', icon: Settings },
 ];
+
+// Impressão foi para dentro de Configuração (seção "Impressora") e não tem
+// mais entrada própria. Configuração fica fixada no rodapé, junto de "Sair".
+const CONFIG_ITEM: NavItem = { href: '/gestor/configuracao', label: 'Configuração', icon: Settings };
 
 export interface SidebarProps {
   tenantName: string;
@@ -80,6 +81,27 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
         );
       })}
     </nav>
+  );
+}
+
+/** Configuração fixada no rodapé, logo acima de "Sair". */
+function ConfigLink({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const active = pathname === CONFIG_ITEM.href;
+  const Icon = CONFIG_ITEM.icon;
+  return (
+    <Link
+      href={CONFIG_ITEM.href}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
+      title={collapsed ? CONFIG_ITEM.label : undefined}
+      className={`flex items-center gap-3 min-h-11 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-colors ${
+        active ? 'bg-brand text-on-brand' : 'text-text-muted hover:bg-bg hover:text-text'
+      } ${collapsed ? 'justify-center' : ''}`}
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <span className={collapsed ? 'sr-only' : 'truncate'}>{CONFIG_ITEM.label}</span>
+    </Link>
   );
 }
 
@@ -121,6 +143,7 @@ export function Sidebar({ tenantName, collapsed, onToggleCollapsed, mobileOpen, 
         </div>
         <NavList collapsed={collapsed} />
         <div className="border-t border-border p-2">
+          <ConfigLink collapsed={collapsed} />
           <button
             type="button"
             onClick={onLogout}
@@ -162,6 +185,7 @@ export function Sidebar({ tenantName, collapsed, onToggleCollapsed, mobileOpen, 
             </div>
             <NavList collapsed={false} onNavigate={onCloseMobile} />
             <div className="border-t border-border p-2">
+              <ConfigLink collapsed={false} onNavigate={onCloseMobile} />
               <button
                 type="button"
                 onClick={() => {

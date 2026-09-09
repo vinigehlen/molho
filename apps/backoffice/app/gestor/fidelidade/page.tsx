@@ -74,8 +74,14 @@ export default function FidelidadePage() {
         <p className="text-body text-text-muted">Carregando…</p>
       ) : (
         <div className="flex max-w-sm flex-col gap-4 rounded-lg border border-border bg-bg-card p-4">
+          <div className="rounded-md bg-bg p-3">
+            <p className="text-caption text-text-muted">Configurado no momento</p>
+            <p className="text-title-lg tabular-nums text-text">
+              {config ? `${config.cashbackPercent}%` : '—'}
+            </p>
+          </div>
           <MoInput
-            label="Cashback (%)"
+            label="Novo percentual de cashback (%)"
             inputMode="numeric"
             value={draft}
             onChange={(e) => {

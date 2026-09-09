@@ -1846,7 +1846,10 @@ export default function CardapioPage() {
                   })}
               </div>
             </section>
-            <aside className="hidden border-l border-border bg-bg/50 p-6 xl:flex xl:flex-col xl:items-center xl:justify-center">
+            {/* Sem `border-l`: com a coluna vazia (nada selecionado) a linha
+                vertical ficava "perdida" no meio da lista. O tom `bg-bg/50`
+                já separa a área onde o painel de edição vai aparecer. */}
+            <aside className="hidden bg-bg/50 p-6 xl:flex xl:flex-col xl:items-center xl:justify-center">
               {!selectedProduct && !creatingProduct && (
                 <div className="max-w-xs text-center">
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[20px] bg-brand-faint text-brand-strong">

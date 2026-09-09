@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, PartyPopper, Plus, Printer, Share2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { PrinterSettings } from '../impressao/printer-settings';
 import type { DayOfWeek, Shift, StoreSetup, ThemeKey, UpdateStoreSetupInput } from '@molho/contracts';
 import { MoButton, MoConfetti, MoQrCode, MoSheet, THEME_KEYS, THEMES } from '@molho/ui';
 import { getStaffSession, setStaffSession } from '../../../lib/staff-session';
@@ -822,9 +823,7 @@ export default function ConfiguracaoPage() {
             </div>
             <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text-muted">Opcional</span>
           </div>
-          <Link href="/gestor/impressao" className="mt-4 inline-block rounded-[14px] border border-border px-4 py-2 text-sm font-semibold text-text hover:border-border-strong">
-            Configurar impressora
-          </Link>
+          <PrinterSettings />
         </section>
       </div>
 
