@@ -47,7 +47,12 @@ export class PrintingApi {
     this.assertAuthorized(res);
     if (!res.ok) throw new PrintingApiError(res.status, `claim falhou (${res.status})`);
 
-    const body = (await res.json()) as Partial<PrintJob>;
+    // Fila vazia → a API responde 200 com corpo vazio (Nest serializa `null`
+    // assim). `res.json()` num corpo vazio lança "Unexpected end of JSON input"
+    // — por isso lê como texto e trata vazio/`null` como "sem job".
+    const text = (await res.text()).trim();
+    if (!text || text === 'null') return null;
+    const body = JSON.parse(text) as Partial<PrintJob>;
     return body.id && body.status === 'printing' && body.ticketText ? (body as PrintJob) : null;
   }
 

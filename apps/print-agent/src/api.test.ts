@@ -42,6 +42,13 @@ describe('PrintingApi', () => {
     expect(fetchImpl.mock.calls[0]?.[1]?.headers).not.toHaveProperty('x-tenant-id');
   });
 
+  it('fila vazia: 200 com corpo vazio ou "null" → null, sem lançar', async () => {
+    for (const body of ['', 'null', '  ', '{}']) {
+      const api = new PrintingApi(CONFIG, vi.fn().mockResolvedValue(new Response(body, { status: 200 })));
+      await expect(api.claimNext()).resolves.toBeNull();
+    }
+  });
+
   it('401/403 vira PrintDeviceRevokedError', async () => {
     for (const status of [401, 403]) {
       const api = new PrintingApi(CONFIG, vi.fn().mockResolvedValue(new Response(null, { status })));
