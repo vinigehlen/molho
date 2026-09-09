@@ -86,6 +86,8 @@ const adminOrderDeliverySchema = z.strictObject({
  */
 export const adminOrderSchema = z.strictObject({
   id: z.uuid(),
+  /** Número sequencial por tenant (#00001, #00002, …). `null` só para pedidos legados. */
+  orderNumber: z.int().positive().nullable(),
   status: orderStatusSchema,
   version: z.int().nonnegative(),
   createdAt: z.iso.datetime(),

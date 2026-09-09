@@ -1,6 +1,6 @@
 import { type ModuleCache, ModuleService, PrismaModuleDataSource } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
-import { buildKitchenTicket } from './print-ticket';
+import { buildCounterTicket, buildKitchenTicket } from './print-ticket';
 import type {
   ClaimPrintJobParams,
   FailPrintJobParams,
@@ -13,9 +13,15 @@ import type {
 const INITIAL_TICKET_WIDTH = 80;
 const INITIAL_TICKET_CUT = true;
 
-export interface QueuePrintJobParams {
+/** As duas vias de cada pedido. `counter` = conferência do balcão (tudo);
+ *  `kitchen` = cozinha (sem preço/endereço). */
+export const TICKET_COPIES = ['counter', 'kitchen'] as const;
+export type TicketCopy = (typeof TICKET_COPIES)[number];
+
+export interface QueueOrderTicketsParams {
   orderId: string;
-  idempotencyKey: string;
+  /** Prefixo da chave de idempotência; vira `<prefix>:counter` e `<prefix>:kitchen`. */
+  idempotencyPrefix: string;
   width: number;
   cut: boolean;
 }
@@ -39,23 +45,31 @@ export class PrintingService {
     private readonly moduleCache: ModuleCache,
   ) {}
 
-  async queueOrderTicket(params: QueuePrintJobParams): Promise<PrintJobRecord> {
+  /** Enfileira as DUAS vias do pedido (balcão + cozinha), uma por job. */
+  async queueOrderTickets(params: QueueOrderTicketsParams): Promise<PrintJobRecord[]> {
     const order = await this.repo.findOrderForTicket(params.orderId);
     if (!order) throw new PrintOrderNotFoundError();
-    return this.repo.createIdempotent({
-      orderId: params.orderId,
-      idempotencyKey: params.idempotencyKey,
-      ticketText: buildKitchenTicket(order),
-      width: params.width,
-      cut: params.cut,
-    });
+
+    const jobs: PrintJobRecord[] = [];
+    for (const copy of TICKET_COPIES) {
+      jobs.push(
+        await this.repo.createIdempotent({
+          orderId: params.orderId,
+          idempotencyKey: `${params.idempotencyPrefix}:${copy}`,
+          ticketText: copy === 'counter' ? buildCounterTicket(order) : buildKitchenTicket(order),
+          width: params.width,
+          cut: params.cut,
+        }),
+      );
+    }
+    return jobs;
   }
 
-  async queueInitialOrderTicketIfActive(orderId: string): Promise<PrintJobRecord | null> {
+  async queueInitialOrderTicketsIfActive(orderId: string): Promise<PrintJobRecord[] | null> {
     if (!(await this.isPrintingActive())) return null;
-    return this.queueOrderTicket({
+    return this.queueOrderTickets({
       orderId,
-      idempotencyKey: `order:${orderId}:kitchen:v1`,
+      idempotencyPrefix: `order:${orderId}:v2`,
       width: INITIAL_TICKET_WIDTH,
       cut: INITIAL_TICKET_CUT,
     });

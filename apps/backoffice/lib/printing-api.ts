@@ -99,19 +99,22 @@ export async function fetchPrintQueueStatus(): Promise<PrintQueueStatus> {
 }
 
 /**
- * Segunda via durável: cada clique gera uma chave nova e cria um job separado.
- * A impressão física acontece no consumidor da fila; aqui só enfileiramos.
+ * Reimprime as DUAS vias do pedido (balcão + cozinha). Cada clique gera um
+ * prefixo novo → dois jobs separados. A impressão física é no agente.
  */
-export async function queueKitchenTicketCopy(orderId: string, idempotencyKey: string): Promise<QueuePrintJobResult> {
+export async function queueOrderTicketCopies(
+  orderId: string,
+  idempotencyPrefix: string,
+): Promise<QueuePrintJobResult[]> {
   const res = await apiFetch(`/v1/admin/printing/orders/${encodeURIComponent(orderId)}/jobs`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ idempotencyKey, width: 80, cut: true }),
+    body: JSON.stringify({ idempotencyPrefix, width: 80, cut: true }),
   });
 
   if (res.status === 403) throw new PrintingUnavailableError();
   if (!res.ok) throw new Error(`Falha ao enfileirar impressão (${res.status})`);
-  return (await res.json()) as QueuePrintJobResult;
+  return (await res.json()) as QueuePrintJobResult[];
 }
 
 export async function claimNextPrintJob(workerId: string, leaseSeconds: number, width = 80): Promise<ClaimedPrintJob | null> {

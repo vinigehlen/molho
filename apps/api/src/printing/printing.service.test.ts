@@ -15,11 +15,33 @@ import type { RequestContextService } from '../context/request-context.service';
 
 const ORDER: PrintTicketOrder = {
   id: '018f3f6b-7d1a-7000-9000-000000000123',
+  orderNumber: 42,
   createdAt: new Date('2026-08-13T22:42:00.000Z'),
   fulfillmentType: 'delivery',
+  fulfillmentDeadlineAt: new Date('2026-08-13T23:30:00.000Z'),
+  scheduledFor: null,
+  paymentMethod: 'pix',
+  changeForCents: null,
+  subtotalCents: 1000,
+  deliveryFeeCents: 800,
+  discountCents: 0,
+  totalCents: 1800,
+  currentTotalCents: null,
+  notes: null,
   customer: { name: 'Maria' },
   store: { timezone: 'America/Sao_Paulo' },
-  items: [{ name: 'X-Burger', quantity: 1, notes: null, modifiers: [] }],
+  delivery: {
+    label: 'Casa',
+    street: 'Rua X',
+    number: '123',
+    complement: null,
+    neighborhood: 'Centro',
+    city: 'Sao Paulo',
+    state: 'SP',
+    postalCode: '00000-000',
+    referencePoint: null,
+  },
+  items: [{ name: 'X-Burger', quantity: 1, lineTotalCents: 1000, notes: null, modifiers: [] }],
 };
 
 function job(overrides: Partial<PrintJobRecord> = {}): PrintJobRecord {
@@ -111,52 +133,62 @@ function service(repo: FakeRepo, active = true): PrintingService {
 }
 
 describe('PrintingService', () => {
-  it('cria job idempotente com comanda renderizada', async () => {
+  it('enfileira as DUAS vias (balcao + cozinha) com conteudo diferente', async () => {
     const repo = new FakeRepo();
 
-    const created = await service(repo).queueOrderTicket({
+    const jobs = await service(repo).queueOrderTickets({
       orderId: ORDER.id,
-      idempotencyKey: 'manual-1',
-      width: 58,
-      cut: false,
+      idempotencyPrefix: 'manual-1',
+      width: 80,
+      cut: true,
     });
 
-    expect(created.idempotencyKey).toBe('manual-1');
-    expect(repo.created).toHaveLength(1);
-    expect(repo.created[0]).toMatchObject({ orderId: ORDER.id, idempotencyKey: 'manual-1', width: 58, cut: false });
-    expect(repo.created[0]?.ticketText).toContain('1x X-Burger');
-    expect(repo.created[0]?.ticketText).not.toContain('R$');
+    expect(jobs).toHaveLength(2);
+    expect(repo.created.map((p) => p.idempotencyKey)).toEqual(['manual-1:counter', 'manual-1:kitchen']);
+
+    const [counter, kitchen] = repo.created;
+    expect(counter?.ticketText).toContain('VIA BALCAO');
+    expect(counter?.ticketText).toContain('PEDIDO #00042');
+    expect(counter?.ticketText).toContain('Rua X, 123');
+    expect(counter?.ticketText).toContain('R$');
+    expect(counter?.ticketText).toContain('Pagamento: PIX');
+
+    expect(kitchen?.ticketText).toContain('VIA COZINHA');
+    expect(kitchen?.ticketText).toContain('PEDIDO #00042');
+    expect(kitchen?.ticketText).toContain('1x X-Burger');
+    expect(kitchen?.ticketText).not.toContain('R$');
+    expect(kitchen?.ticketText).not.toContain('Rua X');
   });
 
-  it('segunda via e so outra idempotencyKey para o mesmo pedido', async () => {
+  it('reimpressao usa outro prefixo, mesmas duas vias', async () => {
     const repo = new FakeRepo();
     const printing = service(repo);
 
-    await printing.queueOrderTicket({ orderId: ORDER.id, idempotencyKey: 'manual-1', width: 80, cut: true });
-    await printing.queueOrderTicket({ orderId: ORDER.id, idempotencyKey: 'manual-2', width: 80, cut: true });
+    await printing.queueOrderTickets({ orderId: ORDER.id, idempotencyPrefix: 'a', width: 80, cut: true });
+    await printing.queueOrderTickets({ orderId: ORDER.id, idempotencyPrefix: 'b', width: 80, cut: true });
 
-    expect(repo.created.map((params) => params.idempotencyKey)).toEqual(['manual-1', 'manual-2']);
+    expect(repo.created.map((p) => p.idempotencyKey)).toEqual(['a:counter', 'a:kitchen', 'b:counter', 'b:kitchen']);
   });
 
   it('via automatica inicial nao cria job quando modulo de impressao esta desligado', async () => {
     const repo = new FakeRepo();
 
-    const result = await service(repo, false).queueInitialOrderTicketIfActive(ORDER.id);
+    const result = await service(repo, false).queueInitialOrderTicketsIfActive(ORDER.id);
 
     expect(result).toBeNull();
     expect(repo.created).toHaveLength(0);
   });
 
-  it('via automatica inicial usa chave deterministica, 80mm e corte', async () => {
+  it('via automatica inicial usa prefixo deterministico, 80mm e corte, duas vias', async () => {
     const repo = new FakeRepo();
 
-    await service(repo).queueInitialOrderTicketIfActive(ORDER.id);
+    await service(repo).queueInitialOrderTicketsIfActive(ORDER.id);
 
-    expect(repo.created[0]).toMatchObject({
-      idempotencyKey: `order:${ORDER.id}:kitchen:v1`,
-      width: 80,
-      cut: true,
-    });
+    expect(repo.created.map((p) => p.idempotencyKey)).toEqual([
+      `order:${ORDER.id}:v2:counter`,
+      `order:${ORDER.id}:v2:kitchen`,
+    ]);
+    expect(repo.created[0]).toMatchObject({ width: 80, cut: true });
   });
 
   it('pedido inexistente vira erro de dominio', async () => {
@@ -164,7 +196,7 @@ describe('PrintingService', () => {
     repo.order = null;
 
     await expect(
-      service(repo).queueOrderTicket({ orderId: ORDER.id, idempotencyKey: 'x', width: 80, cut: true }),
+      service(repo).queueOrderTickets({ orderId: ORDER.id, idempotencyPrefix: 'x', width: 80, cut: true }),
     ).rejects.toThrow(PrintOrderNotFoundError);
   });
 

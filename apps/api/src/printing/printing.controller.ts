@@ -37,13 +37,14 @@ export class PrintingController {
     return this.printing.status();
   }
 
+  /** Reimprime as DUAS vias (balcão + cozinha). Devolve os dois jobs criados. */
   @Post('orders/:orderId/jobs')
   @HttpCode(HttpStatus.CREATED)
   async createForOrder(@Param('orderId') orderId: string, @Body() dto: CreatePrintJobDto) {
     try {
-      return await this.printing.queueOrderTicket({
+      return await this.printing.queueOrderTickets({
         orderId,
-        idempotencyKey: dto.idempotencyKey,
+        idempotencyPrefix: dto.idempotencyPrefix,
         width: dto.width,
         cut: dto.cut,
       });

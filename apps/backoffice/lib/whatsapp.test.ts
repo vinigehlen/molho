@@ -5,6 +5,7 @@ import { orderSummary, waMeUrl, whatsappMessage } from './whatsapp';
 
 const ORDER: AdminOrder = {
   id: '018f0000-0000-7000-8000-000000000001',
+  orderNumber: 1,
   status: 'received',
   version: 0,
   createdAt: '2026-08-10T18:30:00.000Z',

@@ -101,7 +101,7 @@ export class CheckoutController {
       return result.revalidation;
     }
 
-    await this.printing.queueInitialOrderTicketIfActive(result.response.orderId);
+    await this.printing.queueInitialOrderTicketsIfActive(result.response.orderId);
 
     // Enfileira o cutuque de "pedido novo" — flush após o commit da criação
     // (OrderPublishInterceptor). version 0 = pedido recém-nascido.

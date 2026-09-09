@@ -16,6 +16,7 @@ function order(id: string, status: AdminOrder['status']): AdminOrder {
     flaggedReason: null,
     lastNotifiedAt: null,
     notificationCount: 0,
+    orderNumber: 1,
     customerName: 'X',
     customerVerified: true,
     paymentMethod: 'pix',

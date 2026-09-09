@@ -5,7 +5,7 @@ import {
   fetchPrintQueueStatus,
   markPrintJobFailed,
   markPrintJobPrinted,
-  queueKitchenTicketCopy,
+  queueOrderTicketCopies,
 } from './printing-api';
 import { apiFetch } from './api-client';
 
@@ -35,32 +35,32 @@ function printJob(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('queueKitchenTicketCopy', () => {
+describe('queueOrderTicketCopies', () => {
   beforeEach(() => {
     apiFetchMock.mockReset();
   });
 
-  it('cria segunda via com chave idempotente nova', async () => {
+  it('reimprime as duas vias mandando o prefixo', async () => {
     apiFetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify(printJob()), { status: 201, headers: { 'content-type': 'application/json' } }),
+      new Response(JSON.stringify([printJob(), printJob({ id: 'job-2' })]), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      }),
     );
 
-    await expect(queueKitchenTicketCopy('order/1', 'print-copy-1')).resolves.toMatchObject({
-      id: 'job-1',
-      status: 'queued',
-    });
+    await expect(queueOrderTicketCopies('order/1', 'manual:x')).resolves.toHaveLength(2);
 
     expect(apiFetchMock).toHaveBeenCalledWith('/v1/admin/printing/orders/order%2F1/jobs', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ idempotencyKey: 'print-copy-1', width: 80, cut: true }),
+      body: JSON.stringify({ idempotencyPrefix: 'manual:x', width: 80, cut: true }),
     });
   });
 
   it('traduz 403 em módulo de impressão indisponível', async () => {
     apiFetchMock.mockResolvedValueOnce(new Response(null, { status: 403 }));
 
-    await expect(queueKitchenTicketCopy('order-1', 'print-copy-1')).rejects.toBeInstanceOf(PrintingUnavailableError);
+    await expect(queueOrderTicketCopies('order-1', 'manual:x')).rejects.toBeInstanceOf(PrintingUnavailableError);
   });
 });
 
