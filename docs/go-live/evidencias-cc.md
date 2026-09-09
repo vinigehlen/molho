@@ -388,3 +388,24 @@ enfileira; quem imprime é o agente (ESC/POS cru, sem diálogo).
 doc 15. Mudança mínima (unmount + delete de código morto). **Codex: revisar no
 rebase** — se a árvore não-commitada de vocês tocou esses arquivos, é
 delete/modify; os componentes estavam mortos, a decisão certa é aceitar o delete.
+
+### C2.2 — deploy em staging (2026-09-09)
+
+**API `molho-api-staging` → v41** (`fly deploy`, imagem `deployment-01M240WNHTCQ89HVF24DG0BQYT`).
+- 1º deploy **falhou** e o NG-05 pegou um problema real: `MOLHO_DEBUG_PUBSUB` estava
+  ligado no secret store do staging (`NODE_ENV=production` lá). `validate-env` recusou o
+  boot, máquina entrou em crash-loop, deploy abortou — staging seguiu na v39 (sem outage).
+  Fix: `fly secrets unset MOLHO_DEBUG_PUBSUB`.
+- 2º deploy verde. **2 máquinas em `gru`, checks 2/2 passing:**
+  `/health` → `{"status":"ok"}`; `/ready` → `{"status":"ready","db":"ok","redis":"ok"}`.
+  NG-07 confirmado num ambiente Fly real (o Fly checa `/ready` nas duas).
+- Rotas novas respondendo: `POST /v1/printing/agent/jobs/claim` → 401 (não 404),
+  `GET /v1/admin/printing/devices` → 401. Rota velha de staff mantida.
+- Máquina 1 tinha ficado presa no crash-loop do deploy falho → `fly machine start`.
+
+**Backoffice `molho-backoffice-staging` → `staging-app.molho.live`** (`vercel deploy --prod`,
+`dpl_ALS5nsxvDUxSkBAHaUu49kATFSSY`, READY). Fix da impressão pelo navegador (C2.1) no ar.
+O projeto Vercel **não** deploya sozinho no push do `main` — é `vercel deploy` manual.
+
+**Falta:** parear um dispositivo no backoffice de staging → rodar o agente no PC da loja
+com a i7. E o e2e do fluxo do agente (agora dá pra escrever — migration + API no ar).
