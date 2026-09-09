@@ -140,7 +140,7 @@ export function MoSheet({
         aria-describedby={description ? descricaoId : undefined}
         tabIndex={-1}
         className={cn(
-          'relative flex max-h-[90vh] w-full flex-col',
+          'relative flex max-h-[90vh] w-full flex-col overflow-hidden',
           'bg-bg-card rounded-t-xl sm:rounded-xl sm:max-w-md',
           'shadow-3 animate-sheet-in focus-visible:outline-none',
           className,
@@ -180,7 +180,7 @@ export function MoSheet({
 
         <div className="flex-1 overflow-y-auto px-6 text-body text-text">{children}</div>
 
-        {footer ? <div className="flex items-center gap-3 p-6 pt-4">{footer}</div> : null}
+        {footer ? <div className="flex shrink-0 items-center gap-3 border-t border-border p-6 pt-4">{footer}</div> : null}
       </div>
     </div>,
     document.body,

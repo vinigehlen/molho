@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { LayoutGrid, List, MapPin, Star, User } from 'lucide-react';
+import { LayoutGrid, List, MapPin, ShoppingBag, Star, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { CustomerAddress, DeliveryMatchResponse, StorefrontProduct, StorefrontCategory } from '@molho/contracts';
@@ -240,13 +240,31 @@ export function TenantMenu({
             achado do critique de consumidor. Aparece sempre, mesmo sem
             sessão: a própria página trata o caso "sem pedido ainda" com uma
             mensagem, nunca um formulário de login morto. */}
-          <Link
-            href={`/${slug}/minha-conta`}
-            aria-label="Minha conta"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
-          >
-            <User className="h-5 w-5" aria-hidden="true" />
-          </Link>
+          <div className="flex shrink-0 items-center gap-1">
+            <Link
+              href={`/${slug}/carrinho`}
+              aria-label={
+                cart.itemCount > 0
+                  ? `Carrinho, ${cart.itemCount} ${cart.itemCount === 1 ? 'item' : 'itens'}`
+                  : 'Carrinho'
+              }
+              className="relative flex h-11 w-11 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
+            >
+              <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+              {cart.itemCount > 0 ? (
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-pill bg-on-brand px-1 text-[0.6875rem] font-bold leading-none text-brand">
+                  {cart.itemCount > 99 ? '99+' : cart.itemCount}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              href={`/${slug}/minha-conta`}
+              aria-label="Minha conta"
+              className="flex h-11 w-11 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
+            >
+              <User className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </header>
 
