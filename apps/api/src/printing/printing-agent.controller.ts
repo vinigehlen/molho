@@ -35,8 +35,10 @@ export class PrintingAgentController {
 
   @Post('jobs/claim')
   @HttpCode(HttpStatus.OK)
-  claim(@Body() dto: ClaimPrintJobDto) {
-    return this.printing.claimNext(dto);
+  async claim(@Body() dto: ClaimPrintJobDto) {
+    // `{}` explícito quando não há job — Nest serializaria `null` como corpo
+    // VAZIO, e `fetch().json()` no agente lança nesse caso. Ver api.ts.
+    return (await this.printing.claimNext(dto)) ?? {};
   }
 
   @Post('jobs/:id/printed')

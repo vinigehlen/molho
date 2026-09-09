@@ -219,6 +219,13 @@ describe('Printing agent e2e (NG-06)', () => {
     expect(row?.lastSeenAt).toBeInstanceOf(Date);
   }, 20_000);
 
+  it('fila vazia: claim do agente devolve 200 com {} (não corpo vazio)', async () => {
+    const dev = await pairDevice(main, 'Cozinha');
+    const res = await agentClaim(dev.secret, main.tenantId).expect(200);
+    expect(res.body).toEqual({});
+    expect(res.text === '' || res.text === '{}').toBe(true);
+  }, 20_000);
+
   it('restart no meio: reconfirmar com version velha dá 409, agente não reimprime', async () => {
     const dev = await pairDevice(main, 'Cozinha');
     await queueJob(main, `restart-${randomUUID()}`).expect(201);

@@ -63,7 +63,31 @@ MOLHO_PRINT_FORMAT=escpos pnpm --filter @molho/print-agent test-print
 
 Sem `MOLHO_PRINT_FORMAT=escpos` roda em dry-run (imprime no stdout).
 
-## Rodar a fila real
+## Instalar como serviço (configura uma vez, nunca mais mexe)
+
+O agente vira um serviço do SO: sobe no login, reinicia sozinho se cair, roda
+sem terminal. O lojista só precisa do código do dispositivo (do pareamento no
+backoffice) uma vez.
+
+**macOS** (LaunchAgent):
+```bash
+apps/print-agent/install/macos-install.sh molho_pd_SEU_CODIGO "Elgin i7"
+# o 2º argumento (nome da impressora) é opcional — sem ele, auto-detecta
+```
+Log: `~/Library/Logs/molho-print-agent/agent.log`. Remover: `install/macos-uninstall.sh`.
+
+**Windows** (Tarefa Agendada, sobe no logon, reinicia sozinho):
+```powershell
+powershell -ExecutionPolicy Bypass -File apps\print-agent\install\windows-install.ps1 `
+  -Token "molho_pd_SEU_CODIGO" -PrinterName "Elgin i7"
+```
+Log: `%LOCALAPPDATA%\molho-print-agent\agent.log`. Precisa do driver da
+impressora instalado.
+
+Trocar a credencial (revogou e pareou de novo): rode o instalador de novo com o
+código novo.
+
+## Rodar solto (diagnóstico)
 
 ```bash
 MOLHO_API_URL=https://api.staging.molho.live \
@@ -71,11 +95,9 @@ MOLHO_PRINT_DEVICE_TOKEN=molho_pd_... \
 MOLHO_PRINT_FORMAT=escpos \
 pnpm --filter @molho/print-agent start
 ```
-
-Diagnóstico de uma iteração: `MOLHO_PRINT_ONCE=1 … start`.
+Uma iteração e sai: `MOLHO_PRINT_ONCE=1 … start`.
 
 ## Limite atual
 
-Sem instalador/serviço empacotado ainda — o operador técnico roda o processo.
-Empacotar como executável único + serviço (Windows Service / LaunchAgent) é a
-próxima fatia.
+O instalador ainda exige o repo + pnpm + Node na máquina da loja. Empacotar
+como **executável único** (Node SEA) pra dispensar isso é a próxima fatia.
