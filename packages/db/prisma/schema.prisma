@@ -187,6 +187,7 @@ model Tenant {
   orderAdjustments      OrderAdjustment[]
   notificationLogs      NotificationLog[]
   printJobs             PrintJob[]
+  printDevices          PrintDevice[]
   coupons               Coupon[]
   promotions            Promotion[]
   reviews               Review[]
@@ -409,6 +410,8 @@ model User {
   orderStatusHistories OrderStatusHistory[]
   orderAdjustments     OrderAdjustment[]
   notificationLogs     NotificationLog[]
+  printDevicesCreated  PrintDevice[]        @relation("PrintDeviceCreatedBy")
+  printDevicesRevoked  PrintDevice[]        @relation("PrintDeviceRevokedBy")
 
   @@map("users")
 }
@@ -1658,6 +1661,40 @@ model PrintJob {
   // schema.
   @@index([tenantId, orderId])
   @@map("print_jobs")
+}
+
+/// Credencial do agente de impressão (NG-06). Não expira (diferente do token
+/// de staff), escopo fixo `printing`, revogável/rotacionável sem afetar staff.
+/// Segredo só em hash. FORCE RLS na migration — mesmo motivo de PrintJob (o
+/// guard de auth lê num contexto de plataforma).
+model PrintDevice {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String
+  /// Primeiros chars do segredo em claro — lookup do guard + exibição na UI.
+  tokenPrefix String    @map("token_prefix")
+  /// scrypt(segredo). Nunca o segredo em claro.
+  tokenHash   String    @map("token_hash")
+  /// Rotação incrementa; token antigo para de valer.
+  version     Int       @default(0)
+  scope       String    @default("printing")
+  /// Heartbeat do agente, atualizado com throttle (no máx. 1x/60s).
+  lastSeenAt  DateTime? @map("last_seen_at")
+  revokedAt   DateTime? @map("revoked_at")
+  revokedBy   String?   @map("revoked_by") @db.Uuid
+  createdBy   String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator User   @relation("PrintDeviceCreatedBy", fields: [createdBy], references: [id])
+  revoker User?  @relation("PrintDeviceRevokedBy", fields: [revokedBy], references: [id])
+
+  /// Índices parciais (lookup por prefixo, nome único) vivem só na migration —
+  /// Prisma não expressa índice parcial.
+  @@index([tenantId, createdAt])
+  @@map("print_devices")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────
