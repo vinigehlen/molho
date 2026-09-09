@@ -99,6 +99,7 @@ export const MODULES = {
   // ─── Gestão ─────────────────────────────────────────────────────────────────
   'dashboard.basic': { plans: PLANS, default: true },
   'dashboard.advanced': { plans: ['pro', 'premium'] },
+  'analytics.cmv': { plans: PLANS, default: true, requires: ['dashboard.basic'] },
   'fiscal.nfce': { addon: true, priceLabel: 'R$ 39,90/mês', external: true },
   multi_store: { plans: ['premium'] },
   franchise: { plans: ['premium'], tenantType: 'franchisor' },

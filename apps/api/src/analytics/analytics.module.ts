@@ -6,16 +6,23 @@ import { RequestContextService } from '../context/request-context.service';
 import { ModuleCheckModule } from '../modules/module-check.module';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
-import { ANALYTICS_SERVICE } from './analytics.tokens';
+import { CmvController } from './cmv.controller';
+import { CmvService } from './cmv.service';
+import { ANALYTICS_SERVICE, CMV_SERVICE } from './analytics.tokens';
 
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
-  controllers: [AnalyticsController],
+  controllers: [AnalyticsController, CmvController],
   providers: [
     {
       provide: ANALYTICS_SERVICE,
       inject: [RequestContextService],
       useFactory: (requestContext: RequestContextService) => new AnalyticsService(requestContext),
+    },
+    {
+      provide: CMV_SERVICE,
+      inject: [RequestContextService],
+      useFactory: (requestContext: RequestContextService) => new CmvService(requestContext),
     },
   ],
 })

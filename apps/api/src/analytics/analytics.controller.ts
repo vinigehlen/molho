@@ -24,7 +24,7 @@ function parseDate(value: QueryValue, fallback: Date): Date {
   return date;
 }
 
-function parsePeriod(query: Record<string, QueryValue>): AnalyticsPeriod {
+export function parseAnalyticsPeriod(query: Record<string, QueryValue>): AnalyticsPeriod {
   const toFallback = new Date();
   const fromFallback = new Date(toFallback);
   fromFallback.setDate(fromFallback.getDate() - 30);
@@ -54,7 +54,7 @@ export class AnalyticsController {
   @Get('overview')
   @RequirePermission('analytics.read')
   overview(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
-    return this.analytics.overview(storeId, parsePeriod(query));
+    return this.analytics.overview(storeId, parseAnalyticsPeriod(query));
   }
 
   @Get('timeseries')
@@ -62,13 +62,13 @@ export class AnalyticsController {
   timeseries(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
     const granularity = one(query.granularity) ?? 'day';
     if (granularity !== 'day' && granularity !== 'month') throw new BadRequestException('granularity inválida.');
-    return this.analytics.timeseries(storeId, parsePeriod(query), granularity as AnalyticsGranularity);
+    return this.analytics.timeseries(storeId, parseAnalyticsPeriod(query), granularity as AnalyticsGranularity);
   }
 
   @Get('peak-hours')
   @RequirePermission('analytics.read')
   peakHours(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
-    return this.analytics.peakHours(storeId, parsePeriod(query));
+    return this.analytics.peakHours(storeId, parseAnalyticsPeriod(query));
   }
 
   @Get('top-items')
@@ -76,24 +76,24 @@ export class AnalyticsController {
   topItems(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
     const sort = one(query.sort) ?? 'qty';
     if (sort !== 'qty' && sort !== 'revenue') throw new BadRequestException('sort inválido.');
-    return this.analytics.topItems(storeId, parsePeriod(query), parseLimit(query.limit, 10), sort as AnalyticsTopItemsSort);
+    return this.analytics.topItems(storeId, parseAnalyticsPeriod(query), parseLimit(query.limit, 10), sort as AnalyticsTopItemsSort);
   }
 
   @Get('customers')
   @RequirePermission('analytics.customers.read')
   customers(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
-    return this.analytics.customers(storeId, parsePeriod(query), parseLimit(query.limit, 10));
+    return this.analytics.customers(storeId, parseAnalyticsPeriod(query), parseLimit(query.limit, 10));
   }
 
   @Get('regions')
   @RequirePermission('analytics.read')
   regions(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
-    return this.analytics.regions(storeId, parsePeriod(query));
+    return this.analytics.regions(storeId, parseAnalyticsPeriod(query));
   }
 
   @Get('idle-items')
   @RequirePermission('analytics.read')
   idleItems(@Param('storeId') storeId: string, @Query() query: Record<string, QueryValue>) {
-    return this.analytics.idleItems(storeId, parsePeriod(query));
+    return this.analytics.idleItems(storeId, parseAnalyticsPeriod(query));
   }
 }

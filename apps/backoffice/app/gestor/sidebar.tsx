@@ -3,6 +3,7 @@
 import React from 'react';
 import {
   BarChart3,
+  Beef,
   ClipboardList,
   CreditCard,
   ListPlus,
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/gestor/complementos', label: 'Complementos', icon: ListPlus },
   { href: '/gestor/entrega', label: 'Entrega', icon: MapPin },
   { href: '/gestor/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/gestor/analytics/cmv', label: 'CMV', icon: Beef },
   // Promoções, Cupons e Fidelidade viram um item só — as três telas vivem
   // sob abas em /gestor/promocoes (ver promo-tabs.tsx).
   { href: '/gestor/promocoes', label: 'Promoções', icon: Percent, alsoActiveFor: ['/gestor/cupons', '/gestor/fidelidade'] },

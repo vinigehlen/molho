@@ -6,6 +6,7 @@ export * from './cart';
 export * from './catalog-admin';
 export * from './checkout';
 export * from './combo-admin';
+export * from './cmv';
 export * from './copy.pt-BR';
 export * from './coupon-admin';
 export * from './customer-profile';
