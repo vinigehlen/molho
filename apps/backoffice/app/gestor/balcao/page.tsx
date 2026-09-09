@@ -258,7 +258,7 @@ export default function BalcaoPage() {
           )}
         </section>
 
-        <aside className="rounded-[16px] border border-border bg-bg-card p-4">
+        <aside className="rounded-[16px] border border-border bg-bg-card p-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:self-start xl:overflow-y-auto">
           <h2 className="text-lg font-semibold text-text">Pedido</h2>
           <div className="mt-4 space-y-3">
             {cart.length === 0 ? (
