@@ -27,7 +27,6 @@ import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
 import { OrderCard } from './order-card';
-import { PrintJobConsumer } from './print-job-consumer';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
 function statusLabel(status: AdminOrder['status']): string {
@@ -283,7 +282,10 @@ export default function GestorPage() {
               Só sinalizados ({flaggedCount})
             </button>
           )}
-          {tenantId && <PrintJobConsumer active={online} />}
+          {/* O consumidor pelo navegador (window.print()) foi removido: a
+              impressão da comanda agora é sempre pelo agente local (NG-06),
+              que puxa a fila e imprime ESC/POS cru, sem diálogo do SO. O botão
+              "Imprimir" no card só enfileira. Ver apps/print-agent. */}
         </div>
       </div>
       {/* Abaixo de md: abas de coluna — cada uma tem contagem própria, então o
