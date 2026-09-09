@@ -289,3 +289,45 @@ contato do operador Cabanhas, aceite do Cabanhas, confirmar nome `molho-api` liv
 
 **Contratos da seção 4 do doc 15:** `docs/go-live/contratos-cc.md` §4 agora sem decisão PM
 pendente — pronto para o Codex congelar. Desbloqueia **C1** (`NG-05`).
+
+---
+
+## C1 — NG-05 (config fail-fast) + NG-07 (readiness) — 2026-09-09
+
+**Entrega:** `api: fail-fast de config em produção + readiness /ready (NG-05, NG-07)`
+**Branch / SHA:** `cc/no-go-backend-infra` @ `be3362c`
+**NO-GO cobertos:** `NG-05` (código; falta a matriz de env no Fly = C4/C5), `NG-07` (código;
+falta o check `/ready` na `fly.toml` produtiva = `NG-12`).
+
+**Arquivos:**
+- `apps/api/src/bootstrap/validate-env.ts` (+ test) — `validateProductionEnv()` no `main.ts`
+  antes de `NestFactory.create`.
+- `apps/api/src/health/readiness.{service,controller}.ts` (+ service test) — `GET /ready`.
+- `apps/api/src/main.ts`, `app.module.ts`, `context/context.module.ts` (exporta
+  `PRISMA_CLIENT`), `apps/api/fly.toml` (check em `/ready`).
+
+**Migrations:** nenhuma.
+
+**Variáveis novas:** nenhuma. `NG-05` passa a EXIGIR no boot (produção) o que já existe no
+`.env.example`: `DATABASE_URL` (pooled + role `app_runtime` + sem `staging`/`localhost`/
+`vercel.app`), `REDIS_URL` (`rediss://`), `S3_*` (todas as 6, incl. `S3_PUBLIC_URL`),
+`MOLHO_ENCRYPTION_KEYS`/`MOLHO_OTP_HMAC_KEY`/`MOLHO_EMAIL_PEPPER`/`MOLHO_JWT_SECRETS`,
+`MOLHO_CORS_ORIGINS` (https, sem curinga), `MOLHO_DEBUG_PUBSUB` desligado. `S3_PUBLIC_URL`
+em `r2.dev` é aceito (ata NG-01 §1.6).
+
+**Comandos:** `vitest run` (API 760 verde, +23 novos), `eslint` (0), `tsc --noEmit` (0),
+`nest build` (0). E2E não rodado nesta entrega.
+
+**Decisões de implementação:**
+- Guarda ÚNICA no boundary (`main.ts`), não em cada módulo — os ternários
+  `REDIS_URL ? Redis : InMemory` espalhados resolvem sozinhos pro caminho real quando o
+  boot garante a env. Não toquei `storage.module.ts` nem os outros.
+- `DIRECT_URL` fora do runtime: **não** validado (nada na API lê `DIRECT_URL`; um check aqui
+  poderia estourar no job de migration, que compartilha env). Fica pro runner de migration.
+- Guardas per-canal do `MessagingModule` (Resend/Zenvia) não duplicadas — já falham o boot.
+- `/ready`: `SELECT 1` + Redis `PING`, 1,5s de timeout cada, em paralelo, fora do request
+  context. Redis `skipped` sem `REDIS_URL` (só dev).
+
+**Riscos:** e2e de `/ready` contra infra real ainda não escrito (precisa Redis local + Neon).
+**Rollback:** reverter `be3362c`. `validateProductionEnv` é no-op fora de produção.
+**Próximo:** NG-06 (impressão) — contrato + migration `print_devices` primeiro.
