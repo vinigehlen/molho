@@ -408,4 +408,23 @@ delete/modify; os componentes estavam mortos, a decisão certa é aceitar o dele
 O projeto Vercel **não** deploya sozinho no push do `main` — é `vercel deploy` manual.
 
 **Falta:** parear um dispositivo no backoffice de staging → rodar o agente no PC da loja
-com a i7. E o e2e do fluxo do agente (agora dá pra escrever — migration + API no ar).
+com a i7 (teste físico).
+
+### C2.3 — e2e do fluxo do agente (2026-09-09)
+
+`apps/api/src/printing/printing-agent.e2e.test.ts` — 9 casos contra o Neon de staging
+(sem Redis; `MODULE_CACHE` = noop):
+
+| Caso | Cobre |
+|---|---|
+| emissão | `POST /devices` devolve `molho_pd_` uma vez; `GET /devices` nunca devolve segredo nem `token_hash` |
+| uso | agente reivindica → `ticketText` com o pedido → confirma `printed`; `last_seen_at` marcado |
+| restart | reconfirmar com `version` velha → 409 (não reimprime) |
+| rotação | segredo velho → 401; novo → 200; `version` incrementa |
+| revogação | efeito imediato → 401 |
+| tenant cruzado | segredo do B + `x-tenant-id` do A → 401; B não reivindica job do A |
+| módulo desligado | claim do agente → 403 (`@RequireModule`) |
+| segredo não logado | `audit_log` de paired/rotated/revoked não contém o segredo nem `molho_pd_` |
+| isolamento de rota | token de staff na rota do agente → 401; segredo de device na rota de staff → 401 |
+
+Roda: `pnpm --filter @molho/api test:e2e` (ou o arquivo isolado). 9/9 verde.
