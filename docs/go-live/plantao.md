@@ -37,8 +37,8 @@ Incidente P1 dispara também mensagem manual no WhatsApp do plantonista e do ope
 | 1 máquina Fly não-ready | `fly machine restart <id> -a molho-api`; Fly já tira da rotação sozinha via check `/ready` |
 | Banco corrompido / dado perdido | restaurar do dump noturno em `s3://molho-backups/` para uma branch Neon nova, validar, então repontar `DATABASE_URL` |
 | Redis fora | Upstash console → status; se instância morta, criar nova e trocar `REDIS_URL` secret + `fly deploy` |
-| Dispositivo de impressão comprometido | backoffice → Impressão → revogar dispositivo (efeito imediato); parear de novo |
-| Agente de impressão parado | verificar processo no PC da loja; reiniciar; conferir estado "credencial revogada" |
+| Dispositivo de impressão comprometido | backoffice → Configuração → Impressora → revogar dispositivo (efeito imediato); parear e reinstalar o agente com o código novo |
+| Agente de impressão parado | ver `impressora-setup-loja.md` § Gerenciar (macOS: `launchctl load`; Windows: `Start-ScheduledTask`); conferir o `agent.log` |
 
 ## Registro de incidente
 
