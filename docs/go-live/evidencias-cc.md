@@ -372,3 +372,19 @@ em `r2.dev` é aceito (ata NG-01 §1.6).
 
 **Riscos:** e2e do fluxo do agente não escrito (precisa a migration aplicada). CP850 vs CP860 na i7 — confirmar no teste físico, é trocar `MOLHO_PRINT_CODEPAGE`. macOS: a i7 precisa estar adicionada como impressora (Ajustes) ou fila CUPS raw. Empacotamento (executável único + serviço) não feito — próxima fatia.
 **Rollback:** reverter os 3 commits; `DROP TABLE print_devices` em staging.
+
+### C2.1 — fix: comanda pelo agente, não pelo navegador (`3cd6fb3`)
+
+Reportado no teste em staging: clicar no ícone de impressora no card do pedido
+abria o diálogo `window.print()` do SO e mandava PDF/PostScript pra térmica.
+
+Causa: `PrintJobConsumer` (consumidor "prova de conceito" pelo navegador) rodava
+na aba do gestor, reivindicava o job e chamava `window.print()`. Removido de
+`gestor/page.tsx`; deletados `print-job-consumer.tsx` e `kitchen-ticket.tsx`
+(mortos — `kitchen-ticket.tsx` já não era importado). O botão "Imprimir" só
+enfileira; quem imprime é o agente (ESC/POS cru, sem diálogo).
+
+**Cross-ownership:** `gestor/page.tsx` e esses dois componentes são do Codex pelo
+doc 15. Mudança mínima (unmount + delete de código morto). **Codex: revisar no
+rebase** — se a árvore não-commitada de vocês tocou esses arquivos, é
+delete/modify; os componentes estavam mortos, a decisão certa é aceitar o delete.
