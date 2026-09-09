@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flag } from 'lucide-react';
+import { Bell, Flag } from 'lucide-react';
 import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { refreshStaffSession } from '../../lib/staff-auth';
@@ -258,10 +258,13 @@ export default function GestorPage() {
           )}
           {!soundOn && (
             <button
-              className="rounded-full border border-border px-3 py-1 text-xs font-medium text-text"
+              type="button"
+              aria-label="Ativar som de novos pedidos"
+              title="Ativar som de novos pedidos"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text-muted hover:text-text"
               onClick={ativarSom}
             >
-              Ativar som
+              <Bell className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
           {/* flaggedCount === 0 some com o botão só quando o filtro JÁ está

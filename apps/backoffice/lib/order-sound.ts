@@ -9,9 +9,13 @@ export function diffNewIds(seen: Set<string>, currentIds: string[]): string[] {
 }
 
 /**
- * Beep de pedido novo via Web Audio — sem asset (ponytail), sem lib. Autoplay:
+ * Alerta de pedido novo via Web Audio — sem asset (ponytail), sem lib. Autoplay:
  * o browser bloqueia áudio até um gesto do usuário, então `unlock()` (chamado
  * no 1º clique) cria/retoma o AudioContext; `beep()` só soa depois disso.
+ *
+ * `beep()` toca um TOQUE DE TELEFONE: 3 repiques de ~1 s (bitom 440/480 Hz)
+ * com pausa curta entre eles — ~4 s no total, pra puxar a atenção do balcão,
+ * não um bip único que passa batido.
  */
 export class Beeper {
   private ctx: AudioContext | null = null;
@@ -40,17 +44,25 @@ export class Beeper {
   beep(): void {
     if (!this.ctx) return; // ainda não destravado — silêncio, não erro
     void this.ctx.resume();
-    this.tone(0.15, 0.2);
+    // Toque de telefone: 3 repiques de 1 s (bitom 440 + 480 Hz), pausa de 0,5 s.
+    const burst = 1;
+    const gap = 0.5;
+    for (let i = 0; i < 3; i += 1) {
+      const offset = i * (burst + gap);
+      this.tone(0.16, burst, 440, offset);
+      this.tone(0.16, burst, 480, offset);
+    }
   }
 
-  private tone(volume: number, durationSeconds: number): void {
+  private tone(volume: number, durationSeconds: number, frequency = 880, startOffset = 0): void {
     if (!this.ctx) return;
+    const startAt = this.ctx.currentTime + startOffset;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    osc.frequency.value = 880;
+    osc.frequency.value = frequency;
     gain.gain.value = volume;
     osc.connect(gain).connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + durationSeconds);
+    osc.start(startAt);
+    osc.stop(startAt + durationSeconds);
   }
 }
