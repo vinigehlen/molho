@@ -121,7 +121,12 @@ export const OrderCard = memo(function OrderCard({
         onClick={() => setExpanded((value) => !value)}
       >
         <div className="flex items-start justify-between gap-3">
-          <span className="font-medium text-text">{order.customerName}</span>
+          <span className="font-medium text-text">
+            {order.orderNumber != null && (
+              <span className="mr-1.5 tabular-nums text-text-muted">#{String(order.orderNumber).padStart(5, '0')}</span>
+            )}
+            {order.customerName}
+          </span>
           <span className="shrink-0 text-right text-xs tabular-nums text-text-muted">
             <span className="block">{isoToTime(order.createdAt)}</span>
             {/* Selo de prazo em 3 cores (Fase 2, plano do gestor — padrão

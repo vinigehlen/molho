@@ -25,7 +25,7 @@ import { useOrderQueue } from '../../lib/use-order-queue';
 import { isBackwardStaffTransition, isLegalStaffTransition } from '../../lib/order-queue';
 import { Beeper, diffNewIds } from '../../lib/order-sound';
 import { isoToTime } from '../../lib/format';
-import { PrintingUnavailableError, queueKitchenTicketCopy } from '../../lib/printing-api';
+import { PrintingUnavailableError, queueOrderTicketCopies } from '../../lib/printing-api';
 import { OrderCard } from './order-card';
 import { WhatsAppSheet } from './whatsapp-sheet';
 
@@ -186,9 +186,9 @@ export default function GestorPage() {
   async function queuePrintCopy(order: AdminOrder) {
     setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queueing', message: 'Enfileirando…' } }));
     try {
-      const key = `manual:${order.id}:${crypto.randomUUID()}`;
-      await queueKitchenTicketCopy(order.id, key);
-      setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queued', message: '2ª via na fila' } }));
+      const prefix = `manual:${order.id}:${crypto.randomUUID()}`;
+      await queueOrderTicketCopies(order.id, prefix);
+      setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'queued', message: '2 vias na fila' } }));
     } catch (error) {
       const message = error instanceof PrintingUnavailableError ? 'Impressão não ativa' : 'Não deu pra enfileirar';
       setPrintFeedback((prev) => ({ ...prev, [order.id]: { state: 'failed', message } }));

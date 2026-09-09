@@ -112,11 +112,29 @@ function auth(token = ownerToken, tenant = tenantId) {
   return { Authorization: `Bearer ${token}`, 'X-Tenant-Id': tenant };
 }
 
-function createJob(idempotencyKey: string, tenant = tenantId, token = ownerToken, targetOrder = orderId) {
+/** POST .../jobs cria SEMPRE 2 vias (balcão + cozinha). Devolve a resposta crua (array). */
+function createJob(idempotencyPrefix: string, tenant = tenantId, token = ownerToken, targetOrder = orderId) {
   return request(app.getHttpServer())
     .post(`/v1/admin/printing/orders/${targetOrder}/jobs`)
     .set(auth(token, tenant))
-    .send({ idempotencyKey, width: 80, cut: true });
+    .send({ idempotencyPrefix, width: 80, cut: true });
+}
+
+/** Enfileira as 2 vias e falha todas menos a 1ª — os testes de mecânica de fila
+ *  só precisam de UM job claimável. Devolve o job que sobrou. */
+async function queueOneJob(
+  prefix: string,
+  tenant = tenantId,
+  token = ownerToken,
+  targetOrder = orderId,
+): Promise<{ id: string; version: number }> {
+  const res = await createJob(prefix, tenant, token, targetOrder).expect(201);
+  const jobs = res.body as { id: string; version: number }[];
+  const extra = jobs.slice(1).map((j) => j.id);
+  if (extra.length > 0) {
+    await withTenantRls(tenant, (tx) => tx.printJob.updateMany({ where: { id: { in: extra } }, data: { status: 'failed' } }));
+  }
+  return jobs[0]!;
 }
 
 async function withTenantRls<T>(targetTenantId: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
@@ -175,22 +193,57 @@ afterEach(async () => {
 });
 
 describe('Printing e2e', () => {
-  it('cria job idempotente com comanda sem PII/preco', async () => {
+  it('cria as 2 vias idempotentes: balcão com tudo, cozinha sem preço/endereço', async () => {
     const first = await createJob('manual-idempotente').expect(201);
     const second = await createJob('manual-idempotente').expect(201);
 
-    expect(second.body.id).toBe(first.body.id);
-    expect(first.body.ticketText).toContain('1x X-Burger');
-    expect(first.body.ticketText).toContain('+ Bacon');
-    expect(first.body.ticketText).toContain('Obs: sem cebola');
-    expect(first.body.ticketText).not.toContain('R$');
-    expect(first.body.ticketText).not.toContain('Rua');
-    expect(first.body.ticketText).not.toContain('555');
+    const a = first.body as { id: string; idempotencyKey: string; ticketText: string }[];
+    const b = second.body as { id: string }[];
+    expect(a).toHaveLength(2);
+    expect(b.map((j) => j.id).sort()).toEqual(a.map((j) => j.id).sort()); // idempotente
+
+    const counter = a.find((j) => j.idempotencyKey.endsWith(':counter'))!;
+    const kitchen = a.find((j) => j.idempotencyKey.endsWith(':kitchen'))!;
+
+    expect(counter.ticketText).toContain('VIA BALCAO');
+    expect(counter.ticketText).toMatch(/PEDIDO #\d{5}/);
+    expect(counter.ticketText).toContain('1x X-Burger');
+    expect(counter.ticketText).toContain('R$');
+
+    expect(kitchen.ticketText).toContain('VIA COZINHA');
+    expect(kitchen.ticketText).toMatch(/PEDIDO #\d{5}/);
+    expect(kitchen.ticketText).toContain('+ Bacon');
+    expect(kitchen.ticketText).toContain('Obs: sem cebola');
+    expect(kitchen.ticketText).not.toContain('R$');
+    expect(kitchen.ticketText).not.toContain('Rua');
+  }, 15_000);
+
+  it('pedidos do mesmo tenant recebem números sequenciais distintos', async () => {
+    const order2 = await migratorPrisma.order.create({
+      data: {
+        tenantId,
+        storeId: (await migratorPrisma.store.findFirstOrThrow({ where: { tenantId } })).id,
+        customerId: (await migratorPrisma.customer.findFirstOrThrow({ where: { tenantId } })).id,
+        fulfillmentType: 'pickup',
+        paymentMethod: 'pix',
+        subtotalCents: 500,
+        deliveryFeeCents: 0,
+        totalCents: 500,
+        customerVerified: true,
+      },
+      select: { id: true, orderNumber: true },
+    });
+    const order1Number = (await migratorPrisma.order.findFirstOrThrow({ where: { id: orderId }, select: { orderNumber: true } }))
+      .orderNumber;
+    expect(order1Number).not.toBeNull();
+    expect(order2.orderNumber).not.toBeNull();
+    expect(order2.orderNumber).toBe((order1Number ?? 0) + 1);
+    await migratorPrisma.order.delete({ where: { id: order2.id } });
   }, 15_000);
 
   it('claim pula job travado por outra transacao com FOR UPDATE SKIP LOCKED', async () => {
-    const locked = await createJob('locked-job').expect(201);
-    const free = await createJob('free-job').expect(201);
+    const locked = await queueOneJob('locked-job');
+    const free = await queueOneJob('free-job');
 
     let release!: () => void;
     const hold = new Promise<void>((resolve) => {
@@ -202,7 +255,7 @@ describe('Printing e2e', () => {
         await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
         await tx.$executeRaw`SELECT set_config('app.is_platform', 'false', true)`;
         await tx.$queryRaw`
-          SELECT "id" FROM "print_jobs" WHERE "id" = ${locked.body.id}::uuid FOR UPDATE
+          SELECT "id" FROM "print_jobs" WHERE "id" = ${locked.id}::uuid FOR UPDATE
         `;
         await hold;
       },
@@ -217,8 +270,8 @@ describe('Printing e2e', () => {
         .send({ workerId: 'worker-skip', leaseSeconds: 60 })
         .expect(200);
 
-      expect(claimed.body.id).toBe(free.body.id);
-      expect(claimed.body.id).not.toBe(locked.body.id);
+      expect(claimed.body.id).toBe(free.id);
+      expect(claimed.body.id).not.toBe(locked.id);
       expect(claimed.body.status).toBe('printing');
       expect(claimed.body.leasedBy).toBe('worker-skip');
       expect(claimed.body.version).toBe(1);
@@ -229,11 +282,11 @@ describe('Printing e2e', () => {
   }, 15_000);
 
   it('re-lease pega job printing com lease expirado', async () => {
-    const created = await createJob('expired-lease').expect(201);
+    const created = await queueOneJob('expired-lease');
     await withTenantRls(tenantId, (tx) => tx.$executeRaw`
         UPDATE "print_jobs"
         SET "status" = 'printing', "leased_by" = 'dead-worker', "lease_until" = now() - interval '1 second', "version" = "version" + 1
-        WHERE "id" = ${created.body.id}::uuid
+        WHERE "id" = ${created.id}::uuid
       `);
 
     const claimed = await request(app.getHttpServer())
@@ -242,13 +295,13 @@ describe('Printing e2e', () => {
       .send({ workerId: 'worker-new', leaseSeconds: 60 })
       .expect(200);
 
-    expect(claimed.body.id).toBe(created.body.id);
+    expect(claimed.body.id).toBe(created.id);
     expect(claimed.body.leasedBy).toBe('worker-new');
     expect(claimed.body.version).toBe(2);
   }, 15_000);
 
   it('conclusao stale com version antiga devolve 409', async () => {
-    const created = await createJob('stale-finish').expect(201);
+    const created = await queueOneJob('stale-finish');
     const claimed = await request(app.getHttpServer())
       .post('/v1/admin/printing/jobs/claim')
       .set(auth())
@@ -256,13 +309,13 @@ describe('Printing e2e', () => {
       .expect(200);
 
     await request(app.getHttpServer())
-      .post(`/v1/admin/printing/jobs/${created.body.id}/printed`)
+      .post(`/v1/admin/printing/jobs/${created.id}/printed`)
       .set(auth())
       .send({ workerId: 'worker-finish', version: claimed.body.version - 1 })
       .expect(409);
 
     await request(app.getHttpServer())
-      .post(`/v1/admin/printing/jobs/${created.body.id}/printed`)
+      .post(`/v1/admin/printing/jobs/${created.id}/printed`)
       .set(auth())
       .send({ workerId: 'worker-finish', version: claimed.body.version })
       .expect(204);
@@ -271,14 +324,14 @@ describe('Printing e2e', () => {
   it('RLS impede tenant A de criar ou claimar job do tenant B', async () => {
     await createJob('cross-tenant-create', tenantId, ownerToken, otherOrderId).expect(404);
 
-    const otherJob = await createJob('other-tenant-job', otherTenantId, otherOwnerToken, otherOrderId).expect(201);
+    const otherJob = await queueOneJob('other-tenant-job', otherTenantId, otherOwnerToken, otherOrderId);
     const claimedByA = await request(app.getHttpServer())
       .post('/v1/admin/printing/jobs/claim')
       .set(auth(ownerToken, tenantId))
       .send({ workerId: 'worker-a', leaseSeconds: 60 })
       .expect(200);
 
-    expect(claimedByA.body?.id).not.toBe(otherJob.body.id);
+    expect(claimedByA.body?.id).not.toBe(otherJob.id);
   }, 15_000);
 
   it('claim sem job elegivel retorna null', async () => {

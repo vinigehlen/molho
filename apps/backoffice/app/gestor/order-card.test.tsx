@@ -9,6 +9,7 @@ import { OrderCard } from './order-card';
 function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
   return {
     id: '0193f1a0-0000-7000-8000-000000000001',
+    orderNumber: 1,
     status: 'ready',
     version: 0,
     createdAt: new Date().toISOString(),

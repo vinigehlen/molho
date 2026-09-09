@@ -5,6 +5,7 @@ import type { RequestContextService } from '../context/request-context.service';
 /** Campos selecionados do Order (flat) + join magro com Customer/items. Espelha o `select` abaixo. */
 export interface AdminOrderRow {
   id: string;
+  orderNumber: number | null;
   status: AdminOrder['status'];
   version: number;
   createdAt: Date;
@@ -47,6 +48,7 @@ export interface AdminOrderRow {
 export function toAdminOrder(row: AdminOrderRow): AdminOrder {
   return {
     id: row.id,
+    orderNumber: row.orderNumber,
     status: row.status,
     version: row.version,
     createdAt: row.createdAt.toISOString(),
@@ -93,6 +95,7 @@ export function toAdminOrder(row: AdminOrderRow): AdminOrder {
 
 const SELECT = {
   id: true,
+  orderNumber: true,
   status: true,
   version: true,
   createdAt: true,

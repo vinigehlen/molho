@@ -188,6 +188,7 @@ model Tenant {
   notificationLogs      NotificationLog[]
   printJobs             PrintJob[]
   printDevices          PrintDevice[]
+  orderNumberCounter    OrderNumberCounter?
   coupons               Coupon[]
   promotions            Promotion[]
   reviews               Review[]
@@ -1130,6 +1131,11 @@ model Order {
   /// É o estado normal da maioria das linhas, não uma linha "apagada").
   idempotencyKey String? @map("idempotency_key")
 
+  /// Número sequencial POR TENANT (#00001, #00002, …), atribuído por trigger
+  /// BEFORE INSERT (migration order_number). Nullable só por legado — pedido
+  /// novo sempre recebe. Não reseta.
+  orderNumber Int? @map("order_number")
+
   version   Int       @default(0)
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -1667,6 +1673,19 @@ model PrintJob {
 /// de staff), escopo fixo `printing`, revogável/rotacionável sem afetar staff.
 /// Segredo só em hash. FORCE RLS na migration — mesmo motivo de PrintJob (o
 /// guard de auth lê num contexto de plataforma).
+/// Contador de número de pedido por tenant. Uma linha por tenant; o trigger
+/// `assign_order_number` (migration order_number) faz o incremento atômico.
+/// `next_number` = próximo a atribuir. Sem RLS FORCE (igual a `orders`).
+model OrderNumberCounter {
+  tenantId   String   @id @map("tenant_id") @db.Uuid
+  nextNumber Int      @map("next_number")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("order_number_counters")
+}
+
 model PrintDevice {
   id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId    String    @map("tenant_id") @db.Uuid

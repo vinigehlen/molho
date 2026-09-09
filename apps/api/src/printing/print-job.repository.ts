@@ -149,12 +149,32 @@ export class PrismaPrintJobRepository implements PrintJobRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
   async findOrderForTicket(orderId: string): Promise<PrintTicketOrder | null> {
-    return this.requestContext.getClient().order.findFirst({
+    const row = await this.requestContext.getClient().order.findFirst({
       where: { id: orderId, deletedAt: null },
       select: {
         id: true,
+        orderNumber: true,
         createdAt: true,
         fulfillmentType: true,
+        fulfillmentDeadlineAt: true,
+        scheduledFor: true,
+        paymentMethod: true,
+        changeForCents: true,
+        subtotalCents: true,
+        deliveryFeeCents: true,
+        discountCents: true,
+        totalCents: true,
+        currentTotalCents: true,
+        notes: true,
+        deliveryLabel: true,
+        deliveryStreet: true,
+        deliveryNumber: true,
+        deliveryComplement: true,
+        deliveryNeighborhood: true,
+        deliveryCity: true,
+        deliveryState: true,
+        deliveryPostalCode: true,
+        deliveryReferencePoint: true,
         customer: { select: { name: true } },
         store: { select: { timezone: true } },
         items: {
@@ -162,12 +182,48 @@ export class PrismaPrintJobRepository implements PrintJobRepository {
           select: {
             name: true,
             quantity: true,
+            lineTotalCents: true,
             notes: true,
             modifiers: { orderBy: { createdAt: 'asc' }, select: { name: true } },
           },
         },
       },
     });
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      orderNumber: row.orderNumber,
+      createdAt: row.createdAt,
+      fulfillmentType: row.fulfillmentType,
+      fulfillmentDeadlineAt: row.fulfillmentDeadlineAt,
+      scheduledFor: row.scheduledFor,
+      paymentMethod: row.paymentMethod,
+      changeForCents: row.changeForCents,
+      subtotalCents: row.subtotalCents,
+      deliveryFeeCents: row.deliveryFeeCents,
+      discountCents: row.discountCents,
+      totalCents: row.totalCents,
+      currentTotalCents: row.currentTotalCents,
+      notes: row.notes,
+      customer: row.customer,
+      store: row.store,
+      delivery:
+        row.fulfillmentType === 'pickup' || row.deliveryLabel === null
+          ? null
+          : {
+              label: row.deliveryLabel,
+              street: row.deliveryStreet,
+              number: row.deliveryNumber,
+              complement: row.deliveryComplement,
+              neighborhood: row.deliveryNeighborhood,
+              city: row.deliveryCity,
+              state: row.deliveryState,
+              postalCode: row.deliveryPostalCode,
+              referencePoint: row.deliveryReferencePoint,
+            },
+      items: row.items,
+    };
   }
 
   async createIdempotent(params: CreatePrintJobParams): Promise<PrintJobRecord> {

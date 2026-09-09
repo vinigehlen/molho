@@ -115,11 +115,21 @@ async function pairDevice(g: Graph, name: string): Promise<{ id: string; secret:
   return { id: res.body.device.id, secret: res.body.secret, tokenPrefix: res.body.device.tokenPrefix };
 }
 
-function queueJob(g: Graph, idempotencyKey: string) {
-  return request(app.getHttpServer())
+/** Enfileira as 2 vias, falha a via BALCÃO e devolve a via COZINHA — assim o
+ *  teste tem UM job claimável e previsível. */
+async function queueJob(g: Graph, idempotencyPrefix: string): Promise<{ id: string; version: number }> {
+  const res = await request(app.getHttpServer())
     .post(`/v1/admin/printing/orders/${g.orderId}/jobs`)
     .set(staffAuth(g))
-    .send({ idempotencyKey, width: 80, cut: true });
+    .send({ idempotencyPrefix, width: 80, cut: true })
+    .expect(201);
+  const jobs = res.body as { id: string; version: number; idempotencyKey: string }[];
+  const kitchen = jobs.find((j) => j.idempotencyKey.endsWith(':kitchen')) ?? jobs[0]!;
+  const others = jobs.filter((j) => j.id !== kitchen.id).map((j) => j.id);
+  if (others.length > 0) {
+    await withRls(g.tenantId, (tx) => tx.printJob.updateMany({ where: { id: { in: others } }, data: { status: 'failed' } }));
+  }
+  return kitchen;
 }
 
 function agentClaim(secret: string, tenantId: string, workerId = 'agent-e2e') {
@@ -200,10 +210,10 @@ describe('Printing agent e2e (NG-06)', () => {
 
   it('uso: agente reivindica, imprime e confirma; heartbeat marca last_seen_at', async () => {
     const dev = await pairDevice(main, 'Cozinha');
-    const job = await queueJob(main, `use-${randomUUID()}`).expect(201);
+    const job = await queueJob(main, `use-${randomUUID()}`);
 
     const claimed = await agentClaim(dev.secret, main.tenantId).expect(200);
-    expect(claimed.body.id).toBe(job.body.id);
+    expect(claimed.body.id).toBe(job.id);
     expect(claimed.body.ticketText).toContain('1x X-Burger');
     expect(claimed.body.status).toBe('printing');
 
@@ -228,7 +238,7 @@ describe('Printing agent e2e (NG-06)', () => {
 
   it('restart no meio: reconfirmar com version velha dá 409, agente não reimprime', async () => {
     const dev = await pairDevice(main, 'Cozinha');
-    await queueJob(main, `restart-${randomUUID()}`).expect(201);
+    await queueJob(main, `restart-${randomUUID()}`);
     const claimed = await agentClaim(dev.secret, main.tenantId).expect(200);
 
     await request(app.getHttpServer())
@@ -255,13 +265,13 @@ describe('Printing agent e2e (NG-06)', () => {
     expect(rot.body.device.version).toBe(1);
 
     await agentClaim(dev.secret, main.tenantId).expect(401);
-    await queueJob(main, `rot-${randomUUID()}`).expect(201);
+    await queueJob(main, `rot-${randomUUID()}`);
     await agentClaim(rot.body.secret, main.tenantId).expect(200);
   }, 20_000);
 
   it('revogação: efeito imediato, agente recebe 401', async () => {
     const dev = await pairDevice(main, 'Cozinha');
-    await queueJob(main, `rev-${randomUUID()}`).expect(201);
+    await queueJob(main, `rev-${randomUUID()}`);
     await agentClaim(dev.secret, main.tenantId).expect(200);
 
     await request(app.getHttpServer())
@@ -276,9 +286,9 @@ describe('Printing agent e2e (NG-06)', () => {
     const devB = await pairDevice(other, 'Cozinha B');
     await agentClaim(devB.secret, main.tenantId).expect(401);
 
-    const jobA = await queueJob(main, `xt-${randomUUID()}`).expect(201);
+    const jobA = await queueJob(main, `xt-${randomUUID()}`);
     const claimedByB = await agentClaim(devB.secret, other.tenantId).expect(200);
-    expect(claimedByB.body?.id ?? null).not.toBe(jobA.body.id);
+    expect(claimedByB.body?.id ?? null).not.toBe(jobA.id);
   }, 20_000);
 
   it('módulo desligado: claim do agente → 403', async () => {

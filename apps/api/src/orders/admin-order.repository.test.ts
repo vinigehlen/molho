@@ -4,6 +4,7 @@ import { toAdminOrder, type AdminOrderRow } from './admin-order.repository';
 
 const ROW: AdminOrderRow = {
   id: '018f0000-0000-7000-8000-000000000001',
+  orderNumber: 42,
   status: 'preparing',
   version: 2,
   createdAt: new Date('2026-07-26T18:30:00.000Z'),

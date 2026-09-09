@@ -14,6 +14,7 @@ vi.mock('../../lib/orders-api', () => ({
 
 const ORDER: AdminOrder = {
   id: '018f3c2a-0000-7000-8000-000000000003',
+  orderNumber: 3,
   status: 'ready',
   version: 0,
   createdAt: '2026-09-02T22:00:00.000Z',
