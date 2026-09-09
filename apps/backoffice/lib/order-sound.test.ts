@@ -33,7 +33,7 @@ describe('Beeper', () => {
     Object.defineProperty(window, 'AudioContext', { configurable: true, value: previous });
   });
 
-  it('destrava tocando um pulso e permite beep posterior', () => {
+  it('destrava tocando um pulso e o beep vira um toque de telefone (3 repiques, bitom)', () => {
     const calls: string[] = [];
     class FakeAudioContext {
       currentTime = 10;
@@ -46,7 +46,7 @@ describe('Beeper', () => {
         return {
           frequency: { value: 0 },
           connect: () => ({ connect: () => undefined }),
-          start: () => calls.push('start'),
+          start: (at: number) => calls.push(`start:${at}`),
           stop: (at: number) => calls.push(`stop:${at}`),
         };
       }
@@ -62,7 +62,26 @@ describe('Beeper', () => {
     expect(beeper.unlocked).toBe(true);
     beeper.beep();
 
-    expect(calls).toEqual(['resume', 'start', 'stop:11', 'resume', 'start', 'stop:10.2']);
+    expect(calls).toEqual([
+      // unlock(): pulso curto de destrave
+      'resume',
+      'start:10',
+      'stop:11',
+      // beep(): toque de telefone — 3 repiques, cada um com bitom (2 osciladores)
+      'resume',
+      'start:10',
+      'stop:11',
+      'start:10',
+      'stop:11',
+      'start:11.5',
+      'stop:12.5',
+      'start:11.5',
+      'stop:12.5',
+      'start:13',
+      'stop:14',
+      'start:13',
+      'stop:14',
+    ]);
     Object.defineProperty(window, 'AudioContext', { configurable: true, value: previous });
   });
 });
