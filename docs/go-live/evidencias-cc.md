@@ -330,4 +330,45 @@ em `r2.dev` é aceito (ata NG-01 §1.6).
 
 **Riscos:** e2e de `/ready` contra infra real ainda não escrito (precisa Redis local + Neon).
 **Rollback:** reverter `be3362c`. `validateProductionEnv` é no-op fora de produção.
-**Próximo:** NG-06 (impressão) — contrato + migration `print_devices` primeiro.
+
+---
+
+## C2 — NG-06 impressão + plug & play na Elgin/Bematech i7 — 2026-09-09
+
+**Objetivo do usuário:** impressora funcionando **já em staging**, plug & play, Windows e Mac.
+
+**Branch:** `cc/no-go-backend-infra` @ `38e19ce` (commits `aed0990`, `8a137eb`, `38e19ce`).
+
+### O que entrou
+
+| Camada | Entrega |
+|---|---|
+| **Migration** | `20260909163000_print_devices` — tabela tenant-scoped, RLS **FORCE** (igual `print_jobs`), índices parciais (lookup por prefixo, nome único/loja), FKs `tenants`/`users`, soft delete. Model Prisma `PrintDevice`. |
+| **API** | `PrintDeviceService` (pair/rotate/revoke + authenticate/heartbeat), `PrintDeviceAuthGuard` (`Bearer molho_pd_...`, contexto de plataforma pro lookup, 401 uniforme), `PrintDeviceContextInterceptor`. `PrintingAgentController` `/v1/printing/agent/{jobs/claim,jobs/:id/printed,jobs/:id/failed}` — mesma semântica claim/lease/optimistic-lock, ator = dispositivo. `PrintDeviceAdminController` `/v1/admin/printing/devices` sob `team.manage`. Segredo: `molho_pd_<32B base64url>`, **scrypt** (node:crypto, sem dep), prefixo de 12 chars. Auditoria em pair/rotate/revoke. |
+| **Agente** | `SystemPrinter`: RAW pelo **spooler do SO sem dep nativa** — macOS/Linux `lp -o raw`, Windows `WritePrinter`/winspool via PowerShell. Auto-detecta a impressora (nome exato → regex de térmica → 1ª da lista). `codepage.ts`: **CP850** (default) e CP860 — acento de verdade (`ESC t n` + encode na página); `ascii` como fallback. Auth trocada pra `MOLHO_PRINT_DEVICE_TOKEN`; `MOLHO_TENANT_ID` vira opcional. 401/403 → backoff 30s, sai código 1 após 5x. |
+| **Backoffice** | Configuração → Impressora: "Dispositivos de impressão" — parear (código mostrado 1×, copiar), listar (último visto), gerar novo código, revogar. |
+
+**Decisões:** scrypt (não argon2, sem dep); rotas do agente em namespace próprio `/v1/printing/agent/*` (não herda `JwtAuthGuard`); `team.manage` (ata NG-01); transporte via spooler do SO com PowerShell no Windows (sem `@thiagoelg/node-printer` nativo — evita churn de pnpm-lock e dor de empacotamento).
+
+**Testes:** API 774 verde (+ segredo, service). print-agent 30 verde (codepage cp850/cp860, seleção de impressora, rota do agente, 401/403). Backoffice build ok. `tsc`/`eslint` ok nos 4 pacotes. Falhas pré-existentes em `staff-session`/`order-queue`/`staff-auth` (localStorage sob Node 26) **não** são desta mudança.
+
+### FALTA pra funcionar em staging (ações do usuário)
+
+1. **Aplicar a migration em staging** (bloqueado pro agente pelo classifier):
+   ```
+   ! cd packages/db && npx dotenv-cli -e ../../.env.local -- pnpm exec prisma migrate deploy
+   ```
+   (`.env.local` já aponta pra staging `ep-floral-water-ac7pi7e3` = projeto Neon `molho-staging`.)
+2. **Deploy da API de staging** com o código deste branch (rotas novas do agente).
+3. No backoffice de staging (loja piloto, módulo `printing.escpos` ativo): **Configuração → Impressora → Parear dispositivo** → copiar o `molho_pd_...`.
+4. No PC da loja (Mac ou Windows) com a i7 ligada e o driver instalado (só Windows):
+   ```
+   MOLHO_API_URL=https://api.staging.molho.live \
+   MOLHO_PRINT_DEVICE_TOKEN=molho_pd_... \
+   MOLHO_PRINT_FORMAT=escpos \
+   pnpm --filter @molho/print-agent start
+   ```
+   Teste seco antes: `MOLHO_PRINT_FORMAT=escpos pnpm --filter @molho/print-agent test-print`.
+
+**Riscos:** e2e do fluxo do agente não escrito (precisa a migration aplicada). CP850 vs CP860 na i7 — confirmar no teste físico, é trocar `MOLHO_PRINT_CODEPAGE`. macOS: a i7 precisa estar adicionada como impressora (Ajustes) ou fila CUPS raw. Empacotamento (executável único + serviço) não feito — próxima fatia.
+**Rollback:** reverter os 3 commits; `DROP TABLE print_devices` em staging.
