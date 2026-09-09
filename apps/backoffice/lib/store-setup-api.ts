@@ -44,8 +44,16 @@ export async function publishStore(storeId: string): Promise<StoreSetup> {
   return (await res.json()) as StoreSetup;
 }
 
-export async function uploadStoreBrandImage(storeId: string, kind: 'logo' | 'cover', file: File): Promise<string> {
-  const uploadFile = await compressProductImage(file);
+export async function uploadStoreBrandImage(
+  storeId: string,
+  kind: 'logo' | 'cover',
+  file: File,
+  options: { preprocessed?: boolean } = {},
+): Promise<string> {
+  // `preprocessed` = o recorte já saiu do editor no tamanho/peso finais e, no
+  // caso da logo, com transparência. Recomprimir aqui viraria JPEG e pintaria
+  // o fundo transparente de preto.
+  const uploadFile = options.preprocessed ? file : await compressProductImage(file);
   const uploadUrlRes = await apiFetch(`${setupPath(storeId)}/brand-upload-url`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

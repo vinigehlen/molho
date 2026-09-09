@@ -314,6 +314,17 @@ Duas regras merecem explicação, porque contrariam o senso comum:
 ### 6.2 White-label (storefront apenas) — 3 templates
 O lojista escolhe **1 entre 3 templates fechados** (constantes em `packages/ui/themes.ts`), todos AA por construção: **Brasa** #D63A1E (padrão) · **Folha** #0F8A5F · **Grafite** #141216 + acento âmbar. Ele também envia logo, capa e descrição. **Não existe seletor de cor livre** — sem rampa em runtime, sem validação de contraste dinâmica. Nunca customiza: neutros, funcionais, cor PIX, tipografia, raios, espaçamento. Backoffice, KDS e apps operacionais são sempre vermelho Molho. Rodapé do storefront: "feito com Molho".
 
+#### 6.2.1 Imagens de marca do lojista (logo e capa)
+
+Enviadas em **Configuração › Sua marca** (`apps/backoffice/.../configuracao/brand-image-field.tsx`). O campo abre um **editor de enquadramento** (pan + zoom, 1×–4×) com o recorte no formato exato de destino; o recorte é assado num `canvas` no tamanho final **no navegador** e só então sobe — o que o lojista vê é o que publica. `uploadStoreBrandImage(..., { preprocessed: true })` pula a recompressão do servidor (que viraria JPEG e pintaria transparência de preto).
+
+| | Recorte | Arquivo final | Peso | Onde aparece |
+|---|---|---|---|---|
+| **Logo** | 1:1 | 512 × 512 PNG (mantém transparência) | ≤ 500 KB | Avatar redondo no card de compartilhamento e ícone do PWA |
+| **Capa** | 1.91:1 | 1200 × 630 JPEG (fundo branco) | ≤ 1 MB | Fundo do card "fachada" do link compartilhado |
+
+Origem aceita: PNG, JPG ou WebP. Orientar o lojista: logo quadrada com folga em volta (recorte circular corta as bordas); capa deitada com o essencial no centro.
+
 ### 6.3 Responsividade
 Breakpoints: 0–639 (mobile, prioridade 1), 640–1023 (tablet/PDV), 1024+ (desktop backoffice). Storefront é mobile-first estrito; backoffice é desktop-first com versão mobile funcional do gestor de pedidos.
 
