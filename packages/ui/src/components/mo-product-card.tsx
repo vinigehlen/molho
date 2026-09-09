@@ -139,16 +139,18 @@ export function MoProductCard({
           disabled={!podeAdicionar}
           aria-label={`Adicionar ${name} ao carrinho`}
           className={cn(
-            'absolute inline-flex h-touch w-touch shrink-0 items-center justify-center rounded-pill shadow-2',
+            // Botão compacto (32px), no tamanho do "+" do iFood — é um atalho
+            // do toque no card inteiro (esse sim ≥44px), não o alvo primário.
+            'absolute inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill shadow-2',
             'transition duration-base ease-out active:scale-[.98]',
             'focus-visible:outline-none focus-visible:shadow-focus',
-            grid ? 'bottom-2 right-2' : 'right-0 top-1/2 -translate-y-1/2',
+            grid ? 'bottom-2 right-2' : 'right-1 top-1/2 -translate-y-1/2',
             podeAdicionar
               ? 'bg-brand text-on-brand hover:brightness-95'
               : 'bg-disabled-surface text-disabled-text cursor-not-allowed',
           )}
         >
-          <Plus className="h-5 w-5" aria-hidden="true" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
         </button>
       ) : null}
     </div>

@@ -165,11 +165,22 @@ function MoProductSheetInner({
       title={product.name}
       className={className}
       footer={
-        <div className="flex w-full items-center gap-4">
-          <MoStepper label={`Quantidade de ${product.name}`} value={quantidade} onChange={setQuantidade} min={1} />
-          <MoButton fullWidth disabled={grupoIncompleto} onClick={handleAdicionar}>
-            Adicionar • {formatCents(totalCents)}
-          </MoButton>
+        <div className="flex w-full items-center gap-3">
+          <MoStepper
+            label={`Quantidade de ${product.name}`}
+            value={quantidade}
+            onChange={setQuantidade}
+            min={1}
+            className="shrink-0"
+          />
+          {/* min-w-0 + flex-1: sem isso o `w-full` do botão somava com o
+              stepper e estourava a largura do sheet no mobile (o "−/+"
+              ficava cortado na borda). */}
+          <div className="min-w-0 flex-1">
+            <MoButton fullWidth disabled={grupoIncompleto} onClick={handleAdicionar}>
+              Adicionar • {formatCents(totalCents)}
+            </MoButton>
+          </div>
         </div>
       }
     >
