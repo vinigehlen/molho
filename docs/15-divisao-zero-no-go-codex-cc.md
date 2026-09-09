@@ -1,0 +1,381 @@
+# Divisão paralela — Zero NO-GO entre Codex e CC
+
+**Data-base:** 09/09/2026
+**Plano mestre:** `docs/14-plano-zero-no-go.md`
+**Publicação:** `docs/13-plano-go-live-producao-cabanhas.md`
+**Objetivo:** executar `NG-01` a `NG-15` no menor caminho crítico possível, com exatamente duas trilhas técnicas e sem conflito de arquivos.
+
+## 1. Papéis
+
+### Codex — release captain e produto público
+
+Responsável por:
+
+- storefront e resolução de tenant por domínio;
+- BFF público e E2E de navegador;
+- site, backoffice, URLs, metadata e headers dos fronts;
+- configuração e telemetria dos fronts;
+- projetos Vercel e release candidate dos fronts;
+- coordenação de decisões, jurídico, Cabanhas e matriz de evidências;
+- integração final, dry run e GO/NO-GO.
+
+### CC — backend, dados e runtime
+
+Responsável por:
+
+- API, contratos e Prisma;
+- configuração fail-fast do backend;
+- credencial e operação do agente de impressão;
+- readiness, Sentry da API, scrubbing e alertas técnicos;
+- Neon, Upstash Redis, R2 e Fly.io;
+- migrations, restore, cross-instance e rollback da API;
+- suporte técnico ao dry run.
+
+### Gates humanos
+
+Alguns resultados não podem ser autoaprovados por nenhum agente:
+
+- PM decide slug, checkout guest, pagamentos, backup/plano e domínio de assets;
+- jurídico aprova termos, privacidade e DPA;
+- Cabanhas aprova dados, cardápio, PIX, operação e teste físico;
+- responsável técnico autoriza o corte e assume o plantão.
+
+Esses gates pertencem a `NG-01`, `NG-14` e `NG-15`. Os agentes preparam e coletam evidências, mas não substituem o aceite humano.
+
+## 2. Ownership dos NO-GO
+
+| ID | DRI | Apoio | Entrega principal |
+|---|---|---|---|
+| `NG-01` | Codex | CC lista dependências técnicas | decisões, acessos e responsáveis |
+| `NG-02` | Codex | — | tenant por subdomínio |
+| `NG-03` | Codex | CC valida fronteira API | BFF e CORS seguro |
+| `NG-04` | Codex | CC congela slug na API | URLs produtivas e slug estável |
+| `NG-05` | CC | Codex valida envs dos fronts | fail-fast de configuração |
+| `NG-06` | CC | Codex valida UI/fluxo | credencial de dispositivo e impressão |
+| `NG-07` | CC | — | liveness/readiness reais |
+| `NG-08` | CC | Codex conecta os fronts | Sentry, alertas e PII scrubbing |
+| `NG-09` | Codex | CC fornece origins/telemetria | CSP enforcement, HSTS e headers |
+| `NG-10` | CC | — | Neon, roles, RLS e restore 30 dias |
+| `NG-11` | CC | — | Redis produtivo e cross-instance |
+| `NG-12` | CC | Codex consome URL técnica | Fly produtiva e rollback |
+| `NG-13` | CC | Codex testa upload pelo backoffice | R2 produtivo e domínio de assets |
+| `NG-14` | Codex | CC valida e-mail/API | Vercel, site, e-mail e legal |
+| `NG-15` | Codex | CC opera backend/infra no teste | dry run e sign-off final |
+
+Um DRI responde pela conclusão e evidência do item, mesmo quando há contribuição da outra trilha.
+
+## 3. Fronteiras de arquivos
+
+### Exclusivos do Codex
+
+- `apps/storefront/**`;
+- `apps/site/**`;
+- `apps/backoffice/**`, exceto impressão;
+- configurações Vercel dos três fronts;
+- `docs/13-plano-go-live-producao-cabanhas.md`;
+- `docs/14-plano-zero-no-go.md`;
+- este documento e matriz central de evidências.
+
+### Exclusivos do CC
+
+- `apps/api/**`;
+- `apps/api/fly.toml` e configuração produtiva Fly;
+- `apps/print-agent/**`;
+- `packages/db/**`;
+- `packages/contracts/**` para contratos backend/impressão;
+- `apps/backoffice/app/gestor/impressao/**`;
+- `apps/backoffice/lib/printing-api*`;
+- migrations e scripts seguros de verificação do banco.
+
+### Arquivos compartilhados controlados
+
+| Arquivo/área | Regra |
+|---|---|
+| `pnpm-lock.yaml` | evitar dependências novas; se inevitável, CC integra primeiro e Codex regenera após rebase |
+| package root/Turbo | somente Codex altera, após combinar o contrato com CC |
+| workflows CI | somente Codex altera; CC fornece os comandos necessários |
+| plano/matriz central | somente Codex edita; CC entrega evidência em handoff separado |
+| backoffice de impressão | somente CC edita; Codex apenas revisa/testa pelo comportamento público |
+
+Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita de handoff.
+
+## 4. Contratos de integração congelados antes dos PRs
+
+### BFF/API
+
+- browser chama apenas rotas same-origin da storefront;
+- proxy encaminha apenas allowlist de `/v1/store/*`;
+- namespace admin/plataforma nunca é proxyado;
+- API mantém CORS credenciado somente para `https://app.molho.live`;
+- variável server-only acordada: `MOLHO_API_INTERNAL_URL`;
+- timeout, tamanho máximo e headers permitidos ficam cobertos por teste.
+
+### Domínios
+
+- site: `https://molho.live`;
+- backoffice: `https://app.molho.live`;
+- API: `https://api.molho.live`;
+- Cabanhas: `https://cabanhas-bbq.molho.live`;
+- assets: domínio registrável separado, definido em `NG-01`;
+- Vercel recebe o domínio explícito do Cabanhas; não há wildcard neste piloto.
+
+### Banco
+
+- `DATABASE_URL`: pooled, papel `app_runtime`, somente runtime;
+- `DIRECT_URL`: direta, papel `app_migrator`, somente migration job;
+- projeto/branch produtivos ficam em `aws-sa-east-1`;
+- nenhuma cópia ou seed de staging;
+- janela de restore de 30 dias.
+
+### Impressão
+
+- dispositivo tenant-scoped;
+- segredo exibido uma vez e persistido somente em hash;
+- escopo exclusivo de impressão;
+- revogação e rotação auditáveis;
+- nenhum token de staff fixo;
+- URL da API obrigatória, sem default de staging.
+
+## 5. Ondas paralelas
+
+### Onda 0 — desbloqueio
+
+**Codex / R0**
+
+- fechar checklist humano de `NG-01`;
+- criar matriz de nomes de recursos e variáveis, sem valores;
+- confirmar contratos da seção 4;
+- registrar quem pode aprovar cada gate.
+
+**CC / C0**
+
+- confirmar todos os acessos técnicos necessários;
+- listar migrations e recursos externos que serão criados;
+- entregar desenho curto da credencial de impressão;
+- não editar código até os contratos da seção 4 estarem fechados.
+
+**Saída:** `ZG-0` verde.
+
+### Onda 1 — fundações em paralelo
+
+**Codex / R1 — `NG-02` + parte frontend de `NG-04`**
+
+- host routing e rewrite;
+- links, canonical, OG, sitemap e manifest;
+- URLs do site/backoffice;
+- remover defaults para staging/`vercel.app` nos fronts;
+- unitários e build dos fronts.
+
+**CC / C1 — `NG-05` + parte backend de `NG-04`**
+
+- schema de configuração da API;
+- proibir adapters mock/memória em produção;
+- validar roles/URLs e ausência de staging;
+- congelar slug publicado na camada de domínio/API;
+- testes negativos de startup e slug.
+
+**Integração:** R1 pode ser mergeado antes de C1. Codex rebasa e roda gate completo após ambos.
+
+### Onda 2 — fluxo público e impressão
+
+**Codex / R2 — `NG-03`**
+
+- BFF allowlisted;
+- clientes browser same-origin;
+- negativas de admin/path traversal/cookies;
+- E2E catálogo → checkout → tracking.
+
+**CC / C2 — `NG-06`**
+
+- contratos e migration do dispositivo;
+- API de pareamento, rotação e revogação;
+- autenticação do consumidor de impressão;
+- agente sem token de staff e sem URL de staging;
+- testes API/agente e idempotência.
+
+**Integração:** CC revisa o contrato de segurança do BFF; Codex revisa o comportamento público de pareamento sem editar os arquivos reservados.
+
+### Onda 3 — operação e segurança
+
+**Codex / R3 — parte frontend de `NG-08` + `NG-09`**
+
+- Sentry/release nos três fronts;
+- CSP report collection em staging;
+- correção das violações e enforcement;
+- headers finais e plano de HSTS;
+- E2E com CSP ativo.
+
+**CC / C3 — `NG-07` + `NG-08`**
+
+- `/health` e `/ready`;
+- checks Fly;
+- Sentry API e PII scrubbing;
+- alertas para 5xx, checkout, stream, impressão e dependências;
+- monitoramento e teste de alerta.
+
+**Integração:** C3 é mergeado antes da finalização de R3 para que Codex use as origins e a telemetria definitivas.
+
+### Onda 4 — infraestrutura produtiva sem DNS público
+
+**Codex / R4 — parte técnica de `NG-14`**
+
+- criar projetos Vercel produtivos;
+- configurar envs dos fronts;
+- gerar builds imutáveis sem domínio ativo;
+- testar pelas URLs técnicas;
+- preparar promoção e rollback;
+- preparar site, `www`, e-mail e pacote para revisão jurídica.
+
+**CC / C4 — `NG-10` + `NG-13`**
+
+- Neon, roles, migrations, RLS e restore;
+- R2, credencial, domínio de assets, CORS e smoke de upload.
+
+**CC / C5 — `NG-12` + `NG-11`**
+
+- Fly produtiva com duas máquinas em `gru`;
+- Upstash produtivo em São Paulo;
+- secrets, readiness e graceful shutdown;
+- cross-instance, restart e rollback;
+- preparar certificado da API sem apontar DNS.
+
+**Integração:** CC entrega URL `fly.dev` e origin de assets ao Codex; Codex gera um novo RC dos fronts com essas origins antes de congelar o SHA.
+
+### Onda 5 — consolidação e dry run
+
+**Codex / R5 — `NG-14` + `NG-15`**
+
+- confirmar e-mail e aceite jurídico;
+- provisionar Cabanhas pelo fluxo real;
+- importar e conferir dados aprovados;
+- coordenar o teste físico completo;
+- consolidar 15/15 evidências;
+- conduzir `ZG-1` a `ZG-5`.
+
+**CC / suporte C6**
+
+- acompanhar API, banco, Redis, R2 e impressão;
+- provar restore, cross-instance, alertas e revogação do agente;
+- corrigir somente incidentes de sua trilha;
+- entregar relatório técnico sanitizado.
+
+Nenhum dos dois aponta DNS ou habilita `channel.storefront` nesta onda. Isso pertence ao plano de publicação depois de `ZG-5`.
+
+## 6. Ordem de merge
+
+| Ordem | Entrega | Condição |
+|---|---|---|
+| 1 | `R1` | testes storefront/site/backoffice verdes |
+| 2 | `C1` | startup fail-fast e slug tests verdes |
+| 3 | `R2` | E2E BFF positivo e negativo verde |
+| 4 | `C2` | migration e impressão automatizada verdes |
+| 5 | `C3` | readiness/Sentry/alertas verdes |
+| 6 | `R3` | CSP enforcement e fronts verdes |
+| 7 | `C4` | restore e storage smoke verdes |
+| 8 | `C5` | Fly/Redis/cross-instance/rollback verdes |
+| 9 | `R4` | RC Vercel pronto e revertível |
+| 10 | `R5` | dry run, evidências e sign-off |
+
+Entregas independentes podem abrir PR simultaneamente, mas entram nessa ordem para reduzir rebases e tornar o SHA candidato reproduzível.
+
+## 7. Estratégia de branches e worktrees
+
+- Codex trabalha em `codex/no-go-front-release`;
+- CC trabalha em `cc/no-go-backend-infra`;
+- cada agente usa worktree próprio;
+- Codex mantém `codex/zero-no-go-integration` como branch de integração;
+- CC nunca faz merge direto na integração;
+- Codex integra somente PRs com handoff e evidência;
+- não executar builds Next simultâneos no mesmo worktree;
+- não compartilhar `.env.local` entre worktrees;
+- nenhum segredo entra em commit, diff, issue ou mensagem.
+
+Se ambos precisarem alterar `pnpm-lock.yaml`, C1/C2 entra primeiro; Codex rebasa, reaplica sua dependência e regenera o lockfile uma única vez.
+
+## 8. Handoff obrigatório por entrega
+
+Cada entrega R*/C* deve informar:
+
+```text
+Entrega:
+Branch / SHA:
+NO-GO cobertos:
+Arquivos alterados:
+Migrations:
+Variáveis novas (nomes, sem valores):
+Comandos executados e resultado:
+Evidências:
+Riscos restantes:
+Rollback:
+Próximo ponto de integração:
+```
+
+CC registra evidência em `docs/go-live/evidencias-cc.md` ou mensagem de handoff. Somente Codex marca a matriz central de `docs/14-plano-zero-no-go.md`.
+
+## 9. Gates de qualidade
+
+Cada PR roda seus testes focados. A branch de integração, após cada onda, roda:
+
+```bash
+pnpm lint
+pnpm test
+pnpm build
+pnpm --filter api test:e2e
+```
+
+Antes de `ZG-5`, executar também:
+
+- E2E browser completo nos hosts técnicos;
+- teste de isolamento tenant A/B;
+- teste físico de impressão por 60 minutos;
+- cross-instance Redis/SSE;
+- restore Neon;
+- rollback Vercel e Fly;
+- teste de alertas e scrubbing;
+- varredura por URLs/credenciais de staging.
+
+## 10. Quadro de acompanhamento
+
+| Entrega | DRI | Depende de | Estado inicial |
+|---|---|---|---|
+| `R0` | Codex | humanos | bloqueado por decisões |
+| `C0` | CC | acessos | pendente |
+| `R1` | Codex | contrato de domínios | pendente |
+| `C1` | CC | contrato de config/slug | pendente |
+| `R2` | Codex | `R1` | pendente |
+| `C2` | CC | desenho de impressão | pendente |
+| `C3` | CC | `C1` | pendente |
+| `R3` | Codex | `R1`, `C3` | pendente |
+| `C4` | CC | `C1`, acessos | pendente |
+| `C5` | CC | `C3`, `C4` | pendente |
+| `R4` | Codex | `R2`, `R3`, URL de `C5` | pendente |
+| `R5` | Codex | todas as anteriores | pendente |
+
+## 11. Caminho crítico esperado
+
+O caminho crítico provável é:
+
+```text
+NG-01 → C1/config → C3/readiness → C4/Neon → C5/Fly+Redis
+      → R4/RC Vercel → C2/R5 impressão física → ZG-5
+```
+
+Codex deve concluir roteamento, BFF, URLs e CSP enquanto CC percorre esse caminho. A única espera planejada é a URL técnica da API para gerar o RC final.
+
+Referência de capacidade, não compromisso de prazo:
+
+- ondas 0–1: 1–3 dias úteis;
+- ondas 2–3: 3–5 dias úteis;
+- onda 4: 2–3 dias úteis;
+- onda 5: 1–2 dias úteis e disponibilidade do Cabanhas;
+- total provável: 7–10 dias úteis com acessos e aprovações disponíveis.
+
+Não reduzir testes, restore, jurídico ou dry run para recuperar atraso.
+
+## 12. Prompt do CC
+
+> Você é o DRI da trilha backend/infra do Plano Zero NO-GO. Leia integralmente `AGENTS.md`, `docs/01-plano-produto.md`, `docs/02-definicoes-v1.md`, `docs/03-self-setup.md`, `docs/07-aprendizados.md`, `docs/14-plano-zero-no-go.md` e `docs/15-divisao-zero-no-go-codex-cc.md`. Trabalhe somente nos pacotes C0–C6 e respeite o ownership de arquivos. Comece por C0/C1; contratos e Prisma precedem API e agente. Não edite storefront/site nem a matriz central, não use seed em produção, não reutilize recursos de staging e não exponha segredos. Entregue cada pacote com o template da seção 8 e pare se faltar decisão, acesso ou gate humano. Não aponte DNS nem publique `channel.storefront`.
+
+## 13. Prompt do Codex
+
+> Atue como release captain e DRI da trilha pública do Plano Zero NO-GO. Execute R0–R5 em `docs/15-divisao-zero-no-go-codex-cc.md`, mantenha a matriz central e integre os handoffs do CC na ordem da seção 6. Não edite API, Prisma, contratos ou agente de impressão; combine interfaces antes dos PRs. Faça roteamento, BFF, URLs, fronts, CSP, Vercel, coordenação humana e dry run. Rode os gates completos após cada onda. Não aponte DNS nem publique o tenant antes de `ZG-5` 15/15 verde.
