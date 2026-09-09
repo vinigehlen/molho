@@ -268,6 +268,9 @@ function RecipesView({ recipes, ranking, loading }: { recipes: CmvRecipeSummary[
                 <span className="rounded-full bg-brand-subtle px-3 py-1 text-sm font-semibold text-brand-strong">{centsToBRL(recipe.custoTotalCents)}</span>
               </div>
               {product ? <p className="mt-3 text-sm text-text-muted">CMV {pct(product.cmvPercent)} · margem unitária {product.margemUnitariaCents === null ? 'sem dados' : centsToBRL(product.margemUnitariaCents)}</p> : null}
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                {recipe.components.length === 0 ? 'Sem ficha técnica' : `${recipe.components.length} componente${recipe.components.length === 1 ? '' : 's'}`}
+              </p>
               <div className="mt-4 grid gap-2">
                 {recipe.components.slice(0, 6).map((component) => (
                   <div key={`${recipe.recipeId}-${component.nome}-${component.quantidade}`} className="flex justify-between gap-3 text-sm">

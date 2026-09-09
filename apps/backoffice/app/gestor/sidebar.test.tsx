@@ -81,7 +81,9 @@ describe('Sidebar', () => {
     expect(config).toBeTruthy();
     expect(config?.closest('nav')).toBeNull();
     const sair = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Sair'));
-    expect(config?.compareDocumentPosition(sair as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sair).toBeTruthy();
+    if (!config || !sair) return;
+    expect(config.compareDocumentPosition(sair) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('colapsado: labels somem visualmente (sr-only) mas continuam no DOM pro leitor de tela', async () => {

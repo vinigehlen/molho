@@ -195,7 +195,17 @@ export class CmvService {
         LEFT JOIN LATERAL (${this.recipeCostSql(Prisma.sql`child."id"`, Prisma.sql`now()`)} ) child_cost ON true
         WHERE rc."recipe_id" = r."id" AND rc."tenant_id" = r."tenant_id" AND rc."deleted_at" IS NULL
       ) components ON true
+      LEFT JOIN "products" menu_product ON menu_product."id" = rp."product_id"
+        AND menu_product."tenant_id" = r."tenant_id"
+        AND menu_product."deleted_at" IS NULL
+      LEFT JOIN "categories" menu_category ON menu_category."id" = menu_product."category_id"
+        AND menu_category."tenant_id" = r."tenant_id"
+        AND menu_category."deleted_at" IS NULL
       WHERE r."deleted_at" IS NULL
+        AND (
+          r."recipe_type" = 'SUB_RECIPE'
+          OR menu_category."visible" = true
+        )
       ORDER BY r."recipe_type", r."name"
     `;
 
