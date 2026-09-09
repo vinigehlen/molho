@@ -1,121 +1,81 @@
 # Molho print-agent
 
-Agente local simples para consumir a fila duravel `print_jobs`.
+Processo local que consome a fila `print_jobs` de um tenant e manda a comanda
+pra impressora térmica da loja.
 
-Ele autentica como staff de um tenant, reivindica jobs via API, envia
-`ticketText` para uma impressora/comando local e confirma `printed` ou `failed`.
+```
+claim → ESC/POS → spooler do SO → printed/failed
+```
 
-## Variaveis
+Autentica com **credencial de dispositivo** (`molho_pd_...`, NG-06) — não é
+token de staff, não expira, é revogável pelo backoffice.
 
-Obrigatorias:
+## Variáveis
 
-- `MOLHO_API_URL`: base da API, exemplo `https://api.staging.molho.live`;
-- `MOLHO_STAFF_ACCESS_TOKEN`: access token de staff;
-- `MOLHO_TENANT_ID`: tenant ativo.
+Obrigatórias:
+
+| Var | Descrição |
+|---|---|
+| `MOLHO_API_URL` | base da API, ex. `https://api.staging.molho.live` (sem default de staging) |
+| `MOLHO_PRINT_DEVICE_TOKEN` | credencial do dispositivo, do pareamento no backoffice |
 
 Opcionais:
 
-- `MOLHO_PRINT_WORKER_ID`: id estavel do worker. Default: `agent:{tenantId}`;
-- `MOLHO_PRINT_ONCE`: `1`/`true` para rodar uma unica iteracao e sair;
-- `MOLHO_PRINT_HEALTH_EVERY`: escreve um resumo a cada N polls. Default: `20`;
-- `MOLHO_PRINT_WIDTH`: largura pedida no claim. Default: `80`;
-- `MOLHO_PRINT_LEASE_SECONDS`: lease do job. Default: `120`;
-- `MOLHO_PRINT_POLL_MS`: intervalo entre polls. Default: `3000`;
-- `MOLHO_PRINT_COMMAND`: comando local de impressao;
-- `MOLHO_PRINT_ARGS`: JSON array de argumentos para o comando;
-- `MOLHO_PRINT_FORMAT`: `text` ou `escpos`. Default: `text`.
+| Var | Default | Descrição |
+|---|---|---|
+| `MOLHO_TENANT_ID` | — | o token já identifica o tenant; se presente, a API confere |
+| `MOLHO_PRINT_FORMAT` | `text` | `escpos` liga o transporte plug & play (spooler do SO) |
+| `MOLHO_PRINTER_NAME` | auto | nome exato da fila/impressora; vazio = auto-detecção |
+| `MOLHO_PRINT_CODEPAGE` | `cp850` | `cp850` / `cp860` (acento) ou `ascii` (sem acento, qualquer térmica) |
+| `MOLHO_PRINT_COMMAND` | — | escape hatch: comando explícito (`lp`), bytes no stdin |
+| `MOLHO_PRINT_ARGS` | `[]` | JSON array de args do comando (sem shell, sem interpolação) |
+| `MOLHO_PRINT_WORKER_ID` | `agent:<tenant>` | id estável do worker |
+| `MOLHO_PRINT_ONCE` | `0` | roda uma iteração e sai (diagnóstico) |
+| `MOLHO_PRINT_POLL_MS` / `MOLHO_PRINT_LEASE_SECONDS` / `MOLHO_PRINT_HEALTH_EVERY` | `3000` / `120` / `20` | |
 
-## Dry-run
+## Plug & play (Elgin/Bematech i7 e similares)
 
-Sem `MOLHO_PRINT_COMMAND`, o agente so escreve a comanda no stdout:
+`MOLHO_PRINT_FORMAT=escpos` + `MOLHO_PRINT_DEVICE_TOKEN` bastam. O agente:
 
-```bash
-MOLHO_API_URL=https://api.staging.molho.live \
-MOLHO_STAFF_ACCESS_TOKEN=... \
-MOLHO_TENANT_ID=... \
-pnpm --filter @molho/print-agent start
-```
+1. renderiza a comanda em ESC/POS (codepage cp850 por padrão → acento de verdade;
+   corte parcial na guilhotina);
+2. acha a impressora: `MOLHO_PRINTER_NAME` exato → primeira fila com cara de
+   térmica (`i7`, `elgin`, `bematech`, `thermal`, `generic / text`, …) → primeira
+   da lista;
+3. manda os bytes RAW pelo spooler:
+   - **macOS/Linux:** `lp -d <fila> -o raw`. A fila CUPS tem que existir — em
+     macOS, adicione a impressora em Ajustes, ou:
+     `lpadmin -p Molho_i7 -E -v "$(lpinfo -v | grep usb | head -1 | cut -d' ' -f2)" -m raw`
+   - **Windows:** `WritePrinter` (winspool) com datatype RAW, via PowerShell —
+     sem módulo nativo. Precisa do **driver da Elgin/Bematech instalado**
+     (instalador assinado do fabricante).
 
-Para diagnostico, rode uma unica iteracao:
+Credencial revogada / inválida → o agente loga claro, faz backoff de 30s, e
+depois de 5x seguidas sai com código 1 (o serviço mostra "parado").
 
-```bash
-MOLHO_PRINT_ONCE=1 \
-MOLHO_API_URL=https://api.staging.molho.live \
-MOLHO_STAFF_ACCESS_TOKEN=... \
-MOLHO_TENANT_ID=... \
-pnpm --filter @molho/print-agent start
-```
-
-O agente escreve logs de claim, sucesso/falha e um resumo periodico:
-
-```text
-health: printed=3 failed=0 stale=0 idle=17 last=idle
-```
-
-## Impressao via comando do sistema
-
-Exemplo com `lp`, mandando o texto pelo stdin:
-
-```bash
-MOLHO_API_URL=https://api.staging.molho.live \
-MOLHO_STAFF_ACCESS_TOKEN=... \
-MOLHO_TENANT_ID=... \
-MOLHO_PRINT_COMMAND=lp \
-MOLHO_PRINT_ARGS='["-d","Cozinha"]' \
-pnpm --filter @molho/print-agent start
-```
-
-O agente nao usa shell para executar o comando. `MOLHO_PRINT_ARGS` e JSON para
-evitar interpolacao de string e reduzir risco de injecao.
-
-## Saida ESC/POS basica
-
-Quando o comando local aceita bytes crus da impressora termica, use:
-
-```bash
-MOLHO_API_URL=https://api.staging.molho.live \
-MOLHO_STAFF_ACCESS_TOKEN=... \
-MOLHO_TENANT_ID=... \
-MOLHO_PRINT_COMMAND=lp \
-MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
-MOLHO_PRINT_FORMAT=escpos \
-pnpm --filter @molho/print-agent start
-```
-
-O modo `escpos` aplica:
-
-- inicializacao da impressora (`ESC @`);
-- alinhamento a esquerda;
-- texto normal;
-- linhas de avanco;
-- corte parcial quando o job vem com `cut=true`.
-
-Para reduzir mojibake entre impressoras brasileiras diferentes, a primeira
-versao normaliza acentos para ASCII (`Búrguer` vira `Burguer`) em vez de tentar
-adivinhar a codepage do equipamento. Codepage configuravel entra quando a
-impressora do piloto estiver definida.
-
-## Cupom de teste local
-
-Depois do build, da para testar a impressora sem API, token ou tenant:
+## Cupom de teste (sem API, token nem tenant)
 
 ```bash
 pnpm --filter @molho/print-agent build
-MOLHO_PRINT_COMMAND=lp \
-MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \
-MOLHO_PRINT_FORMAT=escpos \
-pnpm --filter @molho/print-agent test-print
+MOLHO_PRINT_FORMAT=escpos pnpm --filter @molho/print-agent test-print
+# opcional: MOLHO_PRINTER_NAME="Elgin i7"  MOLHO_PRINT_CODEPAGE=cp860
 ```
 
-Sem `MOLHO_PRINT_COMMAND`, `test-print` roda em dry-run. Em `text`, imprime a
-comanda de teste no stdout; em `escpos`, imprime os bytes em hexadecimal.
+Sem `MOLHO_PRINT_FORMAT=escpos` roda em dry-run (imprime no stdout).
+
+## Rodar a fila real
+
+```bash
+MOLHO_API_URL=https://api.staging.molho.live \
+MOLHO_PRINT_DEVICE_TOKEN=molho_pd_... \
+MOLHO_PRINT_FORMAT=escpos \
+pnpm --filter @molho/print-agent start
+```
+
+Diagnóstico de uma iteração: `MOLHO_PRINT_ONCE=1 … start`.
 
 ## Limite atual
 
-Esta fatia ainda nao empacota instalador, login proprio, service manager nem
-driver ESC/POS especifico por fabricante. Ela fecha a ponte local basica da
-fila:
-
-```text
-claim -> text/escpos -> print command/stdout -> printed/failed
-```
+Sem instalador/serviço empacotado ainda — o operador técnico roda o processo.
+Empacotar como executável único + serviço (Windows Service / LaunchAgent) é a
+próxima fatia.

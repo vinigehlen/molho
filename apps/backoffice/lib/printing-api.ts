@@ -1,5 +1,56 @@
 import { apiFetch } from './api-client';
 
+// ─── Dispositivos de impressão (NG-06) ──────────────────────────────────────
+
+export interface PrintDeviceSummary {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  version: number;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+/** Resposta de parear/rotacionar: o segredo em claro só vem AQUI, uma vez. */
+export interface PairedPrintDevice {
+  device: PrintDeviceSummary;
+  secret: string;
+}
+
+export async function fetchPrintDevices(): Promise<PrintDeviceSummary[]> {
+  const res = await apiFetch('/v1/admin/printing/devices');
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (!res.ok) throw new Error(`Falha ao carregar dispositivos (${res.status})`);
+  return (await res.json()) as PrintDeviceSummary[];
+}
+
+export async function pairPrintDevice(name: string): Promise<PairedPrintDevice> {
+  const res = await apiFetch('/v1/admin/printing/devices', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (!res.ok) throw new Error(`Falha ao parear (${res.status})`);
+  return (await res.json()) as PairedPrintDevice;
+}
+
+export async function rotatePrintDevice(id: string): Promise<PairedPrintDevice> {
+  const res = await apiFetch(`/v1/admin/printing/devices/${encodeURIComponent(id)}/rotate`, { method: 'POST' });
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (res.status === 404) throw new Error('Dispositivo não encontrado.');
+  if (!res.ok) throw new Error(`Falha ao rotacionar (${res.status})`);
+  return (await res.json()) as PairedPrintDevice;
+}
+
+export async function revokePrintDevice(id: string): Promise<void> {
+  const res = await apiFetch(`/v1/admin/printing/devices/${encodeURIComponent(id)}/revoke`, { method: 'POST' });
+  if (res.status === 403) throw new PrintingUnavailableError();
+  if (res.status === 404) throw new Error('Dispositivo não encontrado.');
+  if (!res.ok && res.status !== 204) throw new Error(`Falha ao revogar (${res.status})`);
+}
+
 export interface QueuePrintJobResult {
   id: string;
   orderId: string;

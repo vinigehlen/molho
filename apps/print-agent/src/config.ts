@@ -1,15 +1,23 @@
+import { type Codepage, parseCodepage } from './codepage.js';
+
 export type PrintFormat = 'text' | 'escpos';
 
 export interface PrintOutputConfig {
+  /** Escape hatch: comando explícito (`lp`, etc.). Vazio = transporte automático. */
   printCommand: string | null;
   printArgs: string[];
   printFormat: PrintFormat;
+  /** Nome exato da fila/impressora. Vazio = auto-detecção. */
+  printerName: string | null;
+  codepage: Codepage;
 }
 
 export interface PrintAgentConfig extends PrintOutputConfig {
   apiUrl: string;
-  accessToken: string;
-  tenantId: string;
+  /** Credencial de DISPOSITIVO (`molho_pd_...`), NG-06. Não é token de staff. */
+  deviceToken: string;
+  /** Opcional: o token já identifica o tenant; se presente, a API confere. */
+  tenantId: string | null;
   workerId: string;
   once: boolean;
   healthEvery: number;
@@ -25,13 +33,13 @@ const DEFAULT_HEALTH_EVERY = 20;
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): PrintAgentConfig {
   const apiUrl = required(env, 'MOLHO_API_URL').replace(/\/+$/, '');
-  const tenantId = required(env, 'MOLHO_TENANT_ID');
+  const tenantId = env.MOLHO_TENANT_ID || null;
   return {
     ...readOutputConfig(env),
     apiUrl,
-    accessToken: required(env, 'MOLHO_STAFF_ACCESS_TOKEN'),
+    deviceToken: required(env, 'MOLHO_PRINT_DEVICE_TOKEN'),
     tenantId,
-    workerId: env.MOLHO_PRINT_WORKER_ID || `agent:${tenantId}`,
+    workerId: env.MOLHO_PRINT_WORKER_ID || `agent:${tenantId ?? 'device'}`,
     once: booleanEnv(env, 'MOLHO_PRINT_ONCE'),
     healthEvery: intEnv(env, 'MOLHO_PRINT_HEALTH_EVERY', DEFAULT_HEALTH_EVERY, 0, 1_000),
     width: intEnv(env, 'MOLHO_PRINT_WIDTH', DEFAULT_WIDTH, 1, 120),
@@ -45,6 +53,8 @@ export function readOutputConfig(env: NodeJS.ProcessEnv = process.env): PrintOut
     printCommand: env.MOLHO_PRINT_COMMAND || null,
     printArgs: parsePrintArgs(env.MOLHO_PRINT_ARGS),
     printFormat: printFormat(env.MOLHO_PRINT_FORMAT),
+    printerName: env.MOLHO_PRINTER_NAME || null,
+    codepage: parseCodepage(env.MOLHO_PRINT_CODEPAGE),
   };
 }
 

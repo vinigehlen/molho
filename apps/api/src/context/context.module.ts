@@ -19,6 +19,9 @@ import { RequestContextService } from './request-context.service';
     },
     RequestContextService,
   ],
-  exports: [RequestContextService],
+  // PRISMA_CLIENT exportado só pra readiness: `/ready` roda `SELECT 1` fora do
+  // request path (NG-07). Request path continua obrigado a passar pelo
+  // RequestContextService — o lint garante.
+  exports: [RequestContextService, PRISMA_CLIENT],
 })
 export class ContextModule {}

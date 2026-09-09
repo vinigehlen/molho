@@ -1,13 +1,14 @@
-import type { PrintingApi, PrintJob } from './api.js';
+import { PrintDeviceRevokedError, type PrintingApi, type PrintJob } from './api.js';
 import type { Printer } from './printer.js';
 
-export type AgentOnceResult = 'idle' | 'printed' | 'failed' | 'stale';
+export type AgentOnceResult = 'idle' | 'printed' | 'failed' | 'stale' | 'revoked';
 
 export interface AgentRunStats {
   idle: number;
   printed: number;
   failed: number;
   stale: number;
+  revoked: number;
   lastResult: AgentOnceResult | null;
   lastJobId: string | null;
   lastError: string | null;
@@ -28,7 +29,16 @@ export interface AgentDeps {
 }
 
 export async function runOnce({ api, printer, logger }: AgentDeps): Promise<AgentOnceResult> {
-  const job = await api.claimNext();
+  let job: PrintJob | null;
+  try {
+    job = await api.claimNext();
+  } catch (error) {
+    if (error instanceof PrintDeviceRevokedError) {
+      logger.error(error.message);
+      return 'revoked';
+    }
+    throw error;
+  }
   if (!job) return 'idle';
 
   try {
@@ -42,6 +52,10 @@ export async function runOnce({ api, printer, logger }: AgentDeps): Promise<Agen
     logger.info(`print_job ${job.id} impresso.`);
     return 'printed';
   } catch (error) {
+    if (error instanceof PrintDeviceRevokedError) {
+      logger.error(error.message);
+      return 'revoked';
+    }
     await markFailedQuietly(api, logger, job, error);
     return 'failed';
   }
@@ -53,6 +67,7 @@ export function createAgentRunStats(now: Date = new Date()): AgentRunStats {
     printed: 0,
     failed: 0,
     stale: 0,
+    revoked: 0,
     lastResult: null,
     lastJobId: null,
     lastError: null,

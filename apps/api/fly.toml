@@ -37,14 +37,26 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
   # SSE do gestor. Uma só mataria 100% dos streams a cada deploy.
   min_machines_running = 2
 
-  # /health existe (HealthController, sem prefixo global e sem guard) — resposta
-  # estática, não toca banco nem Redis: check de liveness, não de dependência.
+  # /health: resposta estática, não toca banco nem Redis — LIVENESS (o processo
+  # está vivo?). grace curto, timeout curto: se travar, reinicia a máquina.
   [[http_service.checks]]
     interval = "15s"
     timeout = "2s"
     grace_period = "10s"
     method = "GET"
     path = "/health"
+
+  # /ready: toca banco + Redis, responde 503 se uma dependência obrigatória
+  # está fora — READINESS (dá pra mandar tráfego?). Fly tira a máquina da
+  # rotação do proxy sem matar o processo (streams SSE da outra máquina seguem
+  # vivos). grace maior: no boot, esperar o pool do Prisma e o connect do Redis.
+  # Ver apps/api/src/health/readiness.service.ts — NG-07.
+  [[http_service.checks]]
+    interval = "10s"
+    timeout = "3s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/ready"
 
   [http_service.concurrency]
     # Conexão longa (SSE), não request curta. Limites são ESTIMATIVA a MEDIR no

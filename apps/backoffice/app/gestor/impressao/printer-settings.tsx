@@ -2,18 +2,13 @@
 
 import React, { type ReactNode, useEffect, useState } from 'react';
 import { fetchPrintQueueStatus, PrintingUnavailableError, type PrintQueueStatus } from '../../../lib/printing-api';
+import { PrintDevicesCard } from './print-devices-card';
 
 const TEST_PRINT_COMMAND = `pnpm --filter @molho/print-agent build
-MOLHO_PRINT_COMMAND=lp \\
-MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \\
-MOLHO_PRINT_FORMAT=escpos \\
-pnpm --filter @molho/print-agent test-print`;
+MOLHO_PRINT_FORMAT=escpos pnpm --filter @molho/print-agent test-print`;
 
 const START_AGENT_COMMAND = `MOLHO_API_URL=https://api.staging.molho.live \\
-MOLHO_STAFF_ACCESS_TOKEN=... \\
-MOLHO_TENANT_ID=... \\
-MOLHO_PRINT_COMMAND=lp \\
-MOLHO_PRINT_ARGS='["-d","Cozinha","-o","raw"]' \\
+MOLHO_PRINT_DEVICE_TOKEN=molho_pd_... \\
 MOLHO_PRINT_FORMAT=escpos \\
 pnpm --filter @molho/print-agent start`;
 
@@ -62,41 +57,42 @@ export function PrinterSettings() {
 
       <QueueStatusCard status={queueStatus} />
 
+      <PrintDevicesCard />
+
       <section className="grid gap-4 md:grid-cols-2">
-        <StepCard step="1" title="Instale e rode no computador da loja">
+        <StepCard step="1" title="Pareie o dispositivo">
           <p>
-            Use o app <code className="rounded bg-bg px-1 py-0.5">@molho/print-agent</code>. Ele consome a API com token de
-            staff, reivindica jobs da fila e confirma <code className="rounded bg-bg px-1 py-0.5">printed</code> ou{' '}
-            <code className="rounded bg-bg px-1 py-0.5">failed</code>.
+            Acima: “Parear dispositivo”, dê um nome (ex.: Cozinha), copie o código{' '}
+            <code className="rounded bg-bg px-1 py-0.5">molho_pd_…</code>.
           </p>
         </StepCard>
 
-        <StepCard step="2" title="Escolha a saída da impressora">
+        <StepCard step="2" title="Rode o agente no computador da loja">
           <p>
-            Para CUPS/macOS/Linux, o piloto usa <code className="rounded bg-bg px-1 py-0.5">lp</code>. Em térmica ESC/POS,
-            prefira saída crua com <code className="rounded bg-bg px-1 py-0.5">-o raw</code>.
+            <code className="rounded bg-bg px-1 py-0.5">@molho/print-agent</code> com{' '}
+            <code className="rounded bg-bg px-1 py-0.5">MOLHO_PRINT_FORMAT=escpos</code> acha a impressora sozinho (Windows
+            ou Mac) e imprime com acento. Windows precisa do driver da Elgin/Bematech instalado.
           </p>
         </StepCard>
       </section>
 
       <CommandCard
         title="Cupom de teste local"
-        description="Rode sem API, token ou tenant. Se o papel sair, a ponte computador → impressora está pronta."
+        description="Sem API nem token. Se o papel sair com acento, a ponte computador → impressora está pronta."
         command={TEST_PRINT_COMMAND}
       />
 
       <CommandCard
         title="Ligar a fila real"
-        description="Depois do teste físico, rode o agente com API, token de staff e tenant da loja piloto."
+        description="Cole o código do dispositivo pareado acima em MOLHO_PRINT_DEVICE_TOKEN."
         command={START_AGENT_COMMAND}
       />
 
       <section className="rounded-[14px] border border-border bg-bg p-4">
         <h3 className="text-base font-semibold text-text">Limites desta versão</h3>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-text-muted">
-          <li>Sem pareamento remoto ainda: o token e o tenant são configurados no ambiente do agente.</li>
-          <li>Sem instalador/service manager: o operador técnico roda o processo localmente.</li>
-          <li>Sem driver por fabricante: o ESC/POS atual é básico e normaliza acentos para ASCII.</li>
+          <li>Sem instalador/serviço empacotado: o operador técnico roda o processo (próxima fatia).</li>
+          <li>macOS precisa da impressora adicionada em Ajustes → Impressoras (ou uma fila CUPS raw).</li>
           <li>Reimpressão continua pelo botão “Imprimir” no card do pedido; ela não muda estado operacional.</li>
         </ul>
       </section>
