@@ -71,6 +71,19 @@ describe('Sidebar', () => {
     expect(hrefs.slice(0, 2)).toEqual(['/gestor', '/gestor/balcao']);
   });
 
+  it('Impressão saiu da barra; Configuração fica fixada no rodapé, fora do <nav>, acima de Sair', async () => {
+    await render(baseProps());
+    const navHrefs = [...container.querySelectorAll('nav a')].map((a) => a.getAttribute('href'));
+    expect(navHrefs).not.toContain('/gestor/impressao');
+    expect(navHrefs).not.toContain('/gestor/configuracao');
+
+    const config = [...container.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/gestor/configuracao');
+    expect(config).toBeTruthy();
+    expect(config?.closest('nav')).toBeNull();
+    const sair = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Sair'));
+    expect(config?.compareDocumentPosition(sair as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('colapsado: labels somem visualmente (sr-only) mas continuam no DOM pro leitor de tela', async () => {
     await render({ ...baseProps(), collapsed: true });
 
