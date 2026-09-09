@@ -13,6 +13,7 @@ import { fetchStoreSetup, publishStore, saveStoreSetup, saveStoreTheme, uploadSt
 import { fetchStoreHours, saveStoreHours } from '../../../lib/store-hours-api';
 import { createDeliveryZone, fetchDeliveryZones, type DeliveryZoneResponse } from '../../../lib/delivery-zones-api';
 import { fetchCategories, fetchProducts, type Category, type Product } from '../../../lib/catalog-api';
+import { BrandImageField } from './brand-image-field';
 
 const DAYS: Array<{ key: DayOfWeek; label: string }> = [
   { key: 'monday', label: 'Seg' },
@@ -305,7 +306,8 @@ export default function ConfiguracaoPage() {
     setBusy(kind);
     setError(null);
     try {
-      const key = await uploadStoreBrandImage(storeId, kind, file);
+      // O BrandImageField já entrega o recorte no tamanho e peso finais.
+      const key = await uploadStoreBrandImage(storeId, kind, file, { preprocessed: true });
       const next = { ...storeForm, [kind === 'logo' ? 'logoImageKey' : 'coverImageKey']: key };
       setStoreForm(next);
       const saved = await saveStoreSetup(storeId, next);
@@ -565,13 +567,13 @@ export default function ConfiguracaoPage() {
                 <span className="text-sm font-medium">Descrição pública</span>
                 <textarea className="mt-2 min-h-20 w-full rounded-[14px] border border-border bg-bg-card px-4 py-3 outline-none focus:border-brand" value={storeForm.publicDescription ?? ''} onChange={(event) => setStoreForm((prev) => ({ ...prev, publicDescription: event.target.value || null }))} maxLength={280} />
               </label>
-              <ImageUploadField
+              <BrandImageField
                 kind="logo"
                 imageUrl={setup?.logoImageUrl ?? null}
                 busy={busy === 'logo'}
                 onChange={(file) => void uploadBrand('logo', file)}
               />
-              <ImageUploadField
+              <BrandImageField
                 kind="cover"
                 imageUrl={setup?.coverImageUrl ?? null}
                 busy={busy === 'cover'}
@@ -873,96 +875,6 @@ function MoneyField({ label, value, onChange, placeholder }: { label: string; va
     <label className="block">
       <span className="text-sm font-medium">{label}</span>
       <MoneyInput value={value} onChange={onChange} placeholder={placeholder} className="mt-2" />
-    </label>
-  );
-}
-
-const BRAND_IMAGE_SPEC = {
-  logo: {
-    label: 'Logo',
-    // Vira a foto de perfil circular no card de compartilhamento e no ícone PWA.
-    hint: 'Quadrada, 512 × 512 px · até 500 KB',
-    maxBytes: 500 * 1024,
-    maxLabel: '500 KB',
-    previewClass: 'h-20 w-20 rounded-full',
-  },
-  cover: {
-    label: 'Capa',
-    // É o fundo do card "fachada" (1.91:1, tamanho exato do preview de link).
-    hint: '1200 × 630 px (1.91:1) · até 1 MB',
-    maxBytes: 1024 * 1024,
-    maxLabel: '1 MB',
-    previewClass: 'h-20 w-36 rounded-[10px]',
-  },
-} as const;
-
-function ImageUploadField({
-  kind,
-  imageUrl,
-  busy,
-  onChange,
-}: {
-  kind: 'logo' | 'cover';
-  imageUrl: string | null;
-  busy: boolean;
-  onChange: (file: File | undefined) => void;
-}) {
-  const spec = BRAND_IMAGE_SPEC[kind];
-  const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const [tooBig, setTooBig] = useState(false);
-
-  // Preview imediato do arquivo escolhido (antes de o upload terminar). O
-  // objectURL é revogado quando troca ou o componente desmonta.
-  useEffect(() => {
-    if (!localPreview) return;
-    return () => URL.revokeObjectURL(localPreview);
-  }, [localPreview]);
-
-  function handleFile(file: File | undefined) {
-    setTooBig(false);
-    if (!file) return;
-    if (file.size > spec.maxBytes) {
-      setTooBig(true);
-      setLocalPreview(null);
-      return;
-    }
-    setLocalPreview(URL.createObjectURL(file));
-    onChange(file);
-  }
-
-  const shownImage = localPreview ?? imageUrl;
-
-  return (
-    <label className="block">
-      <span className="text-sm font-medium">{spec.label}</span>
-      <span className="mt-2 flex min-h-28 items-center gap-3 rounded-[14px] border border-border bg-bg px-3 py-3">
-        {shownImage ? (
-          <img src={shownImage} alt="" className={`${spec.previewClass} shrink-0 border border-border object-cover`} />
-        ) : (
-          <span
-            className={`${spec.previewClass} flex shrink-0 items-center justify-center bg-bg-card text-center text-xs text-text-muted`}
-          >
-            Sem imagem
-          </span>
-        )}
-        <span className="flex min-w-0 flex-col gap-2">
-          <input
-            className="block w-full text-sm text-text-muted file:mr-3 file:rounded-[10px] file:border-0 file:bg-brand file:px-3 file:py-2 file:text-sm file:font-semibold file:text-on-brand"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={busy}
-            onChange={(event) => handleFile(event.target.files?.[0])}
-          />
-          <span className="text-xs text-text-muted">
-            {busy ? 'Enviando…' : `PNG, JPG ou WebP · ${spec.hint}`}
-          </span>
-          {tooBig && (
-            <span role="alert" className="text-xs font-medium text-critical">
-              Imagem acima de {spec.maxLabel}. Reduza e tente de novo.
-            </span>
-          )}
-        </span>
-      </span>
     </label>
   );
 }
