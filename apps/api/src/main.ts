@@ -8,10 +8,16 @@ import { GlobalExceptionFilter } from './bootstrap/global-exception.filter';
 import { configureSecurityHeaders } from './bootstrap/security-headers';
 import { initSentry } from './bootstrap/sentry';
 import { configureTrustProxy } from './bootstrap/trust-proxy';
+import { validateProductionEnv } from './bootstrap/validate-env';
 
 const PORTA_PADRAO = 3333;
 
 async function bootstrap() {
+  // ANTES de tudo: processo de produção mal configurado morre aqui, não no
+  // primeiro pedido (Redis em memória, storage mock, DB sem pooler / com role
+  // dona). No-op fora de produção. Ver bootstrap/validate-env.ts — NG-05.
+  validateProductionEnv();
+
   initSentry();
 
   // Logger padrão do Nest (não pino): sem auth, sem banco e sem volume de

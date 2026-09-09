@@ -10,6 +10,8 @@ import { DeliveryZoneAdminModule } from './delivery-zones/delivery-zone.module';
 import { GeoModule } from './geo/geo.module';
 import { GeocodeIpRateLimitMiddleware, GeocodeMiddleware } from './geo/geocode.middleware';
 import { HealthController } from './health/health.controller';
+import { ReadinessController } from './health/readiness.controller';
+import { ReadinessService } from './health/readiness.service';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { CheckoutOrderRateLimitMiddleware } from './orders/checkout-order-rate-limit.middleware';
@@ -47,7 +49,8 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     ReviewsModule,
     SignupModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, ReadinessController],
+  providers: [ReadinessService],
 })
 export class AppModule implements NestModule {
   /**
