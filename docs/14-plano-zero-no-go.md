@@ -32,7 +32,7 @@ Para retirar ambiguidades do executor, este plano adota:
 3. **Produção:** recursos novos e isolados; nada é promovido ou clonado de staging além do artefato de código aprovado.
 4. **Banco:** Neon em `aws-sa-east-1`, runtime pooled como `app_runtime`, migration direta como `app_migrator` e 30 dias de restore habilitados.
 5. **Impressão:** credencial de dispositivo revogável e restrita a impressão; token de staff fixo não será aceito.
-6. **Assets:** bucket R2 produtivo e custom domain em domínio registrável separado de `molho.live`; `r2.dev` não será aceito.
+6. **Assets:** bucket R2 produtivo e origin separada de `molho.live`. A ata `NG-01` registra a exceção explícita do PM para `pub-<hash>.r2.dev` somente no piloto; custom domain próprio fica pós-piloto.
 7. **Segurança:** CSP em enforcement no backoffice após observação em staging; adapters mock/memória proibidos em produção.
 8. **Cabanhas:** tenant criado pelo fluxo real; nenhum seed, cliente, pedido ou sessão de staging será copiado.
 9. **Release:** build imutável validado antes da promoção; migrations somente expansivas nesta janela.
@@ -82,15 +82,15 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 
 **Entradas obrigatórias:**
 
-- [ ] confirmar o slug final `cabanhas-bbq`;
-- [ ] confirmar uso de `cabanhas-bbq.molho.live`, sem domínio próprio no piloto;
-- [ ] decidir `checkout.guest` ligado ou desligado;
-- [ ] confirmar PIX estático e/ou pagamento na entrega;
-- [ ] escolher e registrar o domínio separado de assets;
-- [ ] contratar/habilitar Neon com 30 dias de restore;
+- [x] confirmar o slug final `cabanhas-bbq`;
+- [x] confirmar uso de `cabanhas-bbq.molho.live`, sem domínio próprio no piloto;
+- [x] decidir `checkout.guest` ligado ou desligado;
+- [x] confirmar PIX estático e/ou pagamento na entrega;
+- [x] escolher e registrar a origin separada de assets (exceção PM `r2.dev` documentada);
+- [x] decidir Neon Free + `pg_dump` noturno com retenção de 30 dias;
 - [ ] nomear responsável técnico, jurídico e operador do Cabanhas;
-- [ ] definir canal de incidente e fallback por WhatsApp;
-- [ ] fornecer acesso administrativo a Vercel, Fly, Neon, Upstash, Cloudflare, R2, Resend e Sentry;
+- [x] definir canal de incidente e fallback por WhatsApp;
+- [x] fornecer acesso administrativo a Vercel, Fly, Neon, Upstash, Cloudflare, R2, Resend e Sentry;
 - [ ] definir data do dry run e do primeiro serviço assistido.
 
 **Aceite:** ata curta com decisões, responsáveis e data, sem segredos.
@@ -356,17 +356,17 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 
 **Implementação:**
 
-- [ ] registrar/selecionar domínio de assets separado de `molho.live`;
+- [x] registrar a origin de assets aprovada na ata `NG-01` (`r2.dev` no piloto; custom domain pós-piloto);
 - [ ] criar bucket produtivo;
 - [ ] criar credencial com menor privilégio e rotação documentada;
-- [ ] configurar custom domain no R2;
+- [x] registrar a exceção PM ao custom domain para o piloto;
 - [ ] restringir CORS de upload ao backoffice;
 - [ ] validar tipo/tamanho de arquivo no servidor;
 - [ ] definir cache, invalidação e remoção;
 - [ ] garantir que uploads públicos não recebam cookies da aplicação;
 - [ ] remover defaults `r2.dev` da configuração produtiva.
 
-**Aceite:** upload presignado, leitura, cache, substituição, remoção e rejeição de arquivo inválido passam no domínio final.
+**Aceite:** upload presignado, leitura, cache, substituição, remoção e rejeição de arquivo inválido passam na origin final aprovada na ata.
 **Dependência:** `NG-01`, `NG-05`.
 
 ### NG-14 — Vercel, e-mail, site e legal
@@ -485,23 +485,23 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 
 ## 8. Matriz final Zero NO-GO
 
-| ID | Estado inicial | Evidência para verde |
+| ID | Estado atual | Evidência / bloqueio para verde |
 |---|---|---|
-| `NG-01` | vermelho | decisões e acessos registrados |
-| `NG-02` | vermelho | host routing + metadata E2E |
-| `NG-03` | vermelho | checkout browser + admin negado |
-| `NG-04` | vermelho | slug imutável e zero URL de staging |
-| `NG-05` | vermelho | startup fail-fast validado |
-| `NG-06` | vermelho | credencial revogável + impressão 60 min |
-| `NG-07` | vermelho | DB/Redis failure checks |
-| `NG-08` | vermelho | alertas recebidos sem PII |
-| `NG-09` | vermelho | CSP enforcement + headers validados |
-| `NG-10` | vermelho | RLS + restore 30 dias comprovados |
-| `NG-11` | vermelho | Redis cross-instance comprovado |
-| `NG-12` | vermelho | API Fly prod + rollback |
-| `NG-13` | vermelho | R2 custom domain + upload smoke |
-| `NG-14` | vermelho | fronts, e-mail e jurídico aprovados |
-| `NG-15` | vermelho | dry run e sign-off do Cabanhas |
+| `NG-01` | amarelo | decisões/acessos em `go-live/ata-ng-01.md`; faltam jurídico, operador e primeiro serviço assistido |
+| `NG-02` | amarelo | código + unit/E2E local em `go-live/evidencias-codex.md`; falta RC técnico real |
+| `NG-03` | amarelo | BFF + browser E2E verde; falta validar CORS e hops de proxy com API do RC |
+| `NG-04` | amarelo | URLs frontend concluídas; slug imutável depende de C1; varredura do build bloqueada pela URL de staging no fluxo de impressão C2 |
+| `NG-05` | em execução (CC) | startup fail-fast validado |
+| `NG-06` | em execução (CC) | credencial revogável + impressão 60 min |
+| `NG-07` | em execução (CC) | DB/Redis failure checks |
+| `NG-08` | amarelo | scrubbing/release dos fronts implementados; alertas reais e API dependem de C3 |
+| `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
+| `NG-10` | em execução (CC) | RLS + restore 30 dias comprovados |
+| `NG-11` | em execução (CC) | Redis cross-instance comprovado |
+| `NG-12` | em execução (CC) | API Fly prod + rollback |
+| `NG-13` | em execução (CC) | R2 na origin aprovada + upload smoke |
+| `NG-14` | vermelho | projetos Vercel/Node prontos; faltam envs, RC, e-mail e jurídico; scanner rejeita URL de staging e credencial de staff legada do fluxo C2 |
+| `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
 

@@ -1,6 +1,7 @@
 # Divisão paralela — Zero NO-GO entre Codex e CC
 
 **Data-base:** 09/09/2026
+**Última atualização Codex:** 10/09/2026
 **Plano mestre:** `docs/14-plano-zero-no-go.md`
 **Publicação:** `docs/13-plano-go-live-producao-cabanhas.md`
 **Objetivo:** executar `NG-01` a `NG-15` no menor caminho crítico possível, com exatamente duas trilhas técnicas e sem conflito de arquivos.
@@ -116,7 +117,8 @@ Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita 
 - backoffice: `https://app.molho.live`;
 - API: `https://api.molho.live`;
 - Cabanhas: `https://cabanhas-bbq.molho.live`;
-- assets: domínio registrável separado, definido em `NG-01`;
+- assets: `r2.dev` público no piloto por exceção explícita do PM em `NG-01`; domínio
+  próprio separado fica pós-piloto;
 - Vercel recebe o domínio explícito do Cabanhas; não há wildcard neste piloto.
 
 ### Banco
@@ -125,7 +127,8 @@ Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita 
 - `DIRECT_URL`: direta, papel `app_migrator`, somente migration job;
 - projeto/branch produtivos ficam em `aws-sa-east-1`;
 - nenhuma cópia ou seed de staging;
-- janela de restore de 30 dias.
+- Neon Free com histórico curto aceito; retenção de 30 dias será coberta por `pg_dump`
+  noturno no R2, com restore drill e RPO/RTO registrados.
 
 ### Impressão
 
@@ -290,6 +293,12 @@ Entregas independentes podem abrir PR simultaneamente, mas entram nessa ordem pa
 - não compartilhar `.env.local` entre worktrees;
 - nenhum segredo entra em commit, diff, issue ou mensagem.
 
+**Estado real em 10/09/2026:** as mudanças R0–R4 foram consolidadas em dois commits Codex
+e rebaseadas sobre `main@efbc266`, que já incorpora C1/C2 e os ajustes posteriores de
+impressão. Os arquivos exclusivos do CC foram preservados; os únicos conflitos foram os
+documentos `14` e `15`, resolvidos mantendo as decisões da `main` e este handoff Codex. Os
+gates precisam ser repetidos na árvore integrada antes do RC.
+
 Se ambos precisarem alterar `pnpm-lock.yaml`, C1/C2 entra primeiro; Codex rebasa, reaplica sua dependência e regenera o lockfile uma única vez.
 
 ## 8. Handoff obrigatório por entrega
@@ -338,18 +347,168 @@ Antes de `ZG-5`, executar também:
 
 | Entrega | DRI | Depende de | Estado inicial |
 |---|---|---|---|
-| `R0` | Codex | humanos | bloqueado por decisões |
-| `C0` | CC | acessos | pendente |
-| `R1` | Codex | contrato de domínios | pendente |
-| `C1` | CC | contrato de config/slug | pendente |
-| `R2` | Codex | `R1` | pendente |
-| `C2` | CC | desenho de impressão | pendente |
-| `C3` | CC | `C1` | pendente |
-| `R3` | Codex | `R1`, `C3` | pendente |
-| `C4` | CC | `C1`, acessos | pendente |
-| `C5` | CC | `C3`, `C4` | pendente |
-| `R4` | Codex | `R2`, `R3`, URL de `C5` | pendente |
-| `R5` | Codex | todas as anteriores | pendente |
+| `R0` | Codex | humanos | amarelo: decisões/acessos registrados; jurídico e operador pendentes |
+| `C0` | CC | acessos | concluído e documentado em `docs/go-live/evidencias-cc.md` |
+| `R1` | Codex | contrato de domínios | código + testes locais concluídos; RC pendente |
+| `C1` | CC | contrato de config/slug | config fail-fast + readiness incorporados à `main`; validação em produção pendente |
+| `R2` | Codex | `R1` | BFF + 3 E2E browser locais verdes; integração API pendente |
+| `C2` | CC | desenho de impressão | credencial de dispositivo e agente incorporados à `main`; URL de staging no comando e teste físico pendentes |
+| `C3` | CC | `C1` | readiness incorporada; Sentry API, alertas reais e observação pendentes |
+| `R3` | Codex | `R1`, `C3` | código CSP/Sentry concluído; observação real pendente |
+| `C4` | CC | `C1`, acessos | Neon/RLS provisionados; backup/restore drill e R2 smoke pendentes |
+| `C5` | CC | `C3`, `C4` | Upstash criado; segredo, Fly prod, cross-instance/restart/rollback pendentes |
+| `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/Node prontos; envs e RC bloqueados por C4/C5/Sentry |
+| `R5` | Codex | todas as anteriores | checklist pronto; dry run e gates humanos pendentes |
+
+Nota de nomenclatura: `docs/go-live/evidencias-cc.md` também chamou de “C3” a entrega de
+numeração sequencial e duas vias de comanda. Isso não substitui o C3 deste plano, cujo
+escopo continua sendo readiness, Sentry da API, scrubbing e alertas.
+
+### 10.1 Handoff da execução Codex — 10/09/2026
+
+Este bloco é o resumo autocontido para o CC saber exatamente o que já foi entregue na
+trilha pública. A evidência detalhada permanece em `docs/go-live/evidencias-codex.md`.
+
+#### Snapshot Git e integração
+
+| Item | Estado |
+|---|---|
+| Branch Codex | `codex/no-go-front-release`, baseada em `main@efbc266` com dois commits Codex no topo |
+| `main` local/remota | `efbc266` (`origin/main`) |
+| Divergência após integração | **0 commits atrás e 2 commits à frente** antes dos gates/deploy |
+| CC na `main` | C1/C2, migrations, dispositivo de impressão, agente, staging, número de pedido e duas vias já mergeados |
+| Branch de integração | `codex/zero-no-go-integration` ainda não foi criada |
+| Integração | rebase executado; resolução restrita aos docs `14` e `15` |
+
+Nos arquivos exclusivos de API/Prisma/contratos/agente/impressão prevaleceu a `main`/CC.
+As mudanças Codex de storefront/site/configuração dos fronts foram reaplicadas sobre essa
+base; os documentos compartilhados foram consolidados semanticamente.
+
+#### R0 — decisões, acessos e coordenação (`NG-01`)
+
+- decisões de slug, domínio, guest, pagamentos, Neon/backup, assets, impressão, dry run e
+  plantão registradas em `docs/go-live/ata-ng-01.md`;
+- contratos de BFF/API, domínios, banco e impressão consolidados em
+  `docs/go-live/contratos-cc.md`;
+- matriz central atualizada em `docs/14-plano-zero-no-go.md`;
+- jurídico, operador e aceite do Cabanhas continuam como gates humanos;
+- nenhum DNS foi apontado e `channel.storefront` não foi publicado.
+
+#### R1 — host routing e URLs (`NG-02`, frontend de `NG-04`)
+
+- parser estrito de authority e slug em `apps/storefront/lib/host-routing.ts`;
+- reserva de `www`, `app`, `api`, `staging` e `staging-app`;
+- storefront resolve tenant por `<slug>.molho.live`, com path mode somente local e host
+  técnico amarrado a `MOLHO_STOREFRONT_TECHNICAL_SLUG`;
+- middleware confia em `x-forwarded-host` somente dentro da Vercel, injeta headers internos
+  de tenant/base pública e faz rewrite interno sem expor `/{slug}`;
+- navegação de catálogo, carrinho, conta e tracking usa URLs públicas limpas;
+- canonical, Open Graph, manifest, sitemap e robots usam o host público correto;
+- site e backoffice rejeitam URLs HTTP, staging e `vercel.app` no deployment produtivo;
+- backoffice exibe/copia `https://<slug>.molho.live` na configuração e no signup;
+- unitários de routing, URLs, metadata e navegação adicionados.
+
+#### R2 — BFF público (`NG-03`)
+
+- catch-all same-origin `apps/storefront/app/api/store/[...segments]/route.ts`;
+- allowlist explícita por método/rota somente para `/v1/store/*`; admin, plataforma,
+  traversal, query inesperada e tenant cruzado são rejeitados antes do upstream;
+- `Cookie` e `Authorization` recebidos do browser nunca são propagados;
+- sessão do cliente usa header dedicado e só vira Bearer nas rotas permitidas;
+- body somente JSON, limitado a 256 KiB; streams sem `Content-Length` são interrompidos
+  assim que excedem o teto;
+- timeout de 8 s, redirect manual, headers de resposta allowlisted e erro 502 uniforme;
+- IP só vem de `x-vercel-forwarded-for` quando `VERCEL=1` e contém um único IP válido;
+- browser clients migrados para o BFF same-origin; SSR usa `MOLHO_API_INTERNAL_URL`;
+- checkout E2E segue a decisão `checkout.guest=off`: OTP obrigatório antes do pedido;
+- handoff CC pendente: validar a contagem real de proxies Vercel → Fly e
+  `TRUSTED_PROXY_HOPS` no RC.
+
+#### R3 — CSP, Sentry e privacidade (`NG-09`, frontend de `NG-08`)
+
+- gerador compartilhado de headers em `apps/front-security.ts` aplicado aos três fronts;
+- CSP em enforcement por padrão; report-only exige opt-in explícito;
+- origins exatas, sem `https:`, `ws:` ou `wss:` genéricos; `unsafe-eval` só em dev;
+- HSTS exige `MOLHO_ENABLE_HSTS=true`; `includeSubDomains` exige decisão separada;
+- `/api/csp-report` nos três fronts, limite 16 KiB, persistindo somente directive e
+  origins sanitizadas;
+- scrubber Sentry compartilhado remove telefone, e-mail, JWT, Bearer, cookie, OTP, token,
+  endereço, body e query; `sendDefaultPii=false` nos nove configs;
+- release Sentry usa SHA; analytics não captura URL completa nem token de tracking e não
+  faz autocapture;
+- observação no RC, DSNs reais, alertas e ativação de HSTS após TLS continuam pendentes.
+
+#### R4 — Vercel e preparação do RC (`NG-14`)
+
+Operações externas já executadas no escopo `vinigehlens-projects`:
+
+| Projeto | ID | Root | Node | Estado |
+|---|---|---|---|---|
+| `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | existente; Node alinhado |
+| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado, vazio |
+| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado, vazio |
+
+- inventário de domínios/envs em `docs/go-live/inventario-fronts-producao.md`;
+- release/rollback em `docs/go-live/runbook-release-fronts.md`;
+- `scripts/verify-front-release.mjs` exige `.next/BUILD_ID` e procura endpoints proibidos
+  e a credencial legada de staff nos artefatos;
+- nenhum Production env, deployment, domínio, alias ou DNS foi criado/alterado;
+- nenhum deployment Vercel dos projetos produtivos existe ainda;
+- os deploys de staging registrados pelo CC (API v43 e backoffice staging) não incluem as
+  mudanças desta branch Codex;
+- faltam URL técnica da API/Fly, origin R2, DSNs Sentry, e-mail validado e jurídico antes
+  de gerar o RC com `vercel deploy --prebuilt --prod --skip-domain`.
+
+O scanner foi executado num build integral da base Codex antiga e encontrou dois artefatos
+do backoffice com `api.staging.molho.live` e `MOLHO_STAFF_ACCESS_TOKEN`, vindos de
+`apps/backoffice/app/gestor/impressao/printer-settings.tsx`. A `main` nova já substituiu o
+token de staff por `MOLHO_PRINT_DEVICE_TOKEN`, mas ainda mantém a URL explícita de staging;
+após a integração é obrigatório reconstruir e repetir a varredura.
+
+#### R5 — dry run (`NG-15`)
+
+- checklist criado em `docs/go-live/checklist-dry-run-cabanhas.md`;
+- jornada cobre Wi-Fi/4G, catálogo, checkout OTP, tracking, gestor, WhatsApp, impressão por
+  60 min, restart, reconexão, isolamento A/B, logs sem PII e fallback;
+- tenant real, importação aprovada, teste físico e sign-offs ainda não foram executados;
+- data-alvo registrada: 11/09/2026, sujeita à disponibilidade do restaurante.
+
+#### Variáveis introduzidas ou formalizadas pelos fronts
+
+- storefront: `MOLHO_API_INTERNAL_URL`, `MOLHO_STOREFRONT_ROOT_DOMAIN`,
+  `MOLHO_STOREFRONT_PATH_MODE`, `MOLHO_STOREFRONT_TECHNICAL_SLUG`,
+  `MOLHO_STOREFRONT_PUBLIC_URL`, `MOLHO_ASSETS_ORIGIN`;
+- site/backoffice: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`;
+- segurança/observabilidade: `MOLHO_CSP_REPORT_ONLY`, `MOLHO_ENABLE_HSTS`,
+  `MOLHO_HSTS_INCLUDE_SUBDOMAINS`, `NEXT_PUBLIC_SENTRY_*`, `SENTRY_*`,
+  `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_GA_ID`.
+
+Somente nomes e exemplos sem credenciais foram adicionados a `.env.example`.
+
+#### Gates executados na árvore Codex antes da integração
+
+| Comando | Resultado |
+|---|---|
+| `pnpm lint` | verde |
+| `pnpm test` | verde, Turbo 9/9; storefront 199, backoffice 249, API unit 737, contracts 404, UI 227, DB 35, print-agent 19 |
+| `pnpm build` | verde, Turbo 7/7 em checkout isolado |
+| storefront typecheck | verde |
+| `pnpm --filter @molho/storefront test:e2e` | 3/3 verde: fluxo OTP/tracking, negativas BFF e CSP report |
+| `pnpm --filter api test:e2e` | não conclusivo localmente: Redis em `localhost:6379` indisponível; 16 arquivos falharam por timeout, 2 passaram |
+| `pnpm verify:front-release` | vermelho no build integral pelos valores de impressão descritos acima |
+| `git diff --check` | verde |
+
+O E2E da API do CC prova separadamente o fluxo do dispositivo de impressão contra staging,
+mas o gate integral deve ser repetido na árvore integrada com Redis disponível.
+
+#### Rollback e próximo ponto de integração
+
+- não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
+- o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
+- próximo passo obrigatório: repetir lint/test/build/API E2E/storefront E2E/scanner na
+  árvore integrada;
+- somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
+- promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 
 ## 11. Caminho crítico esperado
 
