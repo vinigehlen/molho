@@ -473,3 +473,68 @@ aplicada antes do deploy (o código lê `orders.order_number`).
 
 **Cross-ownership (doc 15):** `packages/contracts/admin-order.ts` (campo aditivo),
 `apps/backoffice` (card/page/lib de impressão). Aditivo — mergeável no rebase do Codex.
+
+---
+
+## C4/C5 — infra produtiva: Fly + Redis + R2 provisionados — 2026-09-10
+
+**Entrega:** API produtiva no ar em `molho-api.fly.dev` (sem DNS), Upstash e R2
+de produção conectados. Fecha `NG-05`, `NG-07`, `NG-11`, `NG-12` (código +
+runtime real); `NG-10` e `NG-13` parciais; `NG-08` pendente.
+**Branch:** `cc/no-go-backend-infra`.
+
+### Recursos externos criados
+
+| Recurso | Detalhe |
+|---|---|
+| Fly app `molho-api` | `gru`, 2 máquinas `shared-cpu-1x`/512MB, `min_machines_running=2`, rolling. Cert `api.molho.live` criado, `Not verified` (DNS não apontado, correto até `ZG-5`). IPs: v4 shared `66.241.125.222`, v6 dedicado. |
+| Upstash `molho-prod` | `legible-mosquito-152891`, `aws sa-east-1` (São Paulo), TLS, Pay-as-you-go. Só `REDIS_URL` (TCP) é usado pela API. |
+| R2 `molho-uploads-prod` | conta `04f41f752ef10cb87fa8789e00ff61a0`, CORS `https://app.molho.live` (GET/PUT), Public Dev URL `pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev` (piloto, ata NG-01). Bucket `molho-backups` criado pro `pg_dump`. Token de conta "Object Read & Write" escopado nos 2 buckets. |
+
+### fly.prod.toml
+
+`apps/api/fly.prod.toml` — cópia fiel de `fly.toml` (staging), só o nome do app
+troca (`molho-api`). Manter os dois em sincronia. Deploy da raiz:
+`fly deploy . -c apps/api/fly.prod.toml`.
+
+### Secrets no Fly (17, todos `Deployed`)
+
+Cifra/JWT/OTP-HMAC/e-mail-pepper **gerados frescos** pra prod (isolados de
+staging). `RESEND_API_KEY` nova (`molho-api-prod`, mesmo domínio `send.molho.live`
+verified — aprovado pelo PM reusar o domínio). `DIRECT_URL` **não** entra no
+runtime (só no job de migration). Origem dos valores: `docs/go-live/.env.prod.local`
+(gitignored).
+
+### Migrations
+
+`prisma migrate deploy` contra a prod: 49/49 aplicadas (faltavam
+`print_devices` + `order_number` desde o C4).
+
+### Gates executados
+
+| Comando | Resultado |
+|---|---|
+| `fly deploy` (v1) | verde; imagem 142 MB; 2 máquinas criadas em `gru` |
+| `GET /health` | `{"status":"ok","version":"0.1.0"}` |
+| `GET /ready` | `{"status":"ready","db":"ok","redis":"ok"}` — **NG-07 confirmado em prod real** |
+| checks Fly | 2 máquinas, 2/2 passing cada |
+| boot | passou `validateProductionEnv` (**NG-05** provado com env de prod real) |
+
+### Cross-ownership (doc 15)
+
+`apps/backoffice/app/gestor/impressao/printer-settings.tsx` (CC-exclusivo):
+comando de exemplo exibido ao operador tinha `api.staging.molho.live` — trocado
+pra `api.molho.live`. Destrava o `scripts/verify-front-release.mjs` do Codex.
+
+### Falta
+
+- **NG-13:** smoke de upload real no R2 prod.
+- **NG-10:** cron `pg_dump` noturno → `molho-backups` + restore drill + RPO/RTO.
+- **NG-08:** Sentry da API (DSN prod, environment+release SHA, alertas, auditoria
+  do scrubbing PII).
+- **NG-11:** re-verificar fan-out cross-instância nas 2 máquinas de prod (mecanismo
+  já provado em staging; em prod é só confirmar `psubscribe` nas duas).
+- rollback drill Fly (`fly releases` / `fly deploy --image`).
+
+**Handoff Codex:** `MOLHO_ASSETS_ORIGIN` = `https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev`.
+**Rollback:** `fly apps destroy molho-api`; recursos Upstash/R2 removíveis pelos painéis.
