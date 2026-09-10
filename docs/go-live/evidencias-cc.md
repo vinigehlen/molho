@@ -427,4 +427,49 @@ com a i7 (teste físico).
 | segredo não logado | `audit_log` de paired/rotated/revoked não contém o segredo nem `molho_pd_` |
 | isolamento de rota | token de staff na rota do agente → 401; segredo de device na rota de staff → 401 |
 
-Roda: `pnpm --filter @molho/api test:e2e` (ou o arquivo isolado). 9/9 verde.
+Roda: `pnpm --filter @molho/api test:e2e` (ou o arquivo isolado). 10/10 verde.
+
+---
+
+## C3 — numeração sequencial de pedido + 2 vias de comanda — 2026-09-10
+
+**Pedido do usuário:** todo pedido único e identificável no tenant (saíam todos `#01A0`
+— `shortOrderId` pegava o prefixo do UUID v7, que é timestamp); e a comanda vira 2 vias
+(balcão para conferência + cozinha).
+
+**Branch:** `cc/no-go-backend-infra` (merge `0f619aa` no `main`).
+
+### Numeração (`#00001`, lifetime por tenant)
+- migration `20260909180000_order_number`: `orders.order_number`, tabela
+  `order_number_counters` (1 linha/tenant), trigger `BEFORE INSERT assign_order_number`
+  (INSERT ... ON CONFLICT DO UPDATE — atômico, serializa concorrentes na linha do
+  contador). Backfill dos pedidos existentes por `created_at`; semente do contador.
+  RLS ENABLE (não FORCE, igual a `orders`). Pega checkout + balcão + futuro sem tocar
+  em cada repo.
+- Aplicada em staging: trigger ok, **0 pedidos sem número**, Cabanhas numerado 1→20
+  (20 distintos), contador em 21.
+- `AdminOrder.orderNumber` (contrato aditivo, nullable p/ legado) → card do gestor
+  mostra `#00042`.
+
+### Duas vias (sempre, delivery e retirada)
+- `buildCounterTicket` **VIA BALCAO**: número, data/hora, tipo, prazo, agendamento,
+  **nome + endereço completo**, itens **com valor**, subtotal/desconto/taxa/**total**,
+  **forma de pagamento** (+ troco), observação. `currentTotalCents` quando há ajuste.
+- `buildKitchenTicket` **VIA COZINHA**: número, nome, tipo, prazo, itens + adicionais +
+  observação. **Sem preço, sem endereço, sem telefone.**
+- `queueOrderTickets` enfileira 2 jobs (`<prefix>:counter` e `:kitchen`). Checkout
+  auto-enfileira as 2; botão "Imprimir" reimprime as 2.
+- `findOrderForTicket` expandido (pagamento, totais, endereço-snapshot, prazos, número).
+
+**Removidos** `apps/backoffice/lib/kitchen-ticket.{ts,test.ts}` (mortos).
+
+**Testes:** print-ticket (as 2 vias, `formatOrderNumber`, retirada, ajuste), printing.service
+(2 jobs, prefixo, conteúdo), e2e `printing.e2e` 7/7 + `printing-agent.e2e` 10/10 contra
+staging (rodados separados — juntos estouram o limite de transação do Neon Free). API
+779 unit, contracts 404, tsc/lint/build ok.
+
+**Deploy:** API `molho-api-staging` v43, backoffice `staging-app.molho.live`. Migration
+aplicada antes do deploy (o código lê `orders.order_number`).
+
+**Cross-ownership (doc 15):** `packages/contracts/admin-order.ts` (campo aditivo),
+`apps/backoffice` (card/page/lib de impressão). Aditivo — mergeável no rebase do Codex.
