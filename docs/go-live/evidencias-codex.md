@@ -77,18 +77,30 @@ HSTS após certificado válido.
 - Projetos `molho-backoffice-prod` e `molho-storefront-prod` criados com roots corretos e
   Node 22.x.
 - `molho-site` alinhado a Node 22.x.
-- Nenhum deploy, domínio, DNS ou env parcial foi publicado.
+- Somente os envs da API técnica foram gravados; nenhum deploy, domínio ou DNS foi
+  publicado.
 - Inventário: `docs/go-live/inventario-fronts-producao.md`.
 - Promoção/rollback: `docs/go-live/runbook-release-fronts.md`.
 
-Auditoria direta da Vercel em 10/09/2026:
+Auditoria e configuração direta da Vercel em 10/09/2026:
 
-- `molho-storefront-prod`: nenhuma variável no ambiente Production;
-- `molho-backoffice-prod`: nenhuma variável no ambiente Production;
+- `molho-storefront-prod`: `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev` foi gravada
+  no ambiente Production; demais variáveis pendentes;
+- `molho-backoffice-prod`: `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev` foi gravada no
+  ambiente Production; demais variáveis pendentes;
 - `molho-site`: somente `NEXT_PUBLIC_SITE_URL` e `NEXT_PUBLIC_APP_URL` em Production.
 
-Bloqueios do RC: URL técnica da API (C5), origin de assets (C4), DSNs Sentry, revisão
-jurídica e confirmação de e-mail. A varredura do build integrado encontrou
+Validação da API técnica em 10/09/2026:
+
+- `GET https://molho-api.fly.dev/ready`: HTTP 200, `db=ok`, `redis=ok`;
+- `fly status -a molho-api`: duas máquinas `started` em `gru`, ambas com 2/2 checks
+  passando.
+
+O certificado de `api.molho.live` foi criado e permanece `Not verified`, como esperado,
+até o apontamento de DNS autorizado somente depois de `ZG-5`.
+
+Bloqueios do RC: origin de assets (C4), DSNs Sentry, revisão jurídica e confirmação de
+e-mail. A varredura do build integrado encontrou
 `api.staging.molho.live` no comando exibido por
 `apps/backoffice/app/gestor/impressao/printer-settings.tsx`, arquivo reservado a C2. A
 credencial legada de staff já não aparece no artefato integrado. Portanto `NG-14`

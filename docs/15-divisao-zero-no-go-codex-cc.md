@@ -358,7 +358,7 @@ Antes de `ZG-5`, executar também:
 | `C3` | CC | `C1` | readiness incorporada; Sentry API, alertas reais e observação pendentes |
 | `R3` | Codex | `R1`, `C3` | código CSP/Sentry concluído; observação real pendente |
 | `C4` | CC | `C1`, acessos | Neon/RLS provisionados; backup/restore drill e R2 smoke pendentes |
-| `C5` | CC | `C3`, `C4` | Upstash criado; segredo, Fly prod, cross-instance/restart/rollback pendentes |
+| `C5` | CC | `C3`, `C4` | Fly prod com 2 máquinas/health verde e URL técnica entregues; cross-instance/restart/rollback pendentes |
 | `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/Node prontos; envs e RC bloqueados por C4/C5/Sentry |
 | `R5` | Codex | todas as anteriores | checklist pronto; dry run e gates humanos pendentes |
 
@@ -447,28 +447,37 @@ Operações externas já executadas no escopo `vinigehlens-projects`:
 | Projeto | ID | Root | Node | Estado |
 |---|---|---|---|---|
 | `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | existente; Node alinhado |
-| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado, vazio |
-| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado, vazio |
+| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado; env da API técnica gravada |
+| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado; env da API técnica gravada |
 
 - inventário de domínios/envs em `docs/go-live/inventario-fronts-producao.md`;
 - release/rollback em `docs/go-live/runbook-release-fronts.md`;
 - `scripts/verify-front-release.mjs` exige `.next/BUILD_ID` e procura endpoints proibidos
   e a credencial legada de staff nos artefatos;
-- nenhum Production env, deployment, domínio, alias ou DNS foi criado/alterado;
+- somente os envs da API técnica foram gravados em Production; nenhum deployment,
+  domínio, alias ou DNS foi criado/alterado;
 - nenhum deployment Vercel dos projetos produtivos existe ainda;
 - os deploys de staging registrados pelo CC (API v43 e backoffice staging) não incluem as
   mudanças desta branch Codex;
-- faltam URL técnica da API/Fly, origin R2, DSNs Sentry, e-mail validado e jurídico antes
-  de gerar o RC com `vercel deploy --prebuilt --prod --skip-domain`.
+- faltam origin R2, DSNs Sentry, e-mail validado e jurídico antes de gerar o RC com
+  `vercel deploy --prebuilt --prod --skip-domain`.
 
-A auditoria direta de Production em 10/09/2026 confirmou:
+A auditoria direta de Production em 10/09/2026 confirmou inicialmente:
 
 - `molho-storefront-prod`: zero variáveis;
 - `molho-backoffice-prod`: zero variáveis;
 - `molho-site`: somente `NEXT_PUBLIC_SITE_URL` e `NEXT_PUBLIC_APP_URL`.
 
-Assim, o deploy foi interrompido antes do build Vercel: publicar com envs ausentes viola o
-fail-fast e não produz um RC válido.
+Depois do handoff da URL técnica, foram gravadas em Production:
+
+- storefront: `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev`;
+- backoffice: `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev`.
+
+A URL respondeu `/ready` com HTTP 200, banco e Redis `ok`; `fly status` confirmou duas
+máquinas `started` em `gru`, ambas com 2/2 checks passando. O certificado de
+`api.molho.live` continua `Not verified` sem DNS, conforme a proibição até `ZG-5`.
+O deploy Vercel segue interrompido antes do build porque os demais envs ausentes violam o
+fail-fast e não produziriam um RC válido.
 
 O scanner foi repetido no build integrado. Ele encontrou dois artefatos do backoffice com
 `api.staging.molho.live`, vindos de
@@ -544,7 +553,9 @@ NG-01 → C1/config → C3/readiness → C4/Neon → C5/Fly+Redis
       → R4/RC Vercel → C2/R5 impressão física → ZG-5
 ```
 
-Codex deve concluir roteamento, BFF, URLs e CSP enquanto CC percorre esse caminho. A única espera planejada é a URL técnica da API para gerar o RC final.
+Codex concluiu roteamento, BFF, URLs e CSP enquanto CC percorre esse caminho. A URL
+técnica da API já foi entregue; a espera atual do RC é pela origin de assets, Sentry e
+demais gates registrados em R4/R5.
 
 Referência de capacidade, não compromisso de prazo:
 

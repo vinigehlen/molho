@@ -498,9 +498,9 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
 | `NG-10` | em execução (CC) | RLS + restore 30 dias comprovados |
 | `NG-11` | em execução (CC) | Redis cross-instance comprovado |
-| `NG-12` | em execução (CC) | API Fly prod + rollback |
+| `NG-12` | em execução (CC) | API Fly prod: 2 máquinas/health verdes e URL técnica entregues; rollback pendente |
 | `NG-13` | em execução (CC) | R2 na origin aprovada + upload smoke |
-| `NG-14` | vermelho | projetos Vercel/Node prontos; storefront/backoffice não têm envs de Production; faltam RC, e-mail e jurídico; scanner integrado rejeita somente a URL de staging do fluxo C2 |
+| `NG-14` | vermelho | projetos Vercel/Node e URL técnica prontos; env da API gravada em storefront/backoffice; faltam assets/Sentry/RC/e-mail/jurídico; scanner integrado rejeita somente a URL de staging do fluxo C2 |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
