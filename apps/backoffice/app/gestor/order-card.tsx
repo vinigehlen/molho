@@ -121,11 +121,13 @@ export const OrderCard = memo(function OrderCard({
         onClick={() => setExpanded((value) => !value)}
       >
         <div className="flex items-start justify-between gap-3">
-          <span className="font-medium text-text">
+          <span className="min-w-0">
             {order.orderNumber != null && (
-              <span className="mr-1.5 tabular-nums text-text-muted">#{String(order.orderNumber).padStart(5, '0')}</span>
+              <span className="block text-xs tabular-nums text-text-muted">
+                #{String(order.orderNumber).padStart(5, '0')}
+              </span>
             )}
-            {order.customerName}
+            <span className="block font-medium text-text">{order.customerName}</span>
           </span>
           <span className="shrink-0 text-right text-xs tabular-nums text-text-muted">
             <span className="block">{isoToTime(order.createdAt)}</span>
