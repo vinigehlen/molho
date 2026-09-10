@@ -113,8 +113,13 @@ Bloqueios do RC: DSNs Sentry, revisão jurídica e confirmação de e-mail. Port
   UTC e permite disparo manual;
 - usa `postgres:18-bookworm`, concorrência única, timeout de 30 minutos e permissão
   `contents: read`;
-- `DIRECT_URL`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` foram
-  configurados como Actions secrets sem registrar valores;
+- `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` foram configurados como
+  Actions secrets sem registrar valores;
+- o primeiro disparo em `main@3667c8e` chegou ao `pg_dump`, mas recusou a tabela
+  `print_devices`: `DIRECT_URL` usa `app_migrator`, role sem `BYPASSRLS`, e a tabela usa
+  `FORCE ROW LEVEL SECURITY`;
+- o workflow foi corrigido para exigir `BACKUP_DATABASE_URL`, separada de migration e
+  restrita a leitura integral para backup. Falta fornecer essa URL e repetir o job;
 - restore drill numa branch Neon isolada ainda é obrigatório para fechar `NG-10`.
 
 ## R5 — NG-15

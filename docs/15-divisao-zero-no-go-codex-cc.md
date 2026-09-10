@@ -491,8 +491,12 @@ ocorrência da credencial legada `MOLHO_STAFF_ACCESS_TOKEN`.
 
 Para `NG-10`, `.github/workflows/pg-backup.yml` agenda `scripts/pg-backup.sh` diariamente
 às 06:17 UTC, com disparo manual, container PostgreSQL 18, concorrência única e timeout
-de 30 minutos. Os quatro Actions secrets do handoff foram configurados sem registrar
-valores. Ainda falta executar o primeiro job e o restore drill em branch Neon isolada.
+de 30 minutos. Os três secrets do R2 foram configurados sem registrar valores. O primeiro
+job chegou ao `pg_dump`, mas `DIRECT_URL` (`app_migrator`) foi corretamente bloqueada por
+`FORCE ROW LEVEL SECURITY` em `print_devices`; usar essa role produziria backup incompleto.
+O workflow passou a exigir `BACKUP_DATABASE_URL`, destinada a uma role somente leitura
+com `BYPASSRLS` (ou ao owner Neon). Faltam essa URL, repetir o job e o restore drill em
+branch Neon isolada.
 
 #### R5 — dry run (`NG-15`)
 
@@ -557,8 +561,8 @@ Depois do merge `ba6d3b6` e do workflow `7d99098`, os gates foram novamente exec
 
 - não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
 - o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
-- próximo passo obrigatório: receber/configurar os DSNs Sentry, executar o primeiro backup
-  e o restore drill e então gerar o RC;
+- próximo passo obrigatório: receber/configurar os DSNs Sentry e
+  `BACKUP_DATABASE_URL`, repetir o backup, executar o restore drill e então gerar o RC;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 

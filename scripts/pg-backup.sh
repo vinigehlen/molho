@@ -4,7 +4,8 @@
 # (history = 6h). Ver docs/go-live/ata-ng-01.md §1 e docs/14 NG-10.
 #
 # Roda no GitHub Actions (cron). Precisa de:
-#   DIRECT_URL             — conexão direta do Neon prod, role app_migrator
+#   BACKUP_DATABASE_URL    — conexão direta do Neon prod; role somente leitura
+#                            com BYPASSRLS (ou owner Neon)
 #   S3_ENDPOINT            — https://<accountid>.r2.cloudflarestorage.com
 #   AWS_ACCESS_KEY_ID      — token R2 (Object Read & Write nos 2 buckets)
 #   AWS_SECRET_ACCESS_KEY  — idem
@@ -14,7 +15,7 @@
 
 set -euo pipefail
 
-: "${DIRECT_URL:?DIRECT_URL ausente}"
+: "${BACKUP_DATABASE_URL:?BACKUP_DATABASE_URL ausente}"
 : "${S3_ENDPOINT:?S3_ENDPOINT ausente}"
 : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID ausente}"
 : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY ausente}"
@@ -28,7 +29,7 @@ file="molho-neon-${ts}.sql.gz"
 tmp="$(mktemp -d)/${file}"
 
 echo "==> pg_dump ${ts}"
-pg_dump "$DIRECT_URL" --no-owner --no-privileges --format=plain | gzip -9 > "$tmp"
+pg_dump "$BACKUP_DATABASE_URL" --no-owner --no-privileges --format=plain | gzip -9 > "$tmp"
 echo "    $(du -h "$tmp" | cut -f1)"
 
 echo "==> upload s3://${BUCKET}/${PREFIX}/${file}"
