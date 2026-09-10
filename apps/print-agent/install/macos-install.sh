@@ -48,6 +48,7 @@ cat > "$PLIST" <<EOF
   </array>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
     <key>MOLHO_API_URL</key><string>${API_URL}</string>
     <key>MOLHO_PRINT_DEVICE_TOKEN</key><string>${TOKEN}</string>
     <key>MOLHO_PRINT_FORMAT</key><string>escpos</string>

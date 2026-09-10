@@ -1,8 +1,24 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import type { Codepage } from './codepage.js';
 import { renderEscPosTicket } from './escpos.js';
 import type { PrintOptions, Printer } from './printer.js';
 import { runProcess } from './printer.js';
+
+/**
+ * Resolve o binário por caminho absoluto — um LaunchAgent do macOS / Tarefa
+ * Agendada do Windows roda com PATH mínimo, e `spawn('lp')` dá
+ * "No such file or directory". Tenta os caminhos padrão, cai pro nome puro.
+ */
+function resolveBin(name: string, candidates: string[]): string {
+  return candidates.find((p) => existsSync(p)) ?? name;
+}
+
+const LP_BIN = resolveBin('lp', ['/usr/bin/lp', '/bin/lp', '/usr/local/bin/lp']);
+const LPSTAT_BIN = resolveBin('lpstat', ['/usr/bin/lpstat', '/bin/lpstat', '/usr/local/bin/lpstat']);
+const POWERSHELL_BIN = resolveBin('powershell', [
+  `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`,
+]);
 
 /**
  * Impressão RAW pelo spooler do SO — plug & play, sem `MOLHO_PRINT_COMMAND`.
@@ -46,7 +62,7 @@ export class SystemPrinter implements Printer {
       await printWindowsRaw(name, bytes);
       return;
     }
-    await runProcess('lp', ['-d', name, '-o', 'raw'], bytes);
+    await runProcess(LP_BIN, ['-d', name, '-o', 'raw'], bytes);
   }
 
   private async resolveName(): Promise<string> {
@@ -72,12 +88,12 @@ export class SystemPrinter implements Printer {
 
 /** `lpstat -e` — nomes de fila, um por linha. */
 export async function listCupsQueues(): Promise<string[]> {
-  const out = await capture('lpstat', ['-e']).catch(() => '');
+  const out = await capture(LPSTAT_BIN, ['-e']).catch(() => '');
   return out.split('\n').map((l) => l.trim()).filter(Boolean);
 }
 
 export async function listWindowsPrinters(): Promise<string[]> {
-  const out = await capture('powershell', [
+  const out = await capture(POWERSHELL_BIN, [
     '-NoProfile',
     '-NonInteractive',
     '-Command',
@@ -111,7 +127,7 @@ try {
   [void][Molho.Raw]::EndDocPrinter($h)
 } finally { [void][Molho.Raw]::ClosePrinter($h) }
 `;
-  await runProcessWithEnv('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+  await runProcessWithEnv(POWERSHELL_BIN, ['-NoProfile', '-NonInteractive', '-Command', script], {
     MOLHO_RAW_PRINTER: printerName,
     MOLHO_RAW_B64: bytes.toString('base64'),
   });

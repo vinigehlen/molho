@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Flag } from 'lucide-react';
+import { Bell, BellOff, Flag } from 'lucide-react';
 import type { AdminOrder, OrderNotificationResponse } from '@molho/contracts';
 import { getStaffSession } from '../../lib/staff-session';
 import { refreshStaffSession } from '../../lib/staff-auth';
@@ -46,6 +46,10 @@ export default function GestorPage() {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  // Toque de telefone LIGADO por padrão — o operador silencia se quiser
+  // (persistido). O browser só libera áudio após um gesto, então o unlock de
+  // verdade acontece no 1º clique/tecla em qualquer lugar do painel.
+  const [soundMuted, setSoundMuted] = useState(false);
   // Board mobile-funcional (CLAUDE.md §6.3): abaixo de md, uma coluna de
   // cada vez com seletor por aba, não o grid desktop com scroll horizontal.
   const [mobileColumn, setMobileColumn] = useState<BoardColumn>(BOARD_COLUMNS[0]);
@@ -66,14 +70,44 @@ export default function GestorPage() {
     }
     const novos = diffNewIds(seenIdsRef.current, ids);
     if (novos.length > 0) {
-      beeperRef.current?.beep();
+      if (!soundMuted) beeperRef.current?.beep();
       for (const id of novos) seenIdsRef.current.add(id);
     }
-  }, [orders]);
+  }, [orders, soundMuted]);
 
-  function ativarSom() {
+  // Lê a preferência salva e destrava o áudio no PRIMEIRO gesto do operador
+  // (o browser exige um gesto pra iniciar o AudioContext). Assim o som fica
+  // ligado sem ninguém precisar achar o botão.
+  useEffect(() => {
+    try {
+      setSoundMuted(window.localStorage.getItem('molho:gestor-sound-muted') === '1');
+    } catch {
+      /* storage indisponível — segue com o default (ligado) */
+    }
+    const unlock = () => {
+      beeperRef.current ??= new Beeper();
+      setSoundOn(beeperRef.current.unlock());
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  function toggleMute() {
     beeperRef.current ??= new Beeper();
     setSoundOn(beeperRef.current.unlock());
+    setSoundMuted((muted) => {
+      const next = !muted;
+      try {
+        window.localStorage.setItem('molho:gestor-sound-muted', next ? '1' : '0');
+      } catch {
+        /* ignora */
+      }
+      return next;
+    });
   }
 
   // Load completo do board. Usado no mount e pelo polling degradado
@@ -255,17 +289,24 @@ export default function GestorPage() {
               </span>
             )
           )}
-          {!soundOn && (
-            <button
-              type="button"
-              aria-label="Ativar som de novos pedidos"
-              title="Ativar som de novos pedidos"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text-muted hover:text-text"
-              onClick={ativarSom}
-            >
-              <Bell className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
+          <button
+            type="button"
+            aria-label={soundMuted ? 'Ligar toque de novos pedidos' : 'Silenciar toque de novos pedidos'}
+            aria-pressed={!soundMuted}
+            title={
+              soundMuted
+                ? 'Toque de novos pedidos silenciado — clique para ligar'
+                : soundOn
+                  ? 'Toque de novos pedidos ligado'
+                  : 'Toque de novos pedidos ligado (soa após o primeiro clique na tela)'
+            }
+            className={`flex h-8 w-8 items-center justify-center rounded-full border ${
+              soundMuted ? 'border-border text-text-muted' : 'border-brand text-brand'
+            } hover:text-text`}
+            onClick={toggleMute}
+          >
+            {soundMuted ? <BellOff className="h-4 w-4" aria-hidden="true" /> : <Bell className="h-4 w-4" aria-hidden="true" />}
+          </button>
           {/* flaggedCount === 0 some com o botão só quando o filtro JÁ está
               desligado — senão o board fica preso vazio (dessinalizou o
               último pedido com o filtro ligado e perde como desligar). */}
