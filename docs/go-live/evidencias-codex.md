@@ -85,9 +85,9 @@ HSTS após certificado válido.
 Auditoria e configuração direta da Vercel em 10/09/2026:
 
 - `molho-storefront-prod`: `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev` foi gravada
-  no ambiente Production; demais variáveis pendentes;
+  no ambiente Production, junto de root domain, path mode, slug técnico e origin R2;
 - `molho-backoffice-prod`: `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev` foi gravada no
-  ambiente Production; demais variáveis pendentes;
+  ambiente Production, junto da origin R2;
 - `molho-site`: somente `NEXT_PUBLIC_SITE_URL` e `NEXT_PUBLIC_APP_URL` em Production.
 
 Validação da API técnica em 10/09/2026:
@@ -99,12 +99,23 @@ Validação da API técnica em 10/09/2026:
 O certificado de `api.molho.live` foi criado e permanece `Not verified`, como esperado,
 até o apontamento de DNS autorizado somente depois de `ZG-5`.
 
-Bloqueios do RC: origin de assets (C4), DSNs Sentry, revisão jurídica e confirmação de
-e-mail. A varredura do build integrado encontrou
-`api.staging.molho.live` no comando exibido por
-`apps/backoffice/app/gestor/impressao/printer-settings.tsx`, arquivo reservado a C2. A
-credencial legada de staff já não aparece no artefato integrado. Portanto `NG-14`
-continua vermelho e nenhum RC de produção foi criado.
+O handoff C4 entregou `MOLHO_ASSETS_ORIGIN` e o valor foi gravado na storefront e no
+backoffice. O merge de `cc/no-go-backend-infra@748574e` também removeu a URL de staging
+do comando de impressão. A nova varredura examinou 428 artefatos e encontrou zero
+endpoint proibido.
+
+Bloqueios do RC: DSNs Sentry, revisão jurídica e confirmação de e-mail. Portanto
+`NG-14` continua vermelho e nenhum RC de produção foi criado.
+
+## Coordenação NG-10
+
+- `.github/workflows/pg-backup.yml` agenda `scripts/pg-backup.sh` diariamente às 06:17
+  UTC e permite disparo manual;
+- usa `postgres:18-bookworm`, concorrência única, timeout de 30 minutos e permissão
+  `contents: read`;
+- `DIRECT_URL`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` foram
+  configurados como Actions secrets sem registrar valores;
+- restore drill numa branch Neon isolada ainda é obrigatório para fechar `NG-10`.
 
 ## R5 — NG-15
 
@@ -114,8 +125,8 @@ aceites continuam pendentes; `NG-15` permanece vermelho.
 
 ## Gate final da árvore candidata
 
-Os gates abaixo foram executados na árvore integrada em `e0ac726`. O build integral foi
-isolado porque havia servidores Next ativos no checkout principal.
+Os gates abaixo foram repetidos depois do merge de `cc/no-go-backend-infra@748574e` e da
+criação do workflow de backup.
 
 | Comando | Resultado | Horário |
 |---|---|---|
@@ -123,16 +134,8 @@ isolado porque havia servidores Next ativos no checkout principal.
 | `pnpm test` | verde — Turbo 9/9; storefront 199, backoffice 246, API unit 779, contracts 404, UI 227, DB 35 e print-agent 31 | 2026-09-10 |
 | `pnpm build` | verde — Turbo 7/7 em checkout isolado | 2026-09-10 |
 | `pnpm --filter api test:e2e` | bloqueado pelo ambiente — Redis local recusou conexão; execução encerrada após 16 arquivos falhos por timeout, 2 passaram | 2026-09-10 |
-| `pnpm --filter @molho/storefront test:e2e` | 3/3 verde em checkout isolado | 2026-09-09 |
-| `pnpm verify:front-release` | vermelho no build integrado — 2 artefatos compilados contêm a URL de staging originada no fluxo de impressão de ownership C2; a credencial de staff não aparece mais | 2026-09-10 |
+| `pnpm --filter @molho/storefront test:e2e` | 3/3 verde na árvore integrada | 2026-09-10 |
+| `pnpm verify:front-release` | verde — 428 artefatos, zero endpoint proibido | 2026-09-10 |
 
-O gate global permanece vermelho. Para repetir o E2E da API é necessário disponibilizar o
-Redis esperado pela suíte; para liberar a varredura, C2 deve remover
-`api.staging.molho.live` de
-`apps/backoffice/app/gestor/impressao/printer-settings.tsx` e reconstruir os fronts.
-O verificador também exige `BUILD_ID` em cada `.next`, impedindo que uma saída parcial de
-`next dev` seja aceita como build de release.
-
-Uma alteração não commitada desse arquivo, feita fora da trilha Codex durante o gate,
-já troca a URL por `https://api.molho.live`; ela foi preservada no workspace, mas não foi
-incorporada nem atribuída ao Codex sem o handoff C2 correspondente.
+O gate de código/fronts está verde. O E2E integral da API continua registrado na trilha CC;
+o RC Vercel segue bloqueado pelo Sentry obrigatório e pelos gates externos descritos acima.

@@ -9,8 +9,8 @@ produtivo foi associado e nenhum deployment foi criado nesta preparação.
 | Projeto | ID | Root | Node | Estado |
 |---|---|---|---|---|
 | `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | existente; runtime alinhado ao CI |
-| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado; env da API técnica gravada; demais envs pendentes |
-| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado; env da API técnica gravada; demais envs pendentes |
+| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado; API/assets gravados; Sentry pendente |
+| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado; routing/API/assets gravados; Sentry pendente |
 
 Escopo Vercel: `vinigehlens-projects`. CI usa Node 22. O projeto de staging não foi
 alterado.
@@ -25,7 +25,7 @@ alterado.
 | API | `https://api.molho.live` | trilha CC; não apontar DNS |
 | API técnica do RC | `https://molho-api.fly.dev` | ativa; `/ready` verde; usar antes do DNS |
 | Loja piloto | `https://cabanhas-bbq.molho.live` | cadastro explícito, sem wildcard; não associar antes do corte |
-| Assets | origin R2 decidida na ata `NG-01` | trilha CC entrega a origin final ao RC |
+| Assets | `https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev` | exceção do piloto; smoke R2 verde |
 
 ## Variáveis por projeto
 
@@ -42,11 +42,12 @@ alterado.
 
 - `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev` — server-only; gravada em
   Production em 10/09/2026;
-- `MOLHO_STOREFRONT_ROOT_DOMAIN=molho.live`;
-- `MOLHO_STOREFRONT_PATH_MODE=false`;
-- `MOLHO_STOREFRONT_TECHNICAL_SLUG=cabanhas-bbq`;
+- `MOLHO_STOREFRONT_ROOT_DOMAIN=molho.live` — gravada em Production;
+- `MOLHO_STOREFRONT_PATH_MODE=false` — gravada em Production;
+- `MOLHO_STOREFRONT_TECHNICAL_SLUG=cabanhas-bbq` — gravada em Production;
 - `MOLHO_STOREFRONT_PUBLIC_URL` — fallback técnico opcional;
-- `MOLHO_ASSETS_ORIGIN` — origin final entregue por C4;
+- `MOLHO_ASSETS_ORIGIN=https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev`
+  — gravada em Production;
 - opcionais com consentimento: `NEXT_PUBLIC_POSTHOG_KEY`,
   `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_GA_ID`.
 
@@ -54,7 +55,8 @@ alterado.
 
 - `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev` — gravada em Production para o RC
   técnico em 10/09/2026;
-- `MOLHO_ASSETS_ORIGIN` — origin final entregue por C4.
+- `MOLHO_ASSETS_ORIGIN=https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev`
+  — gravada em Production.
 
 ### Site
 
@@ -63,6 +65,6 @@ alterado.
 - opcionais com consentimento: `NEXT_PUBLIC_POSTHOG_KEY`,
   `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_GA_ID`.
 
-As demais Production envs só serão gravadas quando C4 entregar a origin de assets e os
-três projetos Sentry existirem. O código falha no build produtivo quando uma entrada
-obrigatória está ausente ou aponta para HTTP/staging.
+O bloqueio de env restante é a criação dos três projetos Sentry e seus DSNs. O código
+falha no build produtivo quando uma entrada obrigatória está ausente ou aponta para
+HTTP/staging.

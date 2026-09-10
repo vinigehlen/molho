@@ -354,12 +354,12 @@ Antes de `ZG-5`, executar também:
 | `R1` | Codex | contrato de domínios | código + testes locais concluídos; RC pendente |
 | `C1` | CC | contrato de config/slug | config fail-fast + readiness incorporados à `main`; validação em produção pendente |
 | `R2` | Codex | `R1` | BFF + 3 E2E browser locais verdes; integração API pendente |
-| `C2` | CC | desenho de impressão | credencial de dispositivo e agente incorporados à `main`; URL de staging no comando e teste físico pendentes |
+| `C2` | CC | desenho de impressão | credencial, agente e remoção da URL de staging integrados; teste físico pendente |
 | `C3` | CC | `C1` | readiness incorporada; Sentry API, alertas reais e observação pendentes |
 | `R3` | Codex | `R1`, `C3` | código CSP/Sentry concluído; observação real pendente |
-| `C4` | CC | `C1`, acessos | Neon/RLS provisionados; backup/restore drill e R2 smoke pendentes |
+| `C4` | CC | `C1`, acessos | Neon/RLS e R2 smoke verdes; workflow de backup criado; restore drill pendente |
 | `C5` | CC | `C3`, `C4` | Fly prod com 2 máquinas/health verde e URL técnica entregues; cross-instance/restart/rollback pendentes |
-| `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/Node prontos; envs e RC bloqueados por C4/C5/Sentry |
+| `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/API/assets prontos; RC bloqueado somente pelos envs Sentry |
 | `R5` | Codex | todas as anteriores | checklist pronto; dry run e gates humanos pendentes |
 
 Nota de nomenclatura: `docs/go-live/evidencias-cc.md` também chamou de “C3” a entrega de
@@ -381,6 +381,10 @@ trilha pública. A evidência detalhada permanece em `docs/go-live/evidencias-co
 | CC na `main` | C1/C2, migrations, dispositivo de impressão, agente, staging, número de pedido e duas vias já mergeados |
 | Branch de integração | `codex/zero-no-go-integration` ainda não foi criada |
 | Integração | rebase executado; resolução restrita aos docs `14` e `15` |
+
+Atualização posterior: `cc/no-go-backend-infra@748574e` foi incorporada pela merge
+commit `ba6d3b6`, preservando os três commits e a autoria do CC. O workflow de backup foi
+adicionado em `7d99098`; o ajuste de lint do smoke R2 e esta documentação vieram depois.
 
 Nos arquivos exclusivos de API/Prisma/contratos/agente/impressão prevaleceu a `main`/CC.
 As mudanças Codex de storefront/site/configuração dos fronts foram reaplicadas sobre essa
@@ -447,19 +451,19 @@ Operações externas já executadas no escopo `vinigehlens-projects`:
 | Projeto | ID | Root | Node | Estado |
 |---|---|---|---|---|
 | `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | existente; Node alinhado |
-| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | criado; env da API técnica gravada |
-| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | criado; env da API técnica gravada |
+| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | API técnica e assets gravados; Sentry pendente |
+| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | routing, API técnica e assets gravados; Sentry pendente |
 
 - inventário de domínios/envs em `docs/go-live/inventario-fronts-producao.md`;
 - release/rollback em `docs/go-live/runbook-release-fronts.md`;
 - `scripts/verify-front-release.mjs` exige `.next/BUILD_ID` e procura endpoints proibidos
   e a credencial legada de staff nos artefatos;
-- somente os envs da API técnica foram gravados em Production; nenhum deployment,
+- envs de routing, API técnica e assets foram gravados em Production; nenhum deployment,
   domínio, alias ou DNS foi criado/alterado;
 - nenhum deployment Vercel dos projetos produtivos existe ainda;
 - os deploys de staging registrados pelo CC (API v43 e backoffice staging) não incluem as
   mudanças desta branch Codex;
-- faltam origin R2, DSNs Sentry, e-mail validado e jurídico antes de gerar o RC com
+- faltam DSNs Sentry, e-mail validado e jurídico antes de gerar o RC com
   `vercel deploy --prebuilt --prod --skip-domain`.
 
 A auditoria direta de Production em 10/09/2026 confirmou inicialmente:
@@ -470,21 +474,25 @@ A auditoria direta de Production em 10/09/2026 confirmou inicialmente:
 
 Depois do handoff da URL técnica, foram gravadas em Production:
 
-- storefront: `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev`;
-- backoffice: `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev`.
+- storefront: `MOLHO_API_INTERNAL_URL=https://molho-api.fly.dev`, root domain, path mode,
+  slug técnico e `MOLHO_ASSETS_ORIGIN`;
+- backoffice: `NEXT_PUBLIC_API_URL=https://molho-api.fly.dev` e
+  `MOLHO_ASSETS_ORIGIN`.
 
 A URL respondeu `/ready` com HTTP 200, banco e Redis `ok`; `fly status` confirmou duas
 máquinas `started` em `gru`, ambas com 2/2 checks passando. O certificado de
 `api.molho.live` continua `Not verified` sem DNS, conforme a proibição até `ZG-5`.
-O deploy Vercel segue interrompido antes do build porque os demais envs ausentes violam o
+O deploy Vercel segue interrompido antes do build porque os DSNs Sentry ausentes violam o
 fail-fast e não produziriam um RC válido.
 
-O scanner foi repetido no build integrado. Ele encontrou dois artefatos do backoffice com
-`api.staging.molho.live`, vindos de
-`apps/backoffice/app/gestor/impressao/printer-settings.tsx`. A credencial legada
-`MOLHO_STAFF_ACCESS_TOKEN` não aparece mais: a `main` usa
-`MOLHO_PRINT_DEVICE_TOKEN`. Durante o gate apareceu no workspace uma mudança externa,
-não commitada, que troca a URL pela produção; ela foi preservada e aguarda handoff C2.
+O merge do CC incorporou a troca da URL de impressão para `api.molho.live`. O scanner foi
+repetido depois do merge e examinou 428 artefatos: zero endpoint proibido e nenhuma
+ocorrência da credencial legada `MOLHO_STAFF_ACCESS_TOKEN`.
+
+Para `NG-10`, `.github/workflows/pg-backup.yml` agenda `scripts/pg-backup.sh` diariamente
+às 06:17 UTC, com disparo manual, container PostgreSQL 18, concorrência única e timeout
+de 30 minutos. Os quatro Actions secrets do handoff foram configurados sem registrar
+valores. Ainda falta executar o primeiro job e o restore drill em branch Neon isolada.
 
 #### R5 — dry run (`NG-15`)
 
@@ -535,12 +543,22 @@ O Playwright da storefront continua com a evidência isolada de 3/3 verde anteri
 integração. O E2E integral da API e o Playwright contra o RC continuam obrigatórios;
 não foram declarados verdes por inferência.
 
+Depois do merge `ba6d3b6` e do workflow `7d99098`, os gates foram novamente executados:
+
+| Comando | Resultado |
+|---|---|
+| `pnpm lint` | verde após declarar o `fetch` global do Node no smoke R2 |
+| `pnpm test` | verde, Turbo 9/9; 1.921 testes |
+| `pnpm build` | verde, Turbo 7/7 |
+| `pnpm verify:front-release` | verde, 428 artefatos e zero endpoint proibido |
+| `pnpm --filter @molho/storefront test:e2e` | verde, 3/3 na árvore integrada |
+
 #### Rollback e próximo ponto de integração
 
 - não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
 - o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
-- próximo passo obrigatório: incorporar o handoff C2 da URL, configurar os envs de
-  Production, repetir scanner/API E2E/storefront E2E e então gerar o RC;
+- próximo passo obrigatório: receber/configurar os DSNs Sentry, executar o primeiro backup
+  e o restore drill e então gerar o RC;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 

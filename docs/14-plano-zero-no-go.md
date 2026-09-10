@@ -491,16 +491,16 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | `NG-02` | amarelo | código + unit/E2E local em `go-live/evidencias-codex.md`; falta RC técnico real |
 | `NG-03` | amarelo | BFF + browser E2E verde; falta validar CORS e hops de proxy com API do RC |
 | `NG-04` | amarelo | URLs frontend concluídas; slug imutável depende de C1; varredura do build bloqueada pela URL de staging no fluxo de impressão C2 |
-| `NG-05` | em execução (CC) | startup fail-fast validado |
+| `NG-05` | verde | startup fail-fast validado em Fly prod |
 | `NG-06` | em execução (CC) | credencial revogável + impressão 60 min |
-| `NG-07` | em execução (CC) | DB/Redis failure checks |
+| `NG-07` | verde | readiness real confirmou DB/Redis e 2/2 checks por máquina |
 | `NG-08` | amarelo | scrubbing/release dos fronts implementados; alertas reais e API dependem de C3 |
 | `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
-| `NG-10` | em execução (CC) | RLS + restore 30 dias comprovados |
+| `NG-10` | em execução | workflow noturno e secrets configurados; restore drill isolado pendente |
 | `NG-11` | em execução (CC) | Redis cross-instance comprovado |
 | `NG-12` | em execução (CC) | API Fly prod: 2 máquinas/health verdes e URL técnica entregues; rollback pendente |
-| `NG-13` | em execução (CC) | R2 na origin aprovada + upload smoke |
-| `NG-14` | vermelho | projetos Vercel/Node e URL técnica prontos; env da API gravada em storefront/backoffice; faltam assets/Sentry/RC/e-mail/jurídico; scanner integrado rejeita somente a URL de staging do fluxo C2 |
+| `NG-13` | verde | R2 na origin aprovada; PUT/GET/public GET/backup bucket/cleanup comprovados |
+| `NG-14` | vermelho | projetos, API e assets configurados; lint/test/build/scanner/E2E storefront verdes; faltam Sentry/RC/e-mail/jurídico |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
