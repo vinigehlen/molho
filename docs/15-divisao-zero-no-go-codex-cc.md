@@ -347,20 +347,24 @@ Antes de `ZG-5`, executar também:
 
 ## 10. Quadro de acompanhamento
 
-| Entrega | DRI | Depende de | Estado inicial |
+| Entrega | DRI | Depende de | Estado (10/09/2026) |
 |---|---|---|---|
 | `R0` | Codex | humanos | amarelo: decisões/acessos registrados; jurídico e operador pendentes |
-| `C0` | CC | acessos | concluído e documentado em `docs/go-live/evidencias-cc.md` |
+| `C0` | CC | acessos | ✅ concluído e documentado em `docs/go-live/evidencias-cc.md` |
 | `R1` | Codex | contrato de domínios | código + testes locais concluídos; RC pendente |
-| `C1` | CC | contrato de config/slug | config fail-fast + readiness incorporados à `main`; validação em produção pendente |
+| `C1` | CC | contrato de config/slug | ✅ config fail-fast + readiness validados no boot real da Fly prod (`NG-05`, `NG-07`) |
 | `R2` | Codex | `R1` | BFF + 3 E2E browser locais verdes; integração API pendente |
-| `C2` | CC | desenho de impressão | credencial, agente e remoção da URL de staging integrados; teste físico pendente |
-| `C3` | CC | `C1` | readiness incorporada; Sentry API, alertas reais e observação pendentes |
+| `C2` | CC | desenho de impressão | credencial, agente e remoção da URL de staging integrados; teste físico (60 min) fica no dry run |
+| `C3` | CC | `C1` | readiness ✅; Sentry da API **descopado no piloto** (ata NG-01 §1 linha 12); alerta via fallback `fly logs` + uptime ping no `/ready` |
 | `R3` | Codex | `R1`, `C3` | código CSP/Sentry concluído; observação real pendente |
-| `C4` | CC | `C1`, acessos | Neon/RLS e R2 smoke verdes; workflow de backup criado; restore drill pendente |
-| `C5` | CC | `C3`, `C4` | Fly prod com 2 máquinas/health verde e URL técnica entregues; cross-instance/restart/rollback pendentes |
-| `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/API/assets prontos; RC bloqueado somente pelos envs Sentry |
+| `C4` | CC | `C1`, acessos | ✅ Neon prod (49 migrations, RLS), R2 prod (smoke PUT/GET/public/backup), backup noturno verde + restore drill 17s (RPO ≤ 24h, RTO ~2min) — `NG-10`, `NG-13` |
+| `C5` | CC | `C3`, `C4` | ✅ Fly prod `molho-api.fly.dev` (2×`gru`, 2/2), Upstash prod (`redis:ok`), restart drill OK — `NG-11`, `NG-12`. Fan-out A/B e rollback real ficam no dry run |
+| `R4` | Codex | `R2`, `R3`, URL de `C5` | projetos/API/assets prontos; RC bloqueado por jurídico + e-mail + gates humanos |
 | `R5` | Codex | todas as anteriores | checklist pronto; dry run e gates humanos pendentes |
+
+Trilha CC encerrada em 10/09/2026: `NG-05`, `NG-07`, `NG-10`, `NG-11`, `NG-12`,
+`NG-13` verdes; `NG-08` (parte API) descopado no piloto. Evidência e handoff pro
+Codex em `docs/go-live/evidencias-cc.md`.
 
 Nota de nomenclatura: `docs/go-live/evidencias-cc.md` também chamou de “C3” a entrega de
 numeração sequencial e duas vias de comanda. Isso não substitui o C3 deste plano, cujo
