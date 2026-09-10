@@ -1,3 +1,5 @@
+/* global fetch */
+
 /**
  * NG-13 — smoke do R2 produtivo. PUT/GET/DELETE nos 2 buckets + GET no public URL.
  * Usa o mesmo @aws-sdk/client-s3 do R2StorageProvider da API.
