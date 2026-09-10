@@ -538,3 +538,26 @@ pra `api.molho.live`. Destrava o `scripts/verify-front-release.mjs` do Codex.
 
 **Handoff Codex:** `MOLHO_ASSETS_ORIGIN` = `https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev`.
 **Rollback:** `fly apps destroy molho-api`; recursos Upstash/R2 removíveis pelos painéis.
+
+### NG-13 — smoke do R2 prod (2026-09-10)
+
+`node docs/go-live/r2-smoke.mjs docs/go-live/.env.prod.local` (rodado com o
+`@aws-sdk` de `apps/api`):
+
+```
+PUT uploads bucket: ok
+GET via S3: match
+GET via public URL: 200 match
+PUT backup bucket: molho-backups ok
+cleanup: ok
+```
+
+Bucket, credencial (token de conta escopado), public dev URL e o bucket de
+backup provados end-to-end. **NG-13 fecha** (CORS de browser fica pro teste via
+backoffice no dry run).
+
+### NG-10 — status (2026-09-10)
+
+`scripts/pg-backup.sh` pronto (dump plain + gzip → `s3://molho-backups/neon/`,
+retenção 30d, RPO ≈ 24h). Falta: Codex ligar no cron do CI (workflow é dele) e
+o restore drill numa branch Neon isolada com RTO registrado.
