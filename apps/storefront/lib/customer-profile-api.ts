@@ -12,18 +12,17 @@ import {
   type UpdateCustomerProfileInput,
 } from '@molho/contracts';
 import { z } from 'zod';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { CUSTOMER_TOKEN_HEADER, storeApiPath } from './store-api-path';
 const addressListSchema = z.array(customerProfileAddressSchema);
 
 export class CustomerProfileUnauthorizedError extends Error {}
 export class CustomerProfileConflictError extends Error {}
 
 async function request<T>(slug: string, token: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/me${path}`, {
+  const response = await fetch(storeApiPath(slug, `/me${path}`), {
     ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
+      [CUSTOMER_TOKEN_HEADER]: token,
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
@@ -110,9 +109,9 @@ export async function createReview(
   orderId: string,
   input: { rating: number; comment?: string },
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/orders/${encodeURIComponent(orderId)}/review`, {
+  const response = await fetch(storeApiPath(slug, `/orders/${encodeURIComponent(orderId)}/review`), {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { [CUSTOMER_TOKEN_HEADER]: token, 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
   if (response.status === 401) throw new CustomerProfileUnauthorizedError('Sua sessão expirou.');

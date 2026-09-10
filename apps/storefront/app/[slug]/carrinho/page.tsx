@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { COPY } from '@molho/contracts';
+import { COPY, PICKUP_ETA_MAX_MINUTES } from '@molho/contracts';
 import { getStorefront } from '../../../lib/storefront-api';
+import { storefrontPublicPathPrefix, storefrontUrlForRequest } from '../../../lib/site-url';
 import { CartView } from './cart-view';
 
 interface CarrinhoPageProps {
@@ -15,16 +16,18 @@ interface CarrinhoPageProps {
  */
 export default async function CarrinhoPage({ params }: CarrinhoPageProps) {
   const { slug } = await params;
-  const store = await getStorefront(slug);
+  const [store, publicBaseUrl] = await Promise.all([getStorefront(slug), storefrontUrlForRequest(slug)]);
   if (!store) notFound();
 
   return (
     <CartView
       slug={slug}
+      basePath={storefrontPublicPathPrefix(publicBaseUrl)}
       storeName={store.store.name}
       availablePaymentMethods={store.store.availablePaymentMethods}
       otpChannel={store.otpChannel}
       guestCheckout={store.guestCheckout}
+      pickupEtaMaxMinutes={PICKUP_ETA_MAX_MINUTES}
       emptyTitle={COPY.storefront.carrinhoVazioTitulo}
       emptyBody={COPY.storefront.carrinhoVazioCorpo}
       emptyActionLabel={COPY.storefront.carrinhoVazioAcao}

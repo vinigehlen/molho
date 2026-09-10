@@ -39,6 +39,7 @@ import {
 } from '../../../lib/customer-profile-api';
 import { useCustomerToken } from '../../../lib/use-customer-token';
 import { lookupPostalCode } from '../../../lib/viacep';
+import { storefrontRoute } from '../../../lib/public-routes';
 
 const STATUS: Record<CustomerOrderSummary['status'], string> = {
   pending_payment: 'Aguardando pagamento',
@@ -53,7 +54,7 @@ const STATUS: Record<CustomerOrderSummary['status'], string> = {
   delivery_failed: 'Entrega não concluída',
 };
 
-export function CustomerAccountView({ slug, storeName }: { slug: string; storeName: string }) {
+export function CustomerAccountView({ slug, basePath = `/${slug}`, storeName }: { slug: string; basePath?: string; storeName: string }) {
   const session = useCustomerToken(slug);
   const [mounted, setMounted] = React.useState(false);
   const [profile, setProfile] = React.useState<CustomerProfile | null>(null);
@@ -193,20 +194,20 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
 
   if (!mounted || loading)
     return (
-      <AccountShell slug={slug} storeName={storeName}>
+      <AccountShell basePath={basePath} storeName={storeName}>
         <MoSkeleton className="h-48 w-full" />
       </AccountShell>
     );
   if (!session.token || !profile)
     return (
-      <AccountShell slug={slug} storeName={storeName}>
+      <AccountShell basePath={basePath} storeName={storeName}>
         <MoCard>
           <MoCardContent className="flex flex-col gap-4 p-5">
             <h2 className="text-title text-text">Sua conta está protegida</h2>
             <p className="text-body text-text-muted">
               {error ?? 'Confirme seu telefone ao finalizar um pedido para acessar seus dados.'}
             </p>
-            <Link className={cn(buttonVariants({ fullWidth: true }))} href={`/${slug}`}>
+            <Link className={cn(buttonVariants({ fullWidth: true }))} href={storefrontRoute(basePath)}>
               Voltar pro cardápio
             </Link>
           </MoCardContent>
@@ -215,7 +216,7 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
     );
 
   return (
-    <AccountShell slug={slug} storeName={storeName}>
+    <AccountShell basePath={basePath} storeName={storeName}>
       {error ? (
         <p role="alert" className="rounded-md bg-critical/10 p-3 text-body text-critical-strong">
           {error}
@@ -375,11 +376,11 @@ export function CustomerAccountView({ slug, storeName }: { slug: string; storeNa
 }
 
 function AccountShell({
-  slug,
+  basePath,
   storeName,
   children,
 }: {
-  slug: string;
+  basePath: string;
   storeName: string;
   children: React.ReactNode;
 }) {
@@ -387,7 +388,7 @@ function AccountShell({
     <main className="mx-auto min-h-screen max-w-2xl bg-bg px-4 pb-12">
       <header className="-mx-4 mb-6 flex items-center gap-3 bg-brand px-4 py-5 text-on-brand">
         <Link
-          href={`/${slug}`}
+          href={storefrontRoute(basePath)}
           aria-label="Voltar pro cardápio"
           className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center"
         >

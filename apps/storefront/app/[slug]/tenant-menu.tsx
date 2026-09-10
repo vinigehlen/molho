@@ -17,6 +17,7 @@ import {
 } from '@molho/ui';
 import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
 import { fetchDeliveryMatch } from '../../lib/delivery-match-api';
+import { storefrontRoute } from '../../lib/public-routes';
 import { useAddress } from '../../lib/use-address';
 import { useCart } from '../../lib/use-cart';
 import { useCustomerToken } from '../../lib/use-customer-token';
@@ -59,6 +60,7 @@ function interpolarCopy(template: string, vars: Record<string, string>): string 
  */
 export interface TenantMenuProps {
   slug: string;
+  basePath?: string;
   storeName: string;
   storeDescription: string | null;
   logoImageUrl: string | null;
@@ -84,6 +86,7 @@ const VISUALIZACAO_STORAGE_KEY = 'molho:storefront:visualizacao-cardapio';
 
 export function TenantMenu({
   slug,
+  basePath = `/${slug}`,
   storeName,
   storeDescription,
   logoImageUrl,
@@ -242,7 +245,7 @@ export function TenantMenu({
             mensagem, nunca um formulário de login morto. */}
           <div className="flex shrink-0 items-center gap-1">
             <Link
-              href={`/${slug}/carrinho`}
+              href={storefrontRoute(basePath, '/carrinho')}
               aria-label={
                 cart.itemCount > 0
                   ? `Carrinho, ${cart.itemCount} ${cart.itemCount === 1 ? 'item' : 'itens'}`
@@ -258,7 +261,7 @@ export function TenantMenu({
               ) : null}
             </Link>
             <Link
-              href={`/${slug}/minha-conta`}
+              href={storefrontRoute(basePath, '/minha-conta')}
               aria-label="Minha conta"
               className="flex h-11 w-11 items-center justify-center rounded-pill text-on-brand transition duration-base ease-out hover:bg-on-brand/10"
             >
@@ -400,7 +403,7 @@ export function TenantMenu({
       <MoCartBar
         itemCount={cart.itemCount}
         totalCents={cart.subtotalCents}
-        onClick={() => router.push(`/${slug}/carrinho`)}
+        onClick={() => router.push(storefrontRoute(basePath, '/carrinho'))}
       />
 
       <footer className="px-4 pb-8 pt-2 text-center text-caption text-text-muted">

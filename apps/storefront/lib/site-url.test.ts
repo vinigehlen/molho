@@ -1,22 +1,25 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { normalizePublicUrl, storefrontPublicBaseUrl, storefrontPublicPath } from './site-url';
 
-async function loadStorefrontUrl(): Promise<string> {
-  vi.resetModules();
-  return (await import('./site-url')).STOREFRONT_URL;
-}
-
-describe('STOREFRONT_URL', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
+describe('URLs públicas da storefront', () => {
+  it('usa a origem absoluta resolvida pelo host sem barra final', () => {
+    expect(storefrontPublicBaseUrl('https://cabanhas-bbq.molho.live/', 'cabanhas-bbq')).toBe(
+      'https://cabanhas-bbq.molho.live',
+    );
   });
 
-  it('usa NEXT_PUBLIC_STOREFRONT_URL quando definido, sem barra no fim', async () => {
-    vi.stubEnv('NEXT_PUBLIC_STOREFRONT_URL', 'https://cabanhas-bbq.molho.live/');
-    expect(await loadStorefrontUrl()).toBe('https://cabanhas-bbq.molho.live');
+  it('preserva o modo por path apenas no fallback local', () => {
+    const base = storefrontPublicBaseUrl(null, 'cabanhas-bbq', {});
+    expect(base).toBe('http://localhost:3000/cabanhas-bbq');
+    expect(storefrontPublicPath(base)).toBe('/cabanhas-bbq');
+    expect(storefrontPublicPath('https://cabanhas-bbq.molho.live')).toBe('/');
   });
 
-  it('cai no domínio de dev quando a env não está setada', async () => {
-    vi.stubEnv('NEXT_PUBLIC_STOREFRONT_URL', '');
-    expect(await loadStorefrontUrl()).toBe('https://molho.vercel.app');
+  it('rejeita URL ambígua e falha cedo em produção sem origem', () => {
+    expect(normalizePublicUrl('https://molho.live@evil.test')).toBeNull();
+    expect(normalizePublicUrl('javascript:alert(1)')).toBeNull();
+    expect(() => storefrontPublicBaseUrl(null, 'cabanhas-bbq', { VERCEL_ENV: 'production' })).toThrow(
+      /URL pública/,
+    );
   });
 });

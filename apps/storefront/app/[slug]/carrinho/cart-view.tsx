@@ -4,7 +4,7 @@ import { ArrowLeft, MapPin, Store, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { PICKUP_ETA_MAX_MINUTES, type CustomerAddress } from '@molho/contracts';
+import type { CustomerAddress } from '@molho/contracts';
 import {
   formatCents,
   MoAddressSheet,
@@ -27,6 +27,7 @@ import { useAddress } from '../../../lib/use-address';
 import { useCart } from '../../../lib/use-cart';
 import { useCheckout, type CheckoutStep } from '../../../lib/use-checkout';
 import { lookupPostalCode } from '../../../lib/viacep';
+import { storefrontRoute } from '../../../lib/public-routes';
 
 const LEGAL_TERMS_HREF = 'https://molho.live/termos';
 const LEGAL_PRIVACY_HREF = 'https://molho.live/privacidade';
@@ -63,6 +64,7 @@ function SuccessPaymentInfo({ step }: { step: Extract<CheckoutStep, { kind: 'suc
 
 export interface CartViewProps {
   slug: string;
+  basePath?: string;
   storeName: string;
   /** `GET /v1/store/:slug` (Épico 8, docs/02 §5.5) — array vazio é um estado real: loja sem nenhum método pronto. */
   availablePaymentMethods: CheckoutPaymentMethod[];
@@ -70,6 +72,8 @@ export interface CartViewProps {
   otpChannel: 'sms' | 'email';
   /** `GET /v1/store/:slug` — módulo `checkout.guest` do tenant. Dica de UI: o servidor recusa igual se isto mentir. */
   guestCheckout: boolean;
+  /** Valor canônico vem de @molho/contracts no Server Component. */
+  pickupEtaMaxMinutes: number;
   emptyTitle: string;
   emptyBody: string;
   emptyActionLabel: string;
@@ -84,10 +88,12 @@ export interface CartViewProps {
  */
 export function CartView({
   slug,
+  basePath = `/${slug}`,
   storeName,
   availablePaymentMethods,
   otpChannel,
   guestCheckout,
+  pickupEtaMaxMinutes,
   emptyTitle,
   emptyBody,
   emptyActionLabel,
@@ -147,13 +153,13 @@ export function CartView({
           Pedido <span className="font-mono">#{successStep.orderId.slice(0, 8)}</span>
         </p>
         <div className="flex flex-col gap-2">
-          <MoButton onClick={() => router.push(`/${slug}/acompanhar/${successStep.trackingToken}`)}>
+          <MoButton onClick={() => router.push(storefrontRoute(basePath, `/acompanhar/${successStep.trackingToken}`))}>
             Acompanhar pedido
           </MoButton>
-          <Link href={`/${slug}/minha-conta`} className="text-body-strong text-brand-strong underline-offset-2 hover:underline">
+          <Link href={storefrontRoute(basePath, '/minha-conta')} className="text-body-strong text-brand-strong underline-offset-2 hover:underline">
             Ver meus pedidos
           </Link>
-          <MoButton variant="ghost" onClick={() => router.push(`/${slug}`)}>
+          <MoButton variant="ghost" onClick={() => router.push(storefrontRoute(basePath))}>
             Voltar pro cardápio
           </MoButton>
         </div>
@@ -172,7 +178,7 @@ export function CartView({
         <MoEmptyState
           title="Essa loja não está recebendo pedidos agora"
           description="A forma de pagamento ainda não foi configurada. Volta mais tarde ou fala direto com a loja."
-          action={{ label: 'Voltar pro cardápio', onClick: () => router.push(`/${slug}`) }}
+          action={{ label: 'Voltar pro cardápio', onClick: () => router.push(storefrontRoute(basePath)) }}
         />
       </main>
     );
@@ -184,7 +190,7 @@ export function CartView({
         <MoEmptyState
           title={emptyTitle}
           description={emptyBody}
-          action={{ label: emptyActionLabel, onClick: () => router.push(`/${slug}`) }}
+          action={{ label: emptyActionLabel, onClick: () => router.push(storefrontRoute(basePath)) }}
         />
       </main>
     );
@@ -212,7 +218,7 @@ export function CartView({
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col pb-44">
       <header className="flex flex-col gap-1 bg-brand px-4 py-6 text-on-brand">
         <Link
-          href={`/${slug}`}
+          href={storefrontRoute(basePath)}
           className="-m-2 inline-flex w-fit items-center gap-1 p-2 text-caption underline-offset-2 hover:underline"
         >
           <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -236,7 +242,7 @@ export function CartView({
       {fulfillmentType === 'pickup' ? (
         <div className="flex w-full items-center gap-2 border-b border-border px-4 py-3 text-body text-text-muted">
           <Store className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
-          <span>Retira direto na loja em até {PICKUP_ETA_MAX_MINUTES} min, sem taxa de entrega.</span>
+          <span>Retira direto na loja em até {pickupEtaMaxMinutes} min, sem taxa de entrega.</span>
         </div>
       ) : (
         <>

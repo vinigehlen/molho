@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { slugifyStoreName } from '@molho/contracts';
 import { activateStaffSession } from '../../lib/staff-auth';
 import { checkSlugAvailability, requestSignupOtp, verifySignup, type SlugAvailability } from '../../lib/signup-api';
+import { storefrontDisplayUrl } from '../../lib/storefront-url';
 
 const SLUG_CHECK_DEBOUNCE_MS = 400;
 
@@ -178,29 +179,29 @@ export default function SignupPage() {
 }
 
 /**
- * Preview de `molho.live/<slug>` embaixo do nome (Bloco 2). Só reporta
+ * Preview de `<slug>.molho.live` embaixo do nome (Bloco 2). Só reporta
  * "indisponível" depois que a checagem de verdade voltar do backend — nunca
  * assume ocupado enquanto ainda está checando, senão pisca âmbar a cada
  * tecla antes do debounce resolver.
  */
 function SlugPreview({ slug, checking, availability }: { slug: string; checking: boolean; availability: SlugAvailability | null }) {
-  if (!slug) return <p className="mt-2 text-xs text-text-muted">molho.live/<span className="italic">digite um nome</span></p>;
+  if (!slug) return <p className="mt-2 text-xs text-text-muted"><span className="italic">sua-loja</span>.molho.live</p>;
 
   if (checking || !availability) {
-    return <p className="mt-2 text-xs text-text-muted">molho.live/{slug} · checando disponibilidade…</p>;
+    return <p className="mt-2 text-xs text-text-muted">{storefrontDisplayUrl(slug)} · checando disponibilidade…</p>;
   }
 
   if (availability.available) {
     return (
       <p className="mt-2 text-xs font-medium text-positive">
-        molho.live/{slug} · disponível
+        {storefrontDisplayUrl(slug)} · disponível
       </p>
     );
   }
 
   return (
     <p className="mt-2 text-xs font-medium text-brand-strong">
-      molho.live/{slug} · indisponível{availability.suggestion ? ` — sugerimos ${availability.suggestion}` : ''}
+      {storefrontDisplayUrl(slug)} · indisponível{availability.suggestion ? ` — sugerimos ${availability.suggestion}` : ''}
     </p>
   );
 }

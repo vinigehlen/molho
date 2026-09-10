@@ -7,6 +7,7 @@ import type { OrderStatus, OrderTrackingResponse } from '@molho/contracts';
 import { formatCents, MoButton, MoCard, MoCardContent, MoTimeline, type MoTimelineStep } from '@molho/ui';
 import { OrderReviewForm } from '../../../../components/order-review-form';
 import { createTrackReview, getOrderTracking, ReviewAlreadyExistsError } from '../../../../lib/order-tracking-api';
+import { storefrontRoute } from '../../../../lib/public-routes';
 
 const POLL_MS = 18_000;
 const ORDER_TRACKING_TERMINAL_STATUSES: OrderStatus[] = [
@@ -71,11 +72,13 @@ function timelineSteps(tracking: OrderTrackingResponse): { steps: MoTimelineStep
 
 export function OrderTrackingView({
   slug,
+  basePath = `/${slug}`,
   token,
   storeName,
   initialTracking,
 }: {
   slug: string;
+  basePath?: string;
   token: string;
   storeName: string;
   initialTracking: OrderTrackingResponse;
@@ -133,7 +136,7 @@ export function OrderTrackingView({
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-5 px-4 py-6">
       <header className="flex flex-col gap-3">
-        <Link href={`/${slug}`} className="inline-flex w-fit items-center gap-1 text-caption text-brand-strong underline-offset-2 hover:underline">
+        <Link href={storefrontRoute(basePath)} className="inline-flex w-fit items-center gap-1 text-caption text-brand-strong underline-offset-2 hover:underline">
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           Voltar pro cardápio
         </Link>

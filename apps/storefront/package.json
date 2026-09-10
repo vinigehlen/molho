@@ -2,6 +2,9 @@
   "name": "@molho/storefront",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "description": "Storefront do Molho (Next.js) — cardápio white-label por tenant.",
   "scripts": {
     "dev": "next dev -p 3000",
@@ -9,6 +12,7 @@
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS=--no-experimental-webstorage vitest run",
+    "test:e2e": "node ../../node_modules/playwright/cli.js test --config playwright.config.ts",
     "test:watch": "NODE_OPTIONS=--no-experimental-webstorage vitest"
   },
   "dependencies": {

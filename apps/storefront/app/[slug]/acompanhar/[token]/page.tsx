@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { getStorefront } from '../../../../lib/storefront-api';
-import { getOrderTracking } from '../../../../lib/order-tracking-api';
+import { getOrderTrackingFromApi, getStorefront } from '../../../../lib/storefront-api';
+import { storefrontPublicPathPrefix, storefrontUrlForRequest } from '../../../../lib/site-url';
 import { OrderTrackingView } from './tracking-view';
 
 export default async function AcompanharPedidoPage({
@@ -9,8 +9,20 @@ export default async function AcompanharPedidoPage({
   params: Promise<{ slug: string; token: string }>;
 }) {
   const { slug, token } = await params;
-  const [store, tracking] = await Promise.all([getStorefront(slug), getOrderTracking(slug, token)]);
+  const [store, tracking, publicBaseUrl] = await Promise.all([
+    getStorefront(slug),
+    getOrderTrackingFromApi(slug, token),
+    storefrontUrlForRequest(slug),
+  ]);
   if (!store || !tracking) notFound();
 
-  return <OrderTrackingView slug={slug} token={token} storeName={store.store.name} initialTracking={tracking} />;
+  return (
+    <OrderTrackingView
+      slug={slug}
+      basePath={storefrontPublicPathPrefix(publicBaseUrl)}
+      token={token}
+      storeName={store.store.name}
+      initialTracking={tracking}
+    />
+  );
 }

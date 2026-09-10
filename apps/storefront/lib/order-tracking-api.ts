@@ -1,12 +1,11 @@
 import type { OrderTrackingResponse } from '@molho/contracts';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { storeApiPath } from './store-api-path';
 
 export async function getOrderTracking(slug: string, token: string): Promise<OrderTrackingResponse | null> {
   let response: Response;
   try {
     response = await fetch(
-      `${API_URL}/v1/store/${encodeURIComponent(slug)}/track/${encodeURIComponent(token)}`,
+      storeApiPath(slug, `/track/${encodeURIComponent(token)}`),
       { cache: 'no-store' },
     );
   } catch {
@@ -32,7 +31,7 @@ export async function createTrackReview(
   input: { rating: number; comment?: string },
 ): Promise<void> {
   const response = await fetch(
-    `${API_URL}/v1/store/${encodeURIComponent(slug)}/track/${encodeURIComponent(token)}/review`,
+    storeApiPath(slug, `/track/${encodeURIComponent(token)}/review`),
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

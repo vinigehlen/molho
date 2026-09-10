@@ -17,6 +17,11 @@ afterEach(() => {
 });
 
 describe('StorefrontAnalytics', () => {
+  it('remove token opaco da rota antes de medir', async () => {
+    const { analyticsRoute } = await import('./storefront-analytics');
+    expect(analyticsRoute('/cabanhas-bbq/acompanhar/segredo-123')).toBe('/cabanhas-bbq/acompanhar/[token]');
+  });
+
   it('não captura page view antes do consentimento', async () => {
     vi.stubEnv('NEXT_PUBLIC_GA_ID', 'G-TESTE');
     const gtag = vi.fn();
@@ -46,4 +51,3 @@ describe('StorefrontAnalytics', () => {
     );
   });
 });
-

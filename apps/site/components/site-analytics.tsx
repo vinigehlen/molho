@@ -71,6 +71,15 @@ function capture(event: string, properties: Record<string, unknown> = {}) {
   window.gtag?.('event', event, properties);
 }
 
+export function analyticsDestination(href: string): string {
+  try {
+    const url = new URL(href, 'https://molho.live');
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '[invalid-url]';
+  }
+}
+
 export function SiteAnalytics() {
   const pathname = usePathname();
 
@@ -93,7 +102,6 @@ export function SiteAnalytics() {
     void enableAnalytics().then(() => {
       capture('page_viewed', {
         path: pathname,
-        url: window.location.href,
       });
     });
   }, [pathname]);
@@ -105,7 +113,7 @@ export function SiteAnalytics() {
       const label = target.textContent?.replace(/\s+/g, ' ').trim() ?? '';
       capture('site_cta_clicked', {
         label,
-        href: target.href,
+        destination: analyticsDestination(target.href),
         path: window.location.pathname,
       });
     }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTheme } from '@molho/ui';
 import { getStorefront } from '../../../lib/storefront-api';
+import { storefrontPublicPath, storefrontUrlForRequest } from '../../../lib/site-url';
 
 /**
  * Manifest PWA por loja (Épico 13b) — "Adicionar à tela inicial" usa
@@ -21,7 +22,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const store = await getStorefront(slug);
+  const [store, publicBaseUrl] = await Promise.all([getStorefront(slug), storefrontUrlForRequest(slug)]);
   const theme = getTheme(store?.store.themeKey);
 
   return NextResponse.json(
@@ -29,7 +30,7 @@ export async function GET(
       name: store?.store.name ?? 'Molho',
       short_name: store?.store.name ?? 'Molho',
       description: store?.store.publicDescription ?? undefined,
-      start_url: `/${slug}`,
+      start_url: storefrontPublicPath(publicBaseUrl),
       display: 'standalone',
       // eslint-disable-next-line no-restricted-syntax -- manifest PWA exige hex literal (JSON servido ao navegador, não Tailwind); sem token possível aqui.
       background_color: '#FFFFFF',
