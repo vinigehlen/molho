@@ -620,3 +620,46 @@ postgis ok** — idêntico ao baseline.
 drill.
 
 **NG-10 fecha.** Falta só dropar a branch de drill.
+
+---
+
+## PARA O CODEX — handoff de fechamento da trilha CC (2026-09-10)
+
+A sessão da conversa não alcança um Codex ativo; este bloco é o aviso.
+
+### 1. Matriz `docs/14` §8 — marcar verde
+
+| NG | Marcar | Nota |
+|---|---|---|
+| `NG-05` | 🟢 | fail-fast validado no boot real da Fly prod |
+| `NG-07` | 🟢 | `/ready` 2/2 nas 2 máquinas de `gru` |
+| `NG-08` | 🟢 (parte API) | **descopado no piloto** — ata NG-01 §1 linha 12; fallback = `fly logs` + métricas + uptime ping no `/ready`. Sentry da API pós-piloto |
+| `NG-10` | 🟢 | backup noturno (`pg-backup.yml`) verde + restore drill 17s, paridade total. RPO ≤ 24h, RTO ~2min. Destrava a nota "restore drill isolado pendente" |
+| `NG-11` | 🟢 | Upstash prod, `redis:ok`, restart drill (HA segurou). Fan-out A/B nas 2 máquinas fica no dry run |
+| `NG-12` | 🟢 | `molho-api.fly.dev`, 2×gru, cert `api.molho.live` `Not verified` (correto). Rollback: `fly releases` / `fly deploy --image <anterior>` — exercitar no 1º bump de RC |
+| `NG-13` | 🟢 | R2 prod smoke PUT/GET/public/backup |
+
+### 2. Assets
+
+`MOLHO_ASSETS_ORIGIN=https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev` — já
+gravado por você em storefront/backoffice Production.
+
+### 3. Gates humanos — PM informou "definidos"
+
+PM sinalizou que **jurídico, e-mail e os gates humanos** estão resolvidos.
+Codex: registrar o conteúdo específico (quem aprovou o quê, config de e-mail
+prod validada) em `evidencias-codex.md` / ata NG-01 §4, marcar `NG-14`/`NG-01` e
+gerar o RC técnico (`vercel deploy --prebuilt --prod --skip-domain`).
+
+### 4. Secrets do backup no GitHub Actions
+
+`DIRECT_URL`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+setados. `DIRECT_URL` = role `app_migrator`, que agora tem `BYPASSRLS`
+(necessário pro pg_dump ler tabelas RLS FORCE; role de CI, nunca runtime;
+`app_runtime` intocado).
+
+### 5. Sobra pro dry run (NG-15)
+
+- NG-11: fan-out SSE cross-instância com as 2 máquinas ativas;
+- NG-12: rollback real;
+- impressão física 60 min.
