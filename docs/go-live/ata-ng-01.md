@@ -24,6 +24,7 @@ Sem segredos neste arquivo. Codex ratifica e marca a matriz central de `docs/14`
 | 9 | Cabanhas | Tenant criado pelo fluxo real; nenhum seed/cliente/pedido/sessão de staging copiado (doc 14 §2) | `NG-15` |
 | 10 | Data do dry run físico | **2026-09-11** (alvo; sujeito a disponibilidade do restaurante) | `NG-15` |
 | 11 | Canal de incidente + fallback | Definido em `docs/go-live/plantao.md`: alerta → `superadmin.molho.live@gmail.com`; P1 → WhatsApp `51-99261-6964`; fallback manual = pedidos pelo WhatsApp do restaurante (fluxo pré-Molho) | `NG-08`, `NG-15` |
+| 12 | Sentry da API no piloto | **Descopado.** Sentry não é dependência de boot; sem ele fica sem alerta de erro e sem agregação. Piloto de 1 restaurante aceita o risco. Fallback: `fly logs` + métricas Fly/Grafana + monitor de uptime externo no `/ready` (alerta pro canal de incidente da linha 11). Sentry da API entra pós-piloto. Flexibiliza o critério original de `NG-08` (Sentry + alertas reais na API) — decisão PM explícita, 2026-09-10 | `NG-08` |
 
 ## 2. Responsáveis
 
@@ -47,7 +48,7 @@ Todos os serviços com acesso admin do PM. Neon e Vercel confirmados via MCP nes
 | Cloudflare (DNS) | registros do piloto | ✅ |
 | Cloudflare R2 | bucket produtivo, credencial, `molho-backups` | ✅ |
 | Resend | domínio Verified, SPF/DKIM/return-path/DMARC | ✅ |
-| Sentry | projeto/ambiente da API + os 3 fronts | ✅ |
+| Sentry | os 3 fronts (Codex). API **descopada no piloto** — ver §1 linha 12 | ✅ fronts / ⏭️ API pós-piloto |
 
 **Nome de app Fly `molho-api`:** confirmar que está livre (nomes Fly são globais) antes do primeiro `fly apps create` — se tomado, PM define o nome.
 

@@ -561,3 +561,62 @@ backoffice no dry run).
 `scripts/pg-backup.sh` pronto (dump plain + gzip → `s3://molho-backups/neon/`,
 retenção 30d, RPO ≈ 24h). Falta: Codex ligar no cron do CI (workflow é dele) e
 o restore drill numa branch Neon isolada com RTO registrado.
+
+### NG-08 — descopado no piloto (2026-09-10)
+
+Decisão PM registrada em `docs/go-live/ata-ng-01.md` §1 linha 12: Sentry da API
+não entra no piloto. Não é dependência de boot (`validate-env` não checa,
+`initSentry` vira no-op sem DSN). Trade-off aceito: sem alerta de erro e sem
+agregação na API.
+
+**Fallback do piloto:**
+- `fly logs -a molho-api` + métricas Fly/Grafana;
+- monitor de uptime externo no `/ready` (UptimeRobot/Better Uptime, free) →
+  alerta pro canal de incidente da ata linha 11 (`superadmin.molho.live@gmail.com`
+  + WhatsApp `51-99261-6964`);
+- o próprio Fly já tira máquina da rotação em `/ready` != 2xx e reinicia em
+  `/health` travado.
+
+**Pós-piloto:** projeto Sentry `api`, DSN, environment+release SHA, alertas
+(5xx/checkout/auth/stream/impressão), auditoria do scrubbing PII.
+
+**Ação pendente do PM:** criar o monitor de uptime (3 min, sem código) apontando
+`https://molho-api.fly.dev/ready`, alerta pro e-mail/WhatsApp da ata linha 11.
+
+**Codex:** matriz `docs/14` §8 → `NG-08` (parte API) pode ir a verde com nota
+"descopado no piloto, ata NG-01 §1 linha 12; fallback fly logs + uptime ping".
+
+### NG-10 — backup + restore drill VERDES (2026-09-10)
+
+**Backup:** `.github/workflows/pg-backup.yml` (Codex) rodou verde no 3º disparo:
+```
+==> pg_dump 20260910T193756Z
+    20K
+==> upload s3://molho-backups/neon/molho-neon-20260910T193756Z.sql.gz
+==> retenção: apaga > 30 dias
+==> ok
+```
+Dois ajustes foram necessários:
+1. secret `DIRECT_URL` do GitHub estava vazio → preenchido (role `app_migrator`);
+2. pg_dump travava em `print_devices`/`print_jobs` (RLS **FORCE**) com o role
+   sem BYPASSRLS. Fix: `ALTER ROLE app_migrator BYPASSRLS` (role de CI —
+   migration + backup —, nunca runtime; `app_runtime` segue `rolbypassrls=false`,
+   a prova fail-closed do NG-10 não muda).
+
+**Restore drill:** branch Neon isolada `restore-drill-20260910`
+(`br-fancy-bread-ac78412o`), `DROP SCHEMA public CASCADE` (77 objetos) + restore
+do dump baixado do R2:
+```
+restore: 17s (sem erro, ON_ERROR_STOP=1)
+```
+Paridade com a prod (via MCP): **46 tabelas, 47 policies, 40 RLS, 49 migrations,
+postgis ok** — idêntico ao baseline.
+
+- **RPO** ≤ 24h (cron 06:17 UTC).
+- **RTO** ≈ 2 min pra este tamanho (17s restore + download + branch). Estimativa
+  da ata (~30 min) fica com folga; revisar quando o Cabanhas tiver volume.
+
+`docs/go-live/r2-get.mjs` — baixador de objeto R2 em node (sem awscli), usado no
+drill.
+
+**NG-10 fecha.** Falta só dropar a branch de drill.
