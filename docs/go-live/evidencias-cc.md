@@ -561,3 +561,27 @@ backoffice no dry run).
 `scripts/pg-backup.sh` pronto (dump plain + gzip → `s3://molho-backups/neon/`,
 retenção 30d, RPO ≈ 24h). Falta: Codex ligar no cron do CI (workflow é dele) e
 o restore drill numa branch Neon isolada com RTO registrado.
+
+### NG-08 — descopado no piloto (2026-09-10)
+
+Decisão PM registrada em `docs/go-live/ata-ng-01.md` §1 linha 12: Sentry da API
+não entra no piloto. Não é dependência de boot (`validate-env` não checa,
+`initSentry` vira no-op sem DSN). Trade-off aceito: sem alerta de erro e sem
+agregação na API.
+
+**Fallback do piloto:**
+- `fly logs -a molho-api` + métricas Fly/Grafana;
+- monitor de uptime externo no `/ready` (UptimeRobot/Better Uptime, free) →
+  alerta pro canal de incidente da ata linha 11 (`superadmin.molho.live@gmail.com`
+  + WhatsApp `51-99261-6964`);
+- o próprio Fly já tira máquina da rotação em `/ready` != 2xx e reinicia em
+  `/health` travado.
+
+**Pós-piloto:** projeto Sentry `api`, DSN, environment+release SHA, alertas
+(5xx/checkout/auth/stream/impressão), auditoria do scrubbing PII.
+
+**Ação pendente do PM:** criar o monitor de uptime (3 min, sem código) apontando
+`https://molho-api.fly.dev/ready`, alerta pro e-mail/WhatsApp da ata linha 11.
+
+**Codex:** matriz `docs/14` §8 → `NG-08` (parte API) pode ir a verde com nota
+"descopado no piloto, ata NG-01 §1 linha 12; fallback fly logs + uptime ping".
