@@ -1,5 +1,6 @@
 import { cache } from 'react';
-import { type StorefrontPayload, storefrontPayloadSchema } from '@molho/contracts';
+import { type OrderTrackingResponse, type StorefrontPayload, storefrontPayloadSchema } from '@molho/contracts';
+import { internalApiOrigin } from './api-origin';
 
 /**
  * Importa @molho/contracts. SÓ pode ser chamado de Server Component (layout,
@@ -8,8 +9,6 @@ import { type StorefrontPayload, storefrontPayloadSchema } from '@molho/contract
  * boilerplate de Fast Refresh no CommonJS compilado de contracts quando o
  * import acontece dentro do grafo do bundle cliente, e quebra em runtime.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
-
 /**
  * `cache()` do React garante UMA busca por slug por requisição, não importa
  * quantos componentes da árvore chamem esta função (root layout pro tema,
@@ -30,7 +29,7 @@ export const getStorefront = cache(async (slug: string): Promise<StorefrontPaylo
     // Opt-in de expansão 4C: API antiga ignora a query e continua servindo a
     // oferta principal; API nova só adiciona `offerId`/secundárias a clientes
     // preparados. Como a URL varia, o CDN nunca mistura os dois contratos.
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}?catalog=offers`, {
+    response = await fetch(`${internalApiOrigin()}/v1/store/${encodeURIComponent(slug)}?catalog=offers`, {
       // Mesma janela de 30s que a API já promete na borda (Cache-Control
       // s-maxage=30, Épico 5 commit 2) — o Next não tem por que cachear por
       // mais tempo do que a própria API considera fresco.
@@ -45,3 +44,17 @@ export const getStorefront = cache(async (slug: string): Promise<StorefrontPaylo
   const parsed = storefrontPayloadSchema.safeParse(await response.json());
   return parsed.success ? parsed.data : null;
 });
+
+export async function getOrderTrackingFromApi(slug: string, token: string): Promise<OrderTrackingResponse | null> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${internalApiOrigin()}/v1/store/${encodeURIComponent(slug)}/track/${encodeURIComponent(token)}`,
+      { cache: 'no-store' },
+    );
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  return (await response.json().catch(() => null)) as OrderTrackingResponse | null;
+}

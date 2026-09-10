@@ -252,15 +252,15 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
     mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
     await mount();
 
-    const link = [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'molho.live/cabanhas-bbq');
-    expect(link?.getAttribute('href')).toBe('https://molho.vercel.app/cabanhas-bbq');
+    const link = [...container.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'cabanhas-bbq.molho.live');
+    expect(link?.getAttribute('href')).toBe('https://cabanhas-bbq.molho.live');
   });
 
   it('sem tenantSlug (sessão antiga): não mostra link de domínio quebrado', async () => {
     mocks.fetchStoreSetup.mockResolvedValue(incompleteSetup());
     await mount();
 
-    expect(container.textContent).not.toContain('molho.live/');
+    expect(container.textContent).not.toContain('cabanhas-bbq.molho.live');
   });
 
   it('salvar a loja com nome novo atualiza o link de domínio na hora, sem precisar relogar', async () => {
@@ -269,7 +269,7 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
     mocks.saveStoreSetup.mockResolvedValue({ ...incompleteSetup(), name: 'Cabanhas Churrasco', tenantSlug: 'cabanhas-churrasco' });
     await mount();
 
-    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'molho.live/cabanhas-bbq')).toBe(true);
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'cabanhas-bbq.molho.live')).toBe(true);
 
     const nameInput = [...container.querySelectorAll('label')]
       .find((el) => el.querySelector('span')?.textContent?.trim() === 'Nome fantasia')
@@ -285,7 +285,7 @@ describe('ConfiguracaoPage — barra de publicação compacta (Bloco 1)', () => 
       await Promise.resolve();
     });
 
-    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'molho.live/cabanhas-churrasco')).toBe(true);
+    expect([...container.querySelectorAll('a')].some((a) => a.textContent?.trim() === 'cabanhas-churrasco.molho.live')).toBe(true);
   });
 });
 

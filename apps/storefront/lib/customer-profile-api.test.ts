@@ -23,8 +23,8 @@ describe('customer-profile-api', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(profile)));
     await expect(getCustomerProfile('minha loja', 'token-x')).resolves.toEqual(profile);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/store/minha%20loja/me'),
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer token-x' }) }),
+      '/api/store/minha%20loja/me',
+      expect.objectContaining({ headers: expect.objectContaining({ 'X-Molho-Customer-Token': 'token-x' }) }),
     );
   });
 

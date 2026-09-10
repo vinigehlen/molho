@@ -71,6 +71,12 @@ function capture(event: string, properties: Record<string, unknown> = {}) {
   window.gtag?.('event', event, properties);
 }
 
+export function analyticsRoute(pathname: string): string {
+  return pathname
+    .replace(/(\/acompanhar\/)[^/]+/i, '$1[token]')
+    .replace(/(\/track\/)[^/]+/i, '$1[token]');
+}
+
 export function StorefrontAnalytics() {
   const pathname = usePathname();
 
@@ -92,20 +98,18 @@ export function StorefrontAnalytics() {
     if (!POSTHOG_KEY && !GA_ID) return;
     void enableAnalytics().then(() => {
       capture('storefront_page_viewed', {
-        path: pathname,
-        url: window.location.href,
+        path: analyticsRoute(pathname),
       });
     });
   }, [pathname]);
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
-      const target = event.target instanceof Element ? event.target.closest('button, a') : null;
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-analytics-action]') : null;
       if (!(target instanceof HTMLElement)) return;
-      const label = target.textContent?.replace(/\s+/g, ' ').trim() ?? '';
       capture('storefront_action_clicked', {
-        label,
-        path: window.location.pathname,
+        action: target.dataset.analyticsAction,
+        path: analyticsRoute(window.location.pathname),
       });
     }
 
@@ -115,4 +119,3 @@ export function StorefrontAnalytics() {
 
   return null;
 }
-

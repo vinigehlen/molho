@@ -1,6 +1,5 @@
 import type { DeliveryMatchResponse } from '@molho/contracts';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { storeApiPath } from './store-api-path';
 
 /**
  * Type guard simples, não zod: a resposta é EFÊMERA (chamada → exibida →
@@ -38,7 +37,7 @@ export async function fetchDeliveryMatch(
 ): Promise<DeliveryMatchResponse | null> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/delivery-match`, {
+    response = await fetch(storeApiPath(slug, '/delivery-match'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ postalCode, number }),

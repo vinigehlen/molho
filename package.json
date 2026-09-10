@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test:contrast": "pnpm --filter @molho/ui test:contrast",
+    "verify:front-release": "node scripts/verify-front-release.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "storybook": "pnpm --filter @molho/ui storybook",

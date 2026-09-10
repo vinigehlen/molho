@@ -2,6 +2,9 @@
   "name": "@molho/backoffice",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "description": "Backoffice do Molho (Next.js) — painel do lojista e super-admin.",
   "scripts": {
     "dev": "next dev -p 3001",

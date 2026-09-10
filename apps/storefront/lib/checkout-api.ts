@@ -1,6 +1,5 @@
 import type { Cart, CustomerAddress, FulfillmentType } from '@molho/contracts';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { CUSTOMER_TOKEN_HEADER, storeApiPath } from './store-api-path';
 
 export type CheckoutPaymentMethod = 'pix' | 'cash_on_delivery' | 'card_on_delivery';
 export type { FulfillmentType };
@@ -119,7 +118,7 @@ function isCheckoutReview(value: unknown): value is CheckoutReview {
 export async function revalidateCheckout(slug: string, body: CheckoutRequestBody): Promise<CheckoutReview | null> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/checkout/revalidate`, {
+    response = await fetch(storeApiPath(slug, '/checkout/revalidate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -185,11 +184,11 @@ export async function createOrder(
   const autenticado = 'accessToken' in identity;
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/checkout/orders`, {
+    response = await fetch(storeApiPath(slug, '/checkout/orders'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(autenticado ? { Authorization: `Bearer ${identity.accessToken}` } : {}),
+        ...(autenticado ? { [CUSTOMER_TOKEN_HEADER]: identity.accessToken } : {}),
       },
       body: JSON.stringify({
         ...body,

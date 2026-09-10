@@ -3,6 +3,7 @@ import { COPY, t } from '@molho/contracts';
 import { MoEmptyState } from '@molho/ui';
 import { formatarHorarioCurto } from '../../lib/format-horario';
 import { getStorefront } from '../../lib/storefront-api';
+import { storefrontPublicPathPrefix, storefrontUrlForRequest } from '../../lib/site-url';
 import { TenantMenu } from './tenant-menu';
 
 interface TenantHomePageProps {
@@ -22,7 +23,7 @@ interface TenantHomePageProps {
  */
 export default async function TenantHomePage({ params }: TenantHomePageProps) {
   const { slug } = await params;
-  const store = await getStorefront(slug);
+  const [store, publicBaseUrl] = await Promise.all([getStorefront(slug), storefrontUrlForRequest(slug)]);
   if (!store) notFound();
 
   if (store.categories.length === 0) {
@@ -49,6 +50,7 @@ export default async function TenantHomePage({ params }: TenantHomePageProps) {
   return (
     <TenantMenu
       slug={slug}
+      basePath={storefrontPublicPathPrefix(publicBaseUrl)}
       storeName={store.store.name}
       storeDescription={store.store.publicDescription}
       logoImageUrl={store.store.logoImageUrl}

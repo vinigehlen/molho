@@ -5,12 +5,11 @@ import './globals.css';
 import { CookieConsent } from '../components/cookie-consent';
 import { StorefrontAnalytics } from '../components/storefront-analytics';
 import { getStorefront } from '../lib/storefront-api';
-import { STOREFRONT_URL } from '../lib/site-url';
 
 const DESCRICAO = 'Cardápio digital, PDV e delivery para o seu restaurante. Sem taxa por venda.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(STOREFRONT_URL),
+  metadataBase: new URL('https://molho.live'),
   title: { default: 'Molho', template: '%s · Molho' },
   description: DESCRICAO,
   icons: {
@@ -21,7 +20,6 @@ export const metadata: Metadata = {
     ],
     apple: '/app-icon-180.png',
   },
-  manifest: '/manifest.json',
   // A imagem OG vem da convenção `app/opengraph-image.tsx` (Brasa, gerada) —
   // não do PNG estático antigo, que ainda era a arte roxa `#820AD1`
   // pré-rebrand. Cada `/{slug}` sobrescreve com o card da própria loja

@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import { THEMES } from '@molho/ui';
 import { CookieConsent } from '../components/cookie-consent';
 import { SiteAnalytics } from '../components/site-analytics';
+import { SITE_URL } from '../lib/urls';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -13,7 +14,8 @@ const DESCRICAO =
   'Cardápio digital, pedido com PIX e gestor de pedidos pro seu delivery ou restaurante, sem comissão por venda. Chega de anotar pedido no WhatsApp.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://molho.live'),
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: SITE_URL },
   title: 'Molho: cardápio digital, PIX e delivery sem comissão',
   description: DESCRICAO,
   icons: {

@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+import { storeApiPath } from './store-api-path';
 
 export type OtpRequestResult = { ok: true } | { ok: false; message: string };
 export type OtpVerifyResult = { ok: true; accessToken: string; customerId: string } | { ok: false; message: string };
@@ -12,7 +12,7 @@ export type OtpVerifyResult = { ok: true; accessToken: string; customerId: strin
 export async function requestOtp(slug: string, phone: string, email?: string): Promise<OtpRequestResult> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/auth/otp/request`, {
+    response = await fetch(storeApiPath(slug, '/auth/otp/request'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // `email` só vai no canal de e-mail (Épico 9c) — é destino de ENTREGA,
@@ -36,7 +36,7 @@ export async function verifyOtp(
 ): Promise<OtpVerifyResult> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/v1/store/${encodeURIComponent(slug)}/auth/otp/verify`, {
+    response = await fetch(storeApiPath(slug, '/auth/otp/verify'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email ? { phone, code, email } : { phone, code }),

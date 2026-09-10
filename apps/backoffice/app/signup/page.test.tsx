@@ -83,11 +83,11 @@ afterEach(async () => {
 });
 
 describe('SignupPage — preview de domínio (Bloco 2)', () => {
-  it('mostra "digite um nome" com o campo vazio', async () => {
+  it('mostra o formato do subdomínio com o campo vazio', async () => {
     await mount();
     await goToDetailsStep();
 
-    expect(container.textContent).toContain('digite um nome');
+    expect(container.textContent).toContain('sua-loja.molho.live');
   });
 
   it('slugifica em tempo real ao digitar o nome da loja', async () => {
@@ -95,7 +95,7 @@ describe('SignupPage — preview de domínio (Bloco 2)', () => {
     await goToDetailsStep();
 
     await type(input('restaurantName'), 'Cabanhas BBQ');
-    expect(container.textContent).toContain('molho.live/cabanhas-bbq');
+    expect(container.textContent).toContain('cabanhas-bbq.molho.live');
   });
 
   it('depois do debounce de 400ms, consulta disponibilidade e mostra "disponível"', async () => {

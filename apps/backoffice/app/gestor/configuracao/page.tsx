@@ -13,6 +13,7 @@ import { fetchStoreSetup, publishStore, saveStoreSetup, saveStoreTheme, uploadSt
 import { fetchStoreHours, saveStoreHours } from '../../../lib/store-hours-api';
 import { createDeliveryZone, fetchDeliveryZones, type DeliveryZoneResponse } from '../../../lib/delivery-zones-api';
 import { fetchCategories, fetchProducts, type Category, type Product } from '../../../lib/catalog-api';
+import { storefrontDisplayUrl, storefrontUrl as buildStorefrontUrl } from '../../../lib/storefront-url';
 import { BrandImageField } from './brand-image-field';
 
 const DAYS: Array<{ key: DayOfWeek; label: string }> = [
@@ -196,10 +197,7 @@ export default function ConfiguracaoPage() {
   // sem ele (sessão antiga, storage não migrado) o domínio simplesmente não
   // aparece, nunca quebra a página.
   const tenantSlug = getStaffSession()?.tenantSlug;
-  // Domínio real de produção é `{slug}.molho.live` (CLAUDE.md); em dev o
-  // tenant é servido em rota (`molho.vercel.app/{slug}`) — o texto usa a
-  // marca de produção, o link abre onde a loja REALMENTE responde hoje.
-  const storefrontUrl = tenantSlug ? `https://molho.vercel.app/${tenantSlug}` : null;
+  const storefrontUrl = tenantSlug ? buildStorefrontUrl(tenantSlug) : null;
 
   useEffect(() => {
     if (!getStaffSession()) return;
@@ -451,9 +449,9 @@ export default function ConfiguracaoPage() {
                       ? 'Os passos obrigatórios estão completos — falta só publicar.'
                       : `Falta completar: ${stepLabel(nextStep)}.`}
                 </p>
-                {storefrontUrl && (
+                {storefrontUrl && tenantSlug && (
                   <a href={storefrontUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-brand-strong underline-offset-2 hover:underline">
-                    molho.live/{tenantSlug}
+                    {storefrontDisplayUrl(tenantSlug)}
                   </a>
                 )}
               </div>
@@ -841,7 +839,7 @@ export default function ConfiguracaoPage() {
           {storefrontUrl && <MoQrCode value={storefrontUrl} size={200} />}
           {tenantSlug && (
             <div className="flex w-full items-center gap-2 rounded-[14px] border border-border bg-bg px-4 py-3">
-              <span className="flex-1 truncate text-left text-sm font-medium text-text">molho.live/{tenantSlug}</span>
+              <span className="flex-1 truncate text-left text-sm font-medium text-text">{storefrontDisplayUrl(tenantSlug)}</span>
               <button
                 type="button"
                 className="shrink-0 text-sm font-semibold text-brand-strong"

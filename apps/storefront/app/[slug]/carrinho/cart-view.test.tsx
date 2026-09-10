@@ -106,6 +106,7 @@ function renderCartView(
       availablePaymentMethods={overrides.availablePaymentMethods ?? ['pix', 'cash_on_delivery', 'card_on_delivery']}
       otpChannel="sms"
       guestCheckout={overrides.guestCheckout ?? false}
+      pickupEtaMaxMinutes={30}
       emptyTitle="Seu carrinho tá vazio"
       emptyBody="Bora resolver isso?"
       emptyActionLabel="Ver o cardápio"

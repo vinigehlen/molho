@@ -2,6 +2,9 @@
   "name": "@molho/site",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "description": "Landing site do Molho — molho.live.",
   "scripts": {
     "dev": "next dev -p 3002",
