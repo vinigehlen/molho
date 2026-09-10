@@ -4,6 +4,16 @@
 **Data:** 2026-09-10
 **Ownership:** `NG-01–04`, `NG-09`, `NG-14–15`.
 
+## Integração Git
+
+- `main@efbc266` foi integrada por rebase, preservando as entregas C1/C2 e os ajustes de
+  impressão do CC.
+- A implementação candidata no momento do gate ficou representada por `6961bc1`
+  (fronts) e `e0ac726` (documentação), sem commits pendentes da `main`.
+- Os únicos conflitos ocorreram nos documentos `14` e `15`; a resolução consolidou as
+  decisões da `main` com o handoff Codex. Nenhum arquivo exclusivo de API, Prisma,
+  contratos ou agente foi sobrescrito.
+
 ## R0 — decisões, acessos e contratos
 
 | Item | Estado | Evidência |
@@ -71,12 +81,18 @@ HSTS após certificado válido.
 - Inventário: `docs/go-live/inventario-fronts-producao.md`.
 - Promoção/rollback: `docs/go-live/runbook-release-fronts.md`.
 
+Auditoria direta da Vercel em 10/09/2026:
+
+- `molho-storefront-prod`: nenhuma variável no ambiente Production;
+- `molho-backoffice-prod`: nenhuma variável no ambiente Production;
+- `molho-site`: somente `NEXT_PUBLIC_SITE_URL` e `NEXT_PUBLIC_APP_URL` em Production.
+
 Bloqueios do RC: URL técnica da API (C5), origin de assets (C4), DSNs Sentry, revisão
-jurídica e confirmação de e-mail. A varredura do primeiro build também encontrou
+jurídica e confirmação de e-mail. A varredura do build integrado encontrou
 `api.staging.molho.live` no comando exibido por
-`apps/backoffice/app/gestor/impressao/printer-settings.tsx`, arquivo reservado a C2; esse
-handoff precisa remover a URL e o token de staff antes do RC. Portanto `NG-14` continua
-vermelho.
+`apps/backoffice/app/gestor/impressao/printer-settings.tsx`, arquivo reservado a C2. A
+credencial legada de staff já não aparece no artefato integrado. Portanto `NG-14`
+continua vermelho e nenhum RC de produção foi criado.
 
 ## R5 — NG-15
 
@@ -86,17 +102,17 @@ aceites continuam pendentes; `NG-15` permanece vermelho.
 
 ## Gate final da árvore candidata
 
-Os gates abaixo foram executados depois do último ajuste de código da trilha Codex. O build
-integral foi isolado porque havia servidores Next ativos no checkout principal.
+Os gates abaixo foram executados na árvore integrada em `e0ac726`. O build integral foi
+isolado porque havia servidores Next ativos no checkout principal.
 
 | Comando | Resultado | Horário |
 |---|---|---|
 | `pnpm lint` | verde | 2026-09-10 |
-| `pnpm test` | verde — Turbo 9/9; storefront 199, backoffice 249, API unit 737, contracts 404, UI 227, DB 35 e print-agent 19 | 2026-09-10 |
+| `pnpm test` | verde — Turbo 9/9; storefront 199, backoffice 246, API unit 779, contracts 404, UI 227, DB 35 e print-agent 31 | 2026-09-10 |
 | `pnpm build` | verde — Turbo 7/7 em checkout isolado | 2026-09-10 |
 | `pnpm --filter api test:e2e` | bloqueado pelo ambiente — Redis local recusou conexão; execução encerrada após 16 arquivos falhos por timeout, 2 passaram | 2026-09-10 |
 | `pnpm --filter @molho/storefront test:e2e` | 3/3 verde em checkout isolado | 2026-09-09 |
-| `pnpm verify:front-release` | vermelho no build integral — 2 artefatos compilados contêm URL de staging e o nome da credencial de staff originados no fluxo de impressão de ownership C2 | 2026-09-10 |
+| `pnpm verify:front-release` | vermelho no build integrado — 2 artefatos compilados contêm a URL de staging originada no fluxo de impressão de ownership C2; a credencial de staff não aparece mais | 2026-09-10 |
 
 O gate global permanece vermelho. Para repetir o E2E da API é necessário disponibilizar o
 Redis esperado pela suíte; para liberar a varredura, C2 deve remover
@@ -104,3 +120,7 @@ Redis esperado pela suíte; para liberar a varredura, C2 deve remover
 `apps/backoffice/app/gestor/impressao/printer-settings.tsx` e reconstruir os fronts.
 O verificador também exige `BUILD_ID` em cada `.next`, impedindo que uma saída parcial de
 `next dev` seja aceita como build de release.
+
+Uma alteração não commitada desse arquivo, feita fora da trilha Codex durante o gate,
+já troca a URL por `https://api.molho.live`; ela foi preservada no workspace, mas não foi
+incorporada nem atribuída ao Codex sem o handoff C2 correspondente.

@@ -294,10 +294,12 @@ Entregas independentes podem abrir PR simultaneamente, mas entram nessa ordem pa
 - nenhum segredo entra em commit, diff, issue ou mensagem.
 
 **Estado real em 10/09/2026:** as mudanças R0–R4 foram consolidadas em dois commits Codex
+anteriores a este registro pós-gate
 e rebaseadas sobre `main@efbc266`, que já incorpora C1/C2 e os ajustes posteriores de
 impressão. Os arquivos exclusivos do CC foram preservados; os únicos conflitos foram os
 documentos `14` e `15`, resolvidos mantendo as decisões da `main` e este handoff Codex. Os
-gates precisam ser repetidos na árvore integrada antes do RC.
+gates obrigatórios de lint/test/build foram repetidos na árvore integrada; o scanner e os
+requisitos externos de produção ainda bloqueiam o RC.
 
 Se ambos precisarem alterar `pnpm-lock.yaml`, C1/C2 entra primeiro; Codex rebasa, reaplica sua dependência e regenera o lockfile uma única vez.
 
@@ -373,7 +375,7 @@ trilha pública. A evidência detalhada permanece em `docs/go-live/evidencias-co
 
 | Item | Estado |
 |---|---|
-| Branch Codex | `codex/no-go-front-release`, baseada em `main@efbc266` com dois commits Codex no topo |
+| Branch Codex | `codex/no-go-front-release`, baseada em `main@efbc266`; o candidato testado tinha dois commits Codex no topo |
 | `main` local/remota | `efbc266` (`origin/main`) |
 | Divergência após integração | **0 commits atrás e 2 commits à frente** antes dos gates/deploy |
 | CC na `main` | C1/C2, migrations, dispositivo de impressão, agente, staging, número de pedido e duas vias já mergeados |
@@ -459,11 +461,21 @@ Operações externas já executadas no escopo `vinigehlens-projects`:
 - faltam URL técnica da API/Fly, origin R2, DSNs Sentry, e-mail validado e jurídico antes
   de gerar o RC com `vercel deploy --prebuilt --prod --skip-domain`.
 
-O scanner foi executado num build integral da base Codex antiga e encontrou dois artefatos
-do backoffice com `api.staging.molho.live` e `MOLHO_STAFF_ACCESS_TOKEN`, vindos de
-`apps/backoffice/app/gestor/impressao/printer-settings.tsx`. A `main` nova já substituiu o
-token de staff por `MOLHO_PRINT_DEVICE_TOKEN`, mas ainda mantém a URL explícita de staging;
-após a integração é obrigatório reconstruir e repetir a varredura.
+A auditoria direta de Production em 10/09/2026 confirmou:
+
+- `molho-storefront-prod`: zero variáveis;
+- `molho-backoffice-prod`: zero variáveis;
+- `molho-site`: somente `NEXT_PUBLIC_SITE_URL` e `NEXT_PUBLIC_APP_URL`.
+
+Assim, o deploy foi interrompido antes do build Vercel: publicar com envs ausentes viola o
+fail-fast e não produz um RC válido.
+
+O scanner foi repetido no build integrado. Ele encontrou dois artefatos do backoffice com
+`api.staging.molho.live`, vindos de
+`apps/backoffice/app/gestor/impressao/printer-settings.tsx`. A credencial legada
+`MOLHO_STAFF_ACCESS_TOKEN` não aparece mais: a `main` usa
+`MOLHO_PRINT_DEVICE_TOKEN`. Durante o gate apareceu no workspace uma mudança externa,
+não commitada, que troca a URL pela produção; ela foi preservada e aguarda handoff C2.
 
 #### R5 — dry run (`NG-15`)
 
@@ -501,12 +513,25 @@ Somente nomes e exemplos sem credenciais foram adicionados a `.env.example`.
 O E2E da API do CC prova separadamente o fluxo do dispositivo de impressão contra staging,
 mas o gate integral deve ser repetido na árvore integrada com Redis disponível.
 
+#### Gates repetidos depois da integração
+
+| Comando | Resultado |
+|---|---|
+| `pnpm lint` | verde |
+| `pnpm test` | verde, Turbo 9/9; storefront 199, backoffice 246, API unit 779, contracts 404, UI 227, DB 35, print-agent 31 |
+| `pnpm build` | verde, Turbo 7/7 em worktree isolado de `e0ac726` |
+| `pnpm verify:front-release` | vermelho somente por `api.staging.molho.live` em 2 artefatos do backoffice |
+
+O Playwright da storefront continua com a evidência isolada de 3/3 verde anterior à
+integração. O E2E integral da API e o Playwright contra o RC continuam obrigatórios;
+não foram declarados verdes por inferência.
+
 #### Rollback e próximo ponto de integração
 
 - não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
 - o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
-- próximo passo obrigatório: repetir lint/test/build/API E2E/storefront E2E/scanner na
-  árvore integrada;
+- próximo passo obrigatório: incorporar o handoff C2 da URL, configurar os envs de
+  Production, repetir scanner/API E2E/storefront E2E e então gerar o RC;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 

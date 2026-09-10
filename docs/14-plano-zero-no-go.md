@@ -500,7 +500,7 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | `NG-11` | em execução (CC) | Redis cross-instance comprovado |
 | `NG-12` | em execução (CC) | API Fly prod + rollback |
 | `NG-13` | em execução (CC) | R2 na origin aprovada + upload smoke |
-| `NG-14` | vermelho | projetos Vercel/Node prontos; faltam envs, RC, e-mail e jurídico; scanner rejeita URL de staging e credencial de staff legada do fluxo C2 |
+| `NG-14` | vermelho | projetos Vercel/Node prontos; storefront/backoffice não têm envs de Production; faltam RC, e-mail e jurídico; scanner integrado rejeita somente a URL de staging do fluxo C2 |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
