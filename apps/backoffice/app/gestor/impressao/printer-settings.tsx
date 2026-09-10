@@ -7,7 +7,7 @@ import { PrintDevicesCard } from './print-devices-card';
 const TEST_PRINT_COMMAND = `pnpm --filter @molho/print-agent build
 MOLHO_PRINT_FORMAT=escpos pnpm --filter @molho/print-agent test-print`;
 
-const START_AGENT_COMMAND = `MOLHO_API_URL=https://api.staging.molho.live \\
+const START_AGENT_COMMAND = `MOLHO_API_URL=https://api.molho.live \\
 MOLHO_PRINT_DEVICE_TOKEN=molho_pd_... \\
 MOLHO_PRINT_FORMAT=escpos \\
 pnpm --filter @molho/print-agent start`;
