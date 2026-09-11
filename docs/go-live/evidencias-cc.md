@@ -837,6 +837,40 @@ branco — não sobrepõe, não estoura a tela, simplesmente não renderiza.
 backoffice hoje. Ficaram 3 itens de exemplo do trial (`X-Salada da casa`, `Batata
 crocante`, `Refrigerante lata`) no cardápio do Cabanhas sem conseguir remover.
 
+### 3. Não existe convite de staff/segundo owner no produto
+
+Pedido do PM: `max.buiz@hotmail.com` como segundo owner além de
+`superadmin.molho.live@gmail.com`. Não existe fluxo de "convidar equipe" no
+backoffice hoje (procurado em `apps/backoffice/app/gestor/**`, nada). O único
+endpoint que atribui papel a um e-mail novo num tenant
+(`POST /v1/admin/platform/staff`, `apps/api/src/platform/staff-provisioning.controller.ts`)
+exige `platform.superadmin` — não é self-service pro dono da loja, é ferramenta
+de suporte da plataforma. CC não tem essa credencial e não forçou.
+
+**Sintoma:** `max.buiz@hotmail.com` pede OTP, recebe código, mas
+"Código inválido ou expirado" sempre — o e-mail nunca teve conta/vínculo com o
+tenant, então não existe verificação real por trás do formulário.
+
+**Resolvido pro piloto de hoje (11/09/2026):** PM pediu caminho real, não login
+compartilhado. CC rodou um script one-off (`packages/db/prisma/seed/` local e
+descartado depois, nunca commitado) que reproduz exatamente a lógica de
+`StaffProvisioningRepository` (mesma função `encryptEmail`/`hashEmailForLookup`
+de `@molho/db`, mesmo shape de `AuditLog`) contra o Neon de produção via
+`DIRECT_URL`/`app_migrator`: criou `User` pra `max.buiz@hotmail.com` e concedeu
+`role=owner, scopeType=tenant, scopeId=<cabanhas-bbq>`. Idempotente (findFirst
+antes de create, igual ao código real) — pode rodar de novo sem duplicar.
+Auditoria gravada com `actorRole: 'owner'` (ator = `superadmin.molho.live`) e
+uma nota explícita no `afterJson` dizendo que foi provisionamento manual por
+falta de fluxo self-service.
+
+**Backlog real, não resolvido:** não existe tela de "convidar equipe/segundo
+dono" no backoffice, nem um `platform.superadmin` provisionado em produção (o
+seed que cria esse papel se recusa a rodar com `NODE_ENV=production` de
+propósito — `packages/db/prisma/seed/superadmin.ts:52`). Qualquer próximo
+segundo-dono/staff precisa do mesmo contorno manual até o Codex construir o
+fluxo de convite de verdade (ou alguém decidir bootstrapar um
+`platform.superadmin` de produção pelo fluxo próprio que ainda não existe).
+
 ### Ownership
 
 CC mexeu em `apps/backoffice/app/gestor/cardapio/page.tsx` (só o fix de grid,
