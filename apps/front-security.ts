@@ -42,6 +42,16 @@ export function buildFrontSecurityHeaders({ kind, env = process.env }: SecurityH
     'MOLHO_ASSETS_ORIGIN',
     deployedProduction && kind !== 'site',
   );
+  // Upload direto do browser pro bucket via URL pré-assinada (logo/capa da
+  // loja, doc `store-setup.controller.ts#brand-upload-url`) bate num host
+  // diferente do de leitura pública (`MOLHO_ASSETS_ORIGIN` é só pub-*.r2.dev):
+  // sem essa origem em connect-src, o PUT pro R2 quebra com "Failed to fetch"
+  // (CSP bloqueia antes de sair, sem entrar no Network — só backoffice faz upload).
+  const uploadOrigin = originFromUrl(
+    env.MOLHO_UPLOAD_ORIGIN,
+    'MOLHO_UPLOAD_ORIGIN',
+    deployedProduction && kind === 'backoffice',
+  );
   const apiOrigin = originFromUrl(
     env.NEXT_PUBLIC_API_URL,
     'NEXT_PUBLIC_API_URL',
@@ -67,7 +77,7 @@ export function buildFrontSecurityHeaders({ kind, env = process.env }: SecurityH
     directive('font-src', ["'self'", 'data:']),
     directive('style-src', ["'self'", "'unsafe-inline'"]),
     directive('script-src', ["'self'", "'unsafe-inline'", development ? "'unsafe-eval'" : null, posthogOrigin, googleTagManager]),
-    directive('connect-src', ["'self'", apiOrigin, sentryOrigin, posthogOrigin, googleAnalytics, viaCepOrigin]),
+    directive('connect-src', ["'self'", apiOrigin, uploadOrigin, sentryOrigin, posthogOrigin, googleAnalytics, viaCepOrigin]),
     directive('media-src', ["'self'", 'blob:', assetsOrigin]),
     directive('worker-src', ["'self'", 'blob:']),
     deployedProduction ? 'upgrade-insecure-requests' : '',
