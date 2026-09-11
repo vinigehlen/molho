@@ -95,6 +95,13 @@ export interface CheckoutReview {
   canSubmit: boolean;
 }
 
+/** Extrai `message` de um corpo de erro `{ error, message }` (`toOrderHttpException`, `GlobalExceptionFilter`) — `undefined` se o corpo não tiver essa forma. */
+function errorMessage(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null) return undefined;
+  const message = (data as Record<string, unknown>).message;
+  return typeof message === 'string' ? message : undefined;
+}
+
 function isCheckoutReview(value: unknown): value is CheckoutReview {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -160,7 +167,13 @@ export type CreateOrderResult =
   | { status: 'divergent'; review: CheckoutReview }
   /** Token expirado/inválido — quem chama deve limpar o token guardado e pedir OTP de novo. */
   | { status: 'unauthorized' }
-  | { status: 'error' };
+  /**
+   * `message`, quando presente, é o motivo de VERDADE que a API mandou (loja
+   * sem PIX configurado, forma de pagamento desligada, rate limit etc.) —
+   * outros 4xx/409 que não são o formato de `CheckoutReview` caem aqui.
+   * Ausente só em falha de rede/timeout, onde não existe corpo pra ler.
+   */
+  | { status: 'error'; message?: string };
 
 /** `/checkout/orders` — autenticado (accessToken do OTP do cliente). */
 /**
@@ -204,10 +217,13 @@ export async function createOrder(
 
   if (response.status === 409) {
     const data: unknown = await response.json().catch(() => null);
-    return isCheckoutReview(data) ? { status: 'divergent', review: data } : { status: 'error' };
+    return isCheckoutReview(data) ? { status: 'divergent', review: data } : { status: 'error', message: errorMessage(data) };
   }
 
-  if (!response.ok) return { status: 'error' };
+  if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null);
+    return { status: 'error', message: errorMessage(data) };
+  }
 
   const data: unknown = await response.json().catch(() => null);
   return parseCreatedOrder(data) ?? { status: 'error' };

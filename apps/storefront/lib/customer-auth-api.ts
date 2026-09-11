@@ -33,13 +33,14 @@ export async function verifyOtp(
   phone: string,
   code: string,
   email?: string,
+  name?: string,
 ): Promise<OtpVerifyResult> {
   let response: Response;
   try {
     response = await fetch(storeApiPath(slug, '/auth/otp/verify'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(email ? { phone, code, email } : { phone, code }),
+      body: JSON.stringify({ phone, code, ...(email ? { email } : {}), ...(name ? { name } : {}) }),
     });
   } catch {
     return { ok: false, message: 'Não deu pra confirmar o código agora. Confere sua internet e tenta de novo.' };

@@ -148,7 +148,11 @@ export class CustomerAuthController {
     return this.requestContext.run({ tenantId, isPlatform: false }, async () => {
       // `verified: true` — este é o caminho que ACABOU de provar o telefone por
       // OTP; é o único que carimba `phone_verified_at` (Épico 9c).
-      const { identity } = await this.customerIdentity.findOrCreate(tenantId, phone, { email, verified: true });
+      const { identity } = await this.customerIdentity.findOrCreate(tenantId, phone, {
+        email,
+        name: dto.name?.trim() || undefined,
+        verified: true,
+      });
       const customerRepository = new PrismaCustomerAuthRepository(this.requestContext);
       const scopes = await customerRepository.getRoleAssignments();
 

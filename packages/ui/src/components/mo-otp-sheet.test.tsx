@@ -41,11 +41,14 @@ describe('MoOtpSheet', () => {
     expect(screen.queryByText('Confirma seu telefone')).not.toBeInTheDocument();
   });
 
-  it('botão "Enviar código" desabilitado até o telefone ter 10-11 dígitos', async () => {
+  it('botão "Enviar código" desabilitado até nome + telefone ter 10-11 dígitos', async () => {
     const user = userEvent.setup();
     setup();
 
     const botao = screen.getByRole('button', { name: 'Enviar código' });
+    expect(botao).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     expect(botao).toBeDisabled();
 
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
@@ -56,6 +59,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     const { onRequestCode } = setup();
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
 
@@ -71,6 +75,7 @@ describe('MoOtpSheet', () => {
     const { onRequestCode } = setup({ channel: 'email' });
 
     const botao = screen.getByRole('button', { name: 'Enviar código' });
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     expect(botao).toBeDisabled();
 
@@ -85,6 +90,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     setup({ channel: 'email' });
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.type(screen.getByLabelText('E-mail'), 'ana@loja');
     expect(screen.getByRole('button', { name: 'Enviar código' })).toBeDisabled();
@@ -94,6 +100,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     setup({ onRequestCode: vi.fn().mockResolvedValue({ ok: false, message: 'Muitas tentativas — espera um pouco.' }) });
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
 
@@ -105,6 +112,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     const { onVerifyCode, onVerified } = setup();
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -112,7 +120,7 @@ describe('MoOtpSheet', () => {
     await user.type(screen.getByLabelText('Código'), '123456');
     await user.click(screen.getByRole('button', { name: 'Confirmar código' }));
 
-    expect(onVerifyCode).toHaveBeenCalledWith('(51) 99999-0000', '123456', undefined);
+    expect(onVerifyCode).toHaveBeenCalledWith('(51) 99999-0000', '123456', undefined, 'Ana');
     expect(onVerified).toHaveBeenCalled();
   });
 
@@ -120,6 +128,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     const { onVerified } = setup({ onVerifyCode: vi.fn().mockResolvedValue({ ok: false, message: 'Código inválido ou expirado.' }) });
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -135,6 +144,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     setup();
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -147,6 +157,7 @@ describe('MoOtpSheet', () => {
     const user = userEvent.setup();
     const { rerender } = setup();
 
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');

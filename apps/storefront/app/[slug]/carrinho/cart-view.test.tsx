@@ -343,6 +343,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
 
+    await user.type(screen.getByLabelText('Nome'), 'Cliente Teste');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -389,6 +390,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
+    await user.type(screen.getByLabelText('Nome'), 'Cliente Teste');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -419,6 +421,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
+    await user.type(screen.getByLabelText('Nome'), 'Cliente Teste');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');
@@ -470,6 +473,7 @@ describe('CartView — checkout (Épico 7)', () => {
     await aceitarTermos(user);
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }));
     await screen.findByText('Confirma seu telefone');
+    await user.type(screen.getByLabelText('Nome'), 'Cliente Teste');
     await user.type(screen.getByLabelText('Telefone'), '51999990000');
     await user.click(screen.getByRole('button', { name: 'Enviar código' }));
     await screen.findByText('Digite o código');

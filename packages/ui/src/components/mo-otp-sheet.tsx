@@ -20,8 +20,8 @@ export interface MoOtpSheetProps {
   channel?: 'sms' | 'email';
   /** Chamada ao enviar telefone (+ e-mail, no canal de e-mail) — passo 1. */
   onRequestCode: (phone: string, email?: string) => Promise<MoOtpActionResult>;
-  /** Chamada ao enviar o código (passo 2). */
-  onVerifyCode: (phone: string, code: string, email?: string) => Promise<MoOtpActionResult>;
+  /** Chamada ao enviar o código (passo 2) — `name` só é gravado se o cliente ainda não tiver um de verdade. */
+  onVerifyCode: (phone: string, code: string, email?: string, name?: string) => Promise<MoOtpActionResult>;
   /** Código verificado com sucesso — quem chama decide o que fazer depois (fechar o sheet, seguir o fluxo). */
   onVerified: () => void;
   className?: string;
@@ -62,6 +62,7 @@ function MoOtpSheetInner({
   const [step, setStep] = React.useState<Step>('phone');
   const [phone, setPhone] = React.useState('');
   const [email, setEmail] = React.useState('');
+  const [name, setName] = React.useState('');
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -81,7 +82,8 @@ function MoOtpSheetInner({
   // que rejeitaria um fixo de qualquer forma.
   const telefoneValido = isPlausiblePhoneDigits(phone);
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const contatoValido = telefoneValido && (!porEmail || emailValido);
+  const nomeValido = name.trim().length > 0;
+  const contatoValido = telefoneValido && nomeValido && (!porEmail || emailValido);
   const codigoValido = code.replace(/\D/g, '').length === 6;
 
   async function enviarTelefone() {
@@ -102,7 +104,7 @@ function MoOtpSheetInner({
     if (!codigoValido || loading) return;
     setLoading(true);
     setError(null);
-    const resultado = await onVerifyCode(phone, code, porEmail ? email.trim() : undefined);
+    const resultado = await onVerifyCode(phone, code, porEmail ? email.trim() : undefined, name.trim());
     setLoading(false);
     if (!resultado.ok) {
       setError(resultado.message);
@@ -149,6 +151,13 @@ function MoOtpSheetInner({
       <div className="flex flex-col gap-4 pb-6">
         {step === 'phone' ? (
           <>
+            <MoInput
+              label="Nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Seu nome"
+              autoComplete="name"
+            />
             <MoInput
               label="Telefone"
               mask="phone"

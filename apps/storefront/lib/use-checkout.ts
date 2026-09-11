@@ -36,7 +36,12 @@ export interface UseCheckoutResult {
   requestOtpCode: (phone: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Finaliza sem OTP — só existe quando o tenant tem `checkout.guest` ligado. */
   submitGuest: (name: string, phone: string) => Promise<{ ok: true } | { ok: false; message: string }>;
-  verifyOtpCode: (phone: string, code: string, email?: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  verifyOtpCode: (
+    phone: string,
+    code: string,
+    email?: string,
+    name?: string,
+  ) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Fecha a tela de revisão — carrinho/endereço continuam intactos, cliente pode tentar de novo quando quiser. */
   closeCheckout: () => void;
   /** Fecha o sheet de OTP (ou o de guest) SEM abandonar o checkout — volta pra revisão, que o cliente já viu. */
@@ -119,7 +124,12 @@ export function useCheckout(
         setStep({ kind: 'otp' });
         return;
       }
-      setStep({ kind: 'review', review: lastReviewRef.current, errorMessage: ERRO_CRIACAO, submitting: false });
+      setStep({
+        kind: 'review',
+        review: lastReviewRef.current,
+        errorMessage: (result.status === 'error' && result.message) || ERRO_CRIACAO,
+        submitting: false,
+      });
     },
     [address, changeForCents, clearToken, fulfillmentType, paymentMethod, slug, useLoyaltyBalance],
   );
@@ -192,8 +202,8 @@ export function useCheckout(
   );
 
   const verifyOtpCode = React.useCallback(
-    async (phone: string, code: string, email?: string) => {
-      const result = await verifyOtp(slug, phone, code, email);
+    async (phone: string, code: string, email?: string, name?: string) => {
+      const result = await verifyOtp(slug, phone, code, email, name);
       if (!result.ok) return result;
 
       setToken(result.accessToken, result.customerId);
