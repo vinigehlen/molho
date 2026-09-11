@@ -107,9 +107,22 @@ backoffice. O merge de `cc/no-go-backend-infra@748574e` também removeu a URL de
 do comando de impressão. A nova varredura examinou 428 artefatos e encontrou zero
 endpoint proibido.
 
-Bloqueios do RC removidos em 10/09/2026: API técnica, assets, backup e gates de infra
-foram entregues; Sentry fica descopado no piloto e não bloqueia build/deploy. `NG-14`
-segue amarelo/vermelho apenas pelos gates humanos até registro do aceite jurídico/e-mail.
+RC técnico gerado em 11/09/2026 a partir de `main@55de6b1`, sem apontar DNS e sem alias
+customizado:
+
+| App | Deployment | Estado | Validação |
+|---|---|---|---|
+| storefront | `https://molho-storefront-prod-k8n8uiqux-vinigehlens-projects.vercel.app` (`dpl_39M5Pr79jGgAuV7LF2bBmAeSesWG`) | READY | `vercel curl -I /` → HTTP 200; CSP enforcement com R2 em `img-src`/`media-src`; `/cabanhas-bbq` no host técnico → 404 esperado em host mode |
+| backoffice | `https://molho-backoffice-prod-9tq778c8n-vinigehlens-projects.vercel.app` (`dpl_CFzAdv9XzM4wXTLZGfHFq4M3ZhnR`) | READY | `vercel curl -I /login` → HTTP 200; CSP enforcement com API técnica em `connect-src` e R2 em assets |
+| site | `https://molho-site-1uui6nkts-vinigehlens-projects.vercel.app` (`dpl_2L9zm1sgh8JrTpTDXTzXXPc9EGyk`) | READY | `vercel curl -I /` → HTTP 200; CSP enforcement sem origins externas desnecessárias |
+
+Os acessos públicos diretos retornam 302 para Vercel SSO, mantendo Deployment Protection
+ativa. A validação usou `vercel curl` autenticado. O HSTS visto nos domínios `vercel.app`
+é header da plataforma Vercel; HSTS nos domínios finais de `molho.live` continua pendente
+até TLS/DNS autorizados.
+
+`NG-14` continua sem promoção pública: faltam anexar domínios finais/DNS somente após
+`ZG-5`, registrar aceite jurídico/e-mail e executar o dry run.
 
 ## Coordenação NG-10
 
@@ -119,7 +132,9 @@ segue amarelo/vermelho apenas pelos gates humanos até registro do aceite juríd
   `contents: read`;
 - `DIRECT_URL`, `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` foram
   configurados como Actions secrets sem registrar valores;
-- restore drill numa branch Neon isolada ainda é obrigatório para fechar `NG-10`.
+- restore drill em branch Neon isolada foi registrado pela trilha CC em
+  `docs/go-live/evidencias-cc.md`: backup verde no 3º disparo, restore em ~17 s,
+  RPO ≤ 24h e RTO ~2 min.
 
 ## R5 — NG-15
 
@@ -140,6 +155,17 @@ criação do workflow de backup.
 | `pnpm --filter api test:e2e` | bloqueado pelo ambiente — Redis local recusou conexão; execução encerrada após 16 arquivos falhos por timeout, 2 passaram | 2026-09-10 |
 | `pnpm --filter @molho/storefront test:e2e` | 3/3 verde na árvore integrada | 2026-09-10 |
 | `pnpm verify:front-release` | verde — 428 artefatos, zero endpoint proibido | 2026-09-10 |
+
+Após o descope de Sentry no piloto e o commit `54d9e37`, os gates foram repetidos:
+
+| Comando | Resultado | Horário |
+|---|---|---|
+| `pnpm --filter @molho/storefront test -- front-security.test.ts` | verde — storefront 200 testes | 2026-09-11 |
+| `pnpm lint` | verde | 2026-09-11 |
+| `pnpm test` | verde — Turbo 10/10 | 2026-09-11 |
+| `pnpm build` | verde — Turbo 7/7 | 2026-09-11 |
+| `pnpm verify:front-release` | verde — 409 artefatos, zero endpoint proibido | 2026-09-11 |
+| GitHub CI em `main@55de6b1` | verde — CI + React Doctor | 2026-09-11 |
 
 O gate de código/fronts está verde. O E2E integral da API continua registrado na trilha CC;
 o RC Vercel pode ser gerado sem DSN Sentry no piloto, mantendo NG-08 como risco aceito e

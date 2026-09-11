@@ -488,19 +488,19 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | ID | Estado atual | Evidência / bloqueio para verde |
 |---|---|---|
 | `NG-01` | amarelo | decisões/acessos em `go-live/ata-ng-01.md`; faltam jurídico, operador e primeiro serviço assistido |
-| `NG-02` | amarelo | código + unit/E2E local em `go-live/evidencias-codex.md`; falta RC técnico real |
-| `NG-03` | amarelo | BFF + browser E2E verde; falta validar CORS e hops de proxy com API do RC |
-| `NG-04` | amarelo | URLs frontend concluídas; slug imutável depende de C1; varredura do build bloqueada pela URL de staging no fluxo de impressão C2 |
+| `NG-02` | amarelo | código + unit/E2E local em `go-live/evidencias-codex.md`; RC técnico Vercel READY; falta DNS/alias final só após ZG-5 |
+| `NG-03` | amarelo | BFF + browser E2E verde; negativa real no RC retornou 404; falta validar CORS/hops no domínio final |
+| `NG-04` | amarelo | URLs frontend concluídas; API/slug integrados; scanner do RC sem endpoint proibido; falta domínio final |
 | `NG-05` | verde | startup fail-fast validado em Fly prod |
 | `NG-06` | em execução (CC) | credencial revogável + impressão 60 min |
 | `NG-07` | verde | readiness real confirmou DB/Redis e 2/2 checks por máquina |
 | `NG-08` | amarelo | scrubbing/release dos fronts implementados; Sentry descopado no piloto; alerta real via fallback operacional |
 | `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
-| `NG-10` | em execução | workflow noturno e secrets configurados; restore drill isolado pendente |
-| `NG-11` | em execução (CC) | Redis cross-instance comprovado |
-| `NG-12` | em execução (CC) | API Fly prod: 2 máquinas/health verdes e URL técnica entregues; rollback pendente |
+| `NG-10` | verde | workflow noturno, backup verde e restore drill isolado registrados pela trilha CC |
+| `NG-11` | verde | Upstash prod, `redis:ok` e restart drill registrados pela trilha CC; fan-out A/B fica no dry run |
+| `NG-12` | verde | API Fly prod `molho-api.fly.dev`, 2 máquinas/ready verdes; cert final Not verified até DNS |
 | `NG-13` | verde | R2 na origin aprovada; PUT/GET/public GET/backup bucket/cleanup comprovados |
-| `NG-14` | vermelho | projetos, API e assets configurados; lint/test/build/scanner/E2E storefront verdes; RC técnico em emissão; faltam e-mail/jurídico/sign-off |
+| `NG-14` | amarelo | RC técnico Vercel READY nos 3 fronts; falta e-mail/jurídico/sign-off e DNS/alias final após ZG-5 |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
