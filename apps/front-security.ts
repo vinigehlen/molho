@@ -34,7 +34,7 @@ export function buildFrontSecurityHeaders({ kind, env = process.env }: SecurityH
   const sentryOrigin = originFromUrl(
     env.NEXT_PUBLIC_SENTRY_DSN || env.SENTRY_DSN,
     'NEXT_PUBLIC_SENTRY_DSN',
-    deployedProduction,
+    false,
     true,
   );
   const assetsOrigin = originFromUrl(

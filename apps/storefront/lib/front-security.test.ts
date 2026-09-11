@@ -27,7 +27,19 @@ describe('headers dos fronts', () => {
     expect(headers.find((header) => header.key === 'Strict-Transport-Security')?.value).toBe('max-age=15552000');
   });
 
-  it('falha cedo se Sentry/assets não foram configurados no deployment produtivo', () => {
+  it('falha cedo se assets não foram configurados no deployment produtivo', () => {
     expect(() => buildFrontSecurityHeaders({ kind: 'storefront', env: { VERCEL_ENV: 'production' } })).toThrow();
+  });
+
+  it('permite RC produtivo sem Sentry no piloto', () => {
+    const headers = buildFrontSecurityHeaders({
+      kind: 'storefront',
+      env: {
+        NODE_ENV: 'production',
+        VERCEL_ENV: 'production',
+        MOLHO_ASSETS_ORIGIN: 'https://assets.exampleusercontent.com',
+      },
+    });
+    expect(headers.find((header) => header.key === 'Content-Security-Policy')?.value).not.toContain('sentry.io');
   });
 });

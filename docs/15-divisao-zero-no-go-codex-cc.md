@@ -446,7 +446,9 @@ base; os documentos compartilhados foram consolidados semanticamente.
   endereço, body e query; `sendDefaultPii=false` nos nove configs;
 - release Sentry usa SHA; analytics não captura URL completa nem token de tracking e não
   faz autocapture;
-- observação no RC, DSNs reais, alertas e ativação de HSTS após TLS continuam pendentes.
+- observação no RC, DSNs reais, alertas e ativação de HSTS após TLS continuam pendentes;
+  sem DSN, Sentry não bloqueia mais o RC técnico do piloto conforme descope registrado em
+  `docs/go-live/ata-ng-01.md` §1 linha 12.
 
 #### R4 — Vercel e preparação do RC (`NG-14`)
 
@@ -467,8 +469,9 @@ Operações externas já executadas no escopo `vinigehlens-projects`:
 - nenhum deployment Vercel dos projetos produtivos existe ainda;
 - os deploys de staging registrados pelo CC (API v43 e backoffice staging) não incluem as
   mudanças desta branch Codex;
-- faltam DSNs Sentry, e-mail validado e jurídico antes de gerar o RC com
-  `vercel deploy --prebuilt --prod --skip-domain`.
+- faltam apenas registro de e-mail/jurídico e os gates humanos para promoção pública; o RC
+  técnico pode ser gerado sem DSN Sentry no piloto com `vercel deploy --prebuilt --prod
+  --skip-domain`.
 
 A auditoria direta de Production em 10/09/2026 confirmou inicialmente:
 
@@ -486,8 +489,9 @@ Depois do handoff da URL técnica, foram gravadas em Production:
 A URL respondeu `/ready` com HTTP 200, banco e Redis `ok`; `fly status` confirmou duas
 máquinas `started` em `gru`, ambas com 2/2 checks passando. O certificado de
 `api.molho.live` continua `Not verified` sem DNS, conforme a proibição até `ZG-5`.
-O deploy Vercel segue interrompido antes do build porque os DSNs Sentry ausentes violam o
-fail-fast e não produziriam um RC válido.
+O deploy Vercel deixou de ser bloqueado por DSN Sentry ausente no piloto; a integração de
+Sentry permanece pronta para quando os DSNs forem configurados, mas o RC técnico pode ser
+emitido usando API `fly.dev` e origin R2.
 
 O merge do CC incorporou a troca da URL de impressão para `api.molho.live`. O scanner foi
 repetido depois do merge e examinou 428 artefatos: zero endpoint proibido e nenhuma
@@ -561,8 +565,8 @@ Depois do merge `ba6d3b6` e do workflow `7d99098`, os gates foram novamente exec
 
 - não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
 - o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
-- próximo passo obrigatório: receber/configurar os DSNs Sentry, executar o primeiro backup
-  e o restore drill e então gerar o RC;
+- próximo passo obrigatório: gerar o RC técnico, registrar os links produtivos e manter
+  DSNs Sentry como pós-piloto/pendência de observabilidade;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 
@@ -576,8 +580,8 @@ NG-01 → C1/config → C3/readiness → C4/Neon → C5/Fly+Redis
 ```
 
 Codex concluiu roteamento, BFF, URLs e CSP enquanto CC percorre esse caminho. A URL
-técnica da API já foi entregue; a espera atual do RC é pela origin de assets, Sentry e
-demais gates registrados em R4/R5.
+técnica da API e a origin de assets já foram entregues; Sentry está descopado para o
+piloto e não bloqueia mais o RC técnico.
 
 Referência de capacidade, não compromisso de prazo:
 

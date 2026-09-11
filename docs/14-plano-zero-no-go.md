@@ -494,13 +494,13 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | `NG-05` | verde | startup fail-fast validado em Fly prod |
 | `NG-06` | em execução (CC) | credencial revogável + impressão 60 min |
 | `NG-07` | verde | readiness real confirmou DB/Redis e 2/2 checks por máquina |
-| `NG-08` | amarelo | scrubbing/release dos fronts implementados; alertas reais e API dependem de C3 |
+| `NG-08` | amarelo | scrubbing/release dos fronts implementados; Sentry descopado no piloto; alerta real via fallback operacional |
 | `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
 | `NG-10` | em execução | workflow noturno e secrets configurados; restore drill isolado pendente |
 | `NG-11` | em execução (CC) | Redis cross-instance comprovado |
 | `NG-12` | em execução (CC) | API Fly prod: 2 máquinas/health verdes e URL técnica entregues; rollback pendente |
 | `NG-13` | verde | R2 na origin aprovada; PUT/GET/public GET/backup bucket/cleanup comprovados |
-| `NG-14` | vermelho | projetos, API e assets configurados; lint/test/build/scanner/E2E storefront verdes; faltam Sentry/RC/e-mail/jurídico |
+| `NG-14` | vermelho | projetos, API e assets configurados; lint/test/build/scanner/E2E storefront verdes; RC técnico em emissão; faltam e-mail/jurídico/sign-off |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.

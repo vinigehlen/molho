@@ -66,7 +66,10 @@ real para o rate limit continuar usando o IP do cliente.
 - Coletor `/api/csp-report` limita 16 KiB e grava somente directive + origins, sem path,
   query ou sample.
 - Sentry nos três fronts usa release por SHA e scrubber de e-mail, telefone, JWT, Bearer,
-  cookies, tokens, endereço, body e URL sensível.
+  cookies, tokens, endereço, body e URL sensível quando DSN existir.
+- Após a decisão de descope de Sentry no piloto (`docs/go-live/ata-ng-01.md` §1 linha 12),
+  DSN ausente não bloqueia mais o RC técnico; o fallback operacional fica em uptime,
+  métricas/logs e canal de incidente.
 - Analytics da storefront redige token de tracking e não usa autocapture.
 
 `NG-09` permanece amarelo até observação no staging/RC com origins finais e ativação de
@@ -104,8 +107,9 @@ backoffice. O merge de `cc/no-go-backend-infra@748574e` também removeu a URL de
 do comando de impressão. A nova varredura examinou 428 artefatos e encontrou zero
 endpoint proibido.
 
-Bloqueios do RC: DSNs Sentry, revisão jurídica e confirmação de e-mail. Portanto
-`NG-14` continua vermelho e nenhum RC de produção foi criado.
+Bloqueios do RC removidos em 10/09/2026: API técnica, assets, backup e gates de infra
+foram entregues; Sentry fica descopado no piloto e não bloqueia build/deploy. `NG-14`
+segue amarelo/vermelho apenas pelos gates humanos até registro do aceite jurídico/e-mail.
 
 ## Coordenação NG-10
 
@@ -138,4 +142,5 @@ criação do workflow de backup.
 | `pnpm verify:front-release` | verde — 428 artefatos, zero endpoint proibido | 2026-09-10 |
 
 O gate de código/fronts está verde. O E2E integral da API continua registrado na trilha CC;
-o RC Vercel segue bloqueado pelo Sentry obrigatório e pelos gates externos descritos acima.
+o RC Vercel pode ser gerado sem DSN Sentry no piloto, mantendo NG-08 como risco aceito e
+não como alerta real entregue.
