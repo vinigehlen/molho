@@ -4,6 +4,30 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "MOLHO_API_INTERNAL_URL",
+        "MOLHO_ASSETS_ORIGIN",
+        "MOLHO_STOREFRONT_ROOT_DOMAIN",
+        "MOLHO_STOREFRONT_PATH_MODE",
+        "MOLHO_STOREFRONT_TECHNICAL_SLUG",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_SITE_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_BACKOFFICE_URL",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST",
+        "NEXT_PUBLIC_GA_ID",
+        "SENTRY_DSN",
+        "SENTRY_ENVIRONMENT",
+        "SENTRY_RELEASE",
+        "SENTRY_TRACES_SAMPLE_RATE",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_ENVIRONMENT",
+        "NEXT_PUBLIC_SENTRY_RELEASE",
+        "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
+        "VERCEL_ENV",
+        "VERCEL_GIT_COMMIT_SHA"
+      ],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "build:storybook": {
