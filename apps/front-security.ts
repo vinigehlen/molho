@@ -62,6 +62,10 @@ export function buildFrontSecurityHeaders({ kind, env = process.env }: SecurityH
     : null;
   const googleAnalytics = env.NEXT_PUBLIC_GA_ID ? 'https://www.google-analytics.com' : null;
   const googleTagManager = env.NEXT_PUBLIC_GA_ID ? 'https://www.googletagmanager.com' : null;
+  // Storefront chama ViaCEP direto do browser pra preencher endereço
+  // (`lib/viacep.ts`) — sem essa origem em connect-src, CSP bloqueia o fetch
+  // e cai no fallback "Não deu pra buscar o CEP agora" mesmo com a API no ar.
+  const viaCepOrigin = kind === 'storefront' ? 'https://viacep.com.br' : null;
 
   const csp = [
     directive('default-src', ["'self'"]),
@@ -73,7 +77,7 @@ export function buildFrontSecurityHeaders({ kind, env = process.env }: SecurityH
     directive('font-src', ["'self'", 'data:']),
     directive('style-src', ["'self'", "'unsafe-inline'"]),
     directive('script-src', ["'self'", "'unsafe-inline'", development ? "'unsafe-eval'" : null, posthogOrigin, googleTagManager]),
-    directive('connect-src', ["'self'", apiOrigin, uploadOrigin, sentryOrigin, posthogOrigin, googleAnalytics]),
+    directive('connect-src', ["'self'", apiOrigin, uploadOrigin, sentryOrigin, posthogOrigin, googleAnalytics, viaCepOrigin]),
     directive('media-src', ["'self'", 'blob:', assetsOrigin]),
     directive('worker-src', ["'self'", 'blob:']),
     deployedProduction ? 'upgrade-insecure-requests' : '',
