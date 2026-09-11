@@ -31,6 +31,26 @@ describe('headers dos fronts', () => {
     expect(() => buildFrontSecurityHeaders({ kind: 'storefront', env: { VERCEL_ENV: 'production' } })).toThrow();
   });
 
+  it('falha cedo se o backoffice produtivo não tem origem de upload configurada', () => {
+    expect(() =>
+      buildFrontSecurityHeaders({ kind: 'backoffice', env: { VERCEL_ENV: 'production', MOLHO_ASSETS_ORIGIN: PROD_ENV.MOLHO_ASSETS_ORIGIN } }),
+    ).toThrow();
+  });
+
+  it('backoffice inclui a origem de upload em connect-src (PUT pro R2 pré-assinado)', () => {
+    const headers = buildFrontSecurityHeaders({
+      kind: 'backoffice',
+      env: { ...PROD_ENV, NEXT_PUBLIC_API_URL: 'https://api.exampleusercontent.com', MOLHO_UPLOAD_ORIGIN: 'https://minha-conta.r2.cloudflarestorage.com' },
+    });
+    const csp = headers.find((header) => header.key === 'Content-Security-Policy');
+    expect(csp?.value).toContain('connect-src');
+    expect(csp?.value).toContain('https://minha-conta.r2.cloudflarestorage.com');
+  });
+
+  it('storefront não exige origem de upload (não faz upload de imagem)', () => {
+    expect(() => buildFrontSecurityHeaders({ kind: 'storefront', env: PROD_ENV })).not.toThrow();
+  });
+
   it('permite RC produtivo sem Sentry no piloto', () => {
     const headers = buildFrontSecurityHeaders({
       kind: 'storefront',
