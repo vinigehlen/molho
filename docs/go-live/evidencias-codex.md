@@ -107,8 +107,8 @@ backoffice. O merge de `cc/no-go-backend-infra@748574e` também removeu a URL de
 do comando de impressão. A nova varredura examinou 428 artefatos e encontrou zero
 endpoint proibido.
 
-RC técnico gerado em 11/09/2026 a partir de `main@55de6b1`, sem apontar DNS e sem alias
-customizado:
+RC técnico inicial gerado em 11/09/2026 a partir de `main@55de6b1`, sem apontar DNS e sem
+alias customizado:
 
 | App | Deployment | Estado | Validação |
 |---|---|---|---|
@@ -123,6 +123,24 @@ até TLS/DNS autorizados.
 
 `NG-14` continua sem promoção pública: faltam anexar domínios finais/DNS somente após
 `ZG-5`, registrar aceite jurídico/e-mail e executar o dry run.
+
+Em 11/09/2026, o primeiro redeploy remoto pós-merge revelou que o Turbo na Vercel não
+repassava as variáveis declaradas no projeto para `next build`, fazendo o storefront
+falhar antes de carregar `next.config.ts` por `MOLHO_API_INTERNAL_URL` ausente. O patch
+`1d20f96` / PR #73 declarou as envs de build no `turbo.json`; `pnpm build` completo
+passou localmente com as envs públicas do RC, e o patch foi mesclado em `main`.
+
+RC técnico final reemitido em 11/09/2026 a partir de `main@1d20f96`, ainda sem DNS final
+e sem alias customizado:
+
+| App | Deployment | Estado | Validação |
+|---|---|---|---|
+| storefront | `https://molho-storefront-prod-4kh9wk2pk-vinigehlens-projects.vercel.app` (`dpl_DX8ayUXhPXBXm6kce8Tjv6XwX75x`) | READY | `vercel curl -I /` → HTTP 200; CSP enforcement com R2 em `img-src`/`media-src`; negativa `/api/store/cabanhas-bbq/admin/orders` → HTTP 404 |
+| backoffice | `https://molho-backoffice-prod-4k131l9py-vinigehlens-projects.vercel.app` (`dpl_4NikxrWBLcKRMrpq8KnarL8WojBZ`) | READY | `vercel curl -I /login` → HTTP 200; CSP enforcement com API técnica em `connect-src` e R2 em assets |
+| site | `https://molho-site-ahb1yatb5-vinigehlens-projects.vercel.app` (`dpl_6afsu2sBEqwwG5A7HashJHKF5A6t`) | READY | `vercel curl -I /` → HTTP 200; CSP enforcement sem origins externas desnecessárias |
+
+API técnica no mesmo fechamento: `GET https://molho-api.fly.dev/ready` → HTTP 200,
+`db=ok`, `redis=ok`.
 
 ## Coordenação NG-10
 
@@ -166,6 +184,8 @@ Após o descope de Sentry no piloto e o commit `54d9e37`, os gates foram repetid
 | `pnpm build` | verde — Turbo 7/7 | 2026-09-11 |
 | `pnpm verify:front-release` | verde — 409 artefatos, zero endpoint proibido | 2026-09-11 |
 | GitHub CI em `main@55de6b1` | verde — CI + React Doctor | 2026-09-11 |
+| `pnpm build` com envs públicas do RC após PR #73 | verde — Turbo 7/7 | 2026-09-11 |
+| GitHub PR #73 | merged — React Doctor verde; `quality` passou lint/typecheck/test/build/storybook e seguia no contraste quando o merge entrou; Worker externo `molho-uploads` falhou fora de escopo | 2026-09-11 |
 
 O gate de código/fronts está verde. O E2E integral da API continua registrado na trilha CC;
 o RC Vercel pode ser gerado sem DSN Sentry no piloto, mantendo NG-08 como risco aceito e
