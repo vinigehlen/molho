@@ -768,6 +768,19 @@ finais).
 `NG-09` verde para o escopo operacional de hoje. Próximo: Fase 6 (`NG-15` tenant real e dry
 run).
 
+## Hotfix — rate limit de OTP 1h → 10min (11/09/2026)
+
+Pedido do PM em produção: janela de 1h (`IP_LIMIT_WINDOW_SECONDS`,
+`PHONE_LIMIT_WINDOW_SECONDS` em `apps/api/src/auth/otp/otp.service.ts`)
+travava dono/staff/QA por até uma hora a cada retentativa (o rate limiter
+registra toda tentativa, até as rejeitadas — ver nota em
+`docs/07-aprendizados.md`). Reduzido pra 10min, mesmo teto de requisições
+(20/IP, 5/e-mail-telefone). `tsc` limpo, 779/779 testes da API verdes. Deploy
+`fly deploy . -c apps/api/fly.prod.toml` (build+context da raiz do monorepo —
+rodar de dentro de `apps/api` falha o build multi-stage), imagem
+`deployment-01M28PGB9JYPHNJMC02SSPJ1G6`, 2/2 máquinas saudáveis,
+`api.molho.live/ready` confirmado (`db=ok`, `redis=ok`).
+
 ## PARA O CODEX — handoff: login cai no reload + botões editar/remover somem (11/09/2026)
 
 Dois problemas reais achados pelo PM/operador testando o backoffice em produção,
