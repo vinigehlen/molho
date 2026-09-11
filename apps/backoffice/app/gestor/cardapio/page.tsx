@@ -148,6 +148,11 @@ export default function CardapioPage() {
   const inspectorTriggerRef = useRef<HTMLElement | null>(null);
 
   const selectedProduct = products.find((product) => product.id === selectedProductId) ?? null;
+  // A 3ª coluna do grid (painel lateral) fica reservada só quando o painel
+  // realmente abre — do contrário essa faixa de 420-520px fica em branco e
+  // espreme a lista de itens (e os botões editar/remover) pra fora da tela
+  // em telas xl/2xl. Ver docs/07-aprendizados.md.
+  const panelOpen = creatingProduct || Boolean(selectedProductId);
   const manualTotalCents = useMemo(() => {
     if (!selectedProduct) return 0;
     return (
@@ -817,7 +822,14 @@ export default function CardapioPage() {
             </div>
           </div>
 
-          <div className="relative grid min-h-[680px] lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(420px,1fr)_420px] 2xl:grid-cols-[220px_minmax(480px,1fr)_520px]">
+          <div
+            className={cn(
+              'relative grid min-h-[680px] lg:grid-cols-[220px_minmax(0,1fr)]',
+              panelOpen
+                ? 'xl:grid-cols-[220px_minmax(420px,1fr)_420px] 2xl:grid-cols-[220px_minmax(480px,1fr)_520px]'
+                : 'xl:grid-cols-[220px_minmax(0,1fr)]',
+            )}
+          >
             <aside className="min-w-0 border-b border-border p-4 lg:border-b-0 lg:border-r">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="font-semibold">Categorias</h2>
