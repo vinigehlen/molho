@@ -1,6 +1,8 @@
 # Ata NG-01 — decisões e acessos (Plano Zero NO-GO)
 
-**Data:** 2026-09-09
+**Data:** 2026-09-09  
+**Atualização PM:** 2026-09-11 — PM assumiu `NG-01`, autorizou o foco no sistema
+operacional completo do Cabanhas hoje e moveu Sentry/API completo para backlog futuro.
 **Base:** `docs/14-plano-zero-no-go.md` §5 NG-01 · `docs/15-divisao-zero-no-go-codex-cc.md` §5 R0/C0
 **Decisor:** Vinicius Gehlen (PM + responsável técnico + plantonista)
 **Escopo:** decisões PM e acessos. Aceite jurídico e aceite do Cabanhas seguem pendentes (ver §4).
@@ -25,6 +27,7 @@ Sem segredos neste arquivo. Codex ratifica e marca a matriz central de `docs/14`
 | 10 | Data do dry run físico | **2026-09-11** (alvo; sujeito a disponibilidade do restaurante) | `NG-15` |
 | 11 | Canal de incidente + fallback | Definido em `docs/go-live/plantao.md`: alerta → `superadmin.molho.live@gmail.com`; P1 → WhatsApp `51-99261-6964`; fallback manual = pedidos pelo WhatsApp do restaurante (fluxo pré-Molho) | `NG-08`, `NG-15` |
 | 12 | Sentry da API no piloto | **Descopado.** Sentry não é dependência de boot; sem ele fica sem alerta de erro e sem agregação. Piloto de 1 restaurante aceita o risco. Fallback: `fly logs` + métricas Fly/Grafana + monitor de uptime externo no `/ready` (alerta pro canal de incidente da linha 11). Sentry da API entra pós-piloto. Flexibiliza o critério original de `NG-08` (Sentry + alertas reais na API) — decisão PM explícita, 2026-09-10 | `NG-08` |
+| 13 | Prioridade do corte | **Sistema operacional completo do Cabanhas hoje**: cardápio para clientes, checkout, balcão/pedidos/gestão, WhatsApp, impressão e fallback. Site institucional `molho.live`/`www`, marketing e Sentry completo ficam pós-corte. | `NG-02`, `NG-03`, `NG-04`, `NG-09`, `NG-14`, `NG-15` |
 
 ## 2. Responsáveis
 
@@ -52,14 +55,19 @@ Todos os serviços com acesso admin do PM. Neon e Vercel confirmados via MCP nes
 
 **Nome de app Fly `molho-api`:** confirmar que está livre (nomes Fly são globais) antes do primeiro `fly apps create` — se tomado, PM define o nome.
 
-## 4. Pendências que mantêm `NG-01` amarelo
+## 4. Fechamento de `NG-01` e pendências movidas
 
-`NG-01` fecha as **decisões PM e acessos** (§1–§3). Continuam abertos, como gates humanos distintos:
+`NG-01` fecha as **decisões PM e acessos** (§1–§3) e foi assumido pelo PM em 11/09/2026.
+As pendências abaixo não bloqueiam mais `NG-01`; elas foram movidas para os gates
+operacionais correspondentes:
 
-- [ ] revisão e aceite **jurídico** de termos, privacidade, DPA, subprocessadores, retenção e plano de incidente (`NG-14`);
-- [ ] **contato do operador Cabanhas** nomeado e registrado em `plantao.md` (`NG-15`);
-- [ ] **aceite do Cabanhas** para dados, cardápio, instruções de PIX, operação e teste físico (`NG-15`);
-- [ ] confirmar nome de app Fly `molho-api` livre.
+- revisão jurídica ampla de termos, privacidade, DPA, subprocessadores, retenção e plano
+  de incidente → pós-corte/`NG-14`;
+- contato do operador Cabanhas nomeado e registrado em `plantao.md` → `NG-15`;
+- aceite do Cabanhas para dados, cardápio, instruções de PIX, operação e teste físico →
+  `NG-15`;
+- Sentry/API e alertas completos → backlog futuro `NG-08`;
+- nome Fly `molho-api` já usado no RC técnico da API.
 
 ## 5. Efeito no congelamento de contratos (doc 15 §4)
 

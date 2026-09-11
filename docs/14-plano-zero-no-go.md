@@ -3,7 +3,9 @@
 **Data-base:** 09/09/2026
 **Base auditada:** `main` em `51ff9e6c19bccc38f1f4274a0ba3e23d689285d6`
 **Plano de publicação relacionado:** `docs/13-plano-go-live-producao-cabanhas.md`
-**Regra:** nenhum DNS produtivo será apontado e nenhum tenant será publicado até `ZG-5` estar verde.
+**Regra atualizada em 11/09/2026:** o corte permitido hoje é o sistema operacional do
+Cabanhas — loja pública, backoffice/gestão, API, pedidos e impressão. O site institucional
+`molho.live` e `www` não são caminho crítico desta janela e ficam pós-corte.
 
 > A divisão paralela de execução entre Codex e CC está em `docs/15-divisao-zero-no-go-codex-cc.md`. Esse documento define ownership de arquivos e ordem de merge e prevalece em caso de dúvida operacional.
 
@@ -18,7 +20,7 @@ O sistema estará pronto para publicação quando:
 - os E2E de API e browser estiverem verdes contra o release candidate;
 - produção estiver isolada de staging em banco, Redis, storage, e-mail, chaves e projetos;
 - backup restaurável, observabilidade, rollback e impressão física estiverem provados;
-- jurídico, PM e Cabanhas tiverem dado aceite explícito;
+- PM e Cabanhas tiverem dado aceite explícito para o piloto operacional;
 - o comitê de GO/NO-GO tiver aprovado `ZG-5`.
 
 Não há exceção silenciosa. Um bloqueio só muda para verde com artefato verificável, não com “parece funcionar”.
@@ -36,6 +38,13 @@ Para retirar ambiguidades do executor, este plano adota:
 7. **Segurança:** CSP em enforcement no backoffice após observação em staging; adapters mock/memória proibidos em produção.
 8. **Cabanhas:** tenant criado pelo fluxo real; nenhum seed, cliente, pedido ou sessão de staging será copiado.
 9. **Release:** build imutável validado antes da promoção; migrations somente expansivas nesta janela.
+10. **Prioridade de hoje:** publicar e validar o sistema operacional completo do Cabanhas
+    (`cardápio clientes → checkout → balcão/pedidos/gestão → WhatsApp/impressão/fallback`).
+    O institucional `molho.live`, `www`, marketing e revisão jurídica ampla não bloqueiam
+    este piloto operacional.
+11. **Observabilidade:** `NG-08` fica backlog futuro/pós-piloto. No piloto, o aceite é
+    operar com fallback documentado: `/ready`, logs Fly, métricas da plataforma e canal de
+    incidente.
 
 Escolha de DNS: cadastrar o subdomínio do Cabanhas explicitamente é o caminho mais simples para o piloto porque mantém a Cloudflare como DNS autoritativo; wildcard da Vercel exige o método de nameservers.
 
@@ -369,9 +378,11 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 **Aceite:** upload presignado, leitura, cache, substituição, remoção e rejeição de arquivo inválido passam na origin final aprovada na ata.
 **Dependência:** `NG-01`, `NG-05`.
 
-### NG-14 — Vercel, e-mail, site e legal
+### NG-14 — Vercel, domínios operacionais e corte do Cabanhas
 
-**Resolve:** fronts produtivos ausentes, CTA para staging, e-mail sem recebimento e textos legais pendentes.
+**Resolve:** fronts produtivos operacionais, CTA/URLs sem staging e domínio final da loja
+do Cabanhas. O site institucional `molho.live`, `www` e revisão ampla jurídico-marketing
+ficam pós-corte e não bloqueiam a operação do restaurante hoje.
 
 **Infra/fronts:**
 
@@ -382,24 +393,28 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 - [ ] gerar build produtivo imutável sem associar domínio;
 - [ ] validar pelas URLs técnicas;
 - [ ] preparar `app.molho.live` e `cabanhas-bbq.molho.live` no painel;
-- [ ] preparar `www → molho.live`, mas não ativar CTA antes do corte;
+- [ ] deixar `www → molho.live` e novo institucional fora do caminho crítico de hoje;
 - [ ] registrar deployment para promoção e rollback.
 
-**E-mail/legal:**
+**E-mail/legal operacional:**
 
 - [ ] confirmar Resend como Verified e testar OTP em Gmail/Outlook;
 - [ ] verificar SPF, DKIM, return-path e DMARC no dashboard;
-- [ ] criar caixa/encaminhamento funcional para `contato@molho.live`;
-- [ ] revisar termos, privacidade, DPA, subprocessadores, retenção e incidente;
-- [ ] substituir dados provisórios e remover o aviso de revisão pendente somente após aprovação jurídica;
+- [ ] confirmar canal de suporte/incidente do piloto;
+- [ ] manter termos/privacidade atuais sem bloquear o piloto, com revisão ampla pós-corte
+  se ainda não houver assinatura final;
 - [ ] enviar e responder mensagem externa de teste.
 
-**Aceite:** builds técnicos verdes e revertíveis; nenhum bundle aponta a staging; OTP entrega; caixa recebe; jurídico assina versão publicada.
-**Dependência:** `NG-04`, `NG-08`, `NG-09`, entradas humanas de `NG-01`.
+**Aceite:** builds técnicos verdes e revertíveis; nenhum bundle aponta a staging; OTP
+entrega; `app.molho.live` e `cabanhas-bbq.molho.live` funcionam; canal operacional recebe.
+**Dependência:** `NG-04`, `NG-09`, entradas humanas de `NG-01`. `NG-08` não bloqueia o
+piloto e fica backlog futuro.
 
 ### NG-15 — tenant Cabanhas, dry run e sign-off
 
-**Resolve:** ausência de dados reais, validação física e aceite operacional.
+**Resolve:** ausência de dados reais, validação física e aceite operacional do sistema
+completo do Cabanhas — cardápio para clientes, checkout, balcão/pedidos, gestão,
+WhatsApp, impressão e fallback.
 
 **Provisionamento:**
 
@@ -411,14 +426,16 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 - [ ] cadastrar horários, zonas, taxas e pedido mínimo;
 - [ ] cadastrar PIX/instruções e pagamentos aceitos;
 - [ ] ativar módulos pelo estado entitled AND enabled AND released;
-- [ ] manter `channel.storefront` não publicado até `ZG-5`;
+- [ ] publicar `channel.storefront` somente após domínio final responder e pré-voo
+  operacional passar;
 - [ ] não copiar clientes, pedidos, sessões ou auditoria de staging.
 
-**Dry run físico:**
+**Dry run físico / operação real assistida:**
 
 - [ ] abrir loja em celular real via Wi-Fi e 4G;
 - [ ] executar catálogo → carrinho → endereço → pagamento → pedido;
 - [ ] confirmar pedido no gestor em menos de 3 segundos;
+- [ ] operar balcão/gestão com fila de pedidos, detalhe do pedido e mudança de status;
 - [ ] mudar status somente pelo fluxo autorizado;
 - [ ] validar WhatsApp click-to-chat;
 - [ ] imprimir uma única vez na impressora real;
@@ -428,7 +445,8 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 - [ ] cancelar pedido de teste sem apagar auditoria;
 - [ ] testar isolamento tenant A/B e logs sem PII.
 
-**Aceite:** checklist assinado pelo responsável técnico e pelo operador do Cabanhas; evidência de pedido, tela do gestor, ticket físico, alertas e recuperação.
+**Aceite:** checklist assinado pelo responsável técnico/PM e pelo operador do Cabanhas;
+evidência de pedido, tela do gestor/balcão, ticket físico, canal de incidente e recuperação.
 **Dependência:** `NG-02` a `NG-14`.
 
 ## 6. Plano de PRs e ordem de execução
@@ -439,7 +457,7 @@ As trilhas A–D podem avançar em paralelo depois de `ZG-0`, mas cada PR deve c
 | 2 | PR-B | `NG-03` BFF e fronteira CORS | integração + browser E2E negativo/positivo |
 | 3 | PR-C | `NG-05` config + `NG-07` readiness | unit + API E2E + container startup |
 | 4 | PR-D | `NG-06` impressão, migration e agente | unit + API E2E + teste do agente |
-| 5 | PR-E | `NG-08` observabilidade + `NG-09` headers | testes de scrubbing + CSP E2E |
+| 5 | PR-E | `NG-09` headers + observabilidade mínima operacional (`NG-08` em backlog futuro) | CSP E2E + `/ready`/logs/canal de incidente |
 | 6 | Infra-1 | `NG-10`, `NG-11`, `NG-13` | restore + cross-instance + storage smoke |
 | 7 | Infra-2 | `NG-12`, `NG-14` | RC técnico + rollback |
 | 8 | Operação | `NG-15` | dry run físico e sign-off |
@@ -467,7 +485,7 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 - [ ] cross-instance SSE/Redis verde;
 - [ ] restore Neon verde;
 - [ ] rollback Vercel e Fly ensaiados;
-- [ ] Sentry e uptime entregam alertas;
+- [ ] uptime/fallback operacional entregam alerta; Sentry fica backlog futuro;
 - [ ] CSP enforcement verde;
 - [ ] nenhuma URL/credencial de staging no runtime produtivo.
 
@@ -487,23 +505,24 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 
 | ID | Estado atual | Evidência / bloqueio para verde |
 |---|---|---|
-| `NG-01` | amarelo | decisões/acessos em `go-live/ata-ng-01.md`; faltam jurídico, operador e primeiro serviço assistido |
+| `NG-01` | verde | PM assumiu aceite em 11/09/2026; decisões/acessos em `go-live/ata-ng-01.md`; pendências restantes foram movidas para `NG-14`/`NG-15` |
 | `NG-02` | amarelo | código + unit/E2E local em `go-live/evidencias-codex.md`; RC técnico Vercel READY; falta DNS/alias final só após ZG-5 |
 | `NG-03` | amarelo | BFF + browser E2E verde; negativa real no RC retornou 404; falta validar CORS/hops no domínio final |
 | `NG-04` | amarelo | URLs frontend concluídas; API/slug integrados; scanner do RC sem endpoint proibido; falta domínio final |
 | `NG-05` | verde | startup fail-fast validado em Fly prod |
 | `NG-06` | em execução (CC) | credencial revogável + impressão 60 min |
 | `NG-07` | verde | readiness real confirmou DB/Redis e 2/2 checks por máquina |
-| `NG-08` | amarelo | scrubbing/release dos fronts implementados; Sentry descopado no piloto; alerta real via fallback operacional |
+| `NG-08` | backlog futuro | Sentry/API e alertas completos ficam pós-piloto; piloto opera com fallback aprovado: `/ready`, logs Fly, métricas e canal de incidente |
 | `NG-09` | amarelo | enforcement/headers implementados e testados localmente; falta observação no RC e HSTS após TLS |
 | `NG-10` | verde | workflow noturno, backup verde e restore drill isolado registrados pela trilha CC |
 | `NG-11` | verde | Upstash prod, `redis:ok` e restart drill registrados pela trilha CC; fan-out A/B fica no dry run |
 | `NG-12` | verde | API Fly prod `molho-api.fly.dev`, 2 máquinas/ready verdes; cert final Not verified até DNS |
 | `NG-13` | verde | R2 na origin aprovada; PUT/GET/public GET/backup bucket/cleanup comprovados |
-| `NG-14` | amarelo | RC técnico Vercel READY nos 3 fronts em `main@1d20f96`; falta e-mail/jurídico/sign-off e DNS/alias final após ZG-5 |
-| `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
+| `NG-14` | amarelo | RC técnico Vercel READY; foco hoje é `app.molho.live` + `cabanhas-bbq.molho.live`; institucional `molho.live` fica pós-corte |
+| `NG-15` | vermelho | checklist preparado; faltam tenant real, operação completa cardápio→pedidos/gestão→impressão e sign-off |
 
-`ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
+Para o piloto de hoje, `ZG-5` operacional pode ficar verde com `NG-08` formalmente aceito
+como backlog futuro e com `NG-02/03/04/09/14/15` verdes no fluxo do Cabanhas.
 
 ## 9. Cronograma de referência
 
@@ -514,8 +533,10 @@ Estimativa de caminho crítico, não SLA, assumindo acessos e jurídico disponí
 - **Dias 3–6:** credencial de impressão, observabilidade e CSP;
 - **Dias 5–7:** Neon, Redis, R2, Fly e Vercel produtivos sem DNS público;
 - **Dias 7–8:** migration, RC, restore, rollback e segurança;
-- **Dias 8–9:** provisionamento real e dry run no Cabanhas;
-- **Dia 10 ou posterior:** `ZG-5`; publicação apenas em janela aprovada.
+- **Hoje:** corte operacional do Cabanhas (`app` + storefront + API), provisionamento real
+  e dry run assistido;
+- **Pós-corte:** institucional `molho.live`/`www`, revisão ampla jurídica/marketing e
+  Sentry completo.
 
 Revisão jurídica, aquisição de domínio de assets ou disponibilidade física do restaurante podem alongar o caminho crítico. Não compensar atraso removendo gates.
 

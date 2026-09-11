@@ -2,6 +2,8 @@
 
 **Branch:** `codex/no-go-front-release`
 **Data:** 2026-09-10
+**Atualização:** 2026-09-11 — PM assumiu `NG-01`, priorizou o sistema operacional completo
+do Cabanhas hoje e moveu Sentry/API completo para backlog futuro.
 **Ownership:** `NG-01–04`, `NG-09`, `NG-14–15`.
 
 ## Integração Git
@@ -22,9 +24,11 @@
 | Acesso Vercel | confirmado | CLI autenticada no escopo `vinigehlens-projects` |
 | BFF/API e domínios | congelado | doc 15 §4 + implementação allowlisted |
 | Banco/impressão | aceito para integração | `docs/go-live/contratos-cc.md` |
-| Jurídico e operador Cabanhas | pendente | ata NG-01 §4 |
+| PM/NG-01 | fechado | PM assumiu `NG-01` em 2026-09-11; pendências movidas para `NG-14`/`NG-15` |
+| Jurídico amplo e operador Cabanhas | não bloqueiam `NG-01` | jurídico amplo pós-corte; operador/sign-off no `NG-15` |
 
-`ZG-0` continua amarelo até jurídico e operador estarem nomeados/aceitos.
+`ZG-0`/`NG-01` ficam verdes para o piloto operacional. O corte ainda depende de
+`NG-02/03/04/09/14/15` no domínio final do Cabanhas.
 
 ## R1 — NG-02 e frontend de NG-04
 
@@ -121,8 +125,9 @@ ativa. A validação usou `vercel curl` autenticado. O HSTS visto nos domínios 
 é header da plataforma Vercel; HSTS nos domínios finais de `molho.live` continua pendente
 até TLS/DNS autorizados.
 
-`NG-14` continua sem promoção pública: faltam anexar domínios finais/DNS somente após
-`ZG-5`, registrar aceite jurídico/e-mail e executar o dry run.
+`NG-14` passa a focar o corte operacional do Cabanhas: `app.molho.live` e
+`cabanhas-bbq.molho.live`. Site institucional `molho.live`/`www`, revisão jurídica ampla
+e Sentry completo ficam pós-corte se o PM mantiver o aceite de risco.
 
 Em 11/09/2026, o primeiro redeploy remoto pós-merge revelou que o Turbo na Vercel não
 repassava as variáveis declaradas no projeto para `next build`, fazendo o storefront
@@ -156,9 +161,11 @@ API técnica no mesmo fechamento: `GET https://molho-api.fly.dev/ready` → HTTP
 
 ## R5 — NG-15
 
-Checklist operacional preparado em `docs/go-live/checklist-dry-run-cabanhas.md`. Nenhum
-tenant foi publicado e `channel.storefront` não foi habilitado. O dry run físico e os
-aceites continuam pendentes; `NG-15` permanece vermelho.
+Checklist operacional preparado em `docs/go-live/checklist-dry-run-cabanhas.md` e
+atualizado para a janela de 11/09/2026. O objetivo é validar o sistema completo do
+Cabanhas — cardápio clientes, checkout, balcão/pedidos/gestão, WhatsApp, impressão e
+fallback. `channel.storefront` só deve ser publicado depois de domínio final, dados reais
+e backoffice passarem no pré-voo.
 
 ## Gate final da árvore candidata
 
@@ -188,5 +195,5 @@ Após o descope de Sentry no piloto e o commit `54d9e37`, os gates foram repetid
 | GitHub PR #73 | merged — React Doctor verde; `quality` passou lint/typecheck/test/build/storybook e seguia no contraste quando o merge entrou; Worker externo `molho-uploads` falhou fora de escopo | 2026-09-11 |
 
 O gate de código/fronts está verde. O E2E integral da API continua registrado na trilha CC;
-o RC Vercel pode ser gerado sem DSN Sentry no piloto, mantendo NG-08 como risco aceito e
-não como alerta real entregue.
+o RC Vercel pode ser gerado sem DSN Sentry no piloto, mantendo `NG-08` como backlog futuro
+e risco aceito, não como alerta real entregue.

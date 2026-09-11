@@ -663,3 +663,203 @@ setados. `DIRECT_URL` = role `app_migrator`, que agora tem `BYPASSRLS`
 - NG-11: fan-out SSE cross-instância com as 2 máquinas ativas;
 - NG-12: rollback real;
 - impressão física 60 min.
+
+## Fase 0 — preflight janela 5h (11/09/2026)
+
+- `NG-01` aceito pelo PM (11/09/2026); `NG-08` confirmado backlog futuro/pós-piloto, não
+  bloqueia o piloto de hoje.
+- `origin/main` = local, sem divergência (`ee0276a`), `git status` limpo além dos docs em
+  edição.
+- `curl https://molho-api.fly.dev/ready` → HTTP 200, `{"status":"ready","db":"ok","redis":"ok"}`.
+- Três deployments Vercel Ready (`vercel inspect`):
+  - storefront `molho-storefront-prod-4kh9wk2pk-vinigehlens-projects.vercel.app`
+  - backoffice `molho-backoffice-prod-4k131l9py-vinigehlens-projects.vercel.app`
+  - site `molho-site-ahb1yatb5-vinigehlens-projects.vercel.app`
+
+Preflight concluído. Próximo: Fase 1 (NG-14 domínios/DNS finais do sistema operacional
+Cabanhas), site institucional fora do escopo de hoje.
+
+## Fase 1 — NG-14 domínios/DNS (11/09/2026)
+
+- DNS Cloudflare (`molho.live`, zona third-party): `app.molho.live` e `cabanhas-bbq.molho.live`
+  criados como CNAME pros hosts recomendados pela Vercel
+  (`40e1901676236d08.vercel-dns-017.com` e `790b98515474f389.vercel-dns-017.com`), proxy
+  desligado (DNS only); `api.molho.live` CNAME pro Fly (`pezm29k.molho-api.fly.dev`).
+- Domínios anexados aos projetos certos via `vercel domains add` (`app.molho.live` →
+  `molho-backoffice-prod`, `cabanhas-bbq.molho.live` → `molho-storefront-prod`).
+- Cert TLS não emitiu automaticamente dentro da janela normal (~25min); CAA e DNSSEC
+  descartados como causa (CAA libera `letsencrypt.org`, sem DNSSEC). Forçado com
+  `vercel certs issue <domain>` — emitido em segundos pros dois.
+- Após emissão, domínios responderam `DEPLOYMENT_NOT_FOUND` (404) porque não havia alias
+  explícito pro deployment de produção mais recente. Corrigido com
+  `vercel alias set <deployment> <domain>` pros dois projetos.
+- Fly: `fly certs show api.molho.live -a molho-api` → `Issued`, `Certificate is verified
+  and active`.
+
+**Checks finais:**
+- `curl -I https://app.molho.live/login` → HTTP 200
+- `curl -I https://cabanhas-bbq.molho.live/` → HTTP 200
+- `curl https://api.molho.live/ready` → HTTP 200, `db=ok`, `redis=ok`
+
+`NG-14` (escopo operacional Cabanhas) verde. `molho.live`/`www` institucional seguem fora
+do corte de hoje, sem trabalho adicional. Próximo: Fase 2 (`NG-02` tenant por subdomínio no
+domínio final).
+
+## Fase 2 — NG-02 tenant por subdomínio (11/09/2026)
+
+- `cabanhas-bbq.molho.live/` resolve tenant pelo host, sem `/{slug}` na URL pública; CSP
+  presente no header.
+- `app.molho.live` resolve backoffice (`<title>Molho · Painel</title>`), não vira tenant.
+- `api.molho.live` não resolve HTML de tenant (API pura).
+- Rota profunda (`/carrinho`) responde.
+- **Achado durante a validação, não é bug da app:** tenant inexistente devolve HTTP 200 em
+  vez de 404 — bug upstream do Next.js 15.5.24 em `next start` (`notFound()` programático
+  não seta status), reproduzido isolado sem depender de middleware/fetch/lógica de tenant.
+  Detalhe completo e decisão do PM (não bloqueia o piloto, débito aberto não-bloqueante) em
+  `docs/07-aprendizados.md`. Não afeta o Cabanhas real: quando o tenant existir, a página
+  certa carrega com 200 correto.
+
+`NG-02` verde para o escopo operacional de hoje. Próximo: Fase 3 (`NG-03` BFF/CORS no
+domínio final).
+
+## Fase 3 — NG-03 BFF e CORS (11/09/2026)
+
+- `/api/store/cabanhas-bbq/admin/orders` → 404 `route_not_found` (rejeitado pelo BFF, nunca
+  bate no upstream).
+- `/api/store/cabanhas-bbq/../platform/tenants` e traversal `%2e%2e` → 404 antes do upstream.
+- `/api/store/cabanhas-bbq` (rota pública normal) → 404 `Not Found`/`Loja não encontrada`,
+  mas esse é o **upstream real** respondendo (tenant ainda não provisionado, Fase 6) — não é
+  rejeição do BFF; confirmado comparando o corpo (`route_not_found` vs `Not Found` da API).
+- `Authorization`/`Cookie` enviados pelo browser não voltam ecoados na resposta.
+- CORS da API: `Origin: https://app.molho.live` → `access-control-allow-origin` exato;
+  origin fora da allowlist → sem header de CORS (bloqueado).
+
+`NG-03` verde para o escopo operacional de hoje. Próximo: Fase 4 (`NG-04` URLs
+produtivas/slug).
+
+## Fase 4 — NG-04 URLs produtivas e slug (11/09/2026)
+
+- `pnpm verify:front-release` reutilizado: já verde em `main@1d20f96` (409 artefatos, zero
+  endpoint proibido, ver `docs/go-live/evidencias-codex.md`) — é o SHA técnico servindo os
+  domínios agora; `ee0276a` (main atual) só adiciona docs em cima dele, sem rebuild
+  necessário.
+- Spot-check ao vivo em `https://app.molho.live/`: zero ocorrência de
+  `api.staging`/`staging-app`/`molho.vercel.app`/`localhost:<porta>` no HTML servido.
+
+`NG-04` verde para o escopo operacional de hoje. Próximo: Fase 5 (`NG-09` CSP/HSTS/headers
+finais).
+
+## Fase 5 — NG-09 CSP, HSTS, headers finais (11/09/2026)
+
+- `app.molho.live/login` e `cabanhas-bbq.molho.live/`: CSP em enforcement (sem `https:`,
+  `ws:`, `wss:` genérico), R2 allowlisted só onde necessário, `connect-src` do backoffice
+  cobre `https://molho-api.fly.dev` (API técnica usada hoje pelo browser; migrar pra
+  `api.molho.live` fica registrado como próximo passo, não bloqueia), HSTS ativo,
+  `x-frame-options: DENY`, `x-content-type-options: nosniff`,
+  `referrer-policy: strict-origin-when-cross-origin`, `permissions-policy` presentes.
+- `api.molho.live/ready`: headers defensivos presentes; CSP era report-only genérico
+  (esperado, API não serve HTML de produto) e **faltava HSTS** — TLS já validado
+  (`fly certs show` → `Issued`/verified), então decisão do PM (11/09/2026): ligar
+  `MOLHO_ENABLE_HSTS=true` agora. Aplicado via `fly secrets set MOLHO_ENABLE_HSTS=true -a
+  molho-api`, rolling deploy 2/2 máquinas saudáveis, confirmado
+  `strict-transport-security: max-age=15552000; includeSubDomains` no `/ready` e API
+  continua respondendo `db=ok`/`redis=ok`.
+
+`NG-09` verde para o escopo operacional de hoje. Próximo: Fase 6 (`NG-15` tenant real e dry
+run).
+
+## PARA O CODEX — handoff: login cai no reload + botões editar/remover somem (11/09/2026)
+
+Dois problemas reais achados pelo PM/operador testando o backoffice em produção,
+`app.molho.live`, durante o provisionamento do tenant Cabanhas. Ambos em área
+exclusiva do Codex (`apps/backoffice/**`) — CC só fez o hotfix de urgência abaixo
+e a correção de env; precisa de olho do Codex pro resto.
+
+### 1. Sessão cai a cada reload — devia durar o turno inteiro
+
+**Esperado (já é o desenho, ver `docs/09b-auth-backoffice.md`):** login uma vez no
+início do turno; access token de ~15min renova sozinho via refresh cookie
+`__Host-molho_refresh` (`HttpOnly`, 30 dias deslizante, rotação a cada uso);
+staff só desloga de verdade no fim do expediente/logout manual ou se a máquina
+ficar muito tempo sem uso.
+
+**O que estava quebrado:** `NEXT_PUBLIC_API_URL` do projeto Vercel
+`molho-backoffice-prod` apontava pra `https://molho-api.fly.dev` (URL técnica) em
+vez de `https://api.molho.live`. O cookie de refresh é `__Host-` (host-only, sem
+`Domain`) setado em `api.molho.live` — indo pro domínio `fly.dev`, o browser nunca
+manda o cookie, `refreshStaffSession()` (`apps/backoffice/lib/staff-auth.ts:130`)
+sempre toma 401 e o `gestor/layout.tsx` redireciona pro `/login` a cada reload.
+
+**CC já corrigiu e reemitiu:** `NEXT_PUBLIC_API_URL=https://api.molho.live` (era
+regressão de um hotfix anterior do próprio CC, não bug pré-existente). Redeploy
+`dpl_HQWEHrfKvvqH9TayVZEgUxfKpdHP`, READY, alias `app.molho.live` atualizado; CSP
+`connect-src` confirmado incluindo `https://api.molho.live`.
+
+**Ainda não verificado ao vivo** (rate limit de OTP durante o teste — "Muitos
+pedidos de código, aguarde um pouco"): confirmar no navegador real que um reload
+em `/gestor/*` **não** cai mais pro `/login`. Se ainda cair, o próximo suspeito é
+CORS/cookie do lado da API (`MOLHO_CORS_ORIGINS`, `SameSite`, ou o endpoint
+`/v1/auth/refresh` não aceitando `credentials: include` de `app.molho.live`).
+
+**Pendência de produto, não só bug:** o desenho atual é "sessão dura enquanto o
+refresh cookie for usado" (rotação, 30 dias), **sem timeout de inatividade
+explícito**. O PM quer logout automático depois de ~1h sem uso (tablet/PC de
+balcão compartilhado). Isso não existe hoje — precisa decisão + implementação
+(client-side idle timer que chama logout, ou TTL curto no próprio refresh
+quando ocioso).
+
+### 2. Preço/badge/botões editar-remover somem inteiros em `/gestor/cardapio`
+
+**Não é o mesmo bug que o CC já corrigiu** (aquele era overflow de coluna reservada
+pro painel lateral — corrigido, commit `d4bb364`, confirmado no bundle de produção
+via `curl`). Isso é diferente: no navegador real do operador, a linha do item mostra
+só ícone+nome+categoria+descrição — nem preço, nem badge "à venda", nem os ícones
+lápis/lixeira aparecem, **mesmo depois do hard refresh** e mesmo com o hotfix de
+grid já no ar. Testado com zoom in/out e modo responsivo do DevTools, sem efeito.
+
+Não reproduzido pela sessão de automação do CC (lá os botões aparecem normal). Ou
+seja: depende de alguma condição do ambiente/sessão real do operador que a
+automação não reproduziu — candidatos a investigar:
+- erro JS no console do navegador do operador (não coletado ainda — pedir print
+  da aba Console);
+- alguma extensão de browser do operador escondendo elementos por herurística
+  (ad-blocker/privacy);
+- diferença de viewport real (a automação testou em ~1400-1980px; conferir a
+  resolução real da máquina do operador);
+- efeito colateral do próprio bug de sessão acima (se o token expirou no meio do
+  carregamento, a lista pode renderizar com dado parcial sem erro visível).
+
+**Reprodução relatada:** `app.molho.live/gestor/cardapio`, item da lista mostra
+nome+descrição, mas a faixa à direita (preço, badge, editar, remover) fica em
+branco — não sobrepõe, não estoura a tela, simplesmente não renderiza.
+
+**Efeito prático:** operador não consegue excluir nem pausar item nenhum pelo
+backoffice hoje. Ficaram 3 itens de exemplo do trial (`X-Salada da casa`, `Batata
+crocante`, `Refrigerante lata`) no cardápio do Cabanhas sem conseguir remover.
+
+### Ownership
+
+CC mexeu em `apps/backoffice/app/gestor/cardapio/page.tsx` (só o fix de grid,
+commit `d4bb364`) e nas env vars do Vercel (`MOLHO_ASSETS_ORIGIN`,
+`NEXT_PUBLIC_API_URL`) por urgência de horário — fora do padrão de ownership do
+doc 15, registrando aqui pro Codex revisar/assumir dono formal dessas mudanças.
+
+## Hotfix — grid do cardápio espremendo botões editar/remover (11/09/2026)
+
+- Achado durante provisionamento real do tenant: em `app.molho.live/gestor/cardapio`, a
+  grid reservava coluna fixa de 420-520px pro painel lateral mesmo com nenhum item
+  selecionado, empurrando os botões editar/remover pra fora da área visível em telas
+  xl/2xl (confirmado com zoom e modo responsivo do DevTools — não resolveu).
+- Fix: `apps/backoffice/app/gestor/cardapio/page.tsx` — a 3ª coluna só entra no
+  `grid-template-columns` quando `creatingProduct || selectedProductId` é truthy.
+  Commit `d4bb364` em `main`, branch `hotfix/cardapio-grid-overflow` (merge --ff-only).
+- Gate: `tsc --noEmit` limpo, `eslint` limpo, `next build` verde, `vitest` 246/246
+  (backoffice), incluindo os 23 casos de `cardapio/page.test.tsx`.
+- Achado colateral: `MOLHO_ASSETS_ORIGIN` e `NEXT_PUBLIC_API_URL` no projeto
+  `molho-backoffice-prod` são variáveis "Sensitive" do Vercel — sempre voltam vazias em
+  `vercel env pull`/build local por design (não são um bug; só o build remoto da Vercel
+  consegue lê-las). Build local falhou por causa disso; build remoto (`vercel deploy
+  --prod` sem `--prebuilt`) resolveu certo.
+- Deploy: `vercel deploy --prod` a partir de `apps/backoffice` (build remoto, cache
+  Turborepo), deployment `dpl_9BzAfNcnkLUTQ3z4tkizJk6PBPgS`, `status: Ready`, alias
+  automático em `app.molho.live` confirmado (`/gestor/cardapio` HTTP 200).

@@ -1,10 +1,13 @@
 # Divisão paralela — Zero NO-GO entre Codex e CC
 
 **Data-base:** 09/09/2026
-**Última atualização Codex:** 10/09/2026
+**Última atualização Codex:** 11/09/2026
 **Plano mestre:** `docs/14-plano-zero-no-go.md`
 **Publicação:** `docs/13-plano-go-live-producao-cabanhas.md`
 **Objetivo:** executar `NG-01` a `NG-15` no menor caminho crítico possível, com exatamente duas trilhas técnicas e sem conflito de arquivos.
+**Prioridade operacional de 11/09/2026:** colocar no ar o sistema completo do Cabanhas
+hoje — cardápio para clientes, checkout, balcão/pedidos/gestão, WhatsApp, impressão e
+fallback. O site institucional `molho.live`/`www` não é prioridade desta janela.
 
 ## 1. Papéis
 
@@ -14,7 +17,7 @@ Responsável por:
 
 - storefront e resolução de tenant por domínio;
 - BFF público e E2E de navegador;
-- site, backoffice, URLs, metadata e headers dos fronts;
+- storefront Cabanhas, backoffice, URLs, metadata e headers dos fronts;
 - configuração e telemetria dos fronts;
 - projetos Vercel e release candidate dos fronts;
 - coordenação de decisões, jurídico, Cabanhas e matriz de evidências;
@@ -27,7 +30,7 @@ Responsável por:
 - API, contratos e Prisma;
 - configuração fail-fast do backend;
 - credencial e operação do agente de impressão;
-- readiness, Sentry da API, scrubbing e alertas técnicos;
+- readiness, fallback operacional, scrubbing e alertas técnicos futuros;
 - Neon, Upstash Redis, R2 e Fly.io;
 - migrations, restore, cross-instance e rollback da API;
 - suporte técnico ao dry run.
@@ -37,11 +40,12 @@ Responsável por:
 Alguns resultados não podem ser autoaprovados por nenhum agente:
 
 - PM decide slug, checkout guest, pagamentos, backup/plano e domínio de assets;
-- jurídico aprova termos, privacidade e DPA;
 - Cabanhas aprova dados, cardápio, PIX, operação e teste físico;
 - responsável técnico autoriza o corte e assume o plantão.
 
-Esses gates pertencem a `NG-01`, `NG-14` e `NG-15`. Os agentes preparam e coletam evidências, mas não substituem o aceite humano.
+O PM assumiu `NG-01` em 11/09/2026. Juridico/Sentry completos ficam pós-piloto se ainda
+não estiverem fechados; não bloqueiam o corte operacional do Cabanhas. Os agentes preparam
+e coletam evidências, mas não substituem o aceite humano do PM/Cabanhas no `NG-15`.
 
 ## 2. Ownership dos NO-GO
 
@@ -54,18 +58,82 @@ Esses gates pertencem a `NG-01`, `NG-14` e `NG-15`. Os agentes preparam e coleta
 | `NG-05` | CC | Codex valida envs dos fronts | fail-fast de configuração |
 | `NG-06` | CC | Codex valida UI/fluxo | credencial de dispositivo e impressão |
 | `NG-07` | CC | — | liveness/readiness reais |
-| `NG-08` | CC | Codex conecta os fronts | Sentry, alertas e PII scrubbing |
+| `NG-08` | CC | Codex conecta os fronts | backlog futuro: Sentry/alertas completos pós-piloto |
 | `NG-09` | Codex | CC fornece origins/telemetria | CSP enforcement, HSTS e headers |
 | `NG-10` | CC | — | Neon, roles, RLS e restore 30 dias |
 | `NG-11` | CC | — | Redis produtivo e cross-instance |
 | `NG-12` | CC | Codex consome URL técnica | Fly produtiva e rollback |
 | `NG-13` | CC | Codex testa upload pelo backoffice | R2 produtivo e domínio de assets |
-| `NG-14` | Codex | CC valida e-mail/API | Vercel, site, e-mail e legal |
-| `NG-15` | Codex | CC opera backend/infra no teste | dry run e sign-off final |
+| `NG-14` | Codex | CC valida e-mail/API | Vercel e domínios operacionais do Cabanhas |
+| `NG-15` | Codex | CC opera backend/infra no teste | sistema operacional completo e sign-off final |
 
 Um DRI responde pela conclusão e evidência do item, mesmo quando há contribuição da outra trilha.
 
-## 3. Fronteiras de arquivos
+## 3. Plano CC — corte operacional Cabanhas hoje
+
+Este bloco substitui a leitura antiga de “Zero NO-GO perfeito” por uma janela objetiva de
+produção assistida do restaurante. A meta não é lançar o institucional do Molho; é deixar o
+Cabanhas operando com o Molho em produção.
+
+### Escopo que entra hoje
+
+- loja pública `https://cabanhas-bbq.molho.live`;
+- backoffice/gestão em `https://app.molho.live`;
+- API produtiva Fly, preferencialmente também validada em `https://api.molho.live`;
+- cardápio real aprovado, preços, disponibilidade, horários, zonas, mínimo e pagamentos;
+- checkout com OTP, PIX estático/dinheiro/cartão na entrega;
+- balcão/pedidos/gestão: fila, detalhe, mudança de status e acompanhamento;
+- WhatsApp click-to-chat humano;
+- impressão real e fallback operacional;
+- evidências sanitizadas e sign-off PM/Cabanhas/técnico.
+
+### Fora do caminho crítico de hoje
+
+- site institucional `molho.live` e `www`;
+- marketing/CTA público do Molho;
+- domínio próprio de assets;
+- Sentry/API e suite completa de alertas (`NG-08`) — backlog futuro aprovado pelo PM;
+- melhorias não necessárias para operar o primeiro restaurante.
+
+### Ordem executável
+
+1. Atualizar `origin/main`, confirmar CI verde e RCs técnicos READY.
+2. Marcar `NG-01` como verde por aceite do PM e `NG-08` como backlog futuro nos docs de
+   evidência.
+3. Criar/promover os domínios operacionais:
+   - `cabanhas-bbq.molho.live` → `molho-storefront-prod`;
+   - `app.molho.live` → `molho-backoffice-prod`;
+   - `api.molho.live` → Fly `molho-api`, se o certificado validar a tempo; caso contrário,
+     manter a API técnica `https://molho-api.fly.dev` no runtime já implantado e registrar
+     a pendência do alias final.
+4. Validar TLS e headers finais nos domínios operacionais.
+5. Provisionar o tenant Cabanhas pelo fluxo real; não copiar seed, cliente, sessão, pedido
+   ou auditoria de staging.
+6. Conferir dados operacionais:
+   - CNPJ/endereço/coordenadas;
+   - cardápio, complementos, preços em centavos e disponibilidade;
+   - horários, zonas, taxas e mínimo;
+   - PIX/instruções e formas de pagamento aceitas;
+   - módulos ativos por `entitled AND enabled AND released`.
+7. Publicar `channel.storefront` somente depois do pré-voo do domínio e dados.
+8. Executar dry run assistido usando `docs/go-live/checklist-dry-run-cabanhas.md`.
+9. Se passar, registrar sign-off e marcar `NG-02/03/04/09/14/15` conforme evidência; se
+   falhar, manter NO-GO pontual com causa objetiva e rollback.
+
+### Critérios mínimos para GO operacional
+
+- cliente abre `https://cabanhas-bbq.molho.live` em Wi‑Fi e 4G;
+- checkout cria pedido real de teste com OTP;
+- pedido aparece no gestor em até 3 s;
+- operador consegue aceitar/mudar status no backoffice;
+- WhatsApp abre o contato correto;
+- ticket imprime uma vez;
+- recuperação funciona após restart/rede/impressora;
+- logs/evidências não expõem PII;
+- rollback Vercel/Fly identificado e pronto;
+- PM, técnico e operador Cabanhas assinam GO.
+
+## 4. Fronteiras de arquivos
 
 ### Exclusivos do Codex
 
@@ -100,7 +168,7 @@ Um DRI responde pela conclusão e evidência do item, mesmo quando há contribui
 
 Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita de handoff.
 
-## 4. Contratos de integração congelados antes dos PRs
+## 5. Contratos de integração congelados antes dos PRs
 
 ### BFF/API
 
@@ -139,7 +207,7 @@ Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita 
 - nenhum token de staff fixo;
 - URL da API obrigatória, sem default de staging.
 
-## 5. Ondas paralelas
+## 6. Ondas paralelas
 
 ### Onda 0 — desbloqueio
 
@@ -264,7 +332,7 @@ Nenhum agente edita arquivo pertencente à outra trilha sem mensagem explícita 
 
 Nenhum dos dois aponta DNS ou habilita `channel.storefront` nesta onda. Isso pertence ao plano de publicação depois de `ZG-5`.
 
-## 6. Ordem de merge
+## 7. Ordem de merge
 
 | Ordem | Entrega | Condição |
 |---|---|---|
@@ -281,7 +349,7 @@ Nenhum dos dois aponta DNS ou habilita `channel.storefront` nesta onda. Isso per
 
 Entregas independentes podem abrir PR simultaneamente, mas entram nessa ordem para reduzir rebases e tornar o SHA candidato reproduzível.
 
-## 7. Estratégia de branches e worktrees
+## 8. Estratégia de branches e worktrees
 
 - Codex trabalha em `codex/no-go-front-release`;
 - CC trabalha em `cc/no-go-backend-infra`;
@@ -303,7 +371,7 @@ requisitos externos de produção ainda bloqueiam o RC.
 
 Se ambos precisarem alterar `pnpm-lock.yaml`, C1/C2 entra primeiro; Codex rebasa, reaplica sua dependência e regenera o lockfile uma única vez.
 
-## 8. Handoff obrigatório por entrega
+## 9. Handoff obrigatório por entrega
 
 Cada entrega R*/C* deve informar:
 
@@ -323,7 +391,7 @@ Próximo ponto de integração:
 
 CC registra evidência em `docs/go-live/evidencias-cc.md` ou mensagem de handoff. Somente Codex marca a matriz central de `docs/14-plano-zero-no-go.md`.
 
-## 9. Gates de qualidade
+## 10. Gates de qualidade
 
 Cada PR roda seus testes focados. A branch de integração, após cada onda, roda:
 
@@ -345,7 +413,7 @@ Antes de `ZG-5`, executar também:
 - teste de alertas e scrubbing;
 - varredura por URLs/credenciais de staging.
 
-## 10. Quadro de acompanhamento
+## 11. Quadro de acompanhamento
 
 | Entrega | DRI | Depende de | Estado (10/09/2026) |
 |---|---|---|---|
@@ -614,7 +682,95 @@ Depois do descope de Sentry no piloto e do commit `54d9e37`:
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 
-## 11. Caminho crítico esperado
+## 11.1 Plano de execução imediato — janela de 5 horas (11/09/2026)
+
+**Meta única:** sistema operacional completo do Cabanhas (cardápio clientes + checkout +
+balcão/pedidos/gestão) em produção em até 5 horas a partir de agora. Site institucional
+`molho.live` não é prioridade desta janela — RC técnico já READY basta, sem mais trabalho
+nele hoje.
+
+`main` atual: `ee0276a`. `NG-01` verde por aceite do PM. `NG-08` é backlog futuro/pós-piloto
+e não bloqueia. Nenhuma feature nova — só corte, validação e evidência. Não publicar
+`channel.storefront` antes do dry run e do GO final.
+
+RCs técnicos prontos:
+- Storefront: `https://molho-storefront-prod-4kh9wk2pk-vinigehlens-projects.vercel.app`
+- Backoffice: `https://molho-backoffice-prod-4k131l9py-vinigehlens-projects.vercel.app`
+- Site: `https://molho-site-ahb1yatb5-vinigehlens-projects.vercel.app`
+- API técnica: `https://molho-api.fly.dev`
+
+### Fase 0 — preflight (~15 min)
+
+1. atualizar local para `origin/main`; `git status` limpo;
+2. `curl https://molho-api.fly.dev/ready` → esperado `db=ok`, `redis=ok`;
+3. confirmar os três deployments Vercel acima como READY;
+4. registrar em `docs/go-live/evidencias-cc.md` que `NG-01` foi aceito pelo PM e `NG-08`
+   virou backlog futuro.
+
+### Fase 1 — NG-14 domínios e DNS (~60 min, inclui espera de certificado)
+
+Apontar somente os domínios do sistema operacional:
+
+- `app.molho.live` → `molho-backoffice-prod`;
+- `cabanhas-bbq.molho.live` → `molho-storefront-prod`;
+- `api.molho.live` → Fly `molho-api` (validar instrução exata com
+  `fly certs show api.molho.live -a molho-api` antes de criar/editar registro).
+
+`molho.live`/`www` (site institucional) ficam fora desta janela — não apontar hoje.
+
+DNS via `CNAME` para Vercel nos subdomínios; sem wildcard. Esperar certificados válidos e
+`api.molho.live` sair de `Not verified`.
+
+**Aceite:** `https://app.molho.live/login`, `https://cabanhas-bbq.molho.live` e
+`https://api.molho.live/ready` (`db=ok`, `redis=ok`) respondem.
+
+### Fase 2 — NG-02 tenant por subdomínio (~20 min)
+
+- `curl -I https://cabanhas-bbq.molho.live` resolve tenant `cabanhas-bbq`;
+- URL pública sem `/{slug}`; canonical/OG/manifest/sitemap apontam para o host final;
+- `app`, `api`, `www`, `staging` não resolvem como tenant.
+
+### Fase 3 — NG-03 BFF e CORS final (~20 min)
+
+- browser chama storefront same-origin, não API direta;
+- `/api/store/cabanhas-bbq/admin/orders` → 404/403;
+- admin/plataforma não proxyados; traversal/query proibida rejeitada; cookies/Authorization
+  do browser não repassados;
+- `TRUSTED_PROXY_HOPS`/IP real Vercel → Fly no rate limit;
+- CORS da API libera só `https://app.molho.live`.
+
+### Fase 4 — NG-04 URLs produtivas e slug estável (~15 min)
+
+- backoffice copia/exibe `https://cabanhas-bbq.molho.live`;
+- nenhum bundle aponta `api.staging`, `staging-app`, `localhost`;
+- slug `cabanhas-bbq` imutável; `pnpm verify:front-release` verde.
+
+### Fase 5 — NG-09 CSP, HSTS e headers finais (~15 min)
+
+`curl -I` em `https://app.molho.live/login`, `https://cabanhas-bbq.molho.live`,
+`https://api.molho.live/ready`: CSP enforcement sem `https:`/`ws:`/`wss:` genérico, R2
+permitido só onde necessário, `connect-src` do backoffice cobre a API final, HSTS após TLS
+OK, `x-frame-options`/`x-content-type-options`/`referrer-policy`/`permissions-policy`
+presentes.
+
+### Fase 6 — NG-15 tenant real e dry run (~90–120 min)
+
+Seguir `docs/go-live/checklist-dry-run-cabanhas.md`: provisionar tenant real, conferir
+cardápio aprovado, configurar PIX estático/dinheiro/cartão na entrega, parear
+impressora/agente, manter `channel.storefront` fechado até validação final, rodar jornada
+completa em Wi-Fi e 4G (catálogo, carrinho, OTP, checkout, tracking, gestor, WhatsApp
+fallback, impressão por 60 min, restart/reconexão, fan-out SSE nas duas máquinas, rollback
+drill, logs sem PII), registrar sign-off PM + Cabanhas + técnico.
+
+### Entrega final
+
+Atualizar `docs/14-plano-zero-no-go.md`, este documento, `docs/go-live/evidencias-cc.md`,
+`docs/go-live/evidencias-codex.md` (se mexer em fronts) e `docs/go-live/ata-ng-01.md` (se
+registrar aceite humano). Resultado esperado: `NG-01/02/03/04/09/14/15` verdes, `NG-08`
+backlog futuro, `ZG-5` aprovado — ou, se algo falhar no dry run, manter NO-GO com evidência
+objetiva. Site institucional `molho.live` permanece pós-corte, sem trabalho adicional hoje.
+
+## 12. Caminho crítico esperado
 
 O caminho crítico provável é:
 
@@ -637,10 +793,10 @@ Referência de capacidade, não compromisso de prazo:
 
 Não reduzir testes, restore, jurídico ou dry run para recuperar atraso.
 
-## 12. Prompt do CC
+## 13. Prompt do CC
 
 > Você é o DRI da trilha backend/infra do Plano Zero NO-GO. Leia integralmente `AGENTS.md`, `docs/01-plano-produto.md`, `docs/02-definicoes-v1.md`, `docs/03-self-setup.md`, `docs/07-aprendizados.md`, `docs/14-plano-zero-no-go.md` e `docs/15-divisao-zero-no-go-codex-cc.md`. Trabalhe somente nos pacotes C0–C6 e respeite o ownership de arquivos. Comece por C0/C1; contratos e Prisma precedem API e agente. Não edite storefront/site nem a matriz central, não use seed em produção, não reutilize recursos de staging e não exponha segredos. Entregue cada pacote com o template da seção 8 e pare se faltar decisão, acesso ou gate humano. Não aponte DNS nem publique `channel.storefront`.
 
-## 13. Prompt do Codex
+## 14. Prompt do Codex
 
 > Atue como release captain e DRI da trilha pública do Plano Zero NO-GO. Execute R0–R5 em `docs/15-divisao-zero-no-go-codex-cc.md`, mantenha a matriz central e integre os handoffs do CC na ordem da seção 6. Não edite API, Prisma, contratos ou agente de impressão; combine interfaces antes dos PRs. Faça roteamento, BFF, URLs, fronts, CSP, Vercel, coordenação humana e dry run. Rode os gates completos após cada onda. Não aponte DNS nem publique o tenant antes de `ZG-5` 15/15 verde.
