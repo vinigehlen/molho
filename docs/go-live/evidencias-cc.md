@@ -910,3 +910,68 @@ doc 15, registrando aqui pro Codex revisar/assumir dono formal dessas mudanças.
 - Deploy: `vercel deploy --prod` a partir de `apps/backoffice` (build remoto, cache
   Turborepo), deployment `dpl_9BzAfNcnkLUTQ3z4tkizJk6PBPgS`, `status: Ready`, alias
   automático em `app.molho.live` confirmado (`/gestor/cardapio` HTTP 200).
+
+## PARA O CODEX — handoff: separar Git de staging/prod na Vercel (11/09/2026)
+
+Pedido do PM: hoje deploy pra produção é manual via `vercel --prod` (CLI, cada
+app na sua pasta). PM ligou o repo do GitHub ao Git Integration de um projeto
+Vercel pra testar auto-deploy, viu deploys de `Production` falharem, e
+desligou com medo de ter quebrado o domínio real. **Não quebrou** — mas o
+motivo do medo é real: a Vercel tem hoje DOIS projetos por app (um "de
+verdade", com domínio custom e env vars; um "genérico", sem env vars, criado
+em algum momento anterior) e ninguém tinha documentado a distinção. CC só
+diagnosticou; a separação estrutural (branches, env vars, promote) fica pro
+Codex.
+
+### Estado atual (mapeado via `vercel project ls` / `vercel inspect --logs`)
+
+| Projeto | Root | Domínio custom | Git conectado | Env vars produção | Status dos deploys |
+|---|---|---|---|---|---|
+| `molho-storefront-prod` (`prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW`) | `apps/storefront` | `cabanhas-bbq.molho.live` | não | completas (`MOLHO_API_INTERNAL_URL`, `MOLHO_ASSETS_ORIGIN`, `MOLHO_STOREFRONT_*`) | todos `Ready` |
+| `molho` (`prj_V88GjIl9aSMAtBnzT7ZagAHBXgHu`) | `apps/storefront` | nenhum (`*.vercel.app`) | sim (era, PM desligou) | nenhuma | `Production` sempre `Error`, `Preview` `Ready` |
+| `molho-backoffice-prod` | `apps/backoffice` | `app.molho.live` | não | completas | todos `Ready` |
+| `molho-backoffice-staging` (`prj_9hhuxHf3Dw3ISaqicJhjewLK9VU1`) | `apps/backoffice` | nenhum | sim (era) | nenhuma | `Production` sempre `Error`, `Preview` `Ready` |
+| `molho-site` | `apps/site` | `molho-site.vercel.app` (ou domínio próprio, checar) | não checado | — | `Ready` |
+
+Erro exato capturado nos deploys `Production` que falharam (via `vercel
+inspect <url> --logs`):
+- `molho`: `Error: MOLHO_API_INTERNAL_URL deve ser uma URL absoluta.` (`apps/storefront/lib/api-origin.ts:18`)
+- `molho-backoffice-staging`: `Error: MOLHO_ASSETS_ORIGIN é obrigatória no deployment produtivo.` (`packages/*/front-security.ts:39`)
+
+Confirmado: essas env vars só existem nos projetos `-prod` (`vercel env ls
+production` a partir de `apps/storefront` mostra as 5 vars, todas
+`Encrypted`, só em `Production`). Os projetos genéricos nunca as tiveram —
+por isso falham assim que alguém builda `Production` neles. O domínio real
+nunca esteve em risco porque nenhum dos dois projetos genéricos tem domínio
+custom apontado.
+
+### O que fazer (arquitetura pedida pelo PM: Git separado por ambiente)
+
+Replicar pro storefront o padrão que o backoffice já tem (dois projetos), e
+adicionar a trava de promoção que falta nos dois:
+
+1. **Storefront**: renomear/recriar `molho` como `molho-storefront-staging`
+   (mesmo root `apps/storefront`). Hoje só existe o par completo pro
+   backoffice (`-staging` + `-prod`); o storefront tem só o `-prod`.
+2. Em `Settings → Git` de cada projeto `-staging`: conectar o repo, Production
+   Branch = `main`. Deploy automático a cada push, seguro — domínio é só
+   `*.vercel.app`.
+3. Em `Settings → Git` de cada projeto `-prod`: conectar o repo, mas
+   Production Branch = uma branch protegida (ex. `production`), **não**
+   `main`. Só builda quando alguém faz `git push origin main:production` (ou
+   merge/PR pra ela) ou usa "Promote to Production" no dashboard puxando um
+   deployment já testado no staging. Isso elimina o deploy manual via CLI sem
+   dar ao `main` poder de tocar o domínio real sozinho.
+4. Copiar as env vars de produção dos projetos `-prod` pros `-staging`
+   (ajustando host/URLs pro ambiente de teste — não pode ser literalmente a
+   mesma API/DB de produção). Sem isso o `-staging` builda mas aponta pro
+   backend errado.
+5. Confirmar que o domínio custom (`cabanhas-bbq.molho.live`,
+   `app.molho.live`) está e continua só nos projetos `-prod`.
+6. Depois de validar, dá pra desativar o deploy manual via CLI (ou manter só
+   como fallback) — a promoção passa a ser o fluxo padrão.
+
+**Gate antes de considerar fechado:** um push em `main` builda o `-staging`
+sozinho e não builda nem toca o `-prod`; promover pro `-prod` (branch
+protegida ou botão "Promote") builda com as env vars certas e o domínio
+custom não muda de deployment sem essa ação explícita.
