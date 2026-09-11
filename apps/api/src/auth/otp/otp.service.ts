@@ -9,10 +9,17 @@ import type { RateLimiter } from '../../rate-limit/rate-limiter';
 
 const CODE_TTL_SECONDS = 10 * 60;
 const MAX_VERIFY_ATTEMPTS = 3;
+// Janela deslizante encurtada de 1h pra 10min (piloto Cabanhas, 11/09/2026):
+// o rate limiter registra toda tentativa (mesmo rejeitada, ver
+// RedisSlidingWindowRateLimiter.checkAndRecord) — 1h de janela fazia
+// qualquer teste/retentativa legítima (dono, staff, QA) travar por até uma
+// hora inteira atrás do mesmo IP/e-mail. 10min mantém o mesmo teto de
+// requisições (proteção contra spam de SMS/e-mail) com recuperação viável
+// pra uso humano real. Ver docs/07-aprendizados.md.
 const PHONE_LIMIT_PER_HOUR = 5;
-const PHONE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const PHONE_LIMIT_WINDOW_SECONDS = 10 * 60;
 const IP_LIMIT_PER_HOUR = 20;
-const IP_LIMIT_WINDOW_SECONDS = 60 * 60;
+const IP_LIMIT_WINDOW_SECONDS = 10 * 60;
 const COOLDOWN_SECONDS = 60;
 
 export interface OtpServiceDeps {
