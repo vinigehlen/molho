@@ -493,7 +493,7 @@ O deploy Vercel deixou de ser bloqueado por DSN Sentry ausente no piloto; a inte
 Sentry permanece pronta para quando os DSNs forem configurados, mas o RC técnico pode ser
 emitido usando API `fly.dev` e origin R2.
 
-RC técnico emitido em 11/09/2026 a partir de `main@55de6b1`:
+RC técnico inicial emitido em 11/09/2026 a partir de `main@55de6b1`:
 
 | App | URL técnica | Deployment |
 |---|---|---|
@@ -505,6 +505,23 @@ Validação via `vercel curl` autenticado: storefront `/` HTTP 200, backoffice `
 HTTP 200, site `/` HTTP 200, headers CSP/defensivos presentes. Acesso público direto
 continua protegido por SSO; `molho.live`, `app.molho.live` e
 `cabanhas-bbq.molho.live` seguem sem DNS/alias até `ZG-5`.
+
+Ao redeployar depois do merge, o build remoto da Vercel falhou uma vez no storefront
+porque o Turbo não repassava as envs do projeto para `next build` (`MOLHO_API_INTERNAL_URL`
+chegava vazia no `next.config.ts`). O PR #73 (`1d20f96`) corrigiu `turbo.json`, declarando
+as envs de build dos fronts. Depois disso, o build remoto passou e o RC técnico foi
+reemitido em 11/09/2026 a partir de `main@1d20f96`:
+
+| App | URL técnica | Deployment |
+|---|---|---|
+| storefront | `https://molho-storefront-prod-4kh9wk2pk-vinigehlens-projects.vercel.app` | `dpl_DX8ayUXhPXBXm6kce8Tjv6XwX75x` |
+| backoffice | `https://molho-backoffice-prod-4k131l9py-vinigehlens-projects.vercel.app` | `dpl_4NikxrWBLcKRMrpq8KnarL8WojBZ` |
+| site | `https://molho-site-ahb1yatb5-vinigehlens-projects.vercel.app` | `dpl_6afsu2sBEqwwG5A7HashJHKF5A6t` |
+
+Validação do RC final: storefront `/` HTTP 200; backoffice `/login` HTTP 200; site `/`
+HTTP 200; rota administrativa proibida via BFF
+`/api/store/cabanhas-bbq/admin/orders` HTTP 404; CSP e headers defensivos presentes nos
+três fronts; `GET https://molho-api.fly.dev/ready` HTTP 200 com `db=ok` e `redis=ok`.
 
 O merge do CC incorporou a troca da URL de impressão para `api.molho.live`. O scanner foi
 repetido depois do merge e examinou 428 artefatos: zero endpoint proibido e nenhuma
@@ -584,11 +601,14 @@ Depois do descope de Sentry no piloto e do commit `54d9e37`:
 | `pnpm build` | verde, Turbo 7/7 |
 | `pnpm verify:front-release` | verde, 409 artefatos e zero endpoint proibido |
 | GitHub CI em `main@55de6b1` | verde; CI + React Doctor |
+| `pnpm build` com envs públicas do RC após PR #73 | verde, Turbo 7/7 |
+| GitHub PR #73 | merged em `main@1d20f96`; React Doctor verde; `quality` passou lint/typecheck/test/build/storybook e estava no contraste no momento do merge; Worker externo `molho-uploads` falhou fora de escopo |
 
 #### Rollback e próximo ponto de integração
 
 - há RC técnico Vercel READY nos três fronts; rollback de frontend pode ser feito pela
-  Vercel para o deployment anterior de cada projeto ou por revert do commit `54d9e37`;
+  Vercel para o deployment anterior de cada projeto ou por revert dos commits `54d9e37`
+  e `1d20f96`;
 - próximo passo obrigatório: validar o RC com navegador/Playwright protegido, registrar
   aceite jurídico/e-mail e manter DSNs Sentry como pós-piloto/pendência de observabilidade;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;

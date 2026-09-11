@@ -500,7 +500,7 @@ Também executar os E2E separados de storefront/backoffice relevantes ao fluxo c
 | `NG-11` | verde | Upstash prod, `redis:ok` e restart drill registrados pela trilha CC; fan-out A/B fica no dry run |
 | `NG-12` | verde | API Fly prod `molho-api.fly.dev`, 2 máquinas/ready verdes; cert final Not verified até DNS |
 | `NG-13` | verde | R2 na origin aprovada; PUT/GET/public GET/backup bucket/cleanup comprovados |
-| `NG-14` | amarelo | RC técnico Vercel READY nos 3 fronts; falta e-mail/jurídico/sign-off e DNS/alias final após ZG-5 |
+| `NG-14` | amarelo | RC técnico Vercel READY nos 3 fronts em `main@1d20f96`; falta e-mail/jurídico/sign-off e DNS/alias final após ZG-5 |
 | `NG-15` | vermelho | checklist preparado; faltam tenant real, dry run físico e sign-off |
 
 `ZG-5` só pode ficar verde quando esta tabela estiver 15/15 verde.
