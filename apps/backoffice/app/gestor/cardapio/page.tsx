@@ -1190,7 +1190,7 @@ export default function CardapioPage() {
                   {catalogMessage}
                 </p>
               )}
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2">
                 {loadingProducts && (
                   <div className="space-y-2" aria-label="Carregando itens do cardápio">
                     {Array.from({ length: 4 }, (_, index) => (

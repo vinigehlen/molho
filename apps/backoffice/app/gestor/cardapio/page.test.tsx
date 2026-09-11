@@ -267,6 +267,19 @@ describe('CardapioPage — busca e status rápido', () => {
 });
 
 describe('CardapioPage — workspace operacional', () => {
+  it('mantém preço e ações dentro da largura disponível da lista', async () => {
+    await mount();
+
+    const row = container.querySelector<HTMLElement>('[data-product-id="prod-1"]');
+    const list = row?.parentElement;
+
+    expect(list?.className).toContain('grid-cols-[minmax(0,1fr)]');
+    expect(row?.textContent).toContain('R$\u00a095,00');
+    expect(row?.querySelector('[aria-label="Marcar como esgotado: Picanha"]')).not.toBeNull();
+    expect(row?.querySelector('[aria-label="Editar Picanha"]')).not.toBeNull();
+    expect(row?.querySelector('[aria-label="Remover Picanha"]')).not.toBeNull();
+  });
+
   it('filtra a lista pela categoria escolhida e mantém os contadores', async () => {
     const BEBIDAS = { id: 'cat-2', name: 'Bebidas', sortOrder: 1, visible: true, version: 0 };
     const SUCO = {
