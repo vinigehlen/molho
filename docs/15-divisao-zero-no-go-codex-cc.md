@@ -456,17 +456,17 @@ Operações externas já executadas no escopo `vinigehlens-projects`:
 
 | Projeto | ID | Root | Node | Estado |
 |---|---|---|---|---|
-| `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | existente; Node alinhado |
-| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | API técnica e assets gravados; Sentry pendente |
-| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | routing, API técnica e assets gravados; Sentry pendente |
+| `molho-site` | `prj_zLsTStjMPMF1thOSIMjuYEwNE4Xa` | `apps/site` | `22.x` | RC técnico READY |
+| `molho-backoffice-prod` | `prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG` | `apps/backoffice` | `22.x` | RC técnico READY |
+| `molho-storefront-prod` | `prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW` | `apps/storefront` | `22.x` | RC técnico READY |
 
 - inventário de domínios/envs em `docs/go-live/inventario-fronts-producao.md`;
 - release/rollback em `docs/go-live/runbook-release-fronts.md`;
 - `scripts/verify-front-release.mjs` exige `.next/BUILD_ID` e procura endpoints proibidos
   e a credencial legada de staff nos artefatos;
-- envs de routing, API técnica e assets foram gravados em Production; nenhum deployment,
-  domínio, alias ou DNS foi criado/alterado;
-- nenhum deployment Vercel dos projetos produtivos existe ainda;
+- envs de routing, API técnica e assets foram gravados em Production; valores inicialmente
+  criados vazios pelo CLI foram sobrescritos com `vercel env add --value --force`;
+- deployments técnicos foram criados sem domínio customizado e com Deployment Protection;
 - os deploys de staging registrados pelo CC (API v43 e backoffice staging) não incluem as
   mudanças desta branch Codex;
 - faltam apenas registro de e-mail/jurídico e os gates humanos para promoção pública; o RC
@@ -493,6 +493,19 @@ O deploy Vercel deixou de ser bloqueado por DSN Sentry ausente no piloto; a inte
 Sentry permanece pronta para quando os DSNs forem configurados, mas o RC técnico pode ser
 emitido usando API `fly.dev` e origin R2.
 
+RC técnico emitido em 11/09/2026 a partir de `main@55de6b1`:
+
+| App | URL técnica | Deployment |
+|---|---|---|
+| storefront | `https://molho-storefront-prod-k8n8uiqux-vinigehlens-projects.vercel.app` | `dpl_39M5Pr79jGgAuV7LF2bBmAeSesWG` |
+| backoffice | `https://molho-backoffice-prod-9tq778c8n-vinigehlens-projects.vercel.app` | `dpl_CFzAdv9XzM4wXTLZGfHFq4M3ZhnR` |
+| site | `https://molho-site-1uui6nkts-vinigehlens-projects.vercel.app` | `dpl_2L9zm1sgh8JrTpTDXTzXXPc9EGyk` |
+
+Validação via `vercel curl` autenticado: storefront `/` HTTP 200, backoffice `/login`
+HTTP 200, site `/` HTTP 200, headers CSP/defensivos presentes. Acesso público direto
+continua protegido por SSO; `molho.live`, `app.molho.live` e
+`cabanhas-bbq.molho.live` seguem sem DNS/alias até `ZG-5`.
+
 O merge do CC incorporou a troca da URL de impressão para `api.molho.live`. O scanner foi
 repetido depois do merge e examinou 428 artefatos: zero endpoint proibido e nenhuma
 ocorrência da credencial legada `MOLHO_STAFF_ACCESS_TOKEN`.
@@ -500,7 +513,7 @@ ocorrência da credencial legada `MOLHO_STAFF_ACCESS_TOKEN`.
 Para `NG-10`, `.github/workflows/pg-backup.yml` agenda `scripts/pg-backup.sh` diariamente
 às 06:17 UTC, com disparo manual, container PostgreSQL 18, concorrência única e timeout
 de 30 minutos. Os quatro Actions secrets do handoff foram configurados sem registrar
-valores. Ainda falta executar o primeiro job e o restore drill em branch Neon isolada.
+valores. A trilha CC registrou backup verde no 3º disparo e restore drill em ~17 s.
 
 #### R5 — dry run (`NG-15`)
 
@@ -561,12 +574,23 @@ Depois do merge `ba6d3b6` e do workflow `7d99098`, os gates foram novamente exec
 | `pnpm verify:front-release` | verde, 428 artefatos e zero endpoint proibido |
 | `pnpm --filter @molho/storefront test:e2e` | verde, 3/3 na árvore integrada |
 
+Depois do descope de Sentry no piloto e do commit `54d9e37`:
+
+| Comando | Resultado |
+|---|---|
+| `pnpm --filter @molho/storefront test -- front-security.test.ts` | verde; storefront 200 testes |
+| `pnpm lint` | verde |
+| `pnpm test` | verde, Turbo 10/10 |
+| `pnpm build` | verde, Turbo 7/7 |
+| `pnpm verify:front-release` | verde, 409 artefatos e zero endpoint proibido |
+| GitHub CI em `main@55de6b1` | verde; CI + React Doctor |
+
 #### Rollback e próximo ponto de integração
 
-- não há deployment produtivo para reverter; os projetos Vercel continuam vazios;
-- o rollback de código é reverter os dois commits Codex no topo de `main@efbc266`;
-- próximo passo obrigatório: gerar o RC técnico, registrar os links produtivos e manter
-  DSNs Sentry como pós-piloto/pendência de observabilidade;
+- há RC técnico Vercel READY nos três fronts; rollback de frontend pode ser feito pela
+  Vercel para o deployment anterior de cada projeto ou por revert do commit `54d9e37`;
+- próximo passo obrigatório: validar o RC com navegador/Playwright protegido, registrar
+  aceite jurídico/e-mail e manter DSNs Sentry como pós-piloto/pendência de observabilidade;
 - somente com C4/C5, jurídico e e-mail prontos deve ser criado o RC técnico sem domínio;
 - promoção, DNS e publicação do tenant permanecem proibidos até `ZG-5` 15/15 verde.
 
