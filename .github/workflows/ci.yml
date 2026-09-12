@@ -13,7 +13,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Sem `version:` — o pnpm/action-setup lê o campo `packageManager` do
       # package.json, então CI e máquina local nunca divergem.
       - uses: pnpm/action-setup@v4

@@ -21,7 +21,7 @@ jobs:
       image: postgres:18-bookworm
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Instala cliente S3
         run: |
