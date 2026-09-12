@@ -19,6 +19,21 @@ import { cartItemCount, cartStorageKey, cartSubtotalCents, emptyCart, parseStore
  * sincroniza com as outras, mas continua funcionando sozinha — degradação
  * graciosa, não erro.
  */
+/** IDs em ordem estável — a ordem de seleção do cliente não deve importar. */
+function idsOrdenados(ids: readonly string[] | undefined): string {
+  return [...(ids ?? [])].sort().join(',');
+}
+
+function mesmaLinha(a: CartItem, b: CartItem): boolean {
+  return (
+    a.productId === b.productId &&
+    a.offerId === b.offerId &&
+    a.notes === b.notes &&
+    idsOrdenados(a.modifiers.map((m) => m.id)) === idsOrdenados(b.modifiers.map((m) => m.id)) &&
+    idsOrdenados(a.removedChildIds) === idsOrdenados(b.removedChildIds)
+  );
+}
+
 export interface UseCartResult {
   cart: Cart;
   itemCount: number;
@@ -65,7 +80,15 @@ export function useCart(slug: string): UseCartResult {
 
   const addItem = React.useCallback(
     (item: CartItem) => {
-      persistirEPropagar({ ...cart, items: [...cart.items, item], updatedAt: new Date().toISOString() });
+      // Mesmo produto + mesma oferta + mesmos complementos + mesma remoção de
+      // combo + mesma observação: é o MESMO pedido, só soma quantidade em vez
+      // de virar uma segunda linha (senão "Kit Galeto, alho e óleo" vira duas
+      // linhas idênticas em vez de virar quantidade 2 na mesma linha).
+      const existing = cart.items.find((outro) => mesmaLinha(outro, item));
+      const items = existing
+        ? cart.items.map((outro) => (outro === existing ? { ...outro, quantity: outro.quantity + item.quantity } : outro))
+        : [...cart.items, item];
+      persistirEPropagar({ ...cart, items, updatedAt: new Date().toISOString() });
     },
     [cart, persistirEPropagar],
   );
