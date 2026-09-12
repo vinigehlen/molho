@@ -64,20 +64,42 @@ describe('host routing da storefront', () => {
   });
 
   it('falha cedo em deployment produtivo sem domínio, slug técnico ou com path mode', () => {
-    expect(() => storefrontRoutingConfig({ VERCEL_ENV: 'production' })).toThrow(/ROOT_DOMAIN/);
+    expect(() => storefrontRoutingConfig({ VERCEL_ENV: 'production' })).toThrow(/MOLHO_ENV/);
     expect(() =>
       storefrontRoutingConfig({
         VERCEL_ENV: 'production',
+        MOLHO_ENV: 'production',
         MOLHO_STOREFRONT_ROOT_DOMAIN: 'molho.live',
       }),
     ).toThrow(/TECHNICAL_SLUG/);
     expect(() =>
       storefrontRoutingConfig({
         VERCEL_ENV: 'production',
+        MOLHO_ENV: 'production',
         MOLHO_STOREFRONT_ROOT_DOMAIN: 'molho.live',
         MOLHO_STOREFRONT_TECHNICAL_SLUG: 'cabanhas-bbq',
         MOLHO_STOREFRONT_PATH_MODE: 'true',
       }),
     ).toThrow(/PATH_MODE/);
+  });
+
+  it('isola staging no domínio lógico de staging e na URL técnica', () => {
+    const config = storefrontRoutingConfig({
+      VERCEL_ENV: 'production',
+      VERCEL_URL: 'molho-storefront-staging.vercel.app',
+      MOLHO_ENV: 'staging',
+      MOLHO_STOREFRONT_ROOT_DOMAIN: 'staging.molho.live',
+      MOLHO_STOREFRONT_PATH_MODE: 'true',
+      MOLHO_STOREFRONT_TECHNICAL_SLUG: 'cabanhas-bbq',
+    });
+    expect(resolveTenant('molho-storefront-staging.vercel.app', '/', config)).toEqual({
+      slug: 'cabanhas-bbq',
+      mode: 'technical',
+    });
+    expect(resolveTenant('cabanhas-bbq.molho.live', '/', config)).toBeNull();
+    expect(resolveTenant('staging.molho.live', '/cabanhas-bbq', config)).toEqual({
+      slug: 'cabanhas-bbq',
+      mode: 'path',
+    });
   });
 });

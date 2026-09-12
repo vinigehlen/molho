@@ -104,24 +104,30 @@ export function publicBaseUrl(
 
 export function storefrontRoutingConfig(env: Environment = process.env): StorefrontRoutingConfig {
   const productionDeployment = env.VERCEL_ENV === 'production';
-  const rootDomain = env.MOLHO_STOREFRONT_ROOT_DOMAIN || (productionDeployment ? '' : 'molho.localhost');
+  const deployedEnvironment = env.MOLHO_ENV;
+  if (productionDeployment && deployedEnvironment !== 'staging' && deployedEnvironment !== 'production') {
+    throw new Error('Deployment publicado exige MOLHO_ENV=staging ou MOLHO_ENV=production.');
+  }
+  const published = deployedEnvironment === 'staging' || deployedEnvironment === 'production';
+  const rootDomain = env.MOLHO_STOREFRONT_ROOT_DOMAIN || (published ? '' : 'molho.localhost');
   const technicalHost = env.VERCEL_URL || null;
   const technicalSlug = env.MOLHO_STOREFRONT_TECHNICAL_SLUG || null;
   const pathMode = env.MOLHO_STOREFRONT_PATH_MODE
     ? env.MOLHO_STOREFRONT_PATH_MODE === 'true'
-    : !productionDeployment && env.NODE_ENV !== 'production';
+    : !published && env.NODE_ENV !== 'production';
 
   if (!normalizeRootDomain(rootDomain)) {
     throw new Error('MOLHO_STOREFRONT_ROOT_DOMAIN deve ser um domínio válido.');
   }
-  if (productionDeployment && rootDomain !== 'molho.live') {
-    throw new Error('Produção exige MOLHO_STOREFRONT_ROOT_DOMAIN=molho.live.');
+  const expectedRootDomain = deployedEnvironment === 'production' ? 'molho.live' : 'staging.molho.live';
+  if (published && rootDomain !== expectedRootDomain) {
+    throw new Error(`${deployedEnvironment} exige MOLHO_STOREFRONT_ROOT_DOMAIN=${expectedRootDomain}.`);
   }
-  if (productionDeployment && pathMode) {
+  if (deployedEnvironment === 'production' && pathMode) {
     throw new Error('MOLHO_STOREFRONT_PATH_MODE não pode ser ligado em produção.');
   }
-  if (productionDeployment && (!technicalSlug || !isValidStorefrontSlug(technicalSlug))) {
-    throw new Error('Produção exige MOLHO_STOREFRONT_TECHNICAL_SLUG válido para testar a URL técnica.');
+  if (published && (!technicalSlug || !isValidStorefrontSlug(technicalSlug))) {
+    throw new Error('Staging/produção exige MOLHO_STOREFRONT_TECHNICAL_SLUG válido para testar a URL técnica.');
   }
 
   return { rootDomain, pathMode, technicalHost, technicalSlug };
