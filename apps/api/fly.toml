@@ -22,6 +22,7 @@ primary_region = "gru"       # São Paulo — co-localizado com o Neon sa-east-1
 [env]
   PORT = "3333"
   NODE_ENV = "production"
+  MOLHO_ENV = "staging"
   # A guarda de produção do OTP é POR CANAL EM USO (messaging.module.ts):
   # com OTP_CHANNEL_STAFF/CUSTOMER = "email" (secrets), o boot exige
   # RESEND_API_KEY + MOLHO_EMAIL_FROM — e NÃO a ZENVIA_API_KEY.
