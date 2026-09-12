@@ -78,11 +78,41 @@ describe('useCart', () => {
     const { result } = renderHook(() => useCart(SLUG));
 
     act(() => result.current.addItem(item({ lineId: 'linha-1' })));
-    act(() => result.current.addItem(item({ lineId: 'linha-2' })));
+    act(() =>
+      result.current.addItem(
+        item({ lineId: 'linha-2', productId: '0193f1a0-0000-7000-8000-000000000003' }),
+      ),
+    );
     act(() => result.current.removeItem('linha-1'));
 
     expect(result.current.cart.items).toHaveLength(1);
     expect(result.current.cart.items[0]?.lineId).toBe('linha-2');
+  });
+
+  it('addItem do mesmo produto+complementos soma quantidade em vez de duplicar a linha', () => {
+    const { result } = renderHook(() => useCart(SLUG));
+
+    act(() => result.current.addItem(item({ lineId: 'linha-1' })));
+    act(() => result.current.addItem(item({ lineId: 'linha-2' })));
+
+    expect(result.current.cart.items).toHaveLength(1);
+    expect(result.current.cart.items[0]?.quantity).toBe(2);
+  });
+
+  it('addItem do mesmo produto com complementos DIFERENTES vira linha nova', () => {
+    const { result } = renderHook(() => useCart(SLUG));
+
+    act(() => result.current.addItem(item({ lineId: 'linha-1' })));
+    act(() =>
+      result.current.addItem(
+        item({
+          lineId: 'linha-2',
+          modifiers: [{ id: '0193f1a0-0000-7000-8000-000000000009', groupId: '0193f1a0-0000-7000-8000-00000000000a', name: 'Bacon', priceDeltaCents: 500 }],
+        }),
+      ),
+    );
+
+    expect(result.current.cart.items).toHaveLength(2);
   });
 
   it('duas "abas" (dois hooks montados) sincronizam via BroadcastChannel', async () => {
