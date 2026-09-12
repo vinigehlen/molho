@@ -5,6 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "env": [
+        "MOLHO_ENV",
         "MOLHO_API_INTERNAL_URL",
         "MOLHO_ASSETS_ORIGIN",
         "MOLHO_UPLOAD_ORIGIN",

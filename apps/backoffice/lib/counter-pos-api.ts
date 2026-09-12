@@ -4,7 +4,9 @@ import type {
   CounterOrderResponse,
   CustomerSearchResult,
 } from '@molho/contracts';
+import type { MoProductSheetModifierGroup } from '@molho/ui';
 import { apiFetch } from './api-client';
+import { fetchModifierGroups, fetchModifiers } from './catalog-api';
 
 export interface CounterCategory {
   id: string;
@@ -24,6 +26,30 @@ export interface CounterProduct {
 export interface CounterCartItem {
   productId: string;
   quantity: number;
+  /** Só os IDs escolhidos — mesmo formato do checkout (preço vem do catálogo no servidor). */
+  modifiers?: string[];
+}
+
+/** Grupos + modificadores ativos do produto, no formato que MoProductSheet espera. Vazio = pode adicionar direto, sem abrir o sheet. */
+export async function fetchProductModifierGroups(productId: string): Promise<MoProductSheetModifierGroup[]> {
+  const groups = (await fetchModifierGroups(productId)).filter((group) => group.active);
+  return Promise.all(
+    groups.map(async (group) => ({
+      id: group.id,
+      name: group.name,
+      min: group.min,
+      max: group.max,
+      modifiers: (await fetchModifiers(group.id))
+        .filter((modifier) => modifier.active !== false)
+        .map((modifier) => ({
+          id: modifier.id,
+          name: modifier.name,
+          description: modifier.description,
+          imageUrl: modifier.imageUrl,
+          priceDeltaCents: modifier.priceDeltaCents,
+        })),
+    })),
+  );
 }
 
 export async function fetchCounterCatalog(): Promise<{ categories: CounterCategory[]; products: CounterProduct[] }> {
@@ -65,7 +91,12 @@ export async function createCounterOrder(input: {
       'idempotency-key': crypto.randomUUID(),
     },
     body: JSON.stringify({
-      items: input.items.map((item) => ({ kind: 'unit', productId: item.productId, quantity: item.quantity })),
+      items: input.items.map((item) => ({
+        kind: 'unit',
+        productId: item.productId,
+        quantity: item.quantity,
+        ...(item.modifiers && item.modifiers.length > 0 ? { modifiers: item.modifiers } : {}),
+      })),
       paymentMethod: input.paymentMethod,
       // customer (cadastro completo) tem precedência; senão cai no customerName solto.
       customer: input.customer,

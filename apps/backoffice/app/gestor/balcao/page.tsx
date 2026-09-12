@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CounterOrderPaymentMethod, CounterOrderResponse } from '@molho/contracts';
 import { Minus, Plus, ReceiptText, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomerSearchResult } from '@molho/contracts';
+import { MoProductSheet, type MoProductSheetProduct, type MoProductSheetSelection } from '@molho/ui';
 import {
   createCounterOrder,
   fetchCounterCatalog,
+  fetchProductModifierGroups,
   searchCustomers,
   type CounterCategory,
   type CounterProduct,
@@ -15,8 +17,14 @@ import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
 
 interface CartLine {
+  lineId: string;
   product: CounterProduct;
   quantity: number;
+  modifiers: { id: string; name: string; priceDeltaCents: number }[];
+}
+
+function unitCents(line: CartLine): number {
+  return line.product.basePriceCents + line.modifiers.reduce((sum, m) => sum + m.priceDeltaCents, 0);
 }
 
 const PAYMENT_LABEL: Record<CounterOrderPaymentMethod, string> = {
@@ -44,12 +52,13 @@ export default function BalcaoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CounterOrderResponse | null>(null);
+  const [productSheet, setProductSheet] = useState<MoProductSheetProduct | null>(null);
 
   const filteredProducts = useMemo(
     () => products.filter((product) => categoryId === 'all' || product.categoryId === categoryId),
     [categoryId, products],
   );
-  const totalCents = cart.reduce((sum, line) => sum + line.product.basePriceCents * line.quantity, 0);
+  const totalCents = cart.reduce((sum, line) => sum + unitCents(line) * line.quantity, 0);
 
   useEffect(() => {
     void loadInitialData();
@@ -114,19 +123,56 @@ export default function BalcaoPage() {
     }
   }
 
-  function addProduct(product: CounterProduct) {
+  function addLine(product: CounterProduct, modifiers: CartLine['modifiers']) {
     setSuccess(null);
     setCart((current) => {
-      const existing = current.find((line) => line.product.id === product.id);
-      if (existing) return current.map((line) => (line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line));
-      return [...current, { product, quantity: 1 }];
+      // Só funde com uma linha idêntica (mesmos complementos) — combinar
+      // complementos diferentes na mesma linha perderia a escolha de um dos dois.
+      const chave = (m: CartLine['modifiers']) => [...m.map((x) => x.id)].sort().join(',');
+      const existing = current.find((line) => line.product.id === product.id && chave(line.modifiers) === chave(modifiers));
+      if (existing) return current.map((line) => (line === existing ? { ...line, quantity: line.quantity + 1 } : line));
+      return [...current, { lineId: crypto.randomUUID(), product, quantity: 1, modifiers }];
     });
   }
 
-  function updateQuantity(productId: string, delta: number) {
+  // Produto sem grupo de complemento (ou só opcionais): entra direto, sem
+  // abrir o sheet — mesma regra de "adição rápida" do storefront.
+  async function addProduct(product: CounterProduct) {
+    const groups = await fetchProductModifierGroups(product.id);
+    if (groups.length === 0) {
+      addLine(product, []);
+      return;
+    }
+    setProductSheet({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      basePriceCents: product.basePriceCents,
+      modifierGroups: groups,
+    });
+  }
+
+  function confirmProductSheet(selection: MoProductSheetSelection) {
+    if (!productSheet) return;
+    const product = products.find((p) => p.id === productSheet.id);
+    if (!product) return;
+    setCart((current) => [
+      ...current,
+      {
+        lineId: crypto.randomUUID(),
+        product,
+        quantity: selection.quantity,
+        modifiers: selection.modifiers.map((m) => ({ id: m.id, name: m.name, priceDeltaCents: m.priceDeltaCents })),
+      },
+    ]);
+    setSuccess(null);
+    setProductSheet(null);
+  }
+
+  function updateQuantity(lineId: string, delta: number) {
     setCart((current) =>
       current
-        .map((line) => (line.product.id === productId ? { ...line, quantity: Math.max(0, line.quantity + delta) } : line))
+        .map((line) => (line.lineId === lineId ? { ...line, quantity: Math.max(0, line.quantity + delta) } : line))
         .filter((line) => line.quantity > 0),
     );
   }
@@ -153,7 +199,11 @@ export default function BalcaoPage() {
     try {
       const result = await createCounterOrder({
         storeId,
-        items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+        items: cart.map((line) => ({
+          productId: line.product.id,
+          quantity: line.quantity,
+          modifiers: line.modifiers.map((m) => m.id),
+        })),
         paymentMethod,
         customer: fullCustomer,
         customerName: fullCustomer ? undefined : trimmedFirst || undefined,
@@ -265,19 +315,22 @@ export default function BalcaoPage() {
               <p className="rounded-[12px] border border-dashed border-border p-4 text-sm text-text-muted">Adicione produtos para iniciar.</p>
             ) : (
               cart.map((line) => (
-                <div key={line.product.id} className="rounded-[12px] border border-border bg-bg p-3">
+                <div key={line.lineId} className="rounded-[12px] border border-border bg-bg p-3">
                   <div className="flex justify-between gap-3">
                     <div>
                       <p className="font-semibold text-text">{line.product.name}</p>
-                      <p className="text-sm tabular-nums text-text-muted">{centsToBRL(line.product.basePriceCents)}</p>
+                      <p className="text-sm tabular-nums text-text-muted">{centsToBRL(unitCents(line))}</p>
+                      {line.modifiers.length > 0 && (
+                        <p className="text-sm text-text-muted">+ {line.modifiers.map((m) => m.name).join(', ')}</p>
+                      )}
                     </div>
-                    <p className="font-bold tabular-nums text-text">{centsToBRL(line.product.basePriceCents * line.quantity)}</p>
+                    <p className="font-bold tabular-nums text-text">{centsToBRL(unitCents(line) * line.quantity)}</p>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       aria-label={`Diminuir quantidade de ${line.product.name}`}
                       className="rounded-full border border-border p-2 text-text"
-                      onClick={() => updateQuantity(line.product.id, -1)}
+                      onClick={() => updateQuantity(line.lineId, -1)}
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -285,14 +338,14 @@ export default function BalcaoPage() {
                     <button
                       aria-label={`Aumentar quantidade de ${line.product.name}`}
                       className="rounded-full border border-border p-2 text-text"
-                      onClick={() => updateQuantity(line.product.id, 1)}
+                      onClick={() => updateQuantity(line.lineId, 1)}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                     <button
                       aria-label={`Remover ${line.product.name}`}
                       className="ml-auto rounded-full border border-border p-2 text-critical"
-                      onClick={() => updateQuantity(line.product.id, -line.quantity)}
+                      onClick={() => updateQuantity(line.lineId, -line.quantity)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -416,6 +469,13 @@ export default function BalcaoPage() {
           </button>
         </aside>
       </div>
+
+      <MoProductSheet
+        open={productSheet !== null}
+        onOpenChange={(open) => !open && setProductSheet(null)}
+        product={productSheet}
+        onAddToCart={confirmProductSheet}
+      />
     </main>
   );
 }
