@@ -975,3 +975,74 @@ adicionar a trava de promoção que falta nos dois:
 sozinho e não builda nem toca o `-prod`; promover pro `-prod` (branch
 protegida ou botão "Promote") builda com as env vars certas e o domínio
 custom não muda de deployment sem essa ação explícita.
+
+## CODEX — separação STAGING x PROD executada (12/09/2026)
+
+**Entrega:** ambientes Vercel separados por projeto + branch, variável explícita de ambiente
+de negócio (`MOLHO_ENV`) e evidência de que `main` publica staging sem tocar produção.
+
+### Mapa final dos projetos
+
+| Ambiente | Projeto Vercel | Branch de produção do projeto | Domínio(s) | Env-chave |
+|---|---|---|---|---|
+| Storefront STAGING | `molho-storefront-staging` (`prj_V88GjIl9aSMAtBnzT7ZagAHBXgHu`) | `main` | `staging.molho.live` | `MOLHO_ENV=staging`, `MOLHO_API_INTERNAL_URL=https://api.staging.molho.live`, `MOLHO_STOREFRONT_ROOT_DOMAIN=staging.molho.live`, `MOLHO_STOREFRONT_PATH_MODE=true`, `MOLHO_STOREFRONT_TECHNICAL_SLUG=cabanhas-bbq` |
+| Backoffice STAGING | `molho-backoffice-staging` (`prj_9hhuxHf3Dw3ISaqicJhjewLK9VU1`) | `main` | `staging-app.molho.live` | `MOLHO_ENV=staging`, `NEXT_PUBLIC_API_URL=https://api.staging.molho.live`, `MOLHO_ASSETS_ORIGIN=https://pub-1b8444ab73f54478956eed34fea0a2d3.r2.dev` |
+| Storefront PROD | `molho-storefront-prod` (`prj_r6HYUawAZGy0TD3kiVLgOeCJ3JqW`) | `production` | `cabanhas-bbq.molho.live` | `MOLHO_ENV=production`, `MOLHO_API_INTERNAL_URL=https://api.molho.live`, `MOLHO_STOREFRONT_ROOT_DOMAIN=molho.live`, `MOLHO_STOREFRONT_PATH_MODE=false`, `MOLHO_STOREFRONT_TECHNICAL_SLUG=cabanhas-bbq` |
+| Backoffice PROD | `molho-backoffice-prod` (`prj_wIPYqwJEXxNhtkEZS9DvFh25AnCG`) | `production` | `app.molho.live` | `MOLHO_ENV=production`, `NEXT_PUBLIC_API_URL=https://api.molho.live`, `MOLHO_ASSETS_ORIGIN=https://pub-32e66ce2e40944ed8b5dc1dd8687621a.r2.dev` |
+
+Os dois projetos `-prod` ficaram com Git conectado ao repositório, branch produtiva
+`production` e ignored build step para cancelar Preview de branches que não são produção.
+Assim, push em `main` gera deploy `Production` apenas nos projetos de staging; nos projetos
+prod, `main` vira Preview cancelado e não troca alias/domínio real.
+
+### Ajustes de código/config
+
+- `apps/storefront/lib/api-origin.ts`: `VERCEL_ENV=production` deixou de significar
+  automaticamente "ambiente de negócio produção"; agora exige `MOLHO_ENV`. Em produção,
+  API de staging/local/vercel.app é bloqueada; em staging, API que não seja
+  `api.staging.molho.live` é bloqueada.
+- `apps/storefront/lib/host-routing.ts`: host routing publicado também usa `MOLHO_ENV`.
+  Produção exige `molho.live` + path mode desligado; staging aceita `staging.molho.live`
+  + path mode ligado para `/cabanhas-bbq`.
+- `turbo.json`: `MOLHO_ENV` entrou no hash/env de build.
+- `.env.example`: documenta `MOLHO_ENV=development` e matriz staging/prod.
+- `apps/api/fly.toml` e `apps/api/fly.prod.toml`: `MOLHO_ENV=staging`/`production`.
+- `.github/workflows/ci.yml`: CI roda também para `production`.
+
+Observação de histórico: as mudanças de código chegaram ao `origin/main` junto do PR #77
+por uma corrida com outro trabalho no checkout compartilhado. Para publicar produção sem
+puxar alterações funcionais extras, foi criado o commit infra puro
+`37c8e8a infra: separe staging de produção` e a branch remota `production` foi apontada
+explicitamente para ele.
+
+### Evidências de gate
+
+- Gate local verde: `pnpm lint && pnpm test && pnpm build`.
+- Push em `main`:
+  - `molho-storefront-staging`: deployment `dpl_6Dw9G4F2bGsspgoHVM9ejh2wadka` Ready,
+    aliases incluindo `https://staging.molho.live`.
+  - `molho-backoffice-staging`: deployment `dpl_2FS9w3A28TJHwXXhikEnfwQBPQQt` Ready,
+    aliases incluindo `https://staging-app.molho.live`.
+  - `molho-storefront-prod`: Preview de `main` cancelado por Ignored Build Step.
+  - `molho-backoffice-prod`: Preview de `main` cancelado por Ignored Build Step.
+- Push em `production`:
+  - `molho-storefront-prod`: deployment `dpl_7hyt9wxUBrTKzStvM6rNMVCjHk7p` Ready,
+    alias `https://cabanhas-bbq.molho.live`.
+  - `molho-backoffice-prod`: deployment `dpl_5Su6sqhxrGoYcnURqzrZMLKRfAQm` Ready,
+    alias `https://app.molho.live`.
+- Smoke externo em 12/09/2026:
+  - `https://staging.molho.live/cabanhas-bbq` → 200.
+  - `https://staging-app.molho.live/login` → 200.
+  - `https://cabanhas-bbq.molho.live/` → 200.
+  - `https://app.molho.live/login` → 200.
+  - `https://api.staging.molho.live/ready` → `{"status":"ready","db":"ok","redis":"ok"}`.
+  - `https://api.molho.live/ready` → `{"status":"ready","db":"ok","redis":"ok"}`.
+- CSP confirmado:
+  - PROD backoffice `connect-src` aponta para `https://api.molho.live`.
+  - STAGING backoffice `connect-src` aponta para `https://api.staging.molho.live`.
+  - Busca por `api.staging`, `staging-app`, `molho-api-staging` e `localhost` no HTML
+    público de PROD retornou vazio.
+
+**Status:** gate estrutural STAGING x PROD fechado. Falta apenas manter a disciplina operacional:
+`main` = staging; `production` = produção; promoção para domínio real só via branch protegida
+ou promoção explícita no dashboard.
