@@ -49,6 +49,8 @@ export interface CreateCounterOrderParams {
   notes: string | null;
   idempotencyKey: string;
   createdAt: Date;
+  /** Épico 20 — só cash_at_counter/card_at_counter vinculam (CHECK na migration); pix de balcão vem `null`. */
+  cashSessionId: string | null;
 }
 
 export interface CounterOrderRepository {
@@ -191,7 +193,7 @@ export class PrismaCounterOrderRepository implements CounterOrderRepository {
 
   async createOrder(params: CreateCounterOrderParams): Promise<{ id: string; created: boolean }> {
     const tenantId = this.requestContext.getTenantId();
-    const { storeId, customerId, paymentMethod, subtotalCents, totalCents, notes, idempotencyKey, createdAt } = params;
+    const { storeId, customerId, paymentMethod, subtotalCents, totalCents, notes, idempotencyKey, createdAt, cashSessionId } = params;
     // ON CONFLICT DO NOTHING no par (tenant_id, idempotency_key): retry de
     // rede com a MESMA chave não duplica — 0 linhas devolvidas = outra
     // request já ganhou a corrida, o chamador reconsulta por
@@ -204,13 +206,13 @@ export class PrismaCounterOrderRepository implements CounterOrderRepository {
         "fulfillment_type", "change_for_cents",
         "subtotal_cents", "delivery_fee_cents", "total_cents",
         "delivery_geo", "delivery_postal_code_verified", "customer_verified",
-        "notes", "idempotency_key", "created_at"
+        "notes", "idempotency_key", "created_at", "cash_session_id"
       ) VALUES (
         ${tenantId}::uuid, ${storeId}::uuid, ${customerId}::uuid, 'received', ${paymentMethod}::"PaymentMethod", 'confirmado', 'not_applicable',
         'pickup', NULL,
         ${subtotalCents}, 0, ${totalCents},
         NULL, true, false,
-        ${notes}, ${idempotencyKey}, ${createdAt}
+        ${notes}, ${idempotencyKey}, ${createdAt}, ${cashSessionId}::uuid
       )
       ON CONFLICT ("tenant_id", "idempotency_key") DO NOTHING
       RETURNING "id"

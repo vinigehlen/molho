@@ -402,6 +402,11 @@ model User {
   emailKeyVersion Int       @default(1) @map("email_key_version")
   /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
   tokenVersion    Int       @default(0) @map("token_version")
+  /// PIN de aprovação (Épico 20) — scrypt via security/scrypt-secret.ts,
+  /// nunca em claro. NULLABLE: staff que nunca setou PIN não consegue
+  /// APROVAR sangria/ação sensível de outro ator (verify-pin recusa sem
+  /// hash), mas continua operando normalmente em tudo que não exige PIN.
+  pinHash         String?   @map("pin_hash")
   version         Int       @default(0)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
@@ -1782,10 +1787,12 @@ model CashSession {
   @@map("cash_sessions")
 }
 
-/// Sangria. Aprovação de manager por PIN é OBRIGATÓRIA (não fica pra
-/// depois — decisão 5 do handoff): approvedByUserId nunca nulo, sempre
-/// alguém DIFERENTE de requestedByUserId com a permissão `cash.withdraw`
-/// sem `selfOnly`. Append-only — sem policy de UPDATE/DELETE na migration.
+/// Sangria. approvedByUserId nunca nulo. owner/manager (sem `approval:true`
+/// na matriz de permissões) auto-aprovam — requestedByUserId ==
+/// approvedByUserId é válido pra eles. cashier (`approval:true`) precisa de
+/// um segundo ator com PIN — regra de APLICAÇÃO (CashWithdrawalService via
+/// `can()`), não dá pra expressar só com as colunas. Append-only — sem
+/// policy de UPDATE/DELETE na migration.
 model CashWithdrawal {
   id            String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId      String  @map("tenant_id") @db.Uuid

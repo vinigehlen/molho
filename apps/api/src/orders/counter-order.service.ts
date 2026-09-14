@@ -17,6 +17,20 @@ import {
 import type { CounterOrderRepository, PricedCounterItem } from './counter-order.repository';
 import type { OrderStatusRepository } from './order-status.repository';
 
+/** Épico 20 — só estas duas movem a gaveta física; pix de balcão reusa o método `pix` do delivery e não vincula sessão. */
+const CASH_DRAWER_PAYMENT_METHODS = new Set(['cash_at_counter', 'card_at_counter']);
+
+/**
+ * Interface estreita (não a classe `CashSessionService` inteira) — mesmo
+ * princípio dos "gates" de módulo (modules/loyalty.gate.ts): quem consome só
+ * precisa saber "existe caixa aberto?", não o resto da API de caixa. Deixa o
+ * teste deste serviço mockar sem importar o módulo de caixa inteiro.
+ */
+export interface OpenCashSessionResolver {
+  /** Lança `NoOpenCashSessionError` (cash/cash.errors.ts) se não houver sessão aberta na loja. */
+  requireOpenSessionId(storeId: string): Promise<string>;
+}
+
 /** R$5.000 — teto do valor de um item PESADO (POS trust, não confiança no cliente: CLAUDE.md regra 4). */
 export const WEIGHED_LINE_MAX_CENTS = 500_000;
 
@@ -34,6 +48,7 @@ export class CounterOrderService {
   constructor(
     private readonly repo: CounterOrderRepository,
     private readonly orderStatusRepo: OrderStatusRepository,
+    private readonly cashSessions: OpenCashSessionResolver,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -65,6 +80,12 @@ export class CounterOrderService {
       };
     }
 
+    // Caixa obrigatório pra vender no balcão (Épico 20) — lança
+    // NoOpenCashSessionError antes de repriçar/criar cliente se a loja não
+    // tiver sessão aberta. Chamado ANTES do resto pra não gastar trabalho
+    // (busca de produto, criação de cliente) numa venda que vai ser recusada.
+    const cashSessionId = await this.cashSessions.requireOpenSessionId(storeId);
+
     const { items, subtotalCents } = await this.priceItems(input.items);
 
     const customerId = input.customer
@@ -80,6 +101,10 @@ export class CounterOrderService {
       notes: input.notes?.trim() || null,
       idempotencyKey,
       createdAt,
+      // Só dinheiro/cartão na hora vinculam (CHECK na migration) — pix de
+      // balcão não mexe na gaveta física, mesmo com sessão aberta obrigatória
+      // pra qualquer venda de balcão.
+      cashSessionId: CASH_DRAWER_PAYMENT_METHODS.has(input.paymentMethod) ? cashSessionId : null,
     });
 
     if (created) {
