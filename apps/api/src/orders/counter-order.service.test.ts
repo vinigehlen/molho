@@ -8,8 +8,17 @@ import {
   WeighedPriceOutOfRangeError,
 } from './counter-order.errors';
 import type { CounterOrderRepository } from './counter-order.repository';
-import { CounterOrderService, WEIGHED_LINE_MAX_CENTS } from './counter-order.service';
+import { CounterOrderService, type OpenCashSessionResolver, WEIGHED_LINE_MAX_CENTS } from './counter-order.service';
 import type { OrderStatusRepository } from './order-status.repository';
+
+const CASH_SESSION_ID = 'cash-session-1';
+
+function makeCashSessions(overrides: Partial<OpenCashSessionResolver> = {}): OpenCashSessionResolver {
+  return {
+    requireOpenSessionId: vi.fn().mockResolvedValue(CASH_SESSION_ID),
+    ...overrides,
+  };
+}
 
 const STORE_ID = 'store-1';
 const TENANT_ID = 'tenant-1';
@@ -49,7 +58,7 @@ function unitInput(overrides: Partial<Extract<CounterOrderInput['items'][number]
 describe('CounterOrderService.createOrder', () => {
   it('sem Idempotency-Key: MissingIdempotencyKeyError, nunca toca no banco', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     await expect(service.createOrder(TENANT_ID, STORE_ID, input, undefined, ACTOR)).rejects.toThrow(
@@ -60,7 +69,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('loja inexistente/de outro tenant: CounterOrderStoreNotFoundError', async () => {
     const repo = makeRepo({ findStore: vi.fn().mockResolvedValue(null) });
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     await expect(service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR)).rejects.toThrow(
@@ -70,7 +79,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('item unit: preço vem do CATÁLOGO (basePriceCents × quantity), nunca de um valor mandado pelo cliente', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     // Nenhum campo de preço existe no tipo CounterUnitItemInput — a prova É a
     // ausência estrutural (ver counter-order.test.ts, contracts). Aqui prova-se
     // que o VALOR gravado é 800×2=1600, batendo com basePriceCents do fake repo,
@@ -93,7 +102,7 @@ describe('CounterOrderService.createOrder', () => {
         .fn()
         .mockResolvedValue(new Map([[MODIFIER_ID, { id: MODIFIER_ID, name: 'Bacon', priceDeltaCents: 150 }]])),
     });
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = {
       items: [unitInput({ quantity: 1, modifiers: [MODIFIER_ID] })],
       paymentMethod: 'pix',
@@ -106,7 +115,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('productId inexistente: CounterOrderProductNotFoundError', async () => {
     const repo = makeRepo({ findProducts: vi.fn().mockResolvedValue(new Map()) });
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     await expect(service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR)).rejects.toThrow(
@@ -116,7 +125,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('item weighed: usa lineTotalCents como veio (POS trust)', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = {
       items: [{ kind: 'weighed', productId: PRODUCT_ID, weightGrams: 350, lineTotalCents: 4200 }],
       paymentMethod: 'cash_at_counter',
@@ -129,7 +138,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('item weighed acima do teto: WeighedPriceOutOfRangeError', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = {
       items: [{ kind: 'weighed', productId: PRODUCT_ID, weightGrams: 350, lineTotalCents: WEIGHED_LINE_MAX_CENTS + 1 }],
       paymentMethod: 'pix',
@@ -147,7 +156,7 @@ describe('CounterOrderService.createOrder', () => {
         .fn()
         .mockResolvedValue({ id: 'order-1', status: 'received', paymentMethod: 'pix', subtotalCents: 1600, totalCents: 1600 }),
     });
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     const result = await service.createOrder(TENANT_ID, STORE_ID, input, 'idem-repetida', ACTOR);
@@ -167,7 +176,7 @@ describe('CounterOrderService.createOrder', () => {
   it('pedido novo nasce received para aparecer no gestor, mas pagamento ja confirmado', async () => {
     const orderStatusRepo = makeOrderStatusRepo();
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, orderStatusRepo);
+    const service = new CounterOrderService(repo, orderStatusRepo, makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     const result = await service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR);
@@ -181,7 +190,7 @@ describe('CounterOrderService.createOrder', () => {
   it('grava history/audit_log só quando GANHA a corrida do ON CONFLICT (created=true)', async () => {
     const orderStatusRepo = makeOrderStatusRepo();
     const repo = makeRepo({ createOrder: vi.fn().mockResolvedValue({ id: 'order-2', created: false }) });
-    const service = new CounterOrderService(repo, orderStatusRepo);
+    const service = new CounterOrderService(repo, orderStatusRepo, makeCashSessions());
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'pix' };
 
     await service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR);
@@ -193,12 +202,12 @@ describe('CounterOrderService.createOrder', () => {
 
   it('customerName informado vira nome do customer; ausente vira "Balcão"', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     await service.createOrder(TENANT_ID, STORE_ID, { items: [unitInput()], paymentMethod: 'pix' }, 'idem-1', ACTOR);
     expect(repo.createAnonymousCustomer).toHaveBeenCalledWith('Balcão');
 
     const repo2 = makeRepo();
-    const service2 = new CounterOrderService(repo2, makeOrderStatusRepo());
+    const service2 = new CounterOrderService(repo2, makeOrderStatusRepo(), makeCashSessions());
     await service2.createOrder(
       TENANT_ID,
       STORE_ID,
@@ -211,7 +220,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('cadastro completo: findOrCreateNamedCustomer com nome montado, e-mail normalizado e telefone E.164', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     await service.createOrder(
       TENANT_ID,
       STORE_ID,
@@ -233,7 +242,7 @@ describe('CounterOrderService.createOrder', () => {
 
   it('telefone inválido no cadastro: CounterOrderInvalidCustomerError, nada é criado', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     await expect(
       service.createOrder(
         TENANT_ID,
@@ -253,11 +262,42 @@ describe('CounterOrderService.createOrder', () => {
 
   it('searchCustomers: query < 2 chars devolve [] sem tocar no repo', async () => {
     const repo = makeRepo();
-    const service = new CounterOrderService(repo, makeOrderStatusRepo());
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), makeCashSessions());
     expect(await service.searchCustomers(' a ')).toEqual([]);
     expect(repo.searchCustomersByName).not.toHaveBeenCalled();
 
     await service.searchCustomers('  Vin ');
     expect(repo.searchCustomersByName).toHaveBeenCalledWith('Vin', 8);
+  });
+
+  it('sem caixa aberto: propaga o erro do resolver ANTES de repriçar ou criar cliente (Épico 20)', async () => {
+    const repo = makeRepo();
+    const noOpenSession = { requireOpenSessionId: vi.fn().mockRejectedValue(new Error('NoOpenCashSessionError')) };
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), noOpenSession);
+    const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'cash_at_counter' };
+
+    await expect(service.createOrder(TENANT_ID, STORE_ID, input, 'idem-1', ACTOR)).rejects.toThrow(
+      'NoOpenCashSessionError',
+    );
+    expect(repo.findProducts).not.toHaveBeenCalled();
+    expect(repo.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('cash_at_counter/card_at_counter vinculam cashSessionId; pix de balcão fica null', async () => {
+    const repo = makeRepo();
+    const cashSessions = makeCashSessions();
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), cashSessions);
+
+    await service.createOrder(
+      TENANT_ID,
+      STORE_ID,
+      { items: [unitInput()], paymentMethod: 'cash_at_counter' },
+      'idem-cash',
+      ACTOR,
+    );
+    expect(repo.createOrder).toHaveBeenCalledWith(expect.objectContaining({ cashSessionId: CASH_SESSION_ID }));
+
+    await service.createOrder(TENANT_ID, STORE_ID, { items: [unitInput()], paymentMethod: 'pix' }, 'idem-pix', ACTOR);
+    expect(repo.createOrder).toHaveBeenCalledWith(expect.objectContaining({ cashSessionId: null }));
   });
 });

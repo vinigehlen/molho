@@ -15,6 +15,9 @@ import { PrismaCheckoutGuestGate } from '../modules/checkout-guest.gate';
 import { PrismaLoyaltyGate } from '../modules/loyalty.gate';
 import { PrismaPromotionsGate } from '../modules/promotions.gate';
 import { LOYALTY_CREDITOR, LoyaltyModule } from '../loyalty/loyalty.module';
+import { CashModule } from '../cash/cash.module';
+import { CASH_SESSION_SERVICE } from '../cash/cash.tokens';
+import type { CashSessionService } from '../cash/cash-session.service';
 import type { LoyaltyCreditor } from './loyalty-creditor.port';
 import { PrintingModule } from '../printing/printing.module';
 import { CustomerIdentityRepository } from '../auth/customer-identity.repository';
@@ -80,7 +83,7 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
  * precisam.
  */
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule, LoyaltyModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule, StorefrontModule, PrintingModule, LoyaltyModule, CashModule],
   controllers: [
     CheckoutController,
     OrderPaymentController,
@@ -97,11 +100,12 @@ export { CHECKOUT_REVALIDATION_SERVICE, CHECKOUT_ORDER_SERVICE, PAYMENT_CONFIRMA
     CheckoutOrderRateLimitMiddleware,
     {
       provide: COUNTER_ORDER_SERVICE,
-      inject: [RequestContextService],
-      useFactory: (requestContext: RequestContextService): CounterOrderService =>
+      inject: [RequestContextService, CASH_SESSION_SERVICE],
+      useFactory: (requestContext: RequestContextService, cashSessions: CashSessionService): CounterOrderService =>
         new CounterOrderService(
           new PrismaCounterOrderRepository(requestContext),
           new PrismaOrderStatusRepository(requestContext),
+          cashSessions,
         ),
     },
     {

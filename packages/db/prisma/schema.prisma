@@ -189,6 +189,8 @@ model Tenant {
   printJobs             PrintJob[]
   printDevices          PrintDevice[]
   orderNumberCounter    OrderNumberCounter?
+  cashSessions          CashSession[]
+  cashWithdrawals       CashWithdrawal[]
   coupons               Coupon[]
   promotions            Promotion[]
   reviews               Review[]
@@ -275,6 +277,7 @@ model Store {
   storeHours           StoreHours[]
   storeSchedulingSlots StoreSchedulingSlot[]
   orders               Order[]
+  cashSessions         CashSession[]
 
   // Alvo de FK composta (delivery_zones.store_id, store_hours.store_id) —
   // índice único (id, tenant_id) à mão na migration (Épico 6).
@@ -399,6 +402,11 @@ model User {
   emailKeyVersion Int       @default(1) @map("email_key_version")
   /// Corta sessões na hora (demitir um garçom = incrementar e revogar).
   tokenVersion    Int       @default(0) @map("token_version")
+  /// PIN de aprovação (Épico 20) — scrypt via security/scrypt-secret.ts,
+  /// nunca em claro. NULLABLE: staff que nunca setou PIN não consegue
+  /// APROVAR sangria/ação sensível de outro ator (verify-pin recusa sem
+  /// hash), mas continua operando normalmente em tudo que não exige PIN.
+  pinHash         String?   @map("pin_hash")
   version         Int       @default(0)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
@@ -413,6 +421,10 @@ model User {
   notificationLogs     NotificationLog[]
   printDevicesCreated  PrintDevice[]        @relation("PrintDeviceCreatedBy")
   printDevicesRevoked  PrintDevice[]        @relation("PrintDeviceRevokedBy")
+  cashSessionsOpened      CashSession[]     @relation("CashSessionOpenedBy")
+  cashSessionsClosed      CashSession[]     @relation("CashSessionClosedBy")
+  cashWithdrawalsRequested CashWithdrawal[] @relation("CashWithdrawalRequestedBy")
+  cashWithdrawalsApproved  CashWithdrawal[] @relation("CashWithdrawalApprovedBy")
 
   @@map("users")
 }
@@ -1136,6 +1148,11 @@ model Order {
   /// novo sempre recebe. Não reseta.
   orderNumber Int? @map("order_number")
 
+  /// Épico 20 (PDV + caixa). Só pedidos de balcão pagos em dinheiro/cartão na
+  /// hora (`cash_at_counter`/`card_at_counter`) vinculam — CHECK na migration
+  /// garante isso. Nunca preenchido por pedido de storefront (PIX/delivery).
+  cashSessionId String? @map("cash_session_id") @db.Uuid
+
   version   Int       @default(0)
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -1146,6 +1163,7 @@ model Order {
   customer        Customer             @relation(fields: [customerId], references: [id])
   deliveryAddress Address?             @relation(fields: [deliveryAddressId], references: [id])
   coupon          Coupon?              @relation(fields: [couponId], references: [id])
+  cashSession     CashSession?         @relation(fields: [cashSessionId], references: [id])
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
   adjustments     OrderAdjustment[]
@@ -1714,6 +1732,87 @@ model PrintDevice {
   /// Prisma não expressa índice parcial.
   @@index([tenantId, createdAt])
   @@map("print_devices")
+}
+
+// ─── PDV / caixa (Épico 20) ─────────────────────────────────────────────────
+
+enum CashSessionStatus {
+  open
+  closed
+}
+
+/// Uma sessão de caixa por LOJA (não por operador — docs/HANDOFF-epico-20-pdv-caixa.md
+/// decisão 3): quem abre/fecha/sangra fica registrado por AÇÃO
+/// (openedByUserId/closedByUserId/CashWithdrawal.requestedByUserId), a sessão
+/// em si é "a sessão aberta da loja". Índice único parcial (WHERE status =
+/// 'open') na migration garante só uma sessão aberta por loja ao mesmo tempo
+/// — Prisma não expressa índice parcial no DSL.
+model CashSession {
+  id       String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId String            @map("tenant_id") @db.Uuid
+  storeId  String            @map("store_id") @db.Uuid
+  status   CashSessionStatus @default(open)
+
+  openedAt           DateTime @default(now()) @map("opened_at")
+  openedByUserId     String   @map("opened_by_user_id") @db.Uuid
+  openingAmountCents Int      @map("opening_amount_cents")
+
+  closedAt   DateTime? @map("closed_at")
+  closedByUserId String? @map("closed_by_user_id") @db.Uuid
+  /// Valor contado fisicamente pelo operador no fechamento.
+  countedAmountCents Int? @map("counted_amount_cents")
+  /// opening + vendas_dinheiro - sangrias no instante do fechamento —
+  /// snapshot calculado então, nunca recalculado depois (mesmo racional de
+  /// Order.totalCents). Diferença pra countedAmountCents é a quebra de caixa.
+  expectedAmountCents Int? @map("expected_amount_cents")
+
+  /// Optimistic locking (CLAUDE.md convenção de schema) — abrir/fechar é a
+  /// única transição, mas concorrência (dois cliques de fechar) precisa de
+  /// trava mesmo assim.
+  version   Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store      Store            @relation(fields: [storeId], references: [id])
+  openedBy   User             @relation("CashSessionOpenedBy", fields: [openedByUserId], references: [id])
+  closedBy   User?            @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
+  orders     Order[]
+  withdrawals CashWithdrawal[]
+
+  // FK composta (store_id, tenant_id) → stores(id, tenant_id) na migration —
+  // mesmo guardrail de delivery_zones/store_hours (Épico 6).
+  @@index([tenantId, storeId, status])
+  @@map("cash_sessions")
+}
+
+/// Sangria. approvedByUserId nunca nulo. owner/manager (sem `approval:true`
+/// na matriz de permissões) auto-aprovam — requestedByUserId ==
+/// approvedByUserId é válido pra eles. cashier (`approval:true`) precisa de
+/// um segundo ator com PIN — regra de APLICAÇÃO (CashWithdrawalService via
+/// `can()`), não dá pra expressar só com as colunas. Append-only — sem
+/// policy de UPDATE/DELETE na migration.
+model CashWithdrawal {
+  id            String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  cashSessionId String  @map("cash_session_id") @db.Uuid
+
+  amountCents        Int      @map("amount_cents")
+  reason             String?
+  requestedByUserId  String   @map("requested_by_user_id") @db.Uuid
+  approvedByUserId   String   @map("approved_by_user_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id])
+  requestedBy User        @relation("CashWithdrawalRequestedBy", fields: [requestedByUserId], references: [id])
+  approvedBy  User        @relation("CashWithdrawalApprovedBy", fields: [approvedByUserId], references: [id])
+
+  // FK composta (cash_session_id, tenant_id) → cash_sessions(id, tenant_id)
+  // na migration — mesmo guardrail de order_adjustments (Épico balcão).
+  @@index([tenantId, cashSessionId])
+  @@map("cash_withdrawals")
 }
 
 // ─── Auditoria ────────────────────────────────────────────────────────────────

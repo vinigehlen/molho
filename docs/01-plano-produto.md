@@ -511,31 +511,33 @@ Princípios do design Nubank a aplicar: **vermelho Brasa como identidade, tipogr
 
 ---
 
-## 7. Roadmap de Produto (revisado — MVP real)
+## 7. Roadmap de Produto (atualizado 2026-09-14 — pós go-live do piloto)
 
 > ICP: restaurante com delivery próprio ativo, R$ 40–150 mil/mês, hoje anotando pedido no WhatsApp na mão. Ver `definicoes-v1.md`.
 
-### Fase 0 — Fundação (Semana 1)
-Monorepo, CI, design system Tempero (tokens + componentes), Postgres com RLS, **registry de módulos + gates**, **RBAC com escopo**, auth OTP, upload S3, seed do tenant demo.
-**Saída:** apps sobem, login funciona, `pnpm test` verde nos perfis "core" e "tudo ligado".
+### Fase 0 — Fundação — ✅ concluída
+Monorepo, CI, design system Tempero, Postgres com RLS, registry de módulos + gates, RBAC com escopo, auth OTP, upload S3, seed do tenant demo.
 
-### Fase 1 — MVP (Semanas 2–6)
-Cardápio (categorias, produtos, fotos, variações, esgotado manual) · **importação por planilha** · storefront (menu, carrinho, bottom sheets) · endereço com pin e **zonas de entrega** · horários e pedido mínimo · **checkout PIX (MockPaymentProvider)** · gestor de pedidos realtime · **push/som para o lojista** · **impressão ESC/POS + wizard de impressora** · **WhatsApp de status (click-to-chat)** · página de acompanhamento · **onboarding self-service + assinatura/trial**.
-**Saída:** o restaurante piloto opera uma sexta-feira inteira sem WhatsApp manual.
+### Fase 1 — MVP — ✅ concluída, **em produção** (`molho.live`, piloto Cabanhas BBQ)
+Tudo da lista original saiu, mais itens que entraram fora de ordem por decisão de produto (ver notas por épico abaixo): cupons, promoções, combos, fidelidade por cashback e avaliações vieram para dentro do MVP (decisão do PM 2026-09-02/03: sem tiering de plano por ora, feature com código completo nasce ligada em qualquer plano). Pagamento em produção é **PIX estático com confirmação manual pelo lojista** (não o `MockPaymentProvider` planejado — ver seção 5-D e "Regras de negócio críticas"); a fila dos adaptadores reais (Asaas/Mercado Pago, épicos 24-26) continua depois do go-live.
+**Saída:** gate "zero no-go" fechado (docs/14-plano-zero-no-go.md), infra produtiva (Fly.io `gru`, Neon SP, Upstash SP, backup+restore testado), impressão ESC/POS funcionando na loja piloto.
 
-### Fase 2 — Vender mais (Semanas 7–12)
-Cupons · promoções agendadas · combos · fidelidade · dashboard · avaliações · robô WhatsApp (Cloud API, número dedicado, opcional) · app do motoboy + mapa de entregas · cartão online.
-→ habilita o plano **Pro**.
+### Fase 2 — Vender mais — parcialmente concluída
+Entregue: cupons, promoções agendadas, combos (incl. combo aninhado), fidelidade por cashback, avaliações de pedido, dashboard com analytics + módulo de CMV, pedidos com horário agendado (`scheduling-slots`, adiantado da Fase 4).
+Pendente: app do motoboy (PWA) + mapa de entregas ao vivo, robô WhatsApp via Cloud API, cartão online, campanhas de marketing.
 
-### Fase 3 — Operação completa (Semanas 13–20)
-PDV + caixa · KDS · mesas, QR-code e app do garçom · integração iFood · campanhas de marketing · multi-loja.
-→ habilita o plano **Premium**.
+### Fase 3 — Operação completa — parcialmente concluída
+Entregue (fora de ordem, como extensão do gestor de pedidos): **Balcão** — criação e edição de pedido walk-in, retirada no balcão, leitor de etiqueta de balança, comanda com numeração sequencial e 2 vias (balcão + cozinha). **Épico 20 (caixa)** — sessão de caixa por loja (abertura obrigatória pra vender, fechamento com conferência), sangria com aprovação por PIN, analytics de quebra de caixa; `pdv`/`cash_register` saíram de `plans:['premium']` pra `default:true` em todo plano (mesma decisão de coupons/combos). Branch `feat/epico-20-pdv-caixa`, ainda não mesclada/deployada.
+Pendente: KDS (tela de cozinha — hoje a cozinha lê a comanda impressa), mesas + QR-code + app do garçom (`tables`, `channel.qrcode_table`, `channel.waiter_app`), integração iFood, multi-loja.
 
-### Fase 4 — Escala
-NFC-e (add-on) · franquias · pedidos agendados · IA (descrições, previsão de demanda) · app nativo.
+### Fase 4 — Escala — não iniciada (exceto pedidos agendados, adiantado)
+NFC-e (add-on) · franquias · IA (descrições, previsão de demanda) · app nativo.
+
+### Épicos 24–26 (PSP real: Asaas, Mercado Pago, failover) — não iniciados
+Continuam planejados para depois do go-live, conforme decisão original; nenhum adaptador real de pagamento foi implementado ainda — produção segue com PIX estático manual.
 
 ### KPIs
-Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8% · retenção M3 > 85% · pedido novo visível no gestor < 3s · uptime 99,5%.
+Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8% · retenção M3 > 85% · pedido novo visível no gestor < 3s · uptime 99,5%. *(Ainda não há relato de medição formal desses números pós-go-live nos docs — validar com o time.)*
 
 ---
 
@@ -543,46 +545,72 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 
 **Regras:** um épico por sessão · termina com testes verdes e commit · Definition of Done de todo épico = *módulo registrado no registry + gate no backend (`@RequireModule` + `@RequirePermission`) + gate no front + suíte "somente core" verde*.
 
-| # | Épico | Fase | Entregável |
+| # | Épico | Fase | Status |
 |---|---|---|---|
-| 1 | Scaffold do monorepo + design system Tempero | 0 | Storybook com componentes Mo*; 3 apps sobem |
-| 2 | Schema Prisma + RLS + **registry de módulos** + **RBAC** + seed — ✅ **entregue** | 0 | Migrations, `ModuleService`, `can()`, tenant demo (Hamburgueria da Vila + Pizzaria Roma) |
-| 3 | Auth OTP (mock de envio) + sessões + revogação — ✅ **entregue** | 0 | Login por telefone nos dois fronts |
-| 4 | CRUD de cardápio + upload S3 + **importação por planilha** — ✅ **entregue** | 1 | Lojista sobe 80 produtos de um CSV |
-| 5 | Storefront: menu, carrinho, bottom sheets — ✅ **entregue** | 1 | Navegação mobile completa |
-| 6 | Endereços + zonas de entrega (polígonos) + horários — ✅ **entregue** | 1 | Fora da zona bloqueia; loja fechada desabilita checkout |
-| 7 | Checkout + pedidos + **máquina de estados completa** (feliz + infeliz) — ✅ **entregue** | 1 | Cancelamento, expiração, auto-cancel em 10min, estorno |
-| 8 | Pagamento PIX com **MockPaymentProvider** — ✅ **entregue** | 1 | QR, webhook simulado, idempotência, reconciliação |
-| 9 | Gestor de pedidos realtime + **push/som** + fila offline + **login real de staff (9b)** — ✅ **entregue** (resta 9c: infra real p/ deploy) | 1 | Pedido aparece em <3s; não perde pedido se a rede cair |
-| 11 | **WhatsApp de status via click-to-chat** + `notification_log` | 1 | Um toque envia o status pelo número do próprio lojista |
-| 12 | Página de acompanhamento do pedido (timeline) | 1 | Cliente vê status em tempo real |
-| 13 | **Onboarding self-service + wizard de 7 passos** | 1 | Signup OTP → loja publicada em <30min, sem humano do Molho |
-| 13b | **Tema: 3 templates** (Brasa, Folha, Grafite) + logo/capa | 1 | Lojista escolhe 1 dos 3; toda loja fica bonita e AA |
-| 13d | **Assinatura e billing** (trial, planos, dunning, suspensão) | 1 | Cobrança recorrente + cancelamento em 2 cliques |
-| 14 | Super-admin: provisionamento, módulos, entitlements, impersonation | 1 | Painel interno completo |
-| 10 | **Impressão ESC/POS** + agente local + wizard de impressora | 1 | Cupom de teste sai no papel no onboarding |
-| — | **🚀 GO-LIVE do piloto** | — | Sexta-feira inteira em produção |
-| 15 | Cupons + promoções + combos | 2 | — |
-| 16 | Fidelidade + avaliações | 2 | — |
-| 17 | Dashboard + relatórios | 2 | — |
-| 18 | App do motoboy (PWA) + mapa de entregas | 2 | — |
-| 19 | Robô WhatsApp (Cloud API, número dedicado, opcional) | 2 | — |
-| 20 | PDV + caixa | 3 | — |
-| 21 | KDS + mesas + QR-code + app do garçom | 3 | — |
-| 22 | Integração iFood | 3 | — |
-| 23 | Campanhas de marketing + multi-loja | 3 | — |
-| 24 | **Adaptador Asaas** (PIX + cartão, sandbox → produção) | — | Substitui o mock |
-| 25 | **Adaptador Mercado Pago + roteamento com failover** | — | Segundo PSP, health check |
-| 26 | Conciliação, antifraude, PCI SAQ-A, testes de caos | — | Hardening final |
-| 27 | NFC-e (Focus NFe) + franquias | 4 | — |
+| 1 | Scaffold do monorepo + design system Tempero | 0 | ✅ entregue |
+| 2 | Schema Prisma + RLS + registry de módulos + RBAC + seed | 0 | ✅ entregue |
+| 3 | Auth OTP + sessões + revogação | 0 | ✅ entregue |
+| 4 | CRUD de cardápio + upload S3 + importação por planilha (com revisão assistida) | 1 | ✅ entregue |
+| 4b/4c/4e | Ofertas em múltiplas categorias, `Product.kind`, biblioteca de complementos | 1 | ✅ entregue (fora da numeração original) |
+| 5 | Storefront: menu, carrinho, bottom sheets | 1 | ✅ entregue |
+| 6 | Endereços + zonas de entrega (polígonos) + horários | 1 | ✅ entregue |
+| 7 | Checkout + pedidos + máquina de estados completa | 1 | ✅ entregue |
+| 8 | Pagamento — **revisado**: produção usa PIX estático + confirmação manual, não `MockPaymentProvider` | 1 | ✅ entregue (modelo diferente do planejado) |
+| 9 | Gestor de pedidos realtime + push/som + fila offline + login real de staff | 1 | ✅ entregue |
+| 9c | Infra real de produção (deploy, staging separado, backup/restore) | 1 | ✅ entregue |
+| 10 | Impressão ESC/POS + agente local + wizard de impressora | 1 | ✅ entregue (reposicionado pro fim da Fase 1, antes do go-live, como decidido) |
+| 11 | WhatsApp de status via click-to-chat + `notification_log` | 1 | ✅ entregue |
+| 12 | Página de acompanhamento do pedido (timeline) + convite de avaliação por link | 1 | ✅ entregue |
+| 13 | Onboarding self-service + wizard de 7 passos | 1 | ✅ entregue |
+| 13b | Tema: 3 templates (Brasa, Folha, Grafite) + logo/capa (+ editor de enquadramento) | 1 | ✅ entregue |
+| 13d | Assinatura e billing (ciclo de vida manual: trial, dunning, suspensão) | 1 | ✅ entregue |
+| 14 | Super-admin: provisionamento, módulos, entitlements, impersonation | 1 | ✅ entregue |
+| — | **🚀 GO-LIVE do piloto** (Cabanhas BBQ, `molho.live`) | — | ✅ **feito** |
+| 15 | Cupons + promoções agendadas + combos | 2 | ✅ entregue, adiantado pro MVP |
+| 16 | Fidelidade (por cashback, não pontos) + avaliações | 2 | ✅ entregue, adiantado pro MVP (modelo revisado) |
+| 17 | Dashboard + relatórios + módulo de CMV | 2 | ✅ entregue (CMV não estava no plano original) |
+| — | Pedidos com horário agendado (`scheduling-slots`) | 4→2 | ✅ entregue, adiantado da Fase 4 |
+| — | Balcão: pedido walk-in, retirada, leitor de balança, comanda numerada | 3→1/2 | ✅ entregue, adiantado (cobre parte do escopo de PDV sem caixa) |
+| 18 | App do motoboy (PWA) + mapa de entregas | 2 | ⏳ não iniciado |
+| 19 | Robô WhatsApp (Cloud API, número dedicado, opcional) | 2 | ⏳ não iniciado |
+| — | Cartão online | 2 | ⏳ não iniciado |
+| 20 | PDV completo + caixa (abertura/fechamento, sangria) | 3 | ✅ entregue (branch `feat/epico-20-pdv-caixa`, ainda não mesclada/deployada) — cash_sessions/cash_withdrawals, PIN de aprovação, gate `pdv`/`cash_register` sem tiering, analytics de quebra de caixa, UI de abertura bloqueante no balcão |
+| 21 | KDS + mesas + QR-code + app do garçom | 3 | ⏳ não iniciado (cozinha opera hoje só com comanda impressa) |
+| 22 | Integração iFood | 3 | ⏳ não iniciado |
+| 23 | Campanhas de marketing + multi-loja | 3 | ⏳ não iniciado |
+| 24 | Adaptador Asaas (PIX + cartão, sandbox → produção) | — | ⏳ não iniciado |
+| 25 | Adaptador Mercado Pago + roteamento com failover | — | ⏳ não iniciado |
+| 26 | Conciliação, antifraude, PCI SAQ-A, testes de caos | — | ⏳ não iniciado |
+| 27 | NFC-e (Focus NFe) + franquias | 4 | ⏳ não iniciado |
 
-> **Nota:** os épicos 24–26 (PSP real) são os últimos, conforme decidido — mas **abra as contas sandbox e o KYC agora**: o gargalo é burocrático (2–6 semanas), não técnico.
+> **Nota:** os épicos 24–26 (PSP real) continuam por último — produção roda com PIX estático manual desde o go-live. Verificar se as contas sandbox/KYC citados na seção 5-D.5 já foram abertos.
+
+> **Nota sobre `packages/contracts/modules.ts`:** é a fonte mais confiável de "o que existe vs o que só está planejado" — módulos ainda `plans: ['premium']`/`external: true` sem controller correspondente em `apps/api/src` (ex.: `kds`, `tables`, `channel.ifood`, `channel.waiter_app`, `franchise`, `fiscal.nfce`) seguem não implementados de propósito, registrados desligados. `pdv`/`cash_register` saíram dessa lista no Épico 20 (2026-09-14) — viraram `default:true` e têm controller (`apps/api/src/cash/`).
 
 > **Backlog de UX:** melhorias de UI/UX do storefront identificadas comparando com o iFood (referência de mercado do ICP) — densidade de card, header rico, carrinho no header, sheet horizontal em desktop, modificadores em mais produtos. Não são deste épico nem do próximo; registradas em `docs/06-backlog-ux.md` pra não se perder, priorização futura.
 
 > **Seed do Épico 9:** o pedido de teste criado manualmente durante a validação do Épico 7 (checkout) fica no banco de propósito — apagar exigiria rodar como `app_migrator` pra furar as policies append-only de `order_items`/`order_status_history`, faxina de dev que não vale o custo. Quando o Épico 9 (gestor de pedidos) começar, o seed (`packages/db/prisma/seed/`) ganha pedidos de exemplo em estados variados (`received`, `preparing`, `ready`, `in_transit`, `completed`, `canceled`) pra que a tela do gestor tenha o que renderizar sem depender de alguém fechar pedido na mão toda vez.
 
 > **Épico 10 (impressão ESC/POS) reposicionado pro fim da Fase 1**, depois do 13d e do 14, imediatamente antes do go-live — decisão consciente, não esquecimento (o número "10" fica como identidade do épico, não como posição de execução; mesmo precedente de 13b/13d). **Consequência aceita: o piloto vai ao ar sem comanda impressa, operando 100% por tela** (gestor de pedidos do Épico 9 mostra o pedido, cozinha lê na tela em vez do papel). Se a impressão virar bloqueio de verdade numa conversa com o restaurante piloto — cozinha que só opera com papel, por hábito ou por volume — o épico é antecipado na hora; até lá, o esforço (agente local, wizard de impressora, protocolo ESC/POS) fica atrás de módulos que destravam mais lojas ao mesmo tempo (billing, super-admin).
+
+### 8-B. Decisões de produto pendentes (registrar antes de codar o épico correspondente)
+
+**[PEND-1] Épico 19 — Robô WhatsApp (Cloud API): número e custo, quem conecta e quem paga**
+
+Contexto: `channel.whatsapp_bot` (packages/contracts/modules.ts) tá registrado como módulo `external: true`, plano Pro/Premium, mas nenhuma linha de código existe ainda (nem adaptador `MessagingProvider` pra Cloud API). docs/99-auditoria-2.md (item 2) fechou a recomendação de arquitetura mas não fechou os pontos abaixo.
+
+Recomendação já registrada (auditoria 2, opção B da tabela):
+- O lojista usa um **número novo, dedicado ao robô** — não o WhatsApp pessoal dele. Conectar o número de sempre à Cloud API tira esse número do app normal do celular (inaceitável pro ICP: "restaurante que anota pedido no WhatsApp na mão").
+- Opção C (um número único do Molho pra todos os lojistas) foi descartada — escala mal, quebra marca do lojista.
+- Trade-off aceito: cliente que já fala no número antigo não migra sozinho pro robô; o número novo só funciona pra quem descobrir (link no cardápio, QR etc.).
+
+**Não decidido / não escrito em doc nenhum ainda:**
+1. **Quem é o titular da conta WhatsApp Business/Meta** conectada — o lojista com credencial própria (implícito pelo `external: true`, padrão dos outros módulos externos), ou o Molho intermediando em nome dele? Se for o lojista, ele passa pela verificação de negócio da Meta (1–3 semanas) e aprovação de templates sozinho.
+2. **Quem paga a Meta pelas conversas** — Meta cobra por conversa de serviço/utilidade, estimativa de dezenas de reais/mês numa loja ativa (docs/99-auditoria-2.md linha 48). Pelo desenho atual (módulo external do lojista), o custo cai pro lojista que optar, não pro Molho — mas isso nunca foi escrito como regra.
+3. **Se o Molho cobra markup ou repassa direto** — nenhuma decisão de billing pra esse repasse existe (Épico 13d cobre só a mensalidade do plano, não uso metered de WhatsApp).
+4. **Impacto em unit economics** — docs/99-auditoria-2.md (item 3) já sinalizava que, se o custo de WhatsApp oficial for alto, o plano Standard de R$99 fica com margem apertada; precisa entrar na planilha de unit economics (`docs/05-unit-economics.xlsx`) antes de vender o módulo.
+
+**Ação:** decisão de produto (dono: PM) antes de abrir o Épico 19. Sem isso, `channel.whatsapp_bot` continua registrado e desligado.
 
 ---
 

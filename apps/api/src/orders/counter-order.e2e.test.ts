@@ -103,6 +103,24 @@ beforeAll(async () => {
   });
   storeId = store.id;
 
+  // Épico 20 — balcão recusa pedido sem caixa aberto (NoOpenCashSessionError).
+  // Sessão criada direto no banco (não pelo endpoint): este teste é do FLUXO
+  // DE PEDIDO, não do fluxo de caixa (que tem o próprio e2e/unit).
+  const openerEmail = randomEmail('opener');
+  createdEmails.push(openerEmail);
+  const { ciphertext: openerCiphertext, keyVersion: openerKeyVersion } = encryptEmail(openerEmail);
+  const opener = await migratorPrisma.user.create({
+    data: {
+      name: openerEmail,
+      emailCiphertext: Buffer.from(openerCiphertext),
+      emailLookupHash: hashEmailForLookup(openerEmail),
+      emailKeyVersion: openerKeyVersion,
+    },
+  });
+  await migratorPrisma.cashSession.create({
+    data: { tenantId, storeId, openedByUserId: opener.id, openingAmountCents: 0 },
+  });
+
   const category = await migratorPrisma.category.create({ data: { tenantId, name: 'Salgados', sortOrder: 0, visible: true } });
   categoryId = category.id;
   const product = await migratorPrisma.product.create({
@@ -144,6 +162,10 @@ afterAll(async () => {
       await migratorPrisma.orderItem.deleteMany({ where: { tenantId: id } });
       await migratorPrisma.orderStatusHistory.deleteMany({ where: { tenantId: id } });
       await migratorPrisma.order.deleteMany({ where: { tenantId: id } });
+      // Depois de orders (RESTRICT: orders.cash_session_id → cash_sessions.id) —
+      // Épico 20.
+      await migratorPrisma.cashWithdrawal.deleteMany({ where: { tenantId: id } });
+      await migratorPrisma.cashSession.deleteMany({ where: { tenantId: id } });
       await migratorPrisma.customer.deleteMany({ where: { tenantId: id } });
       await migratorPrisma.product.deleteMany({ where: { tenantId: id } });
       await migratorPrisma.category.deleteMany({ where: { tenantId: id } });

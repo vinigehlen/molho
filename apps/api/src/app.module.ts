@@ -2,6 +2,7 @@ import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from 
 import { AuthModule } from './auth/auth.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { BillingModule } from './billing/billing.module';
+import { CashModule } from './cash/cash.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ContextModule } from './context/context.module';
 import { CouponsModule } from './coupons/coupons.module';
@@ -33,6 +34,7 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     AuthModule,
     AnalyticsModule,
     BillingModule,
+    CashModule,
     CustomerProfileModule,
     CatalogModule,
     CouponsModule,
