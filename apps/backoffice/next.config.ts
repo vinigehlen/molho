@@ -1,5 +1,8 @@
 import type { NextConfig } from 'next';
 import { buildFrontSecurityHeaders } from '../front-security';
+import { validateApiUrl } from './lib/api-config';
+
+validateApiUrl(process.env);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
