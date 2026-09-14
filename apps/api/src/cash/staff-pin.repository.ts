@@ -1,10 +1,17 @@
 import type { RequestContextService } from '../context/request-context.service';
 
+export interface StaffApproverRow {
+  id: string;
+  name: string;
+}
+
 export interface StaffPinRepository {
   setPinHash(userId: string, pinHash: string): Promise<void>;
   getPinHash(userId: string): Promise<string | null>;
   /** owner/manager são os únicos papéis sem `approval:true` pra `cash.withdraw` (packages/contracts/src/permissions.ts) — é isso que qualifica alguém a APROVAR a sangria de outro ator. */
   hasApproverRole(tenantId: string, userId: string): Promise<boolean>;
+  /** Pra UI de sangria oferecer QUEM pode aprovar — só nome (dado já público entre colegas de loja), nunca telefone/e-mail. */
+  listApprovers(tenantId: string): Promise<StaffApproverRow[]>;
 }
 
 const APPROVER_ROLES = ['owner', 'manager'] as const;
@@ -40,5 +47,14 @@ export class PrismaStaffPinRepository implements StaffPinRepository {
       select: { id: true },
     });
     return role !== null;
+  }
+
+  async listApprovers(tenantId: string): Promise<StaffApproverRow[]> {
+    const roles = await this.requestContext.getClient().userRole.findMany({
+      where: { role: { in: [...APPROVER_ROLES] }, scopeType: 'tenant', scopeId: tenantId },
+      select: { user: { select: { id: true, name: true } } },
+      distinct: ['userId'],
+    });
+    return roles.map((r) => r.user);
   }
 }

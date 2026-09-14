@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { CounterOrderPaymentMethod, CounterOrderResponse } from '@molho/contracts';
+import type { CounterOrderPaymentMethod, CounterOrderResponse, CurrentCashSessionResponse } from '@molho/contracts';
 import { Minus, Plus, ReceiptText, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomerSearchResult } from '@molho/contracts';
 import { MoProductSheet, type MoProductSheetProduct, type MoProductSheetSelection } from '@molho/ui';
+import { CashSessionPanel } from './cash-session-panel';
 import {
   createCounterOrder,
   fetchCounterCatalog,
@@ -53,6 +54,9 @@ export default function BalcaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CounterOrderResponse | null>(null);
   const [productSheet, setProductSheet] = useState<MoProductSheetProduct | null>(null);
+  // Épico 20 — null = sem caixa aberto, trava "Finalizar pedido" (o modal
+  // bloqueante de abertura fica dentro de CashSessionPanel).
+  const [cashSession, setCashSession] = useState<CurrentCashSessionResponse>(null);
 
   const filteredProducts = useMemo(
     () => products.filter((product) => categoryId === 'all' || product.categoryId === categoryId),
@@ -178,7 +182,7 @@ export default function BalcaoPage() {
   }
 
   async function submitOrder() {
-    if (!storeId || cart.length === 0) return;
+    if (!storeId || cart.length === 0 || !cashSession) return;
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -252,6 +256,8 @@ export default function BalcaoPage() {
           Pedido {success.orderId.slice(0, 8)} criado: {centsToBRL(success.totalCents)}
         </div>
       )}
+
+      {storeId && <CashSessionPanel storeId={storeId} onSessionChange={setCashSession} />}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
         <section className="space-y-4">
@@ -462,10 +468,10 @@ export default function BalcaoPage() {
           </div>
           <button
             className="mt-4 w-full rounded-[14px] bg-brand px-4 py-3 text-base font-bold text-on-brand disabled:opacity-50"
-            disabled={submitting || cart.length === 0 || !storeId}
+            disabled={submitting || cart.length === 0 || !storeId || !cashSession}
             onClick={() => void submitOrder()}
           >
-            {submitting ? 'Finalizando…' : 'Finalizar pedido'}
+            {submitting ? 'Finalizando…' : !cashSession ? 'Abra o caixa pra vender' : 'Finalizar pedido'}
           </button>
         </aside>
       </div>

@@ -20,4 +20,8 @@ export class StaffPinService {
     if (!stored) return false;
     return verifySecret(pin, stored);
   }
+
+  listApprovers(tenantId: string) {
+    return this.repo.listApprovers(tenantId);
+  }
 }

@@ -61,6 +61,7 @@ function makePinRepo(overrides: Partial<StaffPinRepository> = {}): StaffPinRepos
     setPinHash: vi.fn(),
     getPinHash: vi.fn().mockResolvedValue(null),
     hasApproverRole: vi.fn().mockResolvedValue(false),
+    listApprovers: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }

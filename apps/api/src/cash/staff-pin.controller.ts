@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Inject, Post, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Inject, Post, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import {
   type SetStaffPinInput,
   setStaffPinSchema,
@@ -6,6 +6,7 @@ import {
   verifyStaffPinSchema,
 } from '@molho/contracts';
 import { JwtAuthGuard, type RequestWithUser } from '../auth/guards/jwt-auth.guard';
+import { requireTenantIdHeader } from '../auth/guards/tenant-header.util';
 import { TenantContextInterceptor } from '../auth/guards/tenant-context.interceptor';
 import type { StaffPinService } from './staff-pin.service';
 import { STAFF_PIN_SERVICE } from './cash.tokens';
@@ -39,5 +40,12 @@ export class StaffPinController {
     if (!req.user) throw new ForbiddenException();
     const valid = await this.pins.verifyPin(dto.userId, dto.pin);
     return { valid };
+  }
+
+  /** owner/manager do tenant — a UI de sangria usa isto pra oferecer um SELECT de aprovador, nunca um campo livre de userId. */
+  @Get('approvers')
+  listApprovers(@Req() req: RequestWithUser) {
+    const tenantId = requireTenantIdHeader(req);
+    return this.pins.listApprovers(tenantId);
   }
 }

@@ -48,6 +48,12 @@ export const setStaffPinSchema = z.strictObject({
 });
 export type SetStaffPinInput = z.infer<typeof setStaffPinSchema>;
 
+/** owner/manager do tenant — pra UI de sangria oferecer QUEM pode aprovar (nunca confia num userId digitado à mão). */
+export interface StaffApprover {
+  id: string;
+  name: string;
+}
+
 export const verifyStaffPinSchema = z.strictObject({
   userId: z.uuid(),
   pin: z.string().trim().min(1).max(6),
