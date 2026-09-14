@@ -87,6 +87,11 @@ export class SignupProvisioningService {
       data: {
         tenantId: tenant.id,
         name: input.restaurantName.trim(),
+        // Slug = slug do tenant (já garantido único acima): é a loja que a
+        // URL pública legada `/<tenant-slug>` resolve, e a única que existe
+        // até o lojista criar mais uma via multi_store.
+        slug: tenant.slug,
+        isPrimary: true,
         addressText: 'Configure o endereço da loja',
         timezone: 'America/Sao_Paulo',
       },

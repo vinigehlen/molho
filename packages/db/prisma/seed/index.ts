@@ -76,6 +76,8 @@ async function seedTenant(
   const storeData = {
     tenantId: tenant.id,
     name: def.store.name,
+    slug: def.slug,
+    isPrimary: true,
     addressText: def.store.addressText,
     timezone: def.store.timezone,
     phone: def.store.phone,

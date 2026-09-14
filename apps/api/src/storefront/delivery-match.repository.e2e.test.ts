@@ -52,7 +52,7 @@ beforeAll(async () => {
   tenantId = tenant.id;
 
   const store = await migrator.store.create({
-    data: { tenantId, name: 'Zona E2E', addressText: 'Av. Brasil, 1684', timezone: 'America/Sao_Paulo' },
+    data: { tenantId, name: 'Zona E2E', slug, isPrimary: true, addressText: 'Av. Brasil, 1684', timezone: 'America/Sao_Paulo' },
   });
   storeId = store.id;
   await migrator.$executeRaw`
@@ -171,7 +171,7 @@ describe('PrismaDeliveryMatchRepository — cidade e polígono no mesmo tenant',
       data: { slug: `${slug}-outro`, name: 'Outro', timezone: 'America/Sao_Paulo' },
     });
     const outraLoja = await migrator.store.create({
-      data: { tenantId: outroTenant.id, name: 'Outra', addressText: 'x', timezone: 'America/Sao_Paulo' },
+      data: { tenantId: outroTenant.id, name: 'Outra', slug: `${slug}-outro`, isPrimary: true, addressText: 'x', timezone: 'America/Sao_Paulo' },
     });
     await migrator.$executeRaw`
       INSERT INTO delivery_zones (tenant_id, store_id, name, city, state, fee_cents, eta_min_minutes, eta_max_minutes, priority)
