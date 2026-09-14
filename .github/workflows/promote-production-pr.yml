@@ -1,0 +1,51 @@
+# Abre (não mergeia) o PR main → production assim que a CI de main passa.
+# Merge continua manual — production é branch protegida (PR + CI quality
+# obrigatórios, ver docs/go-live/evidencias-cc.md). Isso só tira o passo
+# manual de criar o PR; promover pra produção real ainda é você apertando
+# merge depois de validar staging (checklist no corpo do PR).
+name: Abre PR de promoção pra produção
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Abre PR se houver diferença e nenhum PR aberto ainda
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin production --quiet
+          if git diff --quiet origin/production main; then
+            echo "main e production já estão iguais, nada a promover."
+            exit 0
+          fi
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base production --head main --state open --json number --jq '.[0].number')"
+          if [ -n "$existing" ]; then
+            echo "PR #$existing já aberto pra production."
+            exit 0
+          fi
+
+          body_file="$(mktemp)"
+          cat .github/PULL_REQUEST_TEMPLATE/production.md > "$body_file"
+          printf '\n' >> "$body_file"
+          git log --oneline origin/production..main >> "$body_file"
+
+          gh pr create --repo "$GITHUB_REPOSITORY" \
+            --base production --head main \
+            --title "chore: promove main para production" \
+            --body-file "$body_file"
