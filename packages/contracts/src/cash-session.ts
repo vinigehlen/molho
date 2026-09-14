@@ -84,3 +84,33 @@ export interface CashWithdrawalResponse {
   approvedByUserId: string;
   createdAt: string;
 }
+
+/**
+ * Corte de análise por sessão FECHADA (decisão 8 do handoff) — sessão aberta
+ * não entra: `expectedAmountCents`/`countedAmountCents` só existem no
+ * fechamento, e uma sessão em andamento não tem "quebra de caixa" ainda.
+ */
+export interface CashSessionReportRow {
+  id: string;
+  openedByUserId: string;
+  closedByUserId: string | null;
+  openedAt: string;
+  closedAt: string;
+  openingAmountCents: number;
+  countedAmountCents: number;
+  expectedAmountCents: number;
+  /** counted - expected — positivo = sobrou dinheiro na gaveta, negativo = faltou. */
+  discrepancyCents: number;
+  withdrawalsCents: number;
+}
+
+export interface CashSessionReportResponse {
+  sessions: CashSessionReportRow[];
+  totals: {
+    openingAmountCents: number;
+    countedAmountCents: number;
+    expectedAmountCents: number;
+    discrepancyCents: number;
+    withdrawalsCents: number;
+  };
+}

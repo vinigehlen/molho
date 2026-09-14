@@ -1,4 +1,5 @@
 import type {
+  CashSessionReportResponse,
   CashSessionResponse,
   CashWithdrawalResponse,
   CreateCashWithdrawalInput,
@@ -82,6 +83,22 @@ export class CashSessionService {
       : actor.id;
 
     return this.repo.createWithdrawal(sessionId, input.amountCents, input.reason, actor.id, approvedByUserId);
+  }
+
+  /** Corte de análise (decisão 8 do handoff) — soma os totais em cima das linhas devolvidas, nunca uma query agregada separada (evita os dois discordarem). */
+  async report(storeId: string, from: Date, to: Date): Promise<CashSessionReportResponse> {
+    const sessions = await this.repo.listClosedForPeriod(storeId, from, to);
+    const totals = sessions.reduce(
+      (acc, s) => ({
+        openingAmountCents: acc.openingAmountCents + s.openingAmountCents,
+        countedAmountCents: acc.countedAmountCents + s.countedAmountCents,
+        expectedAmountCents: acc.expectedAmountCents + s.expectedAmountCents,
+        discrepancyCents: acc.discrepancyCents + s.discrepancyCents,
+        withdrawalsCents: acc.withdrawalsCents + s.withdrawalsCents,
+      }),
+      { openingAmountCents: 0, countedAmountCents: 0, expectedAmountCents: 0, discrepancyCents: 0, withdrawalsCents: 0 },
+    );
+    return { sessions, totals };
   }
 
   /** Usado pelo balcão (CounterOrderService) — sessão obrigatória pra vender é regra de APLICAÇÃO, não CHECK de banco (docs/HANDOFF-epico-20-pdv-caixa.md). */

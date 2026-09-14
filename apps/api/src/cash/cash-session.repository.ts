@@ -1,4 +1,4 @@
-import type { CashSessionResponse, CashWithdrawalResponse } from '@molho/contracts';
+import type { CashSessionReportRow, CashSessionResponse, CashWithdrawalResponse } from '@molho/contracts';
 import { Prisma } from '@molho/db';
 import type { RequestContextService } from '../context/request-context.service';
 import {
@@ -25,6 +25,8 @@ export interface CashSessionRepository {
     requestedByUserId: string,
     approvedByUserId: string,
   ): Promise<CashWithdrawalResponse>;
+  /** Sessões FECHADAS no período (decisão 8 do handoff) — sessão em andamento não tem quebra de caixa ainda. */
+  listClosedForPeriod(storeId: string, from: Date, to: Date): Promise<CashSessionReportRow[]>;
 }
 
 export class PrismaCashSessionRepository implements CashSessionRepository {
@@ -103,6 +105,40 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
       approvedByUserId: withdrawal.approvedByUserId,
       createdAt: withdrawal.createdAt.toISOString(),
     };
+  }
+
+  async listClosedForPeriod(storeId: string, from: Date, to: Date): Promise<CashSessionReportRow[]> {
+    const client = this.requestContext.getClient();
+    const sessions = await client.cashSession.findMany({
+      where: { storeId, status: 'closed', closedAt: { gte: from, lte: to } },
+      orderBy: { closedAt: 'asc' },
+    });
+    if (sessions.length === 0) return [];
+
+    const withdrawalTotals = await client.cashWithdrawal.groupBy({
+      by: ['cashSessionId'],
+      where: { cashSessionId: { in: sessions.map((s) => s.id) } },
+      _sum: { amountCents: true },
+    });
+    const withdrawalsBySession = new Map(withdrawalTotals.map((w) => [w.cashSessionId, w._sum.amountCents ?? 0]));
+
+    return sessions.map((s) => {
+      const counted = s.countedAmountCents ?? 0;
+      const expected = s.expectedAmountCents ?? 0;
+      return {
+        id: s.id,
+        openedByUserId: s.openedByUserId,
+        closedByUserId: s.closedByUserId,
+        openedAt: s.openedAt.toISOString(),
+        // closedAt não é null aqui — filtro é status:'closed', que só grava junto com closedAt (repository.close).
+        closedAt: (s.closedAt as Date).toISOString(),
+        openingAmountCents: s.openingAmountCents,
+        countedAmountCents: counted,
+        expectedAmountCents: expected,
+        discrepancyCents: counted - expected,
+        withdrawalsCents: withdrawalsBySession.get(s.id) ?? 0,
+      };
+    });
   }
 
   /** opening + Σ vendas em DINHEIRO do balcão da sessão - Σ sangrias. Cartão na hora não mexe na gaveta física, por isso fica de fora. */

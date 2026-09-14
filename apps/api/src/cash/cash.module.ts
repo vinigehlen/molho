@@ -6,6 +6,7 @@ import { RequestContextService } from '../context/request-context.service';
 import { ModuleCheckModule } from '../modules/module-check.module';
 import { PrismaCashSessionRepository } from './cash-session.repository';
 import { CashSessionController } from './cash-session.controller';
+import { CashAnalyticsController } from './cash-analytics.controller';
 import { CashSessionService } from './cash-session.service';
 import { PrismaStaffPinRepository } from './staff-pin.repository';
 import { StaffPinController } from './staff-pin.controller';
@@ -19,7 +20,7 @@ import {
 
 @Module({
   imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
-  controllers: [CashSessionController, StaffPinController],
+  controllers: [CashSessionController, StaffPinController, CashAnalyticsController],
   providers: [
     {
       provide: CASH_SESSION_REPOSITORY,
