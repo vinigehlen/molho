@@ -55,7 +55,7 @@ async function createGraph(slug: string, moduleEnabled = true): Promise<Graph> {
     data: { tenantId: tenant.id, moduleKey: 'printing.escpos', enabled: moduleEnabled },
   });
   const store = await db.store.create({
-    data: { tenantId: tenant.id, name: 'Loja', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    data: { tenantId: tenant.id, name: 'Loja', slug, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
   });
   const customer = await db.customer.create({
     data: {
