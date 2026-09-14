@@ -164,7 +164,7 @@ beforeAll(async () => {
   tenantId = tenant.id;
 
   const store = await migratorPrisma.store.create({
-    data: { tenantId, name: 'Ajuste E2E', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    data: { tenantId, name: 'Ajuste E2E', slug, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
   });
   storeId = store.id;
 
@@ -177,7 +177,7 @@ beforeAll(async () => {
 
   // Segunda loja, MESMO tenant — prova que storeId da URL é checado, não só tenant.
   const otherStore = await migratorPrisma.store.create({
-    data: { tenantId, name: 'Outra Loja E2E', addressText: 'Rua Y, 2', timezone: 'America/Sao_Paulo' },
+    data: { tenantId, name: 'Outra Loja E2E', slug: `${slug}-outra`, addressText: 'Rua Y, 2', timezone: 'America/Sao_Paulo' },
   });
   otherStoreId = otherStore.id;
 

@@ -158,6 +158,8 @@ beforeAll(async () => {
     data: {
       tenantId,
       name: 'Checkout E2E',
+      slug,
+      isPrimary: true,
       addressText: 'Rua X, 1',
       timezone: 'America/Sao_Paulo',
       minOrderCents: 1000,
