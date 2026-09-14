@@ -527,8 +527,8 @@ Entregue: cupons, promoções agendadas, combos (incl. combo aninhado), fidelida
 Pendente: app do motoboy (PWA) + mapa de entregas ao vivo, robô WhatsApp via Cloud API, cartão online, campanhas de marketing.
 
 ### Fase 3 — Operação completa — parcialmente concluída
-Entregue (fora de ordem, como extensão do gestor de pedidos): **Balcão** — criação e edição de pedido walk-in, retirada no balcão, leitor de etiqueta de balança, comanda com numeração sequencial e 2 vias (balcão + cozinha). Isso cobre parte do que seria PDV, sem caixa formal.
-Pendente: PDV completo com abertura/fechamento de caixa e sangria (`cash_register`), KDS (tela de cozinha — hoje a cozinha lê a comanda impressa), mesas + QR-code + app do garçom (`tables`, `channel.qrcode_table`, `channel.waiter_app`), integração iFood, multi-loja.
+Entregue (fora de ordem, como extensão do gestor de pedidos): **Balcão** — criação e edição de pedido walk-in, retirada no balcão, leitor de etiqueta de balança, comanda com numeração sequencial e 2 vias (balcão + cozinha). **Épico 20 (caixa)** — sessão de caixa por loja (abertura obrigatória pra vender, fechamento com conferência), sangria com aprovação por PIN, analytics de quebra de caixa; `pdv`/`cash_register` saíram de `plans:['premium']` pra `default:true` em todo plano (mesma decisão de coupons/combos). Branch `feat/epico-20-pdv-caixa`, ainda não mesclada/deployada.
+Pendente: KDS (tela de cozinha — hoje a cozinha lê a comanda impressa), mesas + QR-code + app do garçom (`tables`, `channel.qrcode_table`, `channel.waiter_app`), integração iFood, multi-loja.
 
 ### Fase 4 — Escala — não iniciada (exceto pedidos agendados, adiantado)
 NFC-e (add-on) · franquias · IA (descrições, previsão de demanda) · app nativo.
@@ -574,7 +574,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 | 18 | App do motoboy (PWA) + mapa de entregas | 2 | ⏳ não iniciado |
 | 19 | Robô WhatsApp (Cloud API, número dedicado, opcional) | 2 | ⏳ não iniciado |
 | — | Cartão online | 2 | ⏳ não iniciado |
-| 20 | PDV completo + caixa (abertura/fechamento, sangria) | 3 | ⏳ não iniciado (balcão cobre parte) |
+| 20 | PDV completo + caixa (abertura/fechamento, sangria) | 3 | ✅ entregue (branch `feat/epico-20-pdv-caixa`, ainda não mesclada/deployada) — cash_sessions/cash_withdrawals, PIN de aprovação, gate `pdv`/`cash_register` sem tiering, analytics de quebra de caixa, UI de abertura bloqueante no balcão |
 | 21 | KDS + mesas + QR-code + app do garçom | 3 | ⏳ não iniciado (cozinha opera hoje só com comanda impressa) |
 | 22 | Integração iFood | 3 | ⏳ não iniciado |
 | 23 | Campanhas de marketing + multi-loja | 3 | ⏳ não iniciado |
@@ -585,7 +585,7 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 
 > **Nota:** os épicos 24–26 (PSP real) continuam por último — produção roda com PIX estático manual desde o go-live. Verificar se as contas sandbox/KYC citados na seção 5-D.5 já foram abertos.
 
-> **Nota sobre `packages/contracts/modules.ts`:** é a fonte mais confiável de "o que existe vs o que só está planejado" — módulos ainda `plans: ['premium']`/`external: true` sem controller correspondente em `apps/api/src` (ex.: `pdv`, `kds`, `tables`, `channel.ifood`, `channel.waiter_app`, `franchise`, `fiscal.nfce`) seguem não implementados de propósito, registrados desligados.
+> **Nota sobre `packages/contracts/modules.ts`:** é a fonte mais confiável de "o que existe vs o que só está planejado" — módulos ainda `plans: ['premium']`/`external: true` sem controller correspondente em `apps/api/src` (ex.: `kds`, `tables`, `channel.ifood`, `channel.waiter_app`, `franchise`, `fiscal.nfce`) seguem não implementados de propósito, registrados desligados. `pdv`/`cash_register` saíram dessa lista no Épico 20 (2026-09-14) — viraram `default:true` e têm controller (`apps/api/src/cash/`).
 
 > **Backlog de UX:** melhorias de UI/UX do storefront identificadas comparando com o iFood (referência de mercado do ICP) — densidade de card, header rico, carrinho no header, sheet horizontal em desktop, modificadores em mais produtos. Não são deste épico nem do próximo; registradas em `docs/06-backlog-ux.md` pra não se perder, priorização futura.
 
