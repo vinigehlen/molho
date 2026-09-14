@@ -26,6 +26,7 @@ import { StoreHoursAdminModule } from './store-hours-admin/store-hours-admin.mod
 import { StoreSetupModule } from './store-setup/store-setup.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limit.middleware';
+import { TeamModule } from './team/team.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { StorefrontRateLimitMiddleware } from './storefront/storefront-rate-limi
     LoyaltyModule,
     ReviewsModule,
     SignupModule,
+    TeamModule,
   ],
   controllers: [HealthController, ReadinessController],
   providers: [ReadinessService],

@@ -15,6 +15,7 @@ import {
   Settings,
   Star,
   Store,
+  Users,
   UtensilsCrossed,
   X,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/gestor/promocoes', label: 'Promoções', icon: Percent, alsoActiveFor: ['/gestor/cupons', '/gestor/fidelidade'] },
   { href: '/gestor/avaliacoes', label: 'Avaliações', icon: Star },
   { href: '/gestor/assinatura', label: 'Assinatura', icon: CreditCard },
+  { href: '/gestor/equipe', label: 'Equipe', icon: Users },
 ];
 
 // Impressão foi para dentro de Configuração (seção "Impressora") e não tem

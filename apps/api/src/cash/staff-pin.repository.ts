@@ -34,16 +34,15 @@ export class PrismaStaffPinRepository implements StaffPinRepository {
     return user?.pinHash ?? null;
   }
 
+  // Só escopo tenant — owner/manager são papéis DE LOJISTA (packages/contracts/
+  // src/permissions.ts), nunca deveriam existir em scopeType:'platform' (isso
+  // é pra platform_owner/platform_support/etc). Tinha um `OR: [{scopeType:
+  // 'platform'}, ...]` aqui que aceitava um approver que listApprovers()
+  // (usado pra montar o dropdown da UI) nunca oferece — os dois caminhos
+  // discordavam sobre quem pode aprovar. Mesmo filtro nos dois agora.
   async hasApproverRole(tenantId: string, userId: string): Promise<boolean> {
     const role = await this.requestContext.getClient().userRole.findFirst({
-      where: {
-        userId,
-        role: { in: [...APPROVER_ROLES] },
-        OR: [
-          { scopeType: 'platform' },
-          { scopeType: 'tenant', scopeId: tenantId },
-        ],
-      },
+      where: { userId, role: { in: [...APPROVER_ROLES] }, scopeType: 'tenant', scopeId: tenantId },
       select: { id: true },
     });
     return role !== null;
