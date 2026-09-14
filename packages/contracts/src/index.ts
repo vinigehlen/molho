@@ -31,6 +31,8 @@ export * from './platform-provision';
 export * from './postal-code';
 export * from './promotion';
 export * from './provision-staff';
+export * from './team';
+export * from './store-admin';
 export * from './scheduling-slot-admin';
 export * from './signup';
 export * from './storefront';

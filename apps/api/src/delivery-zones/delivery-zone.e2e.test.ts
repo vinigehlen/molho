@@ -64,7 +64,7 @@ async function provisionTenant(slug: string) {
     data: { tenantId: tenant.id, moduleKey: 'delivery.zones', enabled: true },
   });
   const store = await prisma.store.create({
-    data: { tenantId: tenant.id, name: `Loja ${slug}`, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    data: { tenantId: tenant.id, name: `Loja ${slug}`, slug, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
   });
   return { tenantId: tenant.id, storeId: store.id };
 }
