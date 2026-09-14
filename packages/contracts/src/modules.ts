@@ -62,9 +62,13 @@ export const MODULES = {
   'notify.whatsapp_ctc': { plans: PLANS, default: true },
 
   // ─── Operação ───────────────────────────────────────────────────────────────
-  pdv: { plans: ['premium'] },
-  'pdv.mobile': { plans: ['premium'], requires: ['pdv'] },
-  cash_register: { plans: ['premium'], requires: ['pdv'] },
+  // Épico 20 (2026-09-14): mesma decisão de coupons/combos/loyalty/reviews
+  // acima — sem tiering por ora, código completo nasce ligado em qualquer
+  // plano. Controle fica em feature-flag de super-admin quando o painel
+  // existir; até lá, todo tenant nasce com o módulo ligado.
+  pdv: { plans: PLANS, default: true },
+  'pdv.mobile': { plans: PLANS, default: false, requires: ['pdv'] },
+  cash_register: { plans: PLANS, default: true, requires: ['pdv'] },
   kds: { plans: ['premium'] },
   tables: { plans: ['premium'] },
   'delivery.zones': { plans: PLANS, default: true },

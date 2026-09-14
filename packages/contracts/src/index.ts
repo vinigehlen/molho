@@ -3,6 +3,7 @@ export * from './admin-order';
 export * from './analytics';
 export * from './billing';
 export * from './cart';
+export * from './cash-session';
 export * from './catalog-admin';
 export * from './checkout';
 export * from './combo-admin';
