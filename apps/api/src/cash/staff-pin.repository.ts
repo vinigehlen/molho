@@ -43,16 +43,6 @@ export class PrismaStaffPinRepository implements StaffPinRepository {
   async hasApproverRole(tenantId: string, userId: string): Promise<boolean> {
     const role = await this.requestContext.getClient().userRole.findFirst({
       where: { userId, role: { in: [...APPROVER_ROLES] }, scopeType: 'tenant', scopeId: tenantId },
-  async hasApproverRole(tenantId: string, userId: string): Promise<boolean> {
-    const role = await this.requestContext.getClient().userRole.findFirst({
-      where: {
-        userId,
-        role: { in: [...APPROVER_ROLES] },
-        OR: [
-          { scopeType: 'platform' },
-          { scopeType: 'tenant', scopeId: tenantId },
-        ],
-      },
       select: { id: true },
     });
     return role !== null;
