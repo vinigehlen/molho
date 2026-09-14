@@ -13,6 +13,7 @@ import {
   MoProductCard,
   MoProductSheet,
   type MoProductSheetSelection,
+  MoToast,
   formatCents,
 } from '@molho/ui';
 import { ADDRESS_SCHEMA_VERSION } from '../../lib/address-storage';
@@ -102,6 +103,8 @@ export function TenantMenu({
   // preferência salva logo após o mount — o "flash" de 1 frame é preferível.
   const [visualizacao, setVisualizacao] = React.useState<'list' | 'grid'>('list');
   const [produtoSelecionado, setProdutoSelecionado] = React.useState<StorefrontProduct | null>(null);
+  const [toastAberto, setToastAberto] = React.useState(false);
+  const [toastMensagem, setToastMensagem] = React.useState('');
   const [enderecoSheetAberto, setEnderecoSheetAberto] = React.useState(false);
   const [deliveryMatch, setDeliveryMatch] = React.useState<DeliveryMatchResponse | null>(null);
   const secoesRef = React.useRef<Map<string, HTMLElement>>(new Map());
@@ -167,6 +170,11 @@ export function TenantMenu({
     secoesRef.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  function avisarAdicionado(nomeProduto: string) {
+    setToastMensagem(`${nomeProduto} adicionado ao carrinho`);
+    setToastAberto(true);
+  }
+
   function adicionarAoCarrinho(produto: StorefrontProduct, selecao: MoProductSheetSelection) {
     cart.addItem({
       lineId: crypto.randomUUID(),
@@ -184,6 +192,7 @@ export function TenantMenu({
       notes: selecao.notes,
     });
     setProdutoSelecionado(null);
+    avisarAdicionado(produto.name);
   }
 
   function salvarEndereco(valor: MoAddressSheetValue) {
@@ -209,6 +218,7 @@ export function TenantMenu({
       quantity: 1,
       notes: null,
     });
+    avisarAdicionado(produto.name);
   }
 
   const faltamParaMinimo = minOrderCents - cart.subtotalCents;
@@ -399,6 +409,8 @@ export function TenantMenu({
         onLookupPostalCode={lookupPostalCode}
         onSave={salvarEndereco}
       />
+
+      <MoToast open={toastAberto} onOpenChange={setToastAberto} message={toastMensagem} />
 
       <MoCartBar
         itemCount={cart.itemCount}
