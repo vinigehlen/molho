@@ -593,6 +593,25 @@ Ativação: 1º pedido real em < 48h do cadastro · conversão do storefront > 8
 
 > **Épico 10 (impressão ESC/POS) reposicionado pro fim da Fase 1**, depois do 13d e do 14, imediatamente antes do go-live — decisão consciente, não esquecimento (o número "10" fica como identidade do épico, não como posição de execução; mesmo precedente de 13b/13d). **Consequência aceita: o piloto vai ao ar sem comanda impressa, operando 100% por tela** (gestor de pedidos do Épico 9 mostra o pedido, cozinha lê na tela em vez do papel). Se a impressão virar bloqueio de verdade numa conversa com o restaurante piloto — cozinha que só opera com papel, por hábito ou por volume — o épico é antecipado na hora; até lá, o esforço (agente local, wizard de impressora, protocolo ESC/POS) fica atrás de módulos que destravam mais lojas ao mesmo tempo (billing, super-admin).
 
+### 8-B. Decisões de produto pendentes (registrar antes de codar o épico correspondente)
+
+**[PEND-1] Épico 19 — Robô WhatsApp (Cloud API): número e custo, quem conecta e quem paga**
+
+Contexto: `channel.whatsapp_bot` (packages/contracts/modules.ts) tá registrado como módulo `external: true`, plano Pro/Premium, mas nenhuma linha de código existe ainda (nem adaptador `MessagingProvider` pra Cloud API). docs/99-auditoria-2.md (item 2) fechou a recomendação de arquitetura mas não fechou os pontos abaixo.
+
+Recomendação já registrada (auditoria 2, opção B da tabela):
+- O lojista usa um **número novo, dedicado ao robô** — não o WhatsApp pessoal dele. Conectar o número de sempre à Cloud API tira esse número do app normal do celular (inaceitável pro ICP: "restaurante que anota pedido no WhatsApp na mão").
+- Opção C (um número único do Molho pra todos os lojistas) foi descartada — escala mal, quebra marca do lojista.
+- Trade-off aceito: cliente que já fala no número antigo não migra sozinho pro robô; o número novo só funciona pra quem descobrir (link no cardápio, QR etc.).
+
+**Não decidido / não escrito em doc nenhum ainda:**
+1. **Quem é o titular da conta WhatsApp Business/Meta** conectada — o lojista com credencial própria (implícito pelo `external: true`, padrão dos outros módulos externos), ou o Molho intermediando em nome dele? Se for o lojista, ele passa pela verificação de negócio da Meta (1–3 semanas) e aprovação de templates sozinho.
+2. **Quem paga a Meta pelas conversas** — Meta cobra por conversa de serviço/utilidade, estimativa de dezenas de reais/mês numa loja ativa (docs/99-auditoria-2.md linha 48). Pelo desenho atual (módulo external do lojista), o custo cai pro lojista que optar, não pro Molho — mas isso nunca foi escrito como regra.
+3. **Se o Molho cobra markup ou repassa direto** — nenhuma decisão de billing pra esse repasse existe (Épico 13d cobre só a mensalidade do plano, não uso metered de WhatsApp).
+4. **Impacto em unit economics** — docs/99-auditoria-2.md (item 3) já sinalizava que, se o custo de WhatsApp oficial for alto, o plano Standard de R$99 fica com margem apertada; precisa entrar na planilha de unit economics (`docs/05-unit-economics.xlsx`) antes de vender o módulo.
+
+**Ação:** decisão de produto (dono: PM) antes de abrir o Épico 19. Sem isso, `channel.whatsapp_bot` continua registrado e desligado.
+
 ---
 
 ## 9. Prompt para o Claude Code
