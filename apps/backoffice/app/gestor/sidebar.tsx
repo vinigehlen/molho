@@ -4,6 +4,7 @@ import React from 'react';
 import {
   BarChart3,
   Beef,
+  Building2,
   ClipboardList,
   CreditCard,
   ListPlus,

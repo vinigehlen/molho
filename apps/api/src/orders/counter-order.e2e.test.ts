@@ -99,7 +99,7 @@ beforeAll(async () => {
   tenantId = tenant.id;
 
   const store = await migratorPrisma.store.create({
-    data: { tenantId, name: 'Balcão E2E', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    data: { tenantId, name: 'Balcão E2E', slug, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
   });
   storeId = store.id;
 

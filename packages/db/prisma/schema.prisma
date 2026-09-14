@@ -218,6 +218,18 @@ model Store {
   id              String                                 @id @default(dbgenerated("uuidv7()")) @db.Uuid
   tenantId        String                                 @map("tenant_id") @db.Uuid
   name            String
+  /// Slug da loja (Épico multi_store) — único por tenant entre linhas vivas,
+  /// índice único parcial criado à mão na migration (mesmo padrão de
+  /// email/phone lookup hash). É o segundo segmento da URL pública
+  /// (`/<tenant-slug>/<store-slug>`, PR2), e o identificador estável do
+  /// seletor de loja no backoffice. Backfill das lojas existentes = slug do
+  /// próprio tenant (era a única loja, `/<tenant-slug>` já apontava pra ela).
+  slug            String
+  /// A loja que recebe pedido de quem chega só pelo slug do TENANT (rota
+  /// pública legada, compat) — exatamente uma por tenant entre linhas vivas
+  /// (índice único parcial à mão). A primeira loja de todo tenant nasce
+  /// primária; lojas adicionais (multi_store) nascem `false`.
+  isPrimary       Boolean                                @default(false) @map("is_primary")
   /// Razão social separada do nome fantasia. Nullable por legado: `name`
   /// continua sendo o nome público da loja.
   legalName       String?                                @map("legal_name")

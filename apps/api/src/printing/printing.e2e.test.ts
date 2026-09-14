@@ -51,7 +51,7 @@ async function createTenantGraph(slugValue: string) {
   });
 
   const store = await migratorPrisma.store.create({
-    data: { tenantId: tenant.id, name: 'Loja Impressao', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+    data: { tenantId: tenant.id, name: 'Loja Impressao', slug: slugValue, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
   });
   const customer = await migratorPrisma.customer.create({
     data: {

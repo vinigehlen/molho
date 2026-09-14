@@ -56,6 +56,8 @@ beforeAll(async () => {
     data: {
       tenantId: tenantAtivaId,
       name: 'Hamburgueria E2E',
+      slug: slugAtiva,
+      isPrimary: true,
       addressText: 'Rua das Palmeiras, 120',
       timezone: 'America/Sao_Paulo',
       minOrderCents: 2000,
@@ -209,7 +211,7 @@ describe('GET /v1/store/:slug', () => {
     });
     await provisionaStorefront(migratorPrisma, tenant.id, true);
     await migratorPrisma.store.create({
-      data: { tenantId: tenant.id, name: 'Loja Pagamentos E2E', addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
+      data: { tenantId: tenant.id, name: 'Loja Pagamentos E2E', slug: slugPagamentos, isPrimary: true, addressText: 'Rua X, 1', timezone: 'America/Sao_Paulo' },
     });
     for (const moduleKey of ['payments.on_delivery', 'payments.pix_static']) {
       await migratorPrisma.tenantEntitlement.create({ data: { tenantId: tenant.id, moduleKey, source: 'plan', status: 'active' } });

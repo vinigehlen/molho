@@ -79,6 +79,8 @@ export class PlatformProvisioningService {
       data: {
         tenantId: tenant.id,
         name: input.name.trim(),
+        slug: tenant.slug,
+        isPrimary: true,
         addressText: 'Configure o endereço da loja',
         timezone: 'America/Sao_Paulo',
       },
