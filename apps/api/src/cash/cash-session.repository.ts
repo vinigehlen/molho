@@ -115,8 +115,12 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
     const withdrawal = await this.requestContext.getClient().cashWithdrawal.create({
       data: { tenantId, cashSessionId: sessionId, amountCents, reason, requestedByUserId, approvedByUserId },
     });
-    await this.recordAuditLog(tenantId, requestedByUserId, requestedByRole, 'cash_session.withdraw', withdrawal.id, null, {
-      cashSessionId: sessionId,
+    // entityId = sessionId (não withdrawal.id) — é isto que agrupa
+    // abertura/sangria/fechamento sob o MESMO `entity` no audit_log
+    // (`cash_session:<sessionId>`), reconstruindo o histórico da sessão
+    // inteira numa query só. withdrawalId vai no afterJson, não se perde.
+    await this.recordAuditLog(tenantId, requestedByUserId, requestedByRole, 'cash_session.withdraw', sessionId, null, {
+      withdrawalId: withdrawal.id,
       amountCents,
       approvedByUserId,
     });
