@@ -35,7 +35,7 @@ export class CashSessionService {
   }
 
   open(storeId: string, actor: CashSessionActor, openingAmountCents: number): Promise<CashSessionResponse> {
-    return this.repo.open(storeId, actor.id, openingAmountCents);
+    return this.repo.open(storeId, actor.id, actor.role, openingAmountCents);
   }
 
   /**
@@ -60,7 +60,7 @@ export class CashSessionService {
         throw new CashSessionNotFoundError();
       }
     }
-    return this.repo.close(sessionId, actor.id, countedAmountCents, expectedVersion);
+    return this.repo.close(sessionId, actor.id, actor.role, countedAmountCents, expectedVersion);
   }
 
   /**
@@ -82,7 +82,7 @@ export class CashSessionService {
       ? await this.resolveApprover(tenantId, input)
       : actor.id;
 
-    return this.repo.createWithdrawal(sessionId, input.amountCents, input.reason, actor.id, approvedByUserId);
+    return this.repo.createWithdrawal(sessionId, input.amountCents, input.reason, actor.id, actor.role, approvedByUserId);
   }
 
   /** Corte de análise (decisão 8 do handoff) — soma os totais em cima das linhas devolvidas, nunca uma query agregada separada (evita os dois discordarem). */

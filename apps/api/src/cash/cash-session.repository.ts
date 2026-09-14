@@ -10,19 +10,27 @@ import {
 
 export interface CashSessionRepository {
   getOpenForStore(storeId: string): Promise<CashSessionResponse | null>;
-  open(storeId: string, openedByUserId: string, openingAmountCents: number): Promise<CashSessionResponse>;
+  /** `actorRole` só vira audit_log (CLAUDE.md regra 9 — ação sensível em dinheiro), nunca é checado aqui (RBAC já rodou no guard/service). */
+  open(storeId: string, openedByUserId: string, actorRole: string, openingAmountCents: number): Promise<CashSessionResponse>;
   /**
    * `expectedAmountCents` é calculado AQUI (não recebido) — soma de vendas em
    * dinheiro do balcão vinculadas à sessão menos sangrias, no instante do
    * fechamento. Optimistic lock por `version` (CLAUDE.md § banco): dois
    * cliques de "fechar" ao mesmo tempo, o segundo perde.
    */
-  close(sessionId: string, closedByUserId: string, countedAmountCents: number, expectedVersion: number): Promise<CashSessionResponse>;
+  close(
+    sessionId: string,
+    closedByUserId: string,
+    actorRole: string,
+    countedAmountCents: number,
+    expectedVersion: number,
+  ): Promise<CashSessionResponse>;
   createWithdrawal(
     sessionId: string,
     amountCents: number,
     reason: string | undefined,
     requestedByUserId: string,
+    requestedByRole: string,
     approvedByUserId: string,
   ): Promise<CashWithdrawalResponse>;
   /** Sessões FECHADAS no período (decisão 8 do handoff) — sessão em andamento não tem quebra de caixa ainda. */
@@ -39,12 +47,16 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
     return session ? toResponse(session) : null;
   }
 
-  async open(storeId: string, openedByUserId: string, openingAmountCents: number): Promise<CashSessionResponse> {
+  async open(storeId: string, openedByUserId: string, actorRole: string, openingAmountCents: number): Promise<CashSessionResponse> {
     await this.assertStoreExists(storeId);
     const tenantId = this.requestContext.getTenantId();
+    const client = this.requestContext.getClient();
     try {
-      const session = await this.requestContext.getClient().cashSession.create({
+      const session = await client.cashSession.create({
         data: { tenantId, storeId, openedByUserId, openingAmountCents },
+      });
+      await this.recordAuditLog(tenantId, openedByUserId, actorRole, 'cash_session.open', session.id, null, {
+        openingAmountCents,
       });
       return toResponse(session);
     } catch (error) {
@@ -59,6 +71,7 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
   async close(
     sessionId: string,
     closedByUserId: string,
+    actorRole: string,
     countedAmountCents: number,
     expectedVersion: number,
   ): Promise<CashSessionResponse> {
@@ -82,6 +95,11 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
     if (result.count === 0) throw new CashSessionVersionConflictError();
 
     const updated = await client.cashSession.findUniqueOrThrow({ where: { id: sessionId } });
+    await this.recordAuditLog(this.requestContext.getTenantId(), closedByUserId, actorRole, 'cash_session.close', sessionId, null, {
+      countedAmountCents,
+      expectedAmountCents,
+      discrepancyCents: countedAmountCents - expectedAmountCents,
+    });
     return toResponse(updated);
   }
 
@@ -90,11 +108,17 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
     amountCents: number,
     reason: string | undefined,
     requestedByUserId: string,
+    requestedByRole: string,
     approvedByUserId: string,
   ): Promise<CashWithdrawalResponse> {
     const tenantId = this.requestContext.getTenantId();
     const withdrawal = await this.requestContext.getClient().cashWithdrawal.create({
       data: { tenantId, cashSessionId: sessionId, amountCents, reason, requestedByUserId, approvedByUserId },
+    });
+    await this.recordAuditLog(tenantId, requestedByUserId, requestedByRole, 'cash_session.withdraw', withdrawal.id, null, {
+      cashSessionId: sessionId,
+      amountCents,
+      approvedByUserId,
     });
     return {
       id: withdrawal.id,
@@ -105,6 +129,21 @@ export class PrismaCashSessionRepository implements CashSessionRepository {
       approvedByUserId: withdrawal.approvedByUserId,
       createdAt: withdrawal.createdAt.toISOString(),
     };
+  }
+
+  /** Ação sensível em dinheiro (CLAUDE.md regra 9) — mesmo shape de OrderStatusRepository.recordAuditLog. */
+  private async recordAuditLog(
+    tenantId: string,
+    actorId: string,
+    actorRole: string,
+    action: string,
+    entityId: string,
+    beforeJson: Prisma.InputJsonValue | null,
+    afterJson: Prisma.InputJsonValue,
+  ): Promise<void> {
+    await this.requestContext.getClient().auditLog.create({
+      data: { tenantId, actorId, actorRole, action, entity: `cash_session:${entityId}`, beforeJson: beforeJson ?? undefined, afterJson },
+    });
   }
 
   async listClosedForPeriod(storeId: string, from: Date, to: Date): Promise<CashSessionReportRow[]> {

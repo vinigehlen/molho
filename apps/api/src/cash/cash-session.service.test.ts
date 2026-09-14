@@ -40,17 +40,19 @@ function makeRepo(overrides: Partial<CashSessionRepository> = {}): CashSessionRe
     getOpenForStore: vi.fn().mockResolvedValue(openSession()),
     open: vi.fn(),
     close: vi.fn().mockResolvedValue(openSession({ status: 'closed' })),
-    createWithdrawal: vi.fn().mockImplementation((sessionId, amountCents, reason, requestedByUserId, approvedByUserId) =>
-      Promise.resolve({
-        id: 'withdrawal-1',
-        cashSessionId: sessionId,
-        amountCents,
-        reason: reason ?? null,
-        requestedByUserId,
-        approvedByUserId,
-        createdAt: new Date().toISOString(),
-      }),
-    ),
+    createWithdrawal: vi
+      .fn()
+      .mockImplementation((sessionId, amountCents, reason, requestedByUserId, _requestedByRole, approvedByUserId) =>
+        Promise.resolve({
+          id: 'withdrawal-1',
+          cashSessionId: sessionId,
+          amountCents,
+          reason: reason ?? null,
+          requestedByUserId,
+          approvedByUserId,
+          createdAt: new Date().toISOString(),
+        }),
+      ),
     listClosedForPeriod: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
@@ -163,7 +165,7 @@ describe('CashSessionService.close', () => {
     const service = new CashSessionService(repo, new StaffPinService(pinRepo), pinRepo);
 
     await service.close(TENANT_ID, STORE_ID, SESSION_ID, OWNER, 15_000, 0);
-    expect(repo.close).toHaveBeenCalledWith(SESSION_ID, OWNER.id, 15_000, 0);
+    expect(repo.close).toHaveBeenCalledWith(SESSION_ID, OWNER.id, OWNER.role, 15_000, 0);
   });
 
   it('cashier só fecha a sessão que ELE abriu — sessão de outro cashier: CashSessionNotFoundError', async () => {
@@ -183,7 +185,7 @@ describe('CashSessionService.close', () => {
     const service = new CashSessionService(repo, new StaffPinService(pinRepo), pinRepo);
 
     await service.close(TENANT_ID, STORE_ID, SESSION_ID, CASHIER, 15_000, 0);
-    expect(repo.close).toHaveBeenCalledWith(SESSION_ID, CASHIER.id, 15_000, 0);
+    expect(repo.close).toHaveBeenCalledWith(SESSION_ID, CASHIER.id, CASHIER.role, 15_000, 0);
   });
 });
 
