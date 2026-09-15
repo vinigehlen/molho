@@ -32,6 +32,7 @@ const SETUP = {
   responsiblePhone: '+5551999990000',
   financeEmail: 'financeiro@casa.test',
   minOrderCents: 2500,
+  cashSessionRequired: true,
   pixKey: 'pix@casa.test',
   pixKeyType: 'email',
   pixMerchantCity: 'SAO PAULO',

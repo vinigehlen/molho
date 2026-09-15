@@ -123,6 +123,7 @@ function emptyStoreForm(): UpdateStoreSetupInput {
     responsiblePhone: null,
     financeEmail: null,
     minOrderCents: 0,
+    cashSessionRequired: true,
     pixKey: null,
     pixKeyType: null,
     pixMerchantCity: null,
@@ -248,6 +249,7 @@ export default function ConfiguracaoPage() {
           responsiblePhone: loadedSetup.responsiblePhone,
           financeEmail: loadedSetup.financeEmail,
           minOrderCents: loadedSetup.minOrderCents,
+          cashSessionRequired: loadedSetup.cashSessionRequired,
           pixKey: loadedSetup.pixKey,
           pixKeyType: loadedSetup.pixKeyType,
           pixMerchantCity: loadedSetup.pixMerchantCity,
@@ -334,6 +336,7 @@ export default function ConfiguracaoPage() {
         responsiblePhone: saved.responsiblePhone,
         financeEmail: saved.financeEmail,
         minOrderCents: saved.minOrderCents,
+        cashSessionRequired: saved.cashSessionRequired,
         pixKey: saved.pixKey,
         pixKeyType: saved.pixKeyType,
         pixMerchantCity: saved.pixMerchantCity,
@@ -545,6 +548,15 @@ export default function ConfiguracaoPage() {
             <Field label="Telefone comercial" value={storeForm.phone ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, phone: value || null }))} />
             <Field label="WhatsApp de pedidos" value={storeForm.whatsappNumber ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, whatsappNumber: value || null }))} />
             <MoneyField label="Pedido mínimo" value={centsToBRL(storeForm.minOrderCents)} onChange={(value) => setStoreForm((prev) => ({ ...prev, minOrderCents: brlToCents(value) }))} />
+            <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium text-text-muted">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-border"
+                checked={storeForm.cashSessionRequired}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, cashSessionRequired: event.target.checked }))}
+              />
+              Exigir abertura de caixa antes de vender no balcão/pedidos
+            </label>
             <Field label="CEP" value={storeForm.postalCode ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, postalCode: value || null }))} placeholder="00000-000" />
             <Field label="Rua" value={storeForm.street ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, street: value || null }))} />
             <Field label="Número" value={storeForm.number ?? ''} onChange={(value) => setStoreForm((prev) => ({ ...prev, number: value || null }))} />
