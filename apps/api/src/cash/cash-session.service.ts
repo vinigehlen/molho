@@ -108,6 +108,12 @@ export class CashSessionService {
     return session.id;
   }
 
+  /** Épico 20 follow-up — loja com caixa OPCIONAL: vende sem sessão aberta (`null`), mas ainda vincula se houver uma. */
+  async findOpenSessionId(storeId: string): Promise<string | null> {
+    const session = await this.repo.getOpenForStore(storeId);
+    return session?.id ?? null;
+  }
+
   /** `can()` já foi checado pelo guard na entrada da rota — refeito aqui só pra ler `requiresApproval`/`selfOnly`, que o guard ignora hoje (comentário em require-permission.guard.ts). */
   private resolveCan(
     tenantId: string,

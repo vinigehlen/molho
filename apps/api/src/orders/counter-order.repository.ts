@@ -54,7 +54,7 @@ export interface CreateCounterOrderParams {
 }
 
 export interface CounterOrderRepository {
-  findStore(storeId: string): Promise<{ id: string } | null>;
+  findStore(storeId: string): Promise<{ id: string; cashSessionRequired: boolean } | null>;
   findProducts(productIds: readonly string[]): Promise<Map<string, CatalogProduct>>;
   findModifiers(modifierIds: readonly string[]): Promise<Map<string, CatalogModifier>>;
   findOrderByIdempotencyKey(idempotencyKey: string): Promise<ExistingCounterOrder | null>;
@@ -84,10 +84,10 @@ export interface CounterOrderRepository {
 export class PrismaCounterOrderRepository implements CounterOrderRepository {
   constructor(private readonly requestContext: RequestContextService) {}
 
-  async findStore(storeId: string): Promise<{ id: string } | null> {
+  async findStore(storeId: string): Promise<{ id: string; cashSessionRequired: boolean } | null> {
     return this.requestContext.getClient().store.findFirst({
       where: { id: storeId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, cashSessionRequired: true },
     });
   }
 

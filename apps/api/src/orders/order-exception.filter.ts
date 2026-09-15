@@ -24,6 +24,7 @@ import {
   WeighedPriceOutOfRangeError,
 } from './counter-order.errors';
 import { OrderAdjustmentItemNotFoundError, OrderNotEditableError } from './order-adjustment.errors';
+import { NoOpenCashSessionError } from '../cash/cash.errors';
 import { toOrderHttpException } from './order-http.util';
 
 type OrderDomainError =
@@ -47,7 +48,8 @@ type OrderDomainError =
   | WeighedPriceOutOfRangeError
   | MissingIdempotencyKeyError
   | OrderNotEditableError
-  | OrderAdjustmentItemNotFoundError;
+  | OrderAdjustmentItemNotFoundError
+  | NoOpenCashSessionError;
 
 /** Traduz os erros de domínio de pedidos/checkout pra HTTP — mesmo padrão de CatalogExceptionFilter. */
 @Catch(
@@ -72,6 +74,7 @@ type OrderDomainError =
   MissingIdempotencyKeyError,
   OrderNotEditableError,
   OrderAdjustmentItemNotFoundError,
+  NoOpenCashSessionError,
 )
 export class OrderExceptionFilter implements ExceptionFilter {
   catch(error: OrderDomainError, host: ArgumentsHost): void {
