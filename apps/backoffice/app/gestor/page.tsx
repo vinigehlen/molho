@@ -28,6 +28,9 @@ import { isoToTime } from '../../lib/format';
 import { PrintingUnavailableError, queueOrderTicketCopies } from '../../lib/printing-api';
 import { OrderCard } from './order-card';
 import { WhatsAppSheet } from './whatsapp-sheet';
+import { CashSessionPanel } from './balcao/cash-session-panel';
+import { fetchMyStores } from '../../lib/my-stores-api';
+import { fetchStoreSetup } from '../../lib/store-setup-api';
 
 function statusLabel(status: AdminOrder['status']): string {
   return status in COLUMN_LABEL ? COLUMN_LABEL[status as keyof typeof COLUMN_LABEL] : status;
@@ -43,6 +46,11 @@ export default function GestorPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState('');
+  // Caixa opcional (Épico 20 follow-up) — v1 é uma loja por tenant
+  // (docs/02 §multi-loja ainda não liberado pra staff comum), por isso pega
+  // a primeira loja do staff sem seletor, igual ao balcão fazia antes do 22.
+  const [cashStoreId, setCashStoreId] = useState<string | null>(null);
+  const [cashSessionRequired, setCashSessionRequired] = useState(true);
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
@@ -136,6 +144,18 @@ export default function GestorPage() {
     setTenantName(session.tenantName);
     void reloadOrders();
   }, [router]);
+
+  useEffect(() => {
+    fetchMyStores()
+      .then((stores) => {
+        const storeId = stores[0]?.id ?? null;
+        setCashStoreId(storeId);
+        if (!storeId) return null;
+        return fetchStoreSetup(storeId);
+      })
+      .then((setup) => setup && setCashSessionRequired(setup.cashSessionRequired))
+      .catch(() => setCashSessionRequired(true)); // falha em saber = mantém o bloqueio, mais seguro
+  }, []);
 
   const streamStatus = useOrdersStream(tenantId, {
     // Cutuque magro → refaz o GET REST (passa pela RLS) → upsert/remove no board.
@@ -329,6 +349,11 @@ export default function GestorPage() {
               "Imprimir" no card só enfileira. Ver apps/print-agent. */}
         </div>
       </div>
+      {/* Caixa opcional (Épico 20 follow-up): só aparece quando a loja
+          DESLIGOU o caixa obrigatório em Configuração — com ele ligado, o
+          bloqueio já mora no Balcão, e Pedidos nunca teve gate nenhum de
+          caixa (não vamos inventar um bloqueio novo aqui). */}
+      {cashStoreId && !cashSessionRequired && <CashSessionPanel storeId={cashStoreId} required={false} />}
       {/* Abaixo de md: abas de coluna — cada uma tem contagem própria, então o
           staff vê "tem pedido em Pronto" sem precisar estar olhando pra ela. */}
       {/* role="radiogroup", não tablist: em md+ as 5 colunas ficam TODAS

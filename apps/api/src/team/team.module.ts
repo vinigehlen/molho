@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { TeamController } from './team.controller';
@@ -8,7 +9,7 @@ import { TeamService } from './team.service';
 import { TEAM_REPOSITORY, TEAM_SERVICE } from './team.tokens';
 
 @Module({
-  imports: [AuthModule, ContextModule],
+  imports: [AuthModule, ContextModule, TokenModule],
   controllers: [TeamController],
   providers: [
     {
