@@ -29,6 +29,8 @@ const CASH_DRAWER_PAYMENT_METHODS = new Set(['cash_at_counter', 'card_at_counter
 export interface OpenCashSessionResolver {
   /** Lança `NoOpenCashSessionError` (cash/cash.errors.ts) se não houver sessão aberta na loja. */
   requireOpenSessionId(storeId: string): Promise<string>;
+  /** Épico 20 follow-up — loja com caixa opcional: `null` se não houver sessão aberta, sem lançar. */
+  findOpenSessionId(storeId: string): Promise<string | null>;
 }
 
 /** R$5.000 — teto do valor de um item PESADO (POS trust, não confiança no cliente: CLAUDE.md regra 4). */
@@ -80,11 +82,15 @@ export class CounterOrderService {
       };
     }
 
-    // Caixa obrigatório pra vender no balcão (Épico 20) — lança
-    // NoOpenCashSessionError antes de repriçar/criar cliente se a loja não
-    // tiver sessão aberta. Chamado ANTES do resto pra não gastar trabalho
-    // (busca de produto, criação de cliente) numa venda que vai ser recusada.
-    const cashSessionId = await this.cashSessions.requireOpenSessionId(storeId);
+    // Caixa obrigatório pra vender no balcão é regra POR LOJA (Épico 20
+    // follow-up, Store.cashSessionRequired) — só lança NoOpenCashSessionError
+    // quando a loja exige. Loja com caixa opcional vende sem sessão aberta
+    // (cashSessionId fica null); se houver uma aberta mesmo assim, vincula
+    // normal. Chamado ANTES do resto pra não gastar trabalho (busca de
+    // produto, criação de cliente) numa venda que vai ser recusada.
+    const cashSessionId = store.cashSessionRequired
+      ? await this.cashSessions.requireOpenSessionId(storeId)
+      : await this.cashSessions.findOpenSessionId(storeId);
 
     const { items, subtotalCents } = await this.priceItems(input.items);
 

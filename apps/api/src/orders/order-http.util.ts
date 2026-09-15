@@ -29,6 +29,7 @@ import {
   WeighedPriceOutOfRangeError,
 } from './counter-order.errors';
 import { OrderAdjustmentItemNotFoundError, OrderNotEditableError } from './order-adjustment.errors';
+import { NoOpenCashSessionError } from '../cash/cash.errors';
 
 /**
  * Mesma ideia de `toCatalogHttpException`: erro desconhecido relança sem
@@ -56,5 +57,6 @@ export function toOrderHttpException(error: unknown): HttpException {
   if (error instanceof MissingIdempotencyKeyError) return new BadRequestException(error.message);
   if (error instanceof OrderNotEditableError) return new ConflictException(error.message);
   if (error instanceof OrderAdjustmentItemNotFoundError) return new NotFoundException(error.message);
+  if (error instanceof NoOpenCashSessionError) return new ConflictException(error.message);
   throw error;
 }

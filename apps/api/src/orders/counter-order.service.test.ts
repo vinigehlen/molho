@@ -16,6 +16,7 @@ const CASH_SESSION_ID = 'cash-session-1';
 function makeCashSessions(overrides: Partial<OpenCashSessionResolver> = {}): OpenCashSessionResolver {
   return {
     requireOpenSessionId: vi.fn().mockResolvedValue(CASH_SESSION_ID),
+    findOpenSessionId: vi.fn().mockResolvedValue(CASH_SESSION_ID),
     ...overrides,
   };
 }
@@ -28,7 +29,7 @@ const ACTOR = { id: 'staff-1', role: 'cashier' };
 
 function makeRepo(overrides: Partial<CounterOrderRepository> = {}): CounterOrderRepository {
   return {
-    findStore: vi.fn().mockResolvedValue({ id: STORE_ID }),
+    findStore: vi.fn().mockResolvedValue({ id: STORE_ID, cashSessionRequired: true }),
     findProducts: vi.fn().mockResolvedValue(new Map([[PRODUCT_ID, { id: PRODUCT_ID, name: 'Coxinha', basePriceCents: 800 }]])),
     findModifiers: vi.fn().mockResolvedValue(new Map()),
     findOrderByIdempotencyKey: vi.fn().mockResolvedValue(null),
@@ -270,9 +271,11 @@ describe('CounterOrderService.createOrder', () => {
     expect(repo.searchCustomersByName).toHaveBeenCalledWith('Vin', 8);
   });
 
-  it('sem caixa aberto: propaga o erro do resolver ANTES de repriçar ou criar cliente (Épico 20)', async () => {
+  it('sem caixa aberto e loja com caixa OBRIGATÓRIO: propaga o erro do resolver ANTES de repriçar ou criar cliente (Épico 20)', async () => {
     const repo = makeRepo();
-    const noOpenSession = { requireOpenSessionId: vi.fn().mockRejectedValue(new Error('NoOpenCashSessionError')) };
+    const noOpenSession = makeCashSessions({
+      requireOpenSessionId: vi.fn().mockRejectedValue(new Error('NoOpenCashSessionError')),
+    });
     const service = new CounterOrderService(repo, makeOrderStatusRepo(), noOpenSession);
     const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'cash_at_counter' };
 
@@ -281,6 +284,22 @@ describe('CounterOrderService.createOrder', () => {
     );
     expect(repo.findProducts).not.toHaveBeenCalled();
     expect(repo.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('sem caixa aberto e loja com caixa OPCIONAL: vende mesmo assim, cashSessionId fica null (bug reportado)', async () => {
+    const repo = makeRepo({ findStore: vi.fn().mockResolvedValue({ id: STORE_ID, cashSessionRequired: false }) });
+    const noOpenSession = makeCashSessions({
+      requireOpenSessionId: vi.fn().mockRejectedValue(new Error('NoOpenCashSessionError — não deveria ser chamado')),
+      findOpenSessionId: vi.fn().mockResolvedValue(null),
+    });
+    const service = new CounterOrderService(repo, makeOrderStatusRepo(), noOpenSession);
+    const input: CounterOrderInput = { items: [unitInput()], paymentMethod: 'cash_at_counter' };
+
+    const result = await service.createOrder(TENANT_ID, STORE_ID, input, 'idem-opcional', ACTOR);
+
+    expect(result.status).toBe('received');
+    expect(noOpenSession.requireOpenSessionId).not.toHaveBeenCalled();
+    expect(repo.createOrder).toHaveBeenCalledWith(expect.objectContaining({ cashSessionId: null }));
   });
 
   it('cash_at_counter/card_at_counter vinculam cashSessionId; pix de balcão fica null', async () => {
