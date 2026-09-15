@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { TokenModule } from '../auth/token/token.module';
 import { ContextModule } from '../context/context.module';
 import { RequestContextService } from '../context/request-context.service';
 import { ModuleCheckModule } from '../modules/module-check.module';
@@ -9,7 +10,7 @@ import { StoreAdminService } from './store-admin.service';
 import { STORE_ADMIN_REPOSITORY, STORE_ADMIN_SERVICE } from './store-admin.tokens';
 
 @Module({
-  imports: [AuthModule, ContextModule, ModuleCheckModule],
+  imports: [AuthModule, ContextModule, ModuleCheckModule, TokenModule],
   controllers: [StoreAdminController],
   providers: [
     {
