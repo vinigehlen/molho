@@ -280,6 +280,10 @@ model Store {
   /// `addressText` (texto livre, formato não previsível). Preenchido junto
   /// com a chave PIX.
   pixMerchantCity String?                                @map("pix_merchant_city")
+  /// Épico 20 — caixa obrigatório antes de vender no balcão/PDV é o padrão;
+  /// lojista desliga em Configuração quando não quer o bloqueio (aí balcão e
+  /// pedidos só mostram o botão opcional "Abrir caixa" no topo).
+  cashSessionRequired Boolean                             @default(true) @map("cash_session_required")
   createdAt       DateTime                               @default(now()) @map("created_at")
   updatedAt       DateTime                               @updatedAt @map("updated_at")
   deletedAt       DateTime?                              @map("deleted_at")

@@ -91,6 +91,7 @@ function incompleteSetup() {
     responsiblePhone: null,
     financeEmail: null,
     minOrderCents: 0,
+    cashSessionRequired: true,
     pixKey: null,
     pixKeyType: null,
     pixMerchantCity: null,

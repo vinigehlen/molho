@@ -26,14 +26,21 @@ export interface CashSessionPanelProps {
   storeId: string;
   /** O balcão usa isto pra travar "Finalizar pedido" sem caixa aberto — Épico 20. */
   onSessionChange?: (session: CurrentCashSessionResponse) => void;
+  /** Store.cashSessionRequired — lojista desliga em Configuração. `true` até
+   * carregar (loading), pra não piscar o botão opcional antes de saber. */
+  required?: boolean;
 }
 
-export function CashSessionPanel({ storeId, onSessionChange }: CashSessionPanelProps) {
+export function CashSessionPanel({ storeId, onSessionChange, required = true }: CashSessionPanelProps) {
   const [session, setSession] = useState<CurrentCashSessionResponse>(null);
   const [loading, setLoading] = useState(true);
   const [openAmount, setOpenAmount] = useState('');
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  // Só usado quando !required: abrir caixa é opcional, então o sheet de
+  // abertura não fica sempre montado esperando session === null (isso
+  // dispararia sozinho assim que o caixa fechasse) — o staff decide clicar.
+  const [openSheetOpen, setOpenSheetOpen] = useState(false);
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -69,6 +76,7 @@ export function CashSessionPanel({ storeId, onSessionChange }: CashSessionPanelP
       setSession(created);
       onSessionChange?.(created);
       setOpenAmount('');
+      setOpenSheetOpen(false);
     } catch (err) {
       setOpenError(err instanceof CashSessionApiError ? err.message : 'Falha ao abrir o caixa.');
     } finally {
@@ -80,10 +88,13 @@ export function CashSessionPanel({ storeId, onSessionChange }: CashSessionPanelP
 
   return (
     <>
-      {/* Modal BLOQUEANTE — onOpenChange ignora tentativa de fechar (Esc/overlay): só sai quando abrir o caixa com sucesso. */}
+      {/* required: modal BLOQUEANTE — onOpenChange ignora tentativa de fechar
+       * (Esc/overlay): só sai quando abrir o caixa com sucesso. !required:
+       * mesmo sheet, mas dispensável — o staff abre pelo botão do topo e
+       * pode desistir. */}
       <MoSheet
-        open={session === null}
-        onOpenChange={() => {}}
+        open={required ? session === null : openSheetOpen}
+        onOpenChange={required ? () => {} : setOpenSheetOpen}
         title="Abrir o caixa"
         description="Primeira coisa do dia: informe o fundo de troco pra começar a vender no balcão."
       >
@@ -107,6 +118,18 @@ export function CashSessionPanel({ storeId, onSessionChange }: CashSessionPanelP
           {opening ? 'Abrindo…' : 'Abrir caixa'}
         </button>
       </MoSheet>
+
+      {!required && session === null && !loading && (
+        <div className="mb-4 flex items-center justify-between rounded-[12px] border border-border bg-bg-card px-4 py-2">
+          <span className="text-sm text-text-muted">Caixa fechado — abertura é opcional pra esta loja.</span>
+          <button
+            className="rounded-[10px] bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+            onClick={() => setOpenSheetOpen(true)}
+          >
+            Abrir Caixa
+          </button>
+        </div>
+      )}
 
       {session && (
         <div className="mb-4 flex items-center justify-between rounded-[12px] border border-border bg-bg-card px-4 py-2">

@@ -27,7 +27,7 @@ function fakeRequestContext(tenant: FakeTenant, state: FakeState = {}) {
     addressText: 'Rua X', postalCode: null, street: null, number: null, neighborhood: null, city: null, state: null, complement: null, referencePoint: null,
     phone: null, whatsappNumber: null, logoImageKey: null, coverImageKey: null,
     responsibleCpfCiphertext: null, responsibleCpfKeyVersion: 1, responsiblePhoneCiphertext: null, responsiblePhoneKeyVersion: 1,
-    financeEmailCiphertext: null, financeEmailKeyVersion: 1, minOrderCents: 0, pixKey: null, pixKeyType: null, pixMerchantCity: null,
+    financeEmailCiphertext: null, financeEmailKeyVersion: 1, minOrderCents: 0, cashSessionRequired: true, pixKey: null, pixKeyType: null, pixMerchantCity: null,
     timezone: 'America/Sao_Paulo',
   };
   const otherTenants: FakeTenant[] = [];
@@ -88,6 +88,7 @@ const BASE_INPUT = {
   responsiblePhone: null,
   financeEmail: null,
   minOrderCents: 0,
+  cashSessionRequired: true,
   pixKey: null,
   pixKeyType: null,
   pixMerchantCity: null,

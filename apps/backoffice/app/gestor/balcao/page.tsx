@@ -16,6 +16,7 @@ import {
 } from '../../../lib/counter-pos-api';
 import { centsToBRL } from '../../../lib/format';
 import { fetchMyStores, type StaffStore } from '../../../lib/my-stores-api';
+import { fetchStoreSetup } from '../../../lib/store-setup-api';
 
 interface CartLine {
   lineId: string;
@@ -54,9 +55,11 @@ export default function BalcaoPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<CounterOrderResponse | null>(null);
   const [productSheet, setProductSheet] = useState<MoProductSheetProduct | null>(null);
-  // Épico 20 — null = sem caixa aberto, trava "Finalizar pedido" (o modal
-  // bloqueante de abertura fica dentro de CashSessionPanel).
+  // Épico 20 — null = sem caixa aberto, trava "Finalizar pedido" só quando
+  // cashSessionRequired (o modal bloqueante de abertura fica dentro de
+  // CashSessionPanel).
   const [cashSession, setCashSession] = useState<CurrentCashSessionResponse>(null);
+  const [cashSessionRequired, setCashSessionRequired] = useState(true);
 
   const filteredProducts = useMemo(
     () => products.filter((product) => categoryId === 'all' || product.categoryId === categoryId),
@@ -67,6 +70,13 @@ export default function BalcaoPage() {
   useEffect(() => {
     void loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!storeId) return;
+    fetchStoreSetup(storeId)
+      .then((setup) => setCashSessionRequired(setup.cashSessionRequired))
+      .catch(() => setCashSessionRequired(true)); // falha em saber = mantém o bloqueio, mais seguro
+  }, [storeId]);
 
   // Autopreenchimento: staff digita "Vin" no nome e o sistema oferece clientes
   // já cadastrados começando com essas letras. Selecionar um preenche o resto.
@@ -182,7 +192,7 @@ export default function BalcaoPage() {
   }
 
   async function submitOrder() {
-    if (!storeId || cart.length === 0 || !cashSession) return;
+    if (!storeId || cart.length === 0 || (cashSessionRequired && !cashSession)) return;
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -257,7 +267,9 @@ export default function BalcaoPage() {
         </div>
       )}
 
-      {storeId && <CashSessionPanel storeId={storeId} onSessionChange={setCashSession} />}
+      {storeId && (
+        <CashSessionPanel storeId={storeId} onSessionChange={setCashSession} required={cashSessionRequired} />
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
         <section className="space-y-4">
@@ -468,10 +480,14 @@ export default function BalcaoPage() {
           </div>
           <button
             className="mt-4 w-full rounded-[14px] bg-brand px-4 py-3 text-base font-bold text-on-brand disabled:opacity-50"
-            disabled={submitting || cart.length === 0 || !storeId || !cashSession}
+            disabled={submitting || cart.length === 0 || !storeId || (cashSessionRequired && !cashSession)}
             onClick={() => void submitOrder()}
           >
-            {submitting ? 'Finalizando…' : !cashSession ? 'Abra o caixa pra vender' : 'Finalizar pedido'}
+            {submitting
+              ? 'Finalizando…'
+              : cashSessionRequired && !cashSession
+                ? 'Abra o caixa pra vender'
+                : 'Finalizar pedido'}
           </button>
         </aside>
       </div>
