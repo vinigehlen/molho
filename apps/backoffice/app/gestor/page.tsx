@@ -32,6 +32,10 @@ import { CashSessionPanel } from './balcao/cash-session-panel';
 import { fetchMyStores } from '../../lib/my-stores-api';
 import { fetchStoreSetup } from '../../lib/store-setup-api';
 
+// Card "Abrir Caixa" opcional desativado a pedido — mantido como flag (não
+// deletado) pra reverter fácil se o pedido mudar. Ver comentário no render.
+const CAIXA_OPCIONAL_NO_BOARD: boolean = false;
+
 function statusLabel(status: AdminOrder['status']): string {
   return status in COLUMN_LABEL ? COLUMN_LABEL[status as keyof typeof COLUMN_LABEL] : status;
 }
@@ -349,11 +353,13 @@ export default function GestorPage() {
               "Imprimir" no card só enfileira. Ver apps/print-agent. */}
         </div>
       </div>
-      {/* Caixa opcional (Épico 20 follow-up): só aparece quando a loja
-          DESLIGOU o caixa obrigatório em Configuração — com ele ligado, o
-          bloqueio já mora no Balcão, e Pedidos nunca teve gate nenhum de
-          caixa (não vamos inventar um bloqueio novo aqui). */}
-      {cashStoreId && !cashSessionRequired && <CashSessionPanel storeId={cashStoreId} required={false} />}
+      {/* Caixa opcional (Épico 20 follow-up) desativado a pedido: o card
+          "Abrir Caixa" não deve aparecer em Pedidos nunca, mesmo com caixa
+          opcional na loja. State/import mantidos (só oculto), fluxo real de
+          abertura continua no Balcão. */}
+      {CAIXA_OPCIONAL_NO_BOARD && cashStoreId && !cashSessionRequired && (
+        <CashSessionPanel storeId={cashStoreId} required={false} />
+      )}
       {/* Abaixo de md: abas de coluna — cada uma tem contagem própria, então o
           staff vê "tem pedido em Pronto" sem precisar estar olhando pra ela. */}
       {/* role="radiogroup", não tablist: em md+ as 5 colunas ficam TODAS
