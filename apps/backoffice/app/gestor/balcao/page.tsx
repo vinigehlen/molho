@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { CounterOrderPaymentMethod, CounterOrderResponse, CurrentCashSessionResponse } from '@molho/contracts';
 import { Minus, Plus, ReceiptText, RefreshCw, Trash2 } from 'lucide-react';
 import type { CustomerSearchResult } from '@molho/contracts';
@@ -170,15 +170,20 @@ export default function BalcaoPage() {
     if (!productSheet) return;
     const product = products.find((p) => p.id === productSheet.id);
     if (!product) return;
-    setCart((current) => [
-      ...current,
-      {
-        lineId: crypto.randomUUID(),
-        product,
-        quantity: selection.quantity,
-        modifiers: selection.modifiers.map((m) => ({ id: m.id, name: m.name, priceDeltaCents: m.priceDeltaCents })),
-      },
-    ]);
+    const modifiers = selection.modifiers.map((m) => ({ id: m.id, name: m.name, priceDeltaCents: m.priceDeltaCents }));
+    // Mesma regra de fusão do addLine: mesmo produto + mesmos complementos
+    // vira uma linha só com quantidade somada, em vez de uma linha nova por
+    // confirmação do sheet (senão "4x igual" vira 4 linhas de 1x).
+    const chave = (m: CartLine['modifiers']) => [...m.map((x) => x.id)].sort().join(',');
+    setCart((current) => {
+      const existing = current.find((line) => line.product.id === product.id && chave(line.modifiers) === chave(modifiers));
+      if (existing) {
+        return current.map((line) =>
+          line === existing ? { ...line, quantity: line.quantity + selection.quantity } : line,
+        );
+      }
+      return [...current, { lineId: crypto.randomUUID(), product, quantity: selection.quantity, modifiers }];
+    });
     setSuccess(null);
     setProductSheet(null);
   }
